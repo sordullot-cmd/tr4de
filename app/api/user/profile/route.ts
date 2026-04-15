@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { user } = auth;
+    
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
     const supabase = await createClient();
 
     // Récupérer le profil utilisateur depuis la table profiles
@@ -63,6 +71,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const { user } = auth;
+    
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const supabase = await createClient();
 
