@@ -1,16 +1,32 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
+
+type AuthSuccess = {
+  error: null;
+  status: 200;
+  user: User;
+};
+
+type AuthError = {
+  error: string;
+  status: number;
+  user: null;
+};
+
+export type AuthResult = AuthSuccess | AuthError;
 
 /**
  * Middleware pour vérifier l'authentification sur les routes API
  * Utilisation dans les route handlers:
  * 
  * export async function GET(request: NextRequest) {
- *   const user = await requireAuth(request);
- *   // Utiliser user.id, user.email, etc.
+ *   const auth = await requireAuth(request);
+ *   if (auth.error) return NextResponse.json({error: auth.error}, {status: auth.status});
+ *   const user = auth.user; // TypeScript sait que user n'est pas null
  * }
  */
-export async function requireAuth(request: NextRequest) {
+export async function requireAuth(request: NextRequest): Promise<AuthResult> {
   try {
     const supabase = await createClient();
     
