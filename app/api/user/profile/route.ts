@@ -19,6 +19,11 @@ export async function GET(request: NextRequest) {
 
     // À partir d'ici, auth.user est garanti de ne pas être null (type guard)
     const user = auth.user;
+    
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
+    }
+    
     const supabase = await createClient();
 
     // Récupérer le profil utilisateur depuis la table profiles
@@ -65,6 +70,11 @@ export async function PUT(request: NextRequest) {
 
     // À partir d'ici, auth.user est garanti de ne pas être null (type guard)
     const user = auth.user;
+    
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
+    }
+    
     const body = await request.json();
     const supabase = await createClient();
 
