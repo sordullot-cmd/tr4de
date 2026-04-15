@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSV Parser Test</title>
+  <style>
+    body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+    h1 { color: #6366F1; }
+    textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; }
+    button { padding: 10px 20px; background: #6366F1; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin: 10px 0; }
+    button:hover { background: #5859D0; }
+    .result { margin-top: 20px; padding: 15px; background: #f0f9ff; border: 2px solid #3B82F6; border-radius: 4px; }
+    .success { background: #f0fdf4; border-color: #22C55E; color: #166534; }
+    .error { background: #fef2f2; border-color: #EF4444; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+    th { background: #f5f5f5; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 CSV Parser Test</h1>
+    
+    <h2>Sample CSV:</h2>
+    <textarea id="csvInput" placeholder="Paste CSV here or use the sample below">Date,Symbol,Direction,Entry,Exit,PnL
+2026-03-31,NQ,Long,19842,19920,312
+2026-03-31,ES,Short,5290,5268,440
+2026-03-27,ES,Long,5270,5290,400</textarea>
+    
+    <button onclick="loadSampleCSV()">📥 Load Sample CSV</button>
+    <button onclick="testParser()">🧪 Test Parser</button>
+    <button onclick="clear()">🗑️ Clear</button>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function loadSampleCSV() {
+      const csv = `Date,Symbol,Direction,Entry,Exit,PnL
+2026-03-31,NQ,Long,19842,19920,312
+2026-03-31,ES,Short,5290,5268,440
+2026-03-31,NQ,Long,19760,19742,-180
+2026-03-28,CL,Long,71.20,71.85,650
+2026-03-28,NQ,Short,19880,19920,-160
+2026-03-27,ES,Long,5270,5290,400
+2026-03-27,NQ,Long,19950,20040,360
+2026-03-26,ES,Short,5310,5280,300
+2026-03-26,EURUSD,Long,1.0920,1.0960,400
+2026-03-25,GC,Long,2340,2360,200`;
+      document.getElementById('csvInput').value = csv;
+    }
+
+    function testParser() {
+      const csvText = document.getElementById('csvInput').value;
+      
+      if (!csvText.trim()) {
+        showError('❌ Please paste CSV data');
+        return;
+      }
+
+      try {
+        const lines = csvText.trim().split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          showError('❌ CSV must have header + at least 1 data row');
+          return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const trades = [];
+
+        // Find column indices
+        let dateIdx = headers.findIndex(h => h.includes('date'));
+        let symIdx = headers.findIndex(h => h.includes('symbol'));
+        let dirIdx = headers.findIndex(h => h.includes('direction'));
+        let entryIdx = headers.findIndex(h => h.includes('entry'));
+        let exitIdx = headers.findIndex(h => h.includes('exit'));
+        let pnlIdx = headers.findIndex(h => h.includes('pnl'));
+
+        // Fallback to positional indices
+        if (dateIdx === -1) dateIdx = 0;
+        if (symIdx === -1) symIdx = 1;
+        if (dirIdx === -1) dirIdx = 2;
+        if (entryIdx === -1) entryIdx = 3;
+        if (exitIdx === -1) exitIdx = 4;
+        if (pnlIdx === -1) pnlIdx = 5;
+
+        // Parse trades
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          const values = line.split(',').map(v => v.trim());
+          const entryVal = parseFloat(values[entryIdx] || '0');
+          const exitVal = parseFloat(values[exitIdx] || '0');
+          const pnlVal = parseFloat(values[pnlIdx] || '0');
+
+          if (isNaN(entryVal) || isNaN(exitVal) || entryVal === 0 || exitVal === 0) {
+            console.warn('Skipped invalid line:', line);
+            continue;
+          }
+
+          trades.push({
+            date: values[dateIdx] || '?',
+            symbol: values[symIdx] || '?',
+            direction: values[dirIdx] || '?',
+            entry: entryVal,
+            exit: exitVal,
+            pnl: pnlVal
+          });
+        }
+
+        if (trades.length === 0) {
+          showError('❌ No valid trades found. Check your CSV format.');
+          return;
+        }
+
+        showSuccess(trades);
+      } catch (err) {
+        showError('❌ Error: ' + err.message);
+      }
+    }
+
+    function showSuccess(trades) {
+      let html = `<div class="result success">
+        <strong>✅ Successfully parsed ${trades.length} trades!</strong>
+        <table>
+          <tr>
+            <th>Date</th>
+            <th>Symbol</th>
+            <th>Direction</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P&L</th>
+          </tr>`;
+      
+      trades.slice(0, 10).forEach(t => {
+        html += `<tr>
+          <td>${t.date}</td>
+          <td>${t.symbol}</td>
+          <td>${t.direction}</td>
+          <td>${t.entry.toFixed(2)}</td>
+          <td>${t.exit.toFixed(2)}</td>
+          <td style="color: ${t.pnl >= 0 ? '#22C55E' : '#EF4444'};">${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}</td>
+        </tr>`;
+      });
+      
+      if (trades.length > 10) {
+        html += `<tr><td colspan="6" style="text-align: center;">... and ${trades.length - 10} more trades</td></tr>`;
+      }
+      
+      html += '</table></div>';
+      document.getElementById('result').innerHTML = html;
+    }
+
+    function showError(msg) {
+      let html = `<div class="result error">${msg}</div>`;
+      document.getElementById('result').innerHTML = html;
+    }
+
+    function clear() {
+      document.getElementById('csvInput').value = '';
+      document.getElementById('result').innerHTML = '';
+    }
+
+    // Load sample on page load
+    window.addEventListener('load', () => {
+      console.log('✅ CSV Parser Test page loaded');
+    });
+  </script>
+</body>
+</html>

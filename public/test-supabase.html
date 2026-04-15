@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Trades Debugger</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle { 
+            color: #666; 
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        input, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+        input {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 12px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 12px 20px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        button:hover { 
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        .info { color: #74c0fc; }
+        .warning { color: #ffd43b; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .loading { 
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f0f0f0;
+            font-weight: 600;
+            color: #333;
+        }
+        tr:hover { background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Supabase Trades Debugger</h1>
+        <p class="subtitle">Vérifier et déboguer les trades dans Supabase</p>
+
+        <!-- Configuration Section -->
+        <div class="section">
+            <h2>📋 Configuration</h2>
+            <div>
+                <label>Your User ID (from localStorage):</label>
+                <input type="text" id="userId" placeholder="Votre User ID" readonly/>
+            </div>
+            <button onclick="loadUserInfo()">ℹ️ Charger Info Utilisateur</button>
+            <button onclick="clearStorage()">🗑️ Effacer localStorage</button>
+            <div id="userInfo" class="output" style="display:none;"></div>
+        </div>
+
+        <!-- Apex Trades Section -->
+        <div class="section">
+            <h2>🚀 Apex Trades (Table Principale)</h2>
+            <button onclick="fetchApexTrades()">📥 Charger Trades depuis apex_trades</button>
+            <button onclick="countApexTrades()">📊 Compter Trades</button>
+            <div class="stats" id="tradesStats"></div>
+            <div id="apexOutput" class="output"></div>
+            <div id="tradesTable"></div>
+        </div>
+
+        <!-- Trading Accounts Section -->
+        <div class="section">
+            <h2>💰 Trading Accounts</h2>
+            <button onclick="fetchTradingAccounts()">📥 Charger Accounts</button>
+            <div id="accountsOutput" class="output"></div>
+            <div id="accountsTable"></div>
+        </div>
+
+        <!-- SQL Query Section -->
+        <div class="section">
+            <h2>💻 Requête SQL Personnalisée</h2>
+            <label>Table Name:</label>
+            <input type="text" id="tableName" placeholder="ex: apex_trades" value="apex_trades"/>
+            <label>WHERE Clause (optionnel):</label>
+            <input type="text" id="whereClause" placeholder="ex: user_id = 'xxx'" />
+            <label>LIMIT:</label>
+            <input type="number" id="limit" value="50" min="1" max="1000"/>
+            <button onclick="executeCustomQuery()">▶️ Exécuter</button>
+            <div id="customOutput" class="output"></div>
+        </div>
+
+        <!-- Log Section -->
+        <div class="section">
+            <h2>📜 Console Logs</h2>
+            <button onclick="clearLogs()">🗑️ Effacer Logs</button>
+            <div id="logs" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            logsDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        };
+
+        const output = (elementId, message, type = 'info') => {
+            const elem = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            elem.innerHTML = `<div class="${className}">${message}</div>`;
+            elem.style.display = 'block';
+        };
+
+        const table = (elementId, data) => {
+            const elem = document.getElementById(elementId);
+            if (!data || data.length === 0) {
+                elem.innerHTML = '<p class="warning">Aucune donnée</p>';
+                return;
+            }
+            const keys = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+            keys.forEach(k => html += `<th>${k}</th>`);
+            html += '</tr></thead><tbody>';
+            data.forEach(row => {
+                html += '<tr>';
+                keys.forEach(k => {
+                    let val = row[k];
+                    if (typeof val === 'object') val = JSON.stringify(val).substring(0, 50);
+                    html += `<td>${val}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            elem.innerHTML = html;
+        };
+
+        // Load User Info from localStorage
+        function loadUserInfo() {
+            try {
+                const stored = localStorage.getItem('supabase.auth.v1') || localStorage.getItem('sb-xxx-auth-token');
+                const userId = document.getElementById('userId').value || 'unknown';
+                
+                output('userInfo', `<div class="success">✅ User Info Loaded</div>
+User ID: ${userId}
+localStorage keys: ${Object.keys(localStorage).join(', ')}
+Current time: ${new Date().toISOString()}`, 'success');
+                log('User info loaded', 'success');
+            } catch (e) {
+                output('userInfo', `Error: ${e.message}`, 'error');
+                log('Error loading user info: ' + e.message, 'error');
+            }
+        }
+
+        // Fetch Apex Trades
+        async function fetchApexTrades() {
+            const userId = document.getElementById('userId').value || localStorage.getItem('supabaseUserId');
+            if (!userId) {
+                output('apexOutput', 'User ID manquant. Entrez votre User ID.', 'error');
+                return;
+            }
+
+            try {
+                output('apexOutput', 'Chargement...', 'info');
+                log('Fetching apex_trades for user: ' + userId, 'info');
+
+                // Note: This is a public query for demo purposes
+                // In production, use proper authentication
+                const response = await fetch(`/api/trades?user_id=${userId}`, {
+                    mode: 'cors'
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    output('apexOutput', `Erreur API: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+
+                const trades = await response.json();
+                output('apexOutput', `<div class="success">✅ ${trades.length} trades chargés</div>`, 'success');
+                table('tradesTable', trades.slice(0, 20)); // Show first 20
+                log(`Loaded ${trades.length} trades`, 'success');
+
+                // Stats
+                const stats = `
+                    <div class="stat-box">
+                        <div class="stat-value">${trades.length}</div>
+                        <div class="stat-label">Total Trades</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${trades.filter(t => t.pnl > 0).length}</div>
+                        <div class="stat-label">Profitable</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${trades.filter(t => t.pnl < 0).length}</div>
+                        <div class="stat-label">Losing</div>
+                    </div>
+                `;
+                document.getElementById('tradesStats').innerHTML = stats;
+            } catch (e) {
+                output('apexOutput', `Erreur: ${e.message}`, 'error');
+                log('Error fetching trades: ' + e.message, 'error');
+            }
+        }
+
+        // Count Apex Trades
+        async function countApexTrades() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                output('apexOutput', 'User ID manquant', 'error');
+                return;
+            }
+
+            try {
+                output('apexOutput', 'Comptage...', 'info');
+                const response = await fetch(`/api/trades/count?user_id=${userId}`);
+                const data = await response.json();
+                output('apexOutput', `<div class="success">✅ Total: ${data.count} trades</div>`, 'success');
+            } catch (e) {
+                output('apexOutput', `Erreur: ${e.message}`, 'error');
+            }
+        }
+
+        // Fetch Trading Accounts
+        async function fetchTradingAccounts() {
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                output('accountsOutput', 'User ID manquant', 'error');
+                return;
+            }
+
+            try {
+                output('accountsOutput', 'Chargement...', 'info');
+                const response = await fetch(`/api/accounts?user_id=${userId}`);
+                const accounts = await response.json();
+                output('accountsOutput', `<div class="success">✅ ${accounts.length} accounts chargés</div>`, 'success');
+                table('accountsTable', accounts);
+            } catch (e) {
+                output('accountsOutput', `Erreur: ${e.message}`, 'error');
+            }
+        }
+
+        // Custom Query
+        async function executeCustomQuery() {
+            const table = document.getElementById('tableName').value;
+            const where = document.getElementById('whereClause').value;
+            const limit = document.getElementById('limit').value;
+
+            if (!table) {
+                output('customOutput', 'Table name requise', 'error');
+                return;
+            }
+
+            try {
+                output('customOutput', 'Exécution...', 'info');
+                log(`Executing: SELECT * FROM ${table} ${where ? 'WHERE ' + where : ''} LIMIT ${limit}`, 'info');
+
+                const response = await fetch(`/api/query?table=${table}&where=${encodeURIComponent(where)}&limit=${limit}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    output('customOutput', `Erreur: ${data.error}`, 'error');
+                } else {
+                    output('customOutput', `<div class="success">✅ ${data.length} lignes</div>`, 'success');
+                    table('queryTable', data.slice(0, 10));
+                }
+            } catch (e) {
+                output('customOutput', `Erreur: ${e.message}`, 'error');
+            }
+        }
+
+        // Utility functions
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            log('Logs cleared', 'success');
+        }
+
+        function clearStorage() {
+            if (confirm('Êtes-vous sûr?')) {
+                localStorage.clear();
+                log('localStorage cleared', 'warning');
+                location.reload();
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded', 'success');
+            
+            // Try to get user ID from various sources
+            const userId = localStorage.getItem('supabaseUserId') || 
+                          localStorage.getItem('userId') || 
+                          'ENTER_YOUR_USER_ID';
+            document.getElementById('userId').value = userId;
+        });
+
+        // Intercept console logs
+        const oldLog = console.log;
+        console.log = function(...args) {
+            oldLog.apply(console, args);
+            log(JSON.stringify(args), 'info');
+        };
+    </script>
+</body>
+</html>
