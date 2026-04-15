@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage, getErrorCode } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 interface DisciplineEntry {
@@ -102,8 +103,8 @@ export function useDisciplineTracking() {
 
         console.log(`🔄 Données discipline synchronisées: ${Object.keys(dataMap).length} jours depuis Supabase`);
         setError(null);
-      } catch (err) {
-        console.error("❌ Erreur synchronisation Supabase discipline:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur synchronisation Supabase discipline:", getErrorMessage(err));
         // Pas d'erreur affichée car on a déjà les données localStorage
       }
     };
@@ -176,13 +177,13 @@ export function useDisciplineTracking() {
             console.log("✅ Sauvegardé dans Supabase");
           }
         } catch (supabaseErr) {
-          console.log("⚠️ Supabase save failed:", supabaseErr?.message);
+          console.log("⚠️ Supabase save failed:", getErrorMessage(supabaseErr));
           // localStorage déjà sauvegardé, donc pas de problème
         }
 
         console.log("✅ Mise à jour sauvegardée");
-      } catch (err) {
-        console.error("❌ Erreur mise à jour discipline:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur mise à jour discipline:", getErrorMessage(err));
         throw err;
       }
     },

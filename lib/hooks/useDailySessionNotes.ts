@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 /**
@@ -69,7 +70,7 @@ export function useDailySessionNotes() {
         // Fusionner: Supabase + localStorage (priorité: localStorage si deux versions)
         setNotes(prev => ({ ...notesMap, ...prev }));
       } catch (err) {
-        console.error("⚠️ Sync Supabase failed:", err?.message);
+        console.error("⚠️ Sync Supabase failed:", getErrorMessage(err));
         // Continue avec localStorage, pas d'erreur affichée
       }
     };
@@ -144,14 +145,14 @@ export function useDailySessionNotes() {
             }
             console.log("✅ Sauvegardé dans Supabase (INSERT)");
           }
-        } catch (supabaseErr) {
-          console.log("⚠️ Supabase save skipped (table may not exist yet):", supabaseErr?.message);
+        } catch (supabaseErr: unknown) {
+          console.log("⚠️ Supabase save skipped (table may not exist yet):", getErrorMessage(supabaseErr));
           // Continue - localStorage est notre fallback
         }
 
         console.log("✅ Note journalière sauvegardée");
-      } catch (err) {
-        console.error("❌ Erreur sauvegarde note:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur sauvegarde note:", getErrorMessage(err));
         throw err;
       }
     },
@@ -192,14 +193,14 @@ export function useDailySessionNotes() {
             throw err;
           }
           console.log("✅ Supprimé de Supabase");
-        } catch (supabaseErr) {
-          console.log("⚠️ Supabase delete skipped:", supabaseErr?.message);
+        } catch (supabaseErr: unknown) {
+          console.log("⚠️ Supabase delete skipped:", getErrorMessage(supabaseErr));
           // Continue - localStorage est notre fallback
         }
 
         console.log("✅ Note journalière supprimée");
-      } catch (err) {
-        console.error("❌ Erreur suppression note:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur suppression note:", getErrorMessage(err));
         throw err;
       }
     },

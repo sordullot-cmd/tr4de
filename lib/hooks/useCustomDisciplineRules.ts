@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 interface CustomRule {
@@ -61,8 +62,9 @@ export function useCustomDisciplineRules() {
         console.log(`✅ ${rules.length} règles personnalisées chargées`);
         setCustomRules(rules);
         setError(null);
-      } catch (err) {
-        console.error("❌ Erreur chargement règles:", err?.message);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+        console.error("❌ Erreur chargement règles:", errorMessage);
         setCustomRules([]);
         setError(null);
       } finally {
@@ -136,8 +138,9 @@ export function useCustomDisciplineRules() {
         }
 
         console.log("✅ Règle ajoutée");
-      } catch (err) {
-        console.error("❌ Erreur ajout règle:", err?.message);
+      } catch (err: unknown) {
+        const errorMessage = getErrorMessage(err);
+        console.error("❌ Erreur ajout règle:", errorMessage);
         throw err;
       }
     },
@@ -175,8 +178,9 @@ export function useCustomDisciplineRules() {
         }
 
         console.log("✅ Règle supprimée");
-      } catch (err) {
-        console.error("❌ Erreur suppression règle:", err?.message);
+      } catch (err: unknown) {
+        const errorMessage = getErrorMessage(err);
+        console.error("❌ Erreur suppression règle:", errorMessage);
         throw err;
       }
     },

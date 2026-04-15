@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 /**
@@ -331,7 +332,7 @@ export function useTrades() {
         const tradesArray = data || [];
         localStorage.setItem("tr4de_trades", JSON.stringify(tradesArray));
       } catch (err) {
-        console.error("❌ Erreur sync trades:", err?.message || JSON.stringify(err));
+        console.error("❌ Erreur sync trades:", getErrorMessage(err) || JSON.stringify(err));
       }
     };
 
@@ -413,7 +414,7 @@ export function useTrades() {
         }
         return data?.[0] || newTrade;
       } catch (err) {
-        console.error("❌ Erreur ajout trade:", err?.message || JSON.stringify(err));
+        console.error("❌ Erreur ajout trade:", getErrorMessage(err) || JSON.stringify(err));
       }
     },
     [user?.id]
@@ -449,7 +450,7 @@ export function useTrades() {
         console.log("✅ Trade mis à jour:", data?.[0]);
         return data?.[0];
       } catch (err) {
-        console.error("❌ Erreur mise à jour trade:", err?.message || JSON.stringify(err));
+        console.error("❌ Erreur mise à jour trade:", getErrorMessage(err) || JSON.stringify(err));
       }
     },
     [user?.id]
@@ -485,7 +486,7 @@ export function useTrades() {
         }
         console.log("✅ Trade supprimé de Supabase");
       } catch (err) {
-        console.error("❌ Erreur suppression trade:", err?.message || JSON.stringify(err));
+        console.error("❌ Erreur suppression trade:", getErrorMessage(err) || JSON.stringify(err));
       }
     },
     [user?.id]
