@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 /**
@@ -38,9 +39,9 @@ export function useTradeEmotionTags() {
 
         console.log(`✅ ${Object.keys(tagsMap).length} trades avec emotion tags chargés`);
         setEmotionTags(tagsMap);
-      } catch (err) {
-        console.error("❌ Erreur récupération emotion tags:", err?.message);
-        setError(err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur récupération emotion tags:", getErrorMessage(err));
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -81,8 +82,8 @@ export function useTradeEmotionTags() {
         }));
 
         console.log("✅ Emotion ajoutée");
-      } catch (err) {
-        console.error("❌ Erreur ajout emotion:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur ajout emotion:", getErrorMessage(err));
         throw err;
       }
     },
@@ -112,8 +113,8 @@ export function useTradeEmotionTags() {
         }));
 
         console.log("✅ Emotion supprimée");
-      } catch (err) {
-        console.error("❌ Erreur suppression emotion:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur suppression emotion:", getErrorMessage(err));
         throw err;
       }
     },
@@ -166,9 +167,9 @@ export function useTradeErrorTags() {
 
         console.log(`✅ ${Object.keys(tagsMap).length} trades avec error tags chargés`);
         setErrorTags(tagsMap);
-      } catch (err) {
-        console.error("❌ Erreur récupération error tags:", err?.message);
-        setError(err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur récupération error tags:", getErrorMessage(err));
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -209,8 +210,8 @@ export function useTradeErrorTags() {
         }));
 
         console.log("✅ Erreur ajoutée");
-      } catch (err) {
-        console.error("❌ Erreur ajout error tag:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur ajout error tag:", getErrorMessage(err));
         throw err;
       }
     },
@@ -240,8 +241,8 @@ export function useTradeErrorTags() {
         }));
 
         console.log("✅ Erreur supprimée");
-      } catch (err) {
-        console.error("❌ Erreur suppression error tag:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur suppression error tag:", getErrorMessage(err));
         throw err;
       }
     },

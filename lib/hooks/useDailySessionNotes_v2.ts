@@ -1,5 +1,6 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 
 /**
@@ -69,13 +70,13 @@ export function useDailySessionNotes() {
           console.log(`✅ ${Object.keys(supabaseNotes).length} notes chargées depuis Supabase`);
           setNotes(merged);
           setError(null);
-        } catch (supabaseErr) {
+        } catch (supabaseErr: unknown) {
           console.log("⚠️ Supabase indisponible, utilisant localStorage uniquement");
           // On garde juste localStorage
         }
-      } catch (err) {
-        console.error("❌ Erreur chargement notes:", err?.message);
-        setError(err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur chargement notes:", getErrorMessage(err));
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -156,13 +157,13 @@ export function useDailySessionNotes() {
               console.log("✅ Supabase INSERT");
             }
           } catch (supabaseErr) {
-            console.log("⚠️ Supabase save failed (will retry):", supabaseErr?.message);
+            console.log("⚠️ Supabase save failed (will retry):", getErrorMessage(supabaseErr));
           }
         });
 
         console.log("✅ Note sauvegardée");
       } catch (err) {
-        console.error("❌ Erreur sauvegarde note:", err?.message);
+        console.error("❌ Erreur sauvegarde note:", getErrorMessage(err));
       }
     },
     [user?.id]
@@ -208,13 +209,13 @@ export function useDailySessionNotes() {
             }
             console.log("✅ Supprimé de Supabase");
           } catch (supabaseErr) {
-            console.log("⚠️ Supabase delete failed:", supabaseErr?.message);
+            console.log("⚠️ Supabase delete failed:", getErrorMessage(supabaseErr));
           }
         });
 
         console.log("✅ Note supprimée");
-      } catch (err) {
-        console.error("❌ Erreur suppression:", err?.message);
+      } catch (err: unknown) {
+        console.error("❌ Erreur suppression:", getErrorMessage(err));
       }
     },
     [user?.id]
