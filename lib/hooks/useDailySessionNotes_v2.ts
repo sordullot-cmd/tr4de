@@ -12,7 +12,7 @@ export function useDailySessionNotes() {
   const supabase = createClient();
   const [notes, setNotes] = useState<Record<string, string>>({}); // date -> notes
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les notes depuis Supabase ET localStorage au startup
   useEffect(() => {
