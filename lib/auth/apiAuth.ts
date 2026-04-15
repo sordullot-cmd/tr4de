@@ -17,12 +17,21 @@ type AuthError = {
 export type AuthResult = AuthSuccess | AuthError;
 
 /**
+ * Type guard pour vérifier si l'auth a réussi
+ */
+export function isAuthSuccess(auth: AuthResult): auth is AuthSuccess {
+  return auth.error === null && auth.user !== null;
+}
+
+/**
  * Middleware pour vérifier l'authentification sur les routes API
  * Utilisation dans les route handlers:
  * 
  * export async function GET(request: NextRequest) {
  *   const auth = await requireAuth(request);
- *   if (auth.error) return NextResponse.json({error: auth.error}, {status: auth.status});
+ *   if (!isAuthSuccess(auth)) {
+ *     return NextResponse.json({error: auth.error}, {status: auth.status});
+ *   }
  *   const user = auth.user; // TypeScript sait que user n'est pas null
  * }
  */

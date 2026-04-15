@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth/apiAuth";
+import { requireAuth, isAuthSuccess } from "@/lib/auth/apiAuth";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -10,14 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     // Vérifier l'authentification
     const auth = await requireAuth(request);
-    if (auth.error) {
+    if (!isAuthSuccess(auth)) {
       return NextResponse.json(
         { error: auth.error },
         { status: auth.status }
       );
     }
 
-    // À partir d'ici, auth.user est garanti de ne pas être null
+    // À partir d'ici, auth.user est garanti de ne pas être null (type guard)
     const user = auth.user;
     const supabase = await createClient();
 
@@ -56,14 +56,14 @@ export async function PUT(request: NextRequest) {
   try {
     // Vérifier l'authentification
     const auth = await requireAuth(request);
-    if (auth.error) {
+    if (!isAuthSuccess(auth)) {
       return NextResponse.json(
         { error: auth.error },
         { status: auth.status }
       );
     }
 
-    // À partir d'ici, auth.user est garanti de ne pas être null
+    // À partir d'ici, auth.user est garanti de ne pas être null (type guard)
     const user = auth.user;
     const body = await request.json();
     const supabase = await createClient();
