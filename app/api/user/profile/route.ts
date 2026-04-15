@@ -17,9 +17,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { user } = auth;
+    const user = auth.user;
     
-    if (!user || !user.id) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: "User not authenticated" },
         { status: 401 }
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", user.id as string)
       .single();
 
     if (profileError && profileError.code !== "PGRST116") {
@@ -70,9 +70,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { user } = auth;
+    const user = auth.user;
     
-    if (!user || !user.id) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: "User not authenticated" },
         { status: 401 }
@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest) {
     const { data: profile, error: updateError } = await supabase
       .from("profiles")
       .update(body)
-      .eq("id", user.id)
+      .eq("id", user.id as string)
       .select()
       .single();
 
