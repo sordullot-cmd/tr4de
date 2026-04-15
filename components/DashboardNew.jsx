@@ -205,6 +205,18 @@ function Dashboard({ trades = [] }) {
     } catch (e) {}
   });
 
+  // For Dashboard context, filteredTrades represents all trades
+  // (filtered by month for calendar context, but used for overall stats)
+  const filteredTrades = trades.filter(t => {
+    try {
+      const d = new Date(t.date);
+      if (isNaN(d.getTime())) return false;
+      return d.getMonth() === month && d.getFullYear() === year;
+    } catch (e) {
+      return false;
+    }
+  });
+
   // PENTAGON RADAR COMPONENT
   const PentagonRadar = ({ metrics, size = 280 }) => {
     const center = size / 2;
