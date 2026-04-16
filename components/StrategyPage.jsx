@@ -374,10 +374,6 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                     transform={`rotate(-90 ${size/2} ${size/2})`}
                     style={{transition: "stroke-dashoffset 0.3s ease"}}
                   />
-                  {/* Center text */}
-                  <text x={size/2} y={size/2} textAnchor="middle" dy="0.3em" fontSize="18" fontWeight="700" fill={color}>
-                    {winRate}%
-                  </text>
                 </svg>
               );
             };
