@@ -96,6 +96,8 @@ export function useStrategies() {
           updated_at: new Date().toISOString(),
         };
 
+        console.log("➕ Adding strategy locally:", newStrategy);
+
         // Essayer Supabase d'abord
         try {
           const { data, error: err } = await supabase
@@ -103,16 +105,30 @@ export function useStrategies() {
             .insert([newStrategy])
             .select();
 
-          if (err && !err.message?.includes("Could not find the table")) {
-            throw err;
+          if (err) {
+            console.error("📌 Supabase error:", {
+              message: err.message,
+              code: err.code,
+              details: err.details,
+              hint: err.hint,
+              fullError: JSON.stringify(err)
+            });
+            
+            if (!err.message?.includes("Could not find the table")) {
+              throw err;
+            }
+            console.log("⚠️  Table not found, using localStorage fallback");
           }
           
-          if (data) {
+          if (data && data.length > 0) {
+            console.log("✅ Strategy created on Supabase:", data[0]);
             setStrategies([...strategies, data[0]]);
+            localStorage.setItem("tr4de_strategies", JSON.stringify([...strategies, data[0]]));
             return data[0];
           }
         } catch (supabaseErr) {
-          if (!supabaseErr.message?.includes("Could not find the table")) {
+          console.error("❌ Supabase operation failed:", supabaseErr);
+          if (!supabaseErr?.message?.includes("Could not find the table")) {
             throw supabaseErr;
           }
         }
@@ -122,10 +138,12 @@ export function useStrategies() {
         const updated = [...strategies, newStrategy];
         setStrategies(updated);
         localStorage.setItem("tr4de_strategies", JSON.stringify(updated));
+        console.log("✅ Strategy saved to localStorage");
         return newStrategy;
       } catch (err) {
-        console.error("❌ Erreur ajout stratégie:", err);
-        throw err;
+        const errMsg = err?.message || JSON.stringify(err) || "Unknown error";
+        console.error("❌ Erreur ajout stratégie:", errMsg);
+        throw new Error(`Failed to add strategy: ${errMsg}`);
       }
     },
     [user?.id, strategies]

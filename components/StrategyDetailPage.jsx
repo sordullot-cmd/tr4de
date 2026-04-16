@@ -45,26 +45,59 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
   const [strategies, setStrategies] = useState([]);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tradeStrategiesData, setTradeStrategiesData] = useState({});
   const [checkedRules, setCheckedRules] = useState({});
 
   // Load data from localStorage on mount
   useEffect(() => {
     try {
-      const tradesData = localStorage.getItem('apex_trades');
-      if (tradesData) setTrades(JSON.parse(tradesData));
+      // ✅ Load from CORRECT keys (tr4de_trades, not apex_trades)
+      const tradesData = localStorage.getItem('tr4de_trades');
+      if (tradesData) {
+        try {
+          setTrades(JSON.parse(tradesData));
+        } catch {
+          // Fallback to apex_trades for backward compatibility
+          const apexTrades = localStorage.getItem('apex_trades');
+          if (apexTrades) setTrades(JSON.parse(apexTrades));
+        }
+      }
 
-      const strategiesData = localStorage.getItem('apex_strategies');
-      if (strategiesData) setStrategies(JSON.parse(strategiesData));
+      const strategiesData = localStorage.getItem('tr4de_strategies');
+      if (strategiesData) {
+        try {
+          setStrategies(JSON.parse(strategiesData));
+        } catch {
+          // Fallback to apex_strategies
+          const apexStrats = localStorage.getItem('apex_strategies');
+          if (apexStrats) setStrategies(JSON.parse(apexStrats));
+        }
+      }
+
+      // Load trade-strategy mappings
+      const mappingsData = localStorage.getItem('tr4de_trade_strategies');
+      if (mappingsData) setTradeStrategiesData(JSON.parse(mappingsData));
 
       const checkedRulesData = localStorage.getItem('tr4de_checked_rules');
       if (checkedRulesData) setCheckedRules(JSON.parse(checkedRulesData));
 
       // Load selected strategy ID
       const selectedId = localStorage.getItem('selectedStrategyId');
-      if (selectedId && strategiesData) {
-        const strats = JSON.parse(strategiesData);
-        const found = strats.find(s => s.id == selectedId);
-        if (found) setSelectedStrategy(found);
+      if (selectedId) {
+        // First try tr4de_strategies, then apex_strategies
+        let strats = [];
+        try {
+          const stored = localStorage.getItem('tr4de_strategies');
+          strats = stored ? JSON.parse(stored) : [];
+        } catch {
+          const apexStrats = localStorage.getItem('apex_strategies');
+          strats = apexStrats ? JSON.parse(apexStrats) : [];
+        }
+        
+        if (strats.length > 0) {
+          const found = strats.find(s => s.id == selectedId);
+          if (found) setSelectedStrategy(found);
+        }
       }
     } catch (err) {
       console.error("Error loading data:", err);
@@ -72,22 +105,36 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
     setLoading(false);
   }, []);
 
-  // Load trade-strategy mappings
-  const tradeStrategiesData = (() => {
-    try {
-      const saved = localStorage.getItem('tr4de_trade_strategies');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  })();
-
   // Filter trades by selected strategy
   const filteredTrades = selectedStrategy 
     ? trades.filter(t => {
-        const tradeId = t.date + t.symbol + t.entry;
-        const strategyIds = tradeStrategiesData[tradeId] || [];
-        return strategyIds.includes(selectedStrategy.id);
+        // Try multiple key formats for compatibility
+        let strategyIds = [];
+        
+        // Format 1: Direct ID (UUID)
+        if (t.id && tradeStrategiesData[t.id]) {
+          strategyIds = tradeStrategiesData[t.id];
+        }
+        
+        // Format 2: Composite key (no underscores)
+        if (strategyIds.length === 0 && t.date && t.symbol && t.entry) {
+          const compositeKey = `${t.date}${t.symbol}${t.entry}`;
+          if (tradeStrategiesData[compositeKey]) {
+            strategyIds = tradeStrategiesData[compositeKey];
+          }
+        }
+        
+        // Format 3: Normalized composite key
+        if (strategyIds.length === 0 && t.date && t.symbol && t.entry) {
+          const normalizedEntry = parseFloat(t.entry).toFixed(2);
+          const normalizedKey = `${t.date}${t.symbol}${normalizedEntry}`;
+          if (tradeStrategiesData[normalizedKey]) {
+            strategyIds = tradeStrategiesData[normalizedKey];
+          }
+        }
+        
+        // Convert to string for reliable comparison
+        return strategyIds.map(id => String(id)).includes(String(selectedStrategy.id));
       })
     : [];
 

@@ -2321,11 +2321,19 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           ...strategyFormData,
           created: new Date().toLocaleDateString()
         };
-        // ✅ Ajouter la stratégie via le hook au lieu de localStorage
-        await addStrategy(newStrategy);
-        setSelectedImportStrategy(newStrategy.id.toString());
-        setStrategyFormData(getDefaultStrategyFormData());
-        setShowStrategyForm(false);
+        // ✅ Ajouter la stratégie via le hook avec gestion d'erreur
+        try {
+          console.log("📝 Creating strategy:", newStrategy);
+          await addStrategy(newStrategy);
+          console.log("✅ Strategy created successfully");
+          setSelectedImportStrategy(newStrategy.id.toString());
+          setStrategyFormData(getDefaultStrategyFormData());
+          setShowStrategyForm(false);
+        } catch (err) {
+          const errMsg = err?.message || JSON.stringify(err) || "Unknown error";
+          console.error("❌ Failed to create strategy:", errMsg);
+          alert(`❌ Erreur lors de la création de la stratégie: ${errMsg}`);
+        }
       }
     }
   };
