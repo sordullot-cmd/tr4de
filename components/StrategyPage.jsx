@@ -487,9 +487,12 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                       </div>
                     </div>
                     
-                    {/* Donut Chart */}
-                    <div style={{display:"flex",justifyContent:"center",flexShrink:0}}>
+                    {/* Donut Chart + Win Rate Label */}
+                    <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <DonutChart winRate={parseInt(winRate)} size={80}/>
+                      <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase",whiteSpace:"nowrap"}}>
+                        Win<br/>Rate
+                      </div>
                     </div>
                   </div>
                 </div>
