@@ -442,7 +442,8 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   gap:24,
                   padding:20,
                   background:T.white,
-                  border:`1px solid ${T.border}`,
+                  border:"none",
+                  borderTop:`0.5px solid ${T.border}`,
                   borderRadius:12,
                   transition:"all .2s",
                   cursor:"pointer",
@@ -456,7 +457,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 }}
               >
                 {/* ========== LEFT SECTION: STATISTICS ========== */}
-                <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",paddingRight:16,borderRight:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",paddingRight:16}}>
                   {/* Strategy Name & Color Dot */}
                   <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                     <div style={{width:12,height:12,borderRadius:"50%",background:strategy.color,flexShrink:0,marginTop:2}}/>
@@ -510,7 +511,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 </div>
 
                 {/* ========== RIGHT SECTION: RULES ========== */}
-                <div style={{display:"flex",flexDirection:"column",gap:12,paddingLeft:16,borderLeft:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",flexDirection:"column",gap:12,paddingLeft:16}}>
                   <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Rules</div>
                   
                   <div style={{display:"flex",flexDirection:"column",gap:8,flex:1,overflowY:"auto",maxHeight:160}}>
