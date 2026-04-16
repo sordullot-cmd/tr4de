@@ -65,6 +65,80 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
   const [showStrategyForm, setShowStrategyForm] = useState(false);
   const [formData, setFormData] = useState({name:"",description:"",color:"#22C55E",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
   const [editingStrategyId, setEditingStrategyId] = useState(null);
+  
+  // ✅ Rendre tradeStrategiesData réactif
+  const [tradeStrategiesData, setTradeStrategiesData] = useState({});
+  const [checkedRules, setCheckedRules] = useState({});
+
+  // 🔍 DEBUG: Monitor trades and strategy assignments
+  React.useEffect(() => {
+    const stored = localStorage.getItem("tr4de_trades");
+    const tradesFromStorage = stored ? JSON.parse(stored) : [];
+    
+    const stratAssignments = localStorage.getItem('tr4de_trade_strategies');
+    const assignments = stratAssignments ? JSON.parse(stratAssignments) : {};
+    
+    console.log("🔍 DEBUG StrategyPage:");
+    console.log("   Trades from hook:", trades?.length || 0, "trades");
+    console.log("   Trades from localStorage (tr4de_trades):", tradesFromStorage?.length || 0, "trades");
+    console.log("   Strategy assignments keys:", Object.keys(assignments).length, "keys");
+    console.log("   First few trades from hook:", trades?.slice(0, 2));
+    console.log("   First few assignment keys:", Object.keys(assignments).slice(0, 3));
+  }, [trades, strategies]);
+
+  // ✅ Charger et synchroniser les données de localStorage
+  React.useEffect(() => {
+    const loadTradeStrategiesData = () => {
+      try {
+        const saved = localStorage.getItem('tr4de_trade_strategies');
+        const data = saved ? JSON.parse(saved) : {};
+        setTradeStrategiesData(data);
+      } catch (err) {
+        console.error("❌ Error loading trade strategies:", err);
+        setTradeStrategiesData({});
+      }
+    };
+    
+    const loadCheckedRules = () => {
+      try {
+        const saved = localStorage.getItem('tr4de_checked_rules');
+        if (!saved) {
+          setCheckedRules({});
+          return;
+        }
+        const parsed = JSON.parse(saved);
+        const cleaned = {};
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (typeof value === 'boolean') {
+            cleaned[key] = value;
+          }
+        });
+        setCheckedRules(cleaned);
+      } catch (err) {
+        console.error("❌ Error loading checked rules:", err);
+        setCheckedRules({});
+      }
+    };
+    
+    // Charger les données
+    loadTradeStrategiesData();
+    loadCheckedRules();
+    
+    // Écouter les changements de localStorage
+    const handleStorageChange = (e) => {
+      if (e.key === 'tr4de_trade_strategies') {
+        console.log("📡 Trade strategies updated in localStorage");
+        loadTradeStrategiesData();
+      }
+      if (e.key === 'tr4de_checked_rules') {
+        console.log("📡 Checked rules updated in localStorage");
+        loadCheckedRules();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const colors = ["#9B7D94","#997B5D","#A5956B","#6B9B6F","#4A9D6F","#6B9D68","#5F8BA0","#5F7FB4","#6B8BB4","#8B7BA4","#A07B94","#7F7F7F"];
 
@@ -161,51 +235,6 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       groups:formData.groups.map(g=>g.id===groupId?{...g,rules:g.rules.map(r=>r.id===ruleId?{...r,text:value}:r)}:g)
     });
   };
-
-  // Charger les assignations de stratégies aux trades - utiliser l'ID du trade directement
-  const tradeStrategiesData = (() => {
-    try {
-      const saved = localStorage.getItem('tr4de_trade_strategies');
-      const data = saved ? JSON.parse(saved) : {};
-      
-      // Si c'est l'ancien format (date+symbol+entry), laisser-le pour compatibilité
-      // Mais aussi créer des clés par ID pour les trades Supabase
-      const normalized = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalized[key] = value;
-      });
-      
-      // Ajouter aussi les stratégies assignées par trade ID
-      const tradeStrategiesByIds = localStorage.getItem('tr4de_trade_strategies_by_id');
-      if (tradeStrategiesByIds) {
-        const byIdData = JSON.parse(tradeStrategiesByIds);
-        Object.assign(normalized, byIdData);
-      }
-      
-      return normalized;
-    } catch {
-      return {};
-    }
-  })();
-
-  // Charger les règles cochées
-  const checkedRules = (() => {
-    try {
-      const saved = localStorage.getItem('tr4de_checked_rules');
-      if (!saved) return {};
-      const parsed = JSON.parse(saved);
-      // Valider que les valeurs sont des booleans
-      const cleaned = {};
-      Object.entries(parsed).forEach(([key, value]) => {
-        if (typeof value === 'boolean') {
-          cleaned[key] = value;
-        }
-      });
-      return cleaned;
-    } catch {
-      return {};
-    }
-  })();
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">

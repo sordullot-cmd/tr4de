@@ -2722,11 +2722,13 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             id: trade.id
           });
           
-          // Use date + symbol + entry as unique key (matching TradesPage logic)
-          // Try multiple key formats in case there's a mismatch
+          // Use multiple key formats to ensure compatibility:
+          // 1. date + symbol + entry (for backward compatibility with old format)
+          // 2. UUID id (for Supabase trades)
           const keys = [
             `${trade.date}${trade.symbol}${trade.entry}`,           // Original format
             `${trade.date}${trade.symbol}${normalizedEntry}`,       // Normalized format
+            trade.id                                                // Supabase UUID - NEW!
           ];
           
           const strategyId = parseInt(selectedImportStrategy);
