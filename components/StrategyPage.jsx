@@ -247,11 +247,26 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {/* STRATEGIES LIST - VERTICAL */}
       {strategies.length > 0 && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* DEBUG INFO */}
+          <div style={{padding:"12px",background:"#f0f0f0",borderRadius:8,fontSize:12,color:"#666",marginBottom:12}}>
+            <div>📊 Debug: Trades={trades.length}, Strategies={strategies.length}, Mappings={Object.keys(tradeStrategiesData).length}</div>
+          </div>
+          
+          {trades.length === 0 && (
+            <div style={{padding:"20px",background:"#fff3cd",borderRadius:8,borderLeft:"4px solid #ffc107"}}>
+              <strong>⚠️ Aucun trade chargé</strong><br/>
+              Les trades ne sont pas disponibles. Vérifiez que vous avez importé des trades dans l'onglet Dashboard.
+            </div>
+          )}
+          
           {strategies.map(strategy => {
             // 🔍 DEBUG LOG
             console.log(`\n📊 Strategy: "${strategy.name}" (ID: ${strategy.id})`);
             console.log(`  Total trades available: ${trades.length}`);
             console.log(`  Strategy assignments data keys: ${Object.keys(tradeStrategiesData).length}`);
+            if (Object.keys(tradeStrategiesData).length > 0) {
+              console.log(`  First mapping keys:`, Object.keys(tradeStrategiesData).slice(0, 3));
+            }
             
             // ✅ Fonction helper pour obtenir les stratégies assignées à un trade
             const getStrategyIdsForTrade = (trade) => {
