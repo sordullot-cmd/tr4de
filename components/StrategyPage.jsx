@@ -379,7 +379,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             };
             
             // ✅ Fonction helper pour créer un Area Chart
-            const AreaChart = ({ trades, width = 200, height = 100 }) => {
+            const AreaChart = ({ trades, width = 200, height = 100, color = T.blue }) => {
               if (trades.length === 0) {
                 return <div style={{width, height, background: T.bg, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: T.textMut}}>Pas de données</div>;
               }
@@ -410,7 +410,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               });
               pathData += ` L ${width} ${height} Z`;
               
-              const gradColor = isPositive ? T.green : T.red;
+              const gradColor = color;
               
               return (
                 <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{overflow: "visible"}}>
@@ -503,7 +503,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 <div style={{display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",paddingX:16}}>
                   <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:12,textTransform:"uppercase"}}>Performance</div>
                   <div style={{width:"100%",maxWidth:280}}>
-                    <AreaChart trades={strategyTrades} width={280} height={120}/>
+                    <AreaChart trades={strategyTrades} width={280} height={120} color={strategy.color}/>
                   </div>
                   <div style={{fontSize:11,color:T.textMut,marginTop:12}}>
                     {strategyTradeCount} trades
@@ -537,9 +537,9 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                                   padding:"4px 8px",
                                   fontSize:10,
                                   borderRadius:4,
-                                  border:`1px solid ${T.border}`,
-                                  background:T.white,
-                                  color:T.textSub,
+                                  border:`1px solid ${strategy.color}`,
+                                  background:"transparent",
+                                  color:strategy.color,
                                   cursor:"pointer",
                                   whiteSpace:"nowrap",
                                   flexShrink:0,
@@ -568,8 +568,8 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                       fontSize:11,
                       fontWeight:600,
                       borderRadius:6,
-                      border:`1px solid ${T.accent}`,
-                      background:T.accent,
+                      border:`1px solid ${strategy.color}`,
+                      background:strategy.color,
                       color:"#fff",
                       cursor:"pointer",
                       transition:"all .2s",
