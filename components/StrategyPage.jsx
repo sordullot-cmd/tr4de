@@ -462,15 +462,15 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 {/* ========== LEFT SECTION: STATISTICS ========== */}
                 <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",paddingRight:16,borderRight:`1px solid ${T.border}`}}>
                   {/* Strategy Name & Color Dot */}
-                  <div style={{display:"flex",gap:10,alignItems:"flex-start",paddingBottom:12,borderBottom:`1px solid ${T.border}`}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                     <div style={{width:12,height:12,borderRadius:"50%",background:strategy.color,flexShrink:0,marginTop:2}}/>
-                    <div style={{fontSize:14,fontWeight:700,color:T.text,lineHeight:1.3}}>{strategy.name}</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.text,lineHeight:1.3}}>{strategy.name}</div>
                   </div>
                   
                   {/* PnL */}
                   <div style={{paddingTop:12,paddingBottom:12,borderBottom:`1px solid ${T.border}`}}>
                     <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:4,textTransform:"uppercase"}}>P&L</div>
-                    <div style={{fontSize:18,fontWeight:700,color:totalPnL >= 0 ? T.green : T.red}}>{fmt(totalPnL,true)}</div>
+                    <div style={{fontSize:24,fontWeight:700,color:totalPnL >= 0 ? T.green : T.red}}>{fmt(totalPnL,true)}</div>
                   </div>
                   
                   {/* Avg W/L + Donut Chart */}
