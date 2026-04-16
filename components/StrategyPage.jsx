@@ -442,7 +442,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 key={strategy.id}
                 style={{
                   display:"grid",
-                  gridTemplateColumns:"180px 1fr 160px",
+                  gridTemplateColumns:"35% 35% 20%",
                   gap:24,
                   padding:20,
                   background:T.white,
