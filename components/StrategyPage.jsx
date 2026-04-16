@@ -167,14 +167,17 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           } else {
             // ✅ Créer via le hook Supabase
             console.log("➕ Création stratégie Supabase");
-            await addStrategy(formData);
+            const newStrat = await addStrategy(formData);
+            console.log("✅ Stratégie créée:", newStrat);
           }
           setFormData(getDefaultFormData());
           setShowStrategyForm(false);
           setEditingStrategyId(null);
           console.log("✅ Stratégie sauvegardée");
         } catch (err) {
-          console.error("❌ Erreur sauvegarde stratégie:", err);
+          const errMsg = err?.message || JSON.stringify(err) || "Unknown error";
+          console.error("❌ Erreur sauvegarde stratégie:", errMsg);
+          alert(`❌ Erreur lors de la création de la stratégie: ${errMsg}`);
         } finally {
           setLoading(false);
         }

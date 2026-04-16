@@ -85,18 +85,28 @@ export function useStrategies() {
   // Ajouter une stratégie
   const addStrategy = useCallback(
     async (strategyData) => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        throw new Error("No user ID");
+      }
 
       try {
+        // ✅ Validation des données
+        if (!strategyData?.name || !strategyData?.groups) {
+          throw new Error("Strategy must have name and groups");
+        }
+
         const newStrategy = {
-          id: crypto.randomUUID?.() || Date.now().toString(),
-          ...strategyData,
+          id: strategyData.id || crypto.randomUUID?.() || Date.now().toString(),
+          name: strategyData.name,
+          description: strategyData.description || "",
+          color: strategyData.color || "#5F7FB4",
+          groups: strategyData.groups || [],
           user_id: user.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
 
-        console.log("➕ Adding strategy locally:", newStrategy);
+        console.log("➕ Adding strategy with data:", JSON.stringify(newStrategy, null, 2));
 
         // Essayer Supabase d'abord
         try {
@@ -106,12 +116,12 @@ export function useStrategies() {
             .select();
 
           if (err) {
-            console.error("📌 Supabase error:", {
+            console.error("📌 Supabase error details:", {
               message: err.message,
               code: err.code,
               details: err.details,
               hint: err.hint,
-              fullError: JSON.stringify(err)
+              status: err.status
             });
             
             if (!err.message?.includes("Could not find the table")) {
@@ -138,11 +148,15 @@ export function useStrategies() {
         const updated = [...strategies, newStrategy];
         setStrategies(updated);
         localStorage.setItem("tr4de_strategies", JSON.stringify(updated));
-        console.log("✅ Strategy saved to localStorage");
+        console.log("✅ Strategy saved to localStorage:", newStrategy);
         return newStrategy;
       } catch (err) {
         const errMsg = err?.message || JSON.stringify(err) || "Unknown error";
-        console.error("❌ Erreur ajout stratégie:", errMsg);
+        console.error("❌ Erreur ajout stratégie - Full error:", {
+          message: errMsg,
+          stack: err?.stack,
+          originalError: err
+        });
         throw new Error(`Failed to add strategy: ${errMsg}`);
       }
     },

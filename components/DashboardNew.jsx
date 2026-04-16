@@ -2317,16 +2317,19 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
       const validGroups = strategyFormData.groups.every(g => g.rules && g.rules.length > 0);
       if (validGroups) {
         const newStrategy = {
-          id: Date.now(),
-          ...strategyFormData,
-          created: new Date().toLocaleDateString()
+          id: Date.now().toString(), // ✅ Convert to string for consistency
+          name: strategyFormData.name,
+          description: strategyFormData.description,
+          color: strategyFormData.color,
+          groups: strategyFormData.groups,
+          // Don't add 'created' - it's added by addStrategy as 'created_at'
         };
         // ✅ Ajouter la stratégie via le hook avec gestion d'erreur
         try {
           console.log("📝 Creating strategy:", newStrategy);
-          await addStrategy(newStrategy);
-          console.log("✅ Strategy created successfully");
-          setSelectedImportStrategy(newStrategy.id.toString());
+          const created = await addStrategy(newStrategy);
+          console.log("✅ Strategy created successfully:", created);
+          setSelectedImportStrategy(newStrategy.id);
           setStrategyFormData(getDefaultStrategyFormData());
           setShowStrategyForm(false);
         } catch (err) {
