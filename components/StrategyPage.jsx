@@ -473,22 +473,24 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                     <div style={{fontSize:18,fontWeight:700,color:totalPnL >= 0 ? T.green : T.red}}>{fmt(totalPnL,true)}</div>
                   </div>
                   
-                  {/* Avg W/L */}
-                  <div>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Avg W/L</div>
-                    <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8}}>
-                      {winCount} W / {lossCount} L
+                  {/* Avg W/L + Donut Chart */}
+                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Avg W/L</div>
+                      <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8}}>
+                        {winCount} W / {lossCount} L
+                      </div>
+                      {/* Progress bar */}
+                      <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden"}}>
+                        <div style={{flex:winCount,background:T.green,transition:"flex 0.3s"}}/>
+                        <div style={{flex:lossCount,background:T.red,transition:"flex 0.3s"}}/>
+                      </div>
                     </div>
-                    {/* Progress bar */}
-                    <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden"}}>
-                      <div style={{flex:winCount,background:T.green,transition:"flex 0.3s"}}/>
-                      <div style={{flex:lossCount,background:T.red,transition:"flex 0.3s"}}/>
+                    
+                    {/* Donut Chart */}
+                    <div style={{display:"flex",justifyContent:"center",flexShrink:0}}>
+                      <DonutChart winRate={parseInt(winRate)} size={80}/>
                     </div>
-                  </div>
-                  
-                  {/* Donut Chart */}
-                  <div style={{display:"flex",justifyContent:"center",paddingTop:8}}>
-                    <DonutChart winRate={parseInt(winRate)} size={100}/>
                   </div>
                 </div>
 
