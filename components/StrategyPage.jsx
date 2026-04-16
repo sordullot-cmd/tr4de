@@ -162,11 +162,27 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
     });
   };
 
-  // Charger les assignations de stratégies aux trades
+  // Charger les assignations de stratégies aux trades - utiliser l'ID du trade directement
   const tradeStrategiesData = (() => {
     try {
       const saved = localStorage.getItem('tr4de_trade_strategies');
-      return saved ? JSON.parse(saved) : {};
+      const data = saved ? JSON.parse(saved) : {};
+      
+      // Si c'est l'ancien format (date+symbol+entry), laisser-le pour compatibilité
+      // Mais aussi créer des clés par ID pour les trades Supabase
+      const normalized = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalized[key] = value;
+      });
+      
+      // Ajouter aussi les stratégies assignées par trade ID
+      const tradeStrategiesByIds = localStorage.getItem('tr4de_trade_strategies_by_id');
+      if (tradeStrategiesByIds) {
+        const byIdData = JSON.parse(tradeStrategiesByIds);
+        Object.assign(normalized, byIdData);
+      }
+      
+      return normalized;
     } catch {
       return {};
     }
@@ -203,23 +219,49 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {strategies.length > 0 && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {strategies.map(strategy => {
+            // ✅ Fonction helper pour obtenir les stratégies assignées à un trade
+            const getStrategyIdsForTrade = (trade) => {
+              // Chercher d'abord par ID du trade Supabase
+              let strategyIds = tradeStrategiesData[trade.id] || [];
+              
+              // Si pas trouvé, essayer l'ancien format (pour compatibilité)
+              if (strategyIds.length === 0 && trade.date && trade.symbol && trade.entry) {
+                const compositeId = `${trade.date}_${trade.symbol}_${trade.entry}`;
+                strategyIds = tradeStrategiesData[compositeId] || [];
+              }
+              
+              return strategyIds;
+            };
+
             // Compter les trades assignés à cette stratégie
             const strategyTradeCount = trades.filter(t => {
-              const tradeId = t.date + t.symbol + t.entry;
-              const strategyIds = tradeStrategiesData[tradeId] || [];
+              const strategyIds = getStrategyIdsForTrade(t);
               return strategyIds.includes(strategy.id);
             }).length;
 
             // Calculer stats rapides (pour l'aperçu)
             const strategyTrades = trades.filter(t => {
-              const tradeId = t.date + t.symbol + t.entry;
-              const strategyIds = tradeStrategiesData[tradeId] || [];
+              const strategyIds = getStrategyIdsForTrade(t);
               return strategyIds.includes(strategy.id);
             });
-            const totalPnL = strategyTrades.reduce((s,t)=>s+t.pnl,0);
-            const winCount = strategyTrades.filter(t=>t.pnl>0).length;
-            const lossCount = strategyTrades.filter(t=>t.pnl<0).length;
-            const winRate = strategyTradeCount > 0 ? ((winCount/(winCount+lossCount))*100).toFixed(1) : 0;
+            
+            const totalPnL = strategyTrades.reduce((s, t) => {
+              // Assurer que pnl est un nombre valide
+              const pnl = typeof t.pnl === 'number' ? t.pnl : 0;
+              return s + pnl;
+            }, 0);
+            
+            const winCount = strategyTrades.filter(t => {
+              const pnl = typeof t.pnl === 'number' ? t.pnl : 0;
+              return pnl > 0;
+            }).length;
+            
+            const lossCount = strategyTrades.filter(t => {
+              const pnl = typeof t.pnl === 'number' ? t.pnl : 0;
+              return pnl < 0;
+            }).length;
+            
+            const winRate = strategyTradeCount > 0 ? ((winCount / (winCount + lossCount)) * 100).toFixed(1) : 0;
             
             // Calculate total rules count
             const totalRulesCount = strategy.groups.reduce((sum, group) => sum + (group.rules?.length || 0), 0);
