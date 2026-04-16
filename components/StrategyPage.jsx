@@ -38,6 +38,7 @@ const css = `
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: ${T.border2}; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: ${T.border}; }
   button { font-family: inherit; cursor: pointer; }
   @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
   .anim-1 { animation: fadeUp .35s ease both; }
@@ -352,89 +353,224 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             }
             const rulesPercent = strategyTradeCount > 0 ? ((rulesRespectedCount / strategyTradeCount) * 100).toFixed(0) : 0;
             
+            // ✅ Fonction helper pour créer un graphique en anneau (donut chart)
+            const DonutChart = ({ winRate, size = 80 }) => {
+              const radius = size / 2 - 8;
+              const circumference = 2 * Math.PI * radius;
+              const offset = circumference - (winRate / 100) * circumference;
+              const color = winRate >= 50 ? T.green : T.red;
+              
+              return (
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.05))"}}>
+                  {/* Background circle */}
+                  <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={T.border} strokeWidth="6"/>
+                  {/* Progress circle */}
+                  <circle 
+                    cx={size/2} cy={size/2} r={radius} 
+                    fill="none" stroke={color} strokeWidth="6"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${size/2} ${size/2})`}
+                    style={{transition: "stroke-dashoffset 0.3s ease"}}
+                  />
+                  {/* Center text */}
+                  <text x={size/2} y={size/2} textAnchor="middle" dy="0.3em" fontSize="18" fontWeight="700" fill={color}>
+                    {winRate}%
+                  </text>
+                </svg>
+              );
+            };
+            
+            // ✅ Fonction helper pour créer un Area Chart
+            const AreaChart = ({ trades, width = 200, height = 100 }) => {
+              if (trades.length === 0) {
+                return <div style={{width, height, background: T.bg, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: T.textMut}}>Pas de données</div>;
+              }
+              
+              // Calculer les points cumulatifs
+              let cumulative = 0;
+              const points = trades.map(t => {
+                cumulative += typeof t.pnl === 'number' ? t.pnl : 0;
+                return cumulative;
+              });
+              
+              const minVal = Math.min(...points, 0);
+              const maxVal = Math.max(...points, 0);
+              const range = maxVal - minVal || 1;
+              const isPositive = maxVal >= 0;
+              
+              // Normaliser les points pour le graphique
+              const normalized = points.map(p => {
+                const normalized = (p - minVal) / range;
+                return normalized * height;
+              });
+              
+              // Créer le path
+              let pathData = `M 0 ${height}`;
+              normalized.forEach((y, i) => {
+                const x = (i / (normalized.length - 1 || 1)) * width;
+                pathData += ` L ${x} ${height - y}`;
+              });
+              pathData += ` L ${width} ${height} Z`;
+              
+              const gradColor = isPositive ? T.green : T.red;
+              
+              return (
+                <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{overflow: "visible"}}>
+                  <defs>
+                    <linearGradient id={`grad-${strategy.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor={gradColor} stopOpacity="0.3"/>
+                      <stop offset="100%" stopColor={gradColor} stopOpacity="0.05"/>
+                    </linearGradient>
+                  </defs>
+                  <path d={pathData} fill={`url(#grad-${strategy.id})`}/>
+                  <path 
+                    d={pathData.replace(' Z', '')} 
+                    fill="none" 
+                    stroke={gradColor} 
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              );
+            };
+            
             return (
               <div
                 key={strategy.id}
+                style={{
+                  display:"grid",
+                  gridTemplateColumns:"180px 1fr 160px",
+                  gap:24,
+                  padding:20,
+                  background:T.white,
+                  border:`1px solid ${T.border}`,
+                  borderRadius:12,
+                  transition:"all .2s",
+                  cursor:"pointer",
+                  minHeight:200,
+                  alignItems:"stretch"
+                }}
                 onClick={() => {
                   setSelectedStrategyId(strategy.id);
                   localStorage.setItem('selectedStrategyId', strategy.id);
                   setPage('strategy-detail');
                 }}
-                style={{
-                  display:"flex",
-                  alignItems:"center",
-                  gap:32,
-                  padding:16,
-                  background:T.white,
-                  border:`1px solid ${T.border}`,
-                  borderRadius:12,
-                  transition:"all .2s",
-                  cursor:"pointer"
-                }}
               >
-                {/* COLOR DOT */}
-                <div style={{width:12,height:12,borderRadius:"50%",background:strategy.color,flexShrink:0}}/>
-                
-                {/* STRATEGY INFO */}
-                <div style={{minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:600,color:T.text,marginBottom:4}}>{strategy.name}</div>
-                  <div style={{fontSize:12,color:T.textMut,lineHeight:1.4}}>{strategy.description || "Pas de description"}</div>
-                </div>
-
-                {/* SPACER */}
-                <div style={{flex:1}}/>
-
-                {/* QUICK STATS - TABLE LAYOUT */}
-                <div style={{display:"flex",gap:32,alignItems:"center",fontSize:13}}>
-                  {/* TRADES */}
-                  <div style={{display:"flex",flexDirection:"column",textAlign:"left",minWidth:80}}>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Trades</div>
-                    <div style={{fontWeight:600,color:T.text}}>{strategyTradeCount}</div>
+                {/* ========== LEFT SECTION: STATISTICS ========== */}
+                <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",paddingRight:16,borderRight:`1px solid ${T.border}`}}>
+                  {/* Strategy Name & Color Dot */}
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{width:12,height:12,borderRadius:"50%",background:strategy.color,flexShrink:0,marginTop:2}}/>
+                    <div style={{fontSize:14,fontWeight:700,color:T.text,lineHeight:1.3}}>{strategy.name}</div>
                   </div>
                   
-                  {/* RULES */}
-                  <div style={{display:"flex",flexDirection:"column",textAlign:"left",minWidth:80}}>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Règles</div>
-                    <div style={{fontWeight:600,color:T.text}}>{totalRulesCount}</div>
-                  </div>
-
-                  {/* RULES RESPECTED */}
-                  <div style={{display:"flex",flexDirection:"column",textAlign:"left",minWidth:100}}>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Respectées</div>
-                    <div style={{fontWeight:600,color:rulesPercent >= 100 ? T.green : rulesPercent >= 50 ? T.amber : T.red}}>{rulesPercent}% ({rulesRespectedCount}/{strategyTradeCount})</div>
+                  {/* PnL */}
+                  <div>
+                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:4,textTransform:"uppercase"}}>P&L</div>
+                    <div style={{fontSize:18,fontWeight:700,color:totalPnL >= 0 ? T.green : T.red}}>{fmt(totalPnL,true)}</div>
                   </div>
                   
-                  {/* WIN RATE */}
-                  <div style={{display:"flex",flexDirection:"column",textAlign:"left",minWidth:80}}>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Win Rate</div>
-                    <div style={{fontWeight:600,color:T.text}}>{winRate}%</div>
+                  {/* Avg W/L */}
+                  <div>
+                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Avg W/L</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8}}>
+                      {winCount} W / {lossCount} L
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden"}}>
+                      <div style={{flex:winCount,background:T.green,transition:"flex 0.3s"}}/>
+                      <div style={{flex:lossCount,background:T.red,transition:"flex 0.3s"}}/>
+                    </div>
                   </div>
                   
-                  {/* P&L */}
-                  <div style={{display:"flex",flexDirection:"column",textAlign:"left",minWidth:100}}>
-                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>P&L</div>
-                    <div style={{fontWeight:600,color:totalPnL >= 0 ? T.green : T.red}}>{fmt(totalPnL,true)}</div>
+                  {/* Donut Chart */}
+                  <div style={{display:"flex",justifyContent:"center",paddingTop:8}}>
+                    <DonutChart winRate={parseInt(winRate)} size={100}/>
                   </div>
                 </div>
 
-                {/* BUTTONS */}
-                <div style={{display:"flex",gap:8,flexShrink:0}}>
+                {/* ========== CENTER SECTION: AREA CHART ========== */}
+                <div style={{display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",paddingX:16}}>
+                  <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:12,textTransform:"uppercase"}}>Performance</div>
+                  <div style={{width:"100%",maxWidth:280}}>
+                    <AreaChart trades={strategyTrades} width={280} height={120}/>
+                  </div>
+                  <div style={{fontSize:11,color:T.textMut,marginTop:12}}>
+                    {strategyTradeCount} trades
+                  </div>
+                </div>
+
+                {/* ========== RIGHT SECTION: RULES ========== */}
+                <div style={{display:"flex",flexDirection:"column",gap:12,paddingLeft:16,borderLeft:`1px solid ${T.border}`}}>
+                  <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Rules</div>
+                  
+                  <div style={{display:"flex",flexDirection:"column",gap:8,flex:1,overflowY:"auto",maxHeight:160}}>
+                    {strategy.groups && strategy.groups.length > 0 ? (
+                      strategy.groups.map(group => (
+                        <div key={group.id} style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {group.name && (
+                            <div style={{fontSize:9,fontWeight:700,color:T.textSub,textTransform:"uppercase",opacity:0.7}}>
+                              {group.name}
+                            </div>
+                          )}
+                          {group.rules && group.rules.map((rule, idx) => (
+                            <div key={rule.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                              <div style={{fontSize:11,color:T.text,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                {rule.text || `Rule ${idx+1}`}
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditStrategy(strategy);
+                                }}
+                                style={{
+                                  padding:"4px 8px",
+                                  fontSize:10,
+                                  borderRadius:4,
+                                  border:`1px solid ${T.border}`,
+                                  background:T.white,
+                                  color:T.textSub,
+                                  cursor:"pointer",
+                                  whiteSpace:"nowrap",
+                                  flexShrink:0,
+                                  transition:"all .2s"
+                                }}
+                              >
+                                ✎
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{fontSize:11,color:T.textMut,fontStyle:"italic"}}>No rules</div>
+                    )}
+                  </div>
+                  
+                  {/* Edit Button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleEditStrategy(strategy);
                     }}
                     style={{
-                      padding:"8px 14px",
-                      fontSize:12,
+                      padding:"8px 12px",
+                      fontSize:11,
+                      fontWeight:600,
                       borderRadius:6,
-                      border:`1px solid ${T.border}`,
-                      background:T.white,
-                      color:T.textSub,
+                      border:`1px solid ${T.accent}`,
+                      background:T.accent,
+                      color:"#fff",
                       cursor:"pointer",
-                      transition:"all .2s"
+                      transition:"all .2s",
+                      marginTop:"auto"
                     }}
-                  >Éditer</button>
+                  >
+                    Éditer
+                  </button>
                 </div>
               </div>
             );
