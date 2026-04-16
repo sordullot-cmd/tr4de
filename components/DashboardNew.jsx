@@ -2316,8 +2316,11 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
     if (strategyFormData.name.trim() && strategyFormData.groups.length > 0) {
       const validGroups = strategyFormData.groups.every(g => g.rules && g.rules.length > 0);
       if (validGroups) {
+        // ✅ Generate a proper UUID instead of timestamp
+        const newId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
         const newStrategy = {
-          id: Date.now().toString(), // ✅ Convert to string for consistency
+          id: newId,
           name: strategyFormData.name,
           description: strategyFormData.description,
           color: strategyFormData.color,
@@ -2329,7 +2332,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           console.log("📝 Creating strategy:", newStrategy);
           const created = await addStrategy(newStrategy);
           console.log("✅ Strategy created successfully:", created);
-          setSelectedImportStrategy(newStrategy.id);
+          setSelectedImportStrategy(newId);
           setStrategyFormData(getDefaultStrategyFormData());
           setShowStrategyForm(false);
         } catch (err) {
