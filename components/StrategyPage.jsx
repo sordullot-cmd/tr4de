@@ -475,12 +475,16 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                     <div style={{flex:1}}>
                       <div style={{fontSize:10,color:T.textMut,fontWeight:600,marginBottom:6,textTransform:"uppercase"}}>Avg W/L</div>
                       <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8}}>
-                        {winCount} W / {lossCount} L
+                        {strategyTradeCount > 0 ? ((winCount / strategyTradeCount) * 100).toFixed(0) : 0}%
                       </div>
-                      {/* Progress bar */}
-                      <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden"}}>
-                        <div style={{flex:winCount,background:T.green,transition:"flex 0.3s"}}/>
-                        <div style={{flex:lossCount,background:T.red,transition:"flex 0.3s"}}/>
+                      {/* Progress bar with counts */}
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{fontSize:10,fontWeight:600,color:T.green,minWidth:20}}>{winCount}</div>
+                        <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden",flex:1}}>
+                          <div style={{flex:winCount,background:T.green,transition:"flex 0.3s"}}/>
+                          <div style={{flex:lossCount,background:T.red,transition:"flex 0.3s"}}/>
+                        </div>
+                        <div style={{fontSize:10,fontWeight:600,color:T.red,minWidth:20}}>{lossCount}</div>
                       </div>
                     </div>
                     
