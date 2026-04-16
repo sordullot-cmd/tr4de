@@ -28,7 +28,7 @@ export function useTradeDetails() {
         if (err) throw err;
 
         // Convertir en map pour accès rapide
-        const detailsMap = {};
+        const detailsMap: Record<string, any> = {};
         data?.forEach((detail) => {
           detailsMap[detail.trade_id] = detail;
         });
