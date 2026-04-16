@@ -248,6 +248,11 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {strategies.length > 0 && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {strategies.map(strategy => {
+            // 🔍 DEBUG LOG
+            console.log(`\n📊 Strategy: "${strategy.name}" (ID: ${strategy.id})`);
+            console.log(`  Total trades available: ${trades.length}`);
+            console.log(`  Strategy assignments data keys: ${Object.keys(tradeStrategiesData).length}`);
+            
             // ✅ Fonction helper pour obtenir les stratégies assignées à un trade
             const getStrategyIdsForTrade = (trade) => {
               // Chercher d'abord par ID du trade Supabase
@@ -255,8 +260,16 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               
               // Si pas trouvé, essayer l'ancien format (pour compatibilité)
               if (strategyIds.length === 0 && trade.date && trade.symbol && trade.entry) {
-                const compositeId = `${trade.date}_${trade.symbol}_${trade.entry}`;
+                // ✅ IMPORTANT: Pas de tirets bas! Doit correspondre exactement aux clés créées dans DashboardNew.jsx
+                const compositeId = `${trade.date}${trade.symbol}${trade.entry}`;
                 strategyIds = tradeStrategiesData[compositeId] || [];
+                
+                // Aussi essayer avec entry normalisée
+                if (strategyIds.length === 0) {
+                  const normalizedEntry = parseFloat(trade.entry).toFixed(2);
+                  const compositeIdNormalized = `${trade.date}${trade.symbol}${normalizedEntry}`;
+                  strategyIds = tradeStrategiesData[compositeIdNormalized] || [];
+                }
               }
               
               return strategyIds;
@@ -265,13 +278,17 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             // Compter les trades assignés à cette stratégie
             const strategyTradeCount = trades.filter(t => {
               const strategyIds = getStrategyIdsForTrade(t);
-              return strategyIds.includes(strategy.id);
+              // Convertir tous les IDs en string pour comparaison fiable
+              return strategyIds.map(id => String(id)).includes(String(strategy.id));
             }).length;
+            
+            console.log(`  Matching trades found: ${strategyTradeCount}`);
 
             // Calculer stats rapides (pour l'aperçu)
             const strategyTrades = trades.filter(t => {
               const strategyIds = getStrategyIdsForTrade(t);
-              return strategyIds.includes(strategy.id);
+              // Convertir tous les IDs en string pour comparaison fiable
+              return strategyIds.map(id => String(id)).includes(String(strategy.id));
             });
             
             const totalPnL = strategyTrades.reduce((s, t) => {
