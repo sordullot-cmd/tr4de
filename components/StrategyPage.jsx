@@ -321,15 +321,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             </div>
           )}
           
-          {strategies.map(strategy => {
-            // 🔍 DEBUG LOG
-            console.log(`\n📊 Strategy: "${strategy.name}" (ID: ${strategy.id})`);
-            console.log(`  Total trades available: ${trades.length}`);
-            console.log(`  Strategy assignments data keys: ${Object.keys(tradeStrategiesData).length}`);
-            if (Object.keys(tradeStrategiesData).length > 0) {
-              console.log(`  First mapping keys:`, Object.keys(tradeStrategiesData).slice(0, 3));
-            }
-            
+          {(() => {
             // ✅ Fonction helper pour obtenir les stratégies assignées à un trade
             const getStrategyIdsForTrade = (trade) => {
               // Chercher d'abord par ID du trade Supabase
@@ -351,6 +343,35 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               
               return strategyIds;
             };
+
+            // 📊 Compter les trades pour chaque stratégie
+            const strategyTradeCountMap = {};
+            strategies.forEach(s => {
+              strategyTradeCountMap[s.id] = 0;
+            });
+            
+            trades.forEach(t => {
+              const strategyIds = getStrategyIdsForTrade(t);
+              strategyIds.forEach(stratId => {
+                if (strategyTradeCountMap.hasOwnProperty(stratId)) {
+                  strategyTradeCountMap[stratId]++;
+                }
+              });
+            });
+
+            // 🔄 Trier les stratégies par nombre de trades (décroissant)
+            const sortedStrategies = [...strategies].sort((a, b) => {
+              return (strategyTradeCountMap[b.id] || 0) - (strategyTradeCountMap[a.id] || 0);
+            });
+
+            return sortedStrategies.map(strategy => {
+              // 🔍 DEBUG LOG
+              console.log(`\n📊 Strategy: "${strategy.name}" (ID: ${strategy.id})`);
+              console.log(`  Total trades available: ${trades.length}`);
+              console.log(`  Strategy assignments data keys: ${Object.keys(tradeStrategiesData).length}`);
+              if (Object.keys(tradeStrategiesData).length > 0) {
+                console.log(`  First mapping keys:`, Object.keys(tradeStrategiesData).slice(0, 3));
+              }
 
             // Compter les trades assignés à cette stratégie
             const strategyTradeCount = trades.filter(t => {
@@ -651,7 +672,8 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 </div>
               </div>
             );
-          })}
+            });
+          })()}
         </div>
       )}
 
