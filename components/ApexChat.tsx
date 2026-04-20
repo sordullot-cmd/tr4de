@@ -6,6 +6,9 @@ interface ApexChatProps {
   userId: string;
   trades?: any[];
   journalNotes?: any[];
+  strategies?: any[];
+  strategyStats?: any[];
+  dailyNotes?: Record<string, string>;
 }
 
 interface Message {
@@ -13,14 +16,21 @@ interface Message {
   content: string;
 }
 
-export default function ApexChat({ userId, trades = [], journalNotes = [] }: ApexChatProps) {
+export default function ApexChat({ 
+  userId, 
+  trades = [], 
+  journalNotes = [],
+  strategies = [],
+  strategyStats = [],
+  dailyNotes = {}
+}: ApexChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Log when trades are received
+  // Log when trades and other data are received
   useEffect(() => {
     if (Array.isArray(trades) && trades.length > 0) {
       console.log("🎯 ApexChat reçu trades:", trades.length, "trades");
@@ -32,14 +42,25 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
       console.log("📔 ApexChat reçu journal notes:", journalNotes.length, "notes");
       console.log("   Sample note:", journalNotes[0]);
     }
-  }, [trades, journalNotes]);
+    if (Array.isArray(strategies) && strategies.length > 0) {
+      console.log("📊 ApexChat reçu strategies:", strategies.length, "stratégies");
+      console.log("   Sample strategy:", strategies[0]);
+    }
+    if (Array.isArray(strategyStats) && strategyStats.length > 0) {
+      console.log("📈 ApexChat reçu strategy stats:", strategyStats.length, "stats");
+      console.log("   Sample stat:", strategyStats[0]);
+    }
+    if (dailyNotes && Object.keys(dailyNotes).length > 0) {
+      console.log("📅 ApexChat reçu daily notes:", Object.keys(dailyNotes).length, "notes");
+    }
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes]);
 
-  // Envoyer automatiquement le contexte du journal au chargement
+  // Envoyer automatiquement le contexte avec toutes les données au chargement
   useEffect(() => {
     const initializeContext = async () => {
       // Attendre que les données soient disponibles
-      if ((trades.length > 0 || journalNotes.length > 0) && messages.length === 0) {
-        console.log("📡 Initialisation du contexte pour l'IA...");
+      if ((trades.length > 0 || journalNotes.length > 0 || strategies.length > 0) && messages.length === 0) {
+        console.log("📡 Initialisation du contexte complet pour l'IA...");
         
         // Nettoyer rigoureusement toutes les strings
         const cleanString = (str: any): string => {
@@ -70,16 +91,40 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
           created_at: cleanString(note?.created_at || new Date().toISOString()),
         })) : [];
 
+        // 🆕 Nettoyer les stratégies
+        const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
+          id: cleanString(s?.id),
+          name: cleanString(s?.name),
+          description: cleanString(s?.description || ""),
+          color: cleanString(s?.color),
+        })) : [];
+
+        // 🆕 Nettoyer les stats de stratégie
+        const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
+          id: cleanString(stat?.id),
+          name: cleanString(stat?.name),
+          tradeCount: Number(stat?.tradeCount) || 0,
+          wins: Number(stat?.wins) || 0,
+          losses: Number(stat?.losses) || 0,
+          winRate: cleanString(stat?.winRate),
+          totalPnL: cleanString(stat?.totalPnL),
+          avgPnL: cleanString(stat?.avgPnL),
+        })) : [];
+
+        // 🆕 Nettoyer les notes journalières
+        const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
+          acc[date] = cleanString(note);
+          return acc;
+        }, {} as Record<string, string>) : {};
+
         const payload = {
-          messages: [
-            {
-              role: "user",
-              content: `Contexte initialisé - J'ai ${trades.length} trades et ${journalNotes.length} notes du journal à analyser.`,
-            },
-          ],
+          messages: [],
           userId: cleanString(userId || "unknown"),
           trades: cleanTrades,
           journalNotes: cleanJournalNotes,
+          strategies: cleanStrategies,
+          strategyStats: cleanStrategyStats,
+          dailyNotes: cleanDailyNotes,
         };
 
         try {
@@ -90,6 +135,8 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
             return value;
           });
 
+          console.log("📊 Contexte envoyé - Stratégies:", cleanStrategyStats.length, ", Daily Notes:", Object.keys(cleanDailyNotes).length);
+
           const response = await fetch("/api/ai/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -97,13 +144,8 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
           });
 
           if (response.ok) {
-            console.log("✅ Contexte initialisé - L'IA a accès aux données");
-            setMessages([
-              {
-                role: "assistant",
-                content: `✅ Contexte chargé - J'ai accès à vos ${trades.length} trades et ${journalNotes.length} notes du journal. Prêt à analyser!`,
-              },
-            ]);
+            console.log("✅ Contexte complet initialisé - L'IA a accès à toutes les données");
+            // Message automatique désactivé - le chat reste vide jusqu'à la première question
           }
         } catch (err) {
           console.error("Erreur lors de l'initialisation:", err);
@@ -112,7 +154,7 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
     };
 
     initializeContext();
-  }, [trades, journalNotes, userId]);
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, userId]);
 
   const suggestions = [
     { text: "Donne-moi une analyse de mon trading", badge: "Trades", color: "#10B981" },
@@ -187,9 +229,38 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
         created_at: cleanString(note?.created_at || new Date().toISOString()),
       })) : [];
 
+      // 🆕 Construire les stratégies avec nettoyage strict
+      const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
+        id: cleanString(s?.id),
+        name: cleanString(s?.name),
+        description: cleanString(s?.description || ""),
+        color: cleanString(s?.color),
+      })) : [];
+
+      // 🆕 Construire les stats de stratégie avec nettoyage strict
+      const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
+        id: cleanString(stat?.id),
+        name: cleanString(stat?.name),
+        tradeCount: Number(stat?.tradeCount) || 0,
+        wins: Number(stat?.wins) || 0,
+        losses: Number(stat?.losses) || 0,
+        winRate: cleanString(stat?.winRate),
+        totalPnL: cleanString(stat?.totalPnL),
+        avgPnL: cleanString(stat?.avgPnL),
+      })) : [];
+
+      // 🆕 Construire les notes journalières avec nettoyage strict
+      const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
+        acc[date] = cleanString(note);
+        return acc;
+      }, {} as Record<string, string>) : {};
+
       console.log("📊 Données à envoyer:");
       console.log("   - Trades:", cleanTrades.length);
       console.log("   - Journal Notes:", cleanJournalNotes.length);
+      console.log("   - Strategies:", cleanStrategies.length);
+      console.log("   - Strategy Stats:", cleanStrategyStats.length);
+      console.log("   - Daily Notes:", Object.keys(cleanDailyNotes).length);
       if (cleanJournalNotes.length > 0) {
         console.log("   - Première note:", cleanJournalNotes[0]);
       }
@@ -199,6 +270,9 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
         userId: cleanString(userId || "unknown"),
         trades: cleanTrades,
         journalNotes: cleanJournalNotes,
+        strategies: cleanStrategies,
+        strategyStats: cleanStrategyStats,
+        dailyNotes: cleanDailyNotes,
       };
 
       console.log("📦 Payload complet:", JSON.stringify(payload).length, "bytes");

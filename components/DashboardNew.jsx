@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { createClient } from "@/lib/supabase/client";
+import { getLocalDateString } from "@/lib/dateUtils";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { useTrades } from "@/lib/hooks/useTradeData";
 import { useStrategies, useUserPreferences } from "@/lib/hooks/useUserData";
@@ -17,6 +18,7 @@ import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
+import ApexChatNew from "@/components/ApexChatNew";
 
 /* ─── TOKENS ─────────────────────────────────────────────────────── */
 const T = {
@@ -1299,7 +1301,6 @@ function JournalPage({ trades = [] }) {
 
 function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades }) {
   const [selectedTrade, setSelectedTrade] = useState(null);
-  const [activeTab, setActiveTab] = useState("notes");
   const [dateFilter, setDateFilter] = useState("all"); // "day", "week", "month", "year", "all"
   const [tradeNotes, setTradeNotes] = useState({});
   const [tradeStrategies, setTradeStrategies] = useState({});
@@ -1308,6 +1309,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
   const [emotionTags, setEmotionTags] = useState({});
   const [errorTags, setErrorTags] = useState({});
   const [loadedStrategies, setLoadedStrategies] = useState([]);
+  const [activeTab, setActiveTab] = useState("infos");
 
   const allEmotionTags = [
     { id: "fomo", label: "FOMO", color: "#C94F4F" },
@@ -3562,7 +3564,7 @@ function DisciplinePage({ trades = [] }) {
     }
   });
   const heatmapScrollRef = useRef(null);
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const todayDate = new Date();
   const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
   const currentMonth = monthNames[todayDate.getMonth()];
@@ -3590,7 +3592,7 @@ function DisciplinePage({ trades = [] }) {
   // Auto-update journal rule when daily notes change
   React.useEffect(() => {
     const handleStorageChange = () => {
-      const currentDate = new Date().toISOString().split('T')[0];
+      const currentDate = getLocalDateString();
       const dailyNotesData = JSON.parse(localStorage.getItem("tr4de_daily_notes") || "{}");
       const todayNote = dailyNotesData[currentDate];
       
@@ -3919,7 +3921,7 @@ function DisciplinePage({ trades = [] }) {
                 let streak = 0;
                 const cursor = new Date();
                 while (true) {
-                  const dateStr = cursor.toISOString().split('T')[0];
+                  const dateStr = getLocalDateString(cursor);
                   const checkedRulesData = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
                   if (checkedRulesData) {
                     const checked = JSON.parse(checkedRulesData);
@@ -4035,7 +4037,7 @@ function DisciplinePage({ trades = [] }) {
                   
                   const inRange = cursor >= startDate && cursor <= endDate;
                   if (inRange) {
-                    const dateStr = cursor.toISOString().split('T')[0];
+                    const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
                     const dailyData = getDailyData(dateStr);
                     const color = getColorByDiscipline(dailyData.percentage);
                     currentWeek[adjustedDow] = { dateStr, ...dailyData, color };
@@ -4408,6 +4410,8 @@ export default function App() {
   // ✅ Utiliser les hooks pour Trades et Stratégies (auto-stockés dans Supabase)
   const { trades, addTrade, updateTrade, deleteTrade } = useTrades();
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
+  const { notes: agentTradeNotes } = useTradeNotes();
+  const { notes: agentDailyNotes } = useDailySessionNotes();
   const [userId, setUserId] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [accounts, setAccounts] = useState([]);
@@ -4735,9 +4739,10 @@ export default function App() {
     { id:"dashboard",     icon:"📊", label:"Tableau de bord" },
     { id:"calendar",      icon:"📅", label:"Calendrier" },
     { id:"trades",        icon:"📈", label:"Trades", badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
-    { id:"journal",       icon:"📝", label:"Journal de Trading", badge: filteredTrades.filter(t => {try { const d = new Date(t.date); return d.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]; } catch (e) { return false; }}).length },
+    { id:"journal",       icon:"📝", label:"Journal de Trading", badge: filteredTrades.filter(t => {try { const d = new Date(t.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
     { id:"discipline",    icon:"✓", label:"Discipline" },
     { id:"strategies",    icon:"🎯", label:"Stratégies" },
+    { id:"agent",         icon:"🤖", label:"Agent IA" },
   ];
 
   const pages = {
@@ -4749,6 +4754,52 @@ export default function App() {
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
+    agent: (() => {
+      // Convertir la map { [tradeId]: "note" } en tableau pour l'API
+      const journalNotesArr = Object.entries(agentTradeNotes || {})
+        .filter(([, n]) => n && String(n).trim())
+        .map(([trade_id, notes]) => ({ trade_id, notes: String(notes) }));
+
+      // Calculer les stats par stratégie en utilisant le mapping localStorage
+      let assignments = {};
+      try {
+        const raw = localStorage.getItem("tr4de_trade_strategies");
+        assignments = raw ? JSON.parse(raw) : {};
+      } catch {}
+
+      const strategyStats = (strategies || []).map((strategy) => {
+        const stratTrades = filteredTrades.filter((t) => {
+          const byId = assignments[t.id] || [];
+          const byComposite = assignments[`${t.date}${t.symbol}${t.entry}`] || [];
+          return byId.includes(strategy.id) || byComposite.includes(strategy.id);
+        });
+        if (!stratTrades.length) return null;
+        const wins = stratTrades.filter((t) => (t.pnl || 0) > 0).length;
+        const losses = stratTrades.filter((t) => (t.pnl || 0) < 0).length;
+        const totalPnL = stratTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+        return {
+          id: strategy.id,
+          name: strategy.name,
+          tradeCount: stratTrades.length,
+          wins,
+          losses,
+          winRate: stratTrades.length ? ((wins / stratTrades.length) * 100).toFixed(1) : "0",
+          totalPnL: totalPnL.toFixed(2),
+          avgPnL: (totalPnL / stratTrades.length).toFixed(2),
+        };
+      }).filter(Boolean);
+
+      return (
+        <ApexChatNew
+          userId={user?.id}
+          trades={filteredTrades}
+          strategies={strategies || []}
+          strategyStats={strategyStats}
+          journalNotes={journalNotesArr}
+          dailyNotes={agentDailyNotes || {}}
+        />
+      );
+    })(),
   };
 
   // ✅ Afficher un écran de chargement pendant que l'authentification se charge

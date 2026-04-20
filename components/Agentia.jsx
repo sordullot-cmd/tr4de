@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import ApexChat from "@/components/ApexChat";
+import ApexChat from "@/components/ApexChatNew";
 import AgentNotifications from "@/components/AgentNotifications";
 import TradeForm from "@/components/TradeForm";
 
@@ -12,6 +12,9 @@ export default function Agentia({ trades: initialTrades = [] }) {
   const [loading, setLoading] = useState(true);
   const [trades, setTrades] = useState(initialTrades);
   const [journalNotes, setJournalNotes] = useState([]);
+  const [strategies, setStrategies] = useState([]);
+  const [dailyNotes, setDailyNotes] = useState({});
+  const [strategyStats, setStrategyStats] = useState([]);
   const [activeTab, setActiveTab] = useState("chat");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -32,23 +35,167 @@ export default function Agentia({ trades: initialTrades = [] }) {
     checkUser();
   }, [supabase]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!userId || userId.startsWith("demo-")) return;
-
+  // Fonction pour calculer les stats de stratégie
+  const calculateStrategyStats = (tradesData, strategiesData) => {
+    if (!tradesData || !strategiesData) return [];
+    
+    const stats = strategiesData.map(strategy => {
+      // Charger les assignments depuis localStorage
+      let assignments = {};
       try {
-        const { data: tradesData } = await supabase
-          .from("trades").select("*").eq("user_id", userId).order("entry_time", { ascending: false });
-        if (tradesData) setTrades(tradesData);
-
-        const { data: notesData } = await supabase
-          .from("trade_details").select("*").eq("user_id", userId);
-        if (notesData) setJournalNotes(notesData);
+        const stored = localStorage.getItem('tr4de_trade_strategies');
+        assignments = stored ? JSON.parse(stored) : {};
       } catch (err) {
-        console.error("Error:", err);
+        console.warn("Erreur loading trade assignments:", err);
+      }
+
+      // Filtrer les trades de cette stratégie
+      const strategyTrades = tradesData.filter(trade => {
+        let strategyIds = assignments[trade.id] || [];
+        if (!strategyIds.length && trade.date && trade.symbol && trade.entry) {
+          strategyIds = assignments[`${trade.date}${trade.symbol}${trade.entry}`] || [];
+        }
+        return strategyIds.includes(strategy.id);
+      });
+
+      if (strategyTrades.length === 0) return null;
+
+      // Calculer les stats
+      const wins = strategyTrades.filter(t => t.pnl > 0).length;
+      const losses = strategyTrades.filter(t => t.pnl < 0).length;
+      const totalPnL = strategyTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+      const winRate = strategyTrades.length > 0 ? (wins / strategyTrades.length * 100) : 0;
+      const avgPnL = strategyTrades.length > 0 ? totalPnL / strategyTrades.length : 0;
+
+      return {
+        id: strategy.id,
+        name: strategy.name,
+        description: strategy.description,
+        tradeCount: strategyTrades.length,
+        wins,
+        losses,
+        winRate: winRate.toFixed(1),
+        totalPnL: totalPnL.toFixed(2),
+        avgPnL: avgPnL.toFixed(2),
+        color: strategy.color,
+      };
+    }).filter(s => s !== null);
+
+    return stats;
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const readLocal = (key, fallback) => {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
       }
     };
-    fetchData();
+
+    // Convertit une map { tradeId: "note" } en tableau [{ trade_id, notes }]
+    const tradeNotesMapToArray = (map) =>
+      Object.entries(map || {})
+        .filter(([, notes]) => notes && String(notes).trim())
+        .map(([trade_id, notes]) => ({ trade_id, notes: String(notes) }));
+
+    // 1️⃣ Charger IMMÉDIATEMENT depuis localStorage (marche pour démo + auth)
+    const localStrategies = readLocal("tr4de_strategies", []);
+    const localDailyNotes = readLocal("tr4de_daily_notes", {});
+    const localTradeNotes = tradeNotesMapToArray(readLocal("tr4de_trade_notes", {}));
+
+    console.log("⚡ Agentia: chargement localStorage", {
+      strategies: localStrategies.length,
+      dailyNotes: Object.keys(localDailyNotes).length,
+      tradeNotes: localTradeNotes.length,
+    });
+
+    setStrategies(localStrategies);
+    setDailyNotes(localDailyNotes);
+    setJournalNotes(localTradeNotes);
+
+    // Stats calculées à partir des trades déjà en state et des stratégies locales
+    setTrades((currentTrades) => {
+      if (currentTrades && currentTrades.length && localStrategies.length) {
+        setStrategyStats(calculateStrategyStats(currentTrades, localStrategies));
+      }
+      return currentTrades;
+    });
+
+    // 2️⃣ Utilisateur démo → on s'arrête là (localStorage suffit)
+    if (userId.startsWith("demo-")) return;
+
+    // 3️⃣ Sync Supabase en arrière-plan et fusion avec le local
+    const syncFromSupabase = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          console.log("ℹ️ Pas d'auth → on garde les données localStorage");
+          return;
+        }
+
+        console.log("🔄 Agentia: sync Supabase pour", userId);
+
+        const [tradesRes, notesRes, stratsRes, dailyRes] = await Promise.all([
+          supabase.from("trades").select("*").eq("user_id", userId).order("entry_time", { ascending: false }),
+          supabase.from("trade_details").select("trade_id, notes").eq("user_id", userId).not("notes", "is", null),
+          supabase.from("strategies").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+          supabase.from("daily_session_notes").select("date, notes").eq("user_id", userId).order("date", { ascending: false }),
+        ]);
+
+        // Trades
+        let mergedTrades = [];
+        if (tradesRes.data?.length) {
+          setTrades(tradesRes.data);
+          mergedTrades = tradesRes.data;
+        }
+
+        // Stratégies : Supabase prioritaire, sinon on garde le local
+        const mergedStrategies = stratsRes.data?.length ? stratsRes.data : localStrategies;
+        if (stratsRes.data?.length) setStrategies(stratsRes.data);
+
+        // Stats recalculées avec les données fusionnées
+        if (mergedTrades.length && mergedStrategies.length) {
+          setStrategyStats(calculateStrategyStats(mergedTrades, mergedStrategies));
+        }
+
+        // Notes de trade : fusion Supabase + localStorage (clé = trade_id)
+        if (notesRes.data?.length) {
+          const byTrade = new Map(localTradeNotes.map((n) => [n.trade_id, n]));
+          notesRes.data.forEach((n) => {
+            if (n.notes) byTrade.set(n.trade_id, { trade_id: n.trade_id, notes: n.notes });
+          });
+          setJournalNotes(Array.from(byTrade.values()));
+        }
+
+        // Notes journalières : fusion (local prioritaire sur remote en cas de conflit)
+        if (dailyRes.data?.length) {
+          const remoteMap = {};
+          dailyRes.data.forEach((e) => { if (e.notes) remoteMap[e.date] = e.notes; });
+          setDailyNotes({ ...remoteMap, ...localDailyNotes });
+        }
+
+        console.log("✅ Agentia: sync terminée", {
+          trades: tradesRes.data?.length || 0,
+          tradeNotes: notesRes.data?.length || 0,
+          strategies: stratsRes.data?.length || 0,
+          dailyNotes: dailyRes.data?.length || 0,
+          errors: {
+            trades: tradesRes.error?.code,
+            notes: notesRes.error?.code,
+            strats: stratsRes.error?.code,
+            daily: dailyRes.error?.code,
+          },
+        });
+      } catch (err) {
+        console.error("❌ Sync Supabase:", err);
+      }
+    };
+
+    syncFromSupabase();
   }, [userId, supabase]);
 
   const handleLogin = async () => {
@@ -174,7 +321,14 @@ export default function Agentia({ trades: initialTrades = [] }) {
         {/* Tab Content */}
         {activeTab === "chat" && (
           <div className="animate-fadeIn">
-            <ApexChat userId={userId} trades={trades} journalNotes={journalNotes} />
+            <ApexChat 
+              userId={userId} 
+              trades={trades} 
+              journalNotes={journalNotes}
+              strategies={strategies}
+              strategyStats={strategyStats}
+              dailyNotes={dailyNotes}
+            />
           </div>
         )}
 

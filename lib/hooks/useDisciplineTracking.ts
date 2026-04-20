@@ -1,6 +1,7 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getErrorMessage, getErrorCode } from "@/lib/utils/errorUtils";
+import { getLocalDateString } from "@/lib/dateUtils";
 import { useState, useEffect, useCallback } from "react";
 
 interface DisciplineEntry {
@@ -42,7 +43,7 @@ export function useDisciplineTracking() {
     }
 
     // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT pour aujourd'hui
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     try {
       const stored = localStorage.getItem(`tr4de_checked_rules_${today}`);
       const rulesData = stored ? JSON.parse(stored) : {};
@@ -70,7 +71,7 @@ export function useDisciplineTracking() {
           .from("daily_discipline_tracking")
           .select("date, rule_id, completed")
           .eq("user_id", user.id)
-          .gte("date", startDate.toISOString().split('T')[0])
+          .gte("date", getLocalDateString(startDate))
           .order("date", { ascending: false });
 
         if (err) {

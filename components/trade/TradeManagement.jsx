@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { getLocalDateString } from "@/lib/dateUtils";
 
 const INITIAL_TRADES = [
   {
@@ -121,7 +122,7 @@ export default function TradeManagement() {
 
     const newTrade = {
       id: Math.max(...trades.map((t) => t.id), 0) + 1,
-      date: new Date().toISOString().split("T")[0],
+      date: getLocalDateString(),
       ...formData,
       entry: parseFloat(entry),
       exit: parseFloat(exit),

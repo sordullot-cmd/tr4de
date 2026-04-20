@@ -6,6 +6,9 @@ interface ApexChatProps {
   userId: string;
   trades?: any[];
   journalNotes?: any[];
+  strategies?: any[];
+  strategyStats?: any[];
+  dailyNotes?: Record<string, string>;
 }
 
 interface Message {
@@ -13,11 +16,19 @@ interface Message {
   content: string;
 }
 
-export default function ApexChat({ userId, trades = [], journalNotes = [] }: ApexChatProps) {
+export default function ApexChat({ 
+  userId, 
+  trades = [], 
+  journalNotes = [],
+  strategies = [],
+  strategyStats = [],
+  dailyNotes = {}
+}: ApexChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [debugExpanded, setDebugExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,14 +38,23 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
     if (Array.isArray(journalNotes) && journalNotes.length > 0) {
       console.log("📔 ApexChat reçu journal notes:", journalNotes.length, "notes");
     }
-  }, [trades, journalNotes]);
+    if (Array.isArray(strategies) && strategies.length > 0) {
+      console.log("📊 ApexChat reçu strategies:", strategies.length, "stratégies");
+    }
+    if (Array.isArray(strategyStats) && strategyStats.length > 0) {
+      console.log("📈 ApexChat reçu strategy stats:", strategyStats.length, "stats");
+    }
+    if (dailyNotes && Object.keys(dailyNotes).length > 0) {
+      console.log("📅 ApexChat reçu daily notes:", Object.keys(dailyNotes).length, "notes");
+    }
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes]);
 
-  // Envoyer automatiquement le contexte du journal au chargement
+  // Envoyer automatiquement le contexte complet avec toutes les données au chargement
   useEffect(() => {
     const initializeContext = async () => {
       // Attendre que les données soient disponibles
-      if ((trades.length > 0 || journalNotes.length > 0) && messages.length === 0) {
-        console.log("📡 Initialisation du contexte pour l'IA...");
+      if ((trades.length > 0 || journalNotes.length > 0 || strategies.length > 0) && messages.length === 0) {
+        console.log("📡 Initialisation du contexte complet pour l'IA...");
         
         // Envoyer automatiquement un message système avec les données
         const cleanString = (str: any): string => {
@@ -65,16 +85,40 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
           created_at: cleanString(note?.created_at || new Date().toISOString()),
         })) : [];
 
+        // 🆕 Nettoyer les stratégies
+        const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
+          id: cleanString(s?.id),
+          name: cleanString(s?.name),
+          description: cleanString(s?.description || ""),
+          color: cleanString(s?.color),
+        })) : [];
+
+        // 🆕 Nettoyer les stats de stratégie
+        const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
+          id: cleanString(stat?.id),
+          name: cleanString(stat?.name),
+          tradeCount: Number(stat?.tradeCount) || 0,
+          wins: Number(stat?.wins) || 0,
+          losses: Number(stat?.losses) || 0,
+          winRate: cleanString(stat?.winRate),
+          totalPnL: cleanString(stat?.totalPnL),
+          avgPnL: cleanString(stat?.avgPnL),
+        })) : [];
+
+        // 🆕 Nettoyer les notes journalières
+        const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
+          acc[date] = cleanString(note);
+          return acc;
+        }, {} as Record<string, string>) : {};
+
         const payload = {
-          messages: [
-            {
-              role: "user" as const,
-              content: `Contexte initialisé - J'ai ${trades.length} trades et ${journalNotes.length} notes du journal à analyser.`,
-            },
-          ],
+          messages: [],
           userId: cleanString(userId || "unknown"),
           trades: cleanTrades,
           journalNotes: cleanJournalNotes,
+          strategies: cleanStrategies,
+          strategyStats: cleanStrategyStats,
+          dailyNotes: cleanDailyNotes,
         };
 
         try {
@@ -86,12 +130,7 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
 
           if (response.ok) {
             console.log("✅ Contexte initialisé - L'IA a accès aux données");
-            setMessages([
-              {
-                role: "assistant",
-                content: `✅ Contexte chargé - J'ai accès à vos ${trades.length} trades et ${journalNotes.length} notes du journal. Prêt à analyser!`,
-              },
-            ]);
+            // Message automatique désactivé - le chat reste vide jusqu'à la première question
           }
         } catch (err) {
           console.error("Erreur lors de l'initialisation:", err);
@@ -100,17 +139,17 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
     };
 
     initializeContext();
-  }, [trades, journalNotes, userId]);
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, userId]);
 
   const prompts = [
-    { category: "Trades", color: "#06B6D4", emoji: "📊", text: "Donne-moi le résumé de mes trades" },
-    { category: "Analyse", color: "#8B5CF6", emoji: "📈", text: "Qu'est-ce qui amène le succès dans mon trading?" },
-    { category: "Performance", color: "#EC4899", emoji: "🎯", text: "Où suis-je le plus rentable?" },
-    { category: "Risque", color: "#F59E0B", emoji: "⚠️", text: "Où suis-je le moins rentable?" },
-    { category: "Amélioration", color: "#10B981", emoji: "💡", text: "Comment améliorer mon trading?" },
-    { category: "Stratégie", color: "#3B82F6", emoji: "🎲", text: "Comment améliorer ma stratégie?" },
-    { category: "Diagnostic", color: "#06B6D4", emoji: "🔍", text: "Où je manque dans mon trading?" },
-    { category: "Mindset", color: "#8B5CF6", emoji: "🧠", text: "Qu'est-ce qui me retient de faire plus?" },
+    { category: "Trades", color: "#06B6D4", emoji: "", text: "Résumé de mes trades" },
+    { category: "Analyse", color: "#8B5CF6", emoji: "", text: "Facteurs de succès" },
+    { category: "Performance", color: "#EC4899", emoji: "", text: "Rentabilité maximale" },
+    { category: "Risque", color: "#F59E0B", emoji: "", text: "Zones de faiblesse" },
+    { category: "Amélioration", color: "#10B981", emoji: "", text: "Optimisation du trading" },
+    { category: "Stratégie", color: "#3B82F6", emoji: "", text: "Raffinement stratégique" },
+    { category: "Diagnostic", color: "#06B6D4", emoji: "", text: "Analyse diagnostic" },
+    { category: "Discipline", color: "#8B5CF6", emoji: "", text: "Amélioration discipline" },
   ];
 
   const scrollToBottom = () => {
@@ -164,11 +203,40 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
         created_at: cleanString(note?.created_at || new Date().toISOString()),
       })) : [];
 
+      // 🆕 Construire les stratégies avec nettoyage strict
+      const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
+        id: cleanString(s?.id),
+        name: cleanString(s?.name),
+        description: cleanString(s?.description || ""),
+        color: cleanString(s?.color),
+      })) : [];
+
+      // 🆕 Construire les stats de stratégie avec nettoyage strict
+      const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
+        id: cleanString(stat?.id),
+        name: cleanString(stat?.name),
+        tradeCount: Number(stat?.tradeCount) || 0,
+        wins: Number(stat?.wins) || 0,
+        losses: Number(stat?.losses) || 0,
+        winRate: cleanString(stat?.winRate),
+        totalPnL: cleanString(stat?.totalPnL),
+        avgPnL: cleanString(stat?.avgPnL),
+      })) : [];
+
+      // 🆕 Construire les notes journalières avec nettoyage strict
+      const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
+        acc[date] = cleanString(note);
+        return acc;
+      }, {} as Record<string, string>) : {};
+
       const payload = {
         messages: cleanMessages,
         userId: cleanString(userId || "unknown"),
         trades: cleanTrades,
         journalNotes: cleanJournalNotes,
+        strategies: cleanStrategies,
+        strategyStats: cleanStrategyStats,
+        dailyNotes: cleanDailyNotes,
       };
 
       const bodyStr = JSON.stringify(payload, (key, value) => {
@@ -230,7 +298,7 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+        background: "#0a0a0a",
         paddingBottom: "0",
       }}>
         {/* Scrollable Content Area */}
@@ -242,59 +310,72 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
           alignItems: "center",
           padding: "40px 20px",
         }}>
-          {/* Hero Section */}
+          {/* Input Section - JUSTE AU DESSUS DES SUGGESTIONS */}
           <div style={{
-            textAlign: "center",
-            marginBottom: "50px",
-            maxWidth: "700px",
+            display: "flex",
+            gap: "12px",
+            maxWidth: "1100px",
+            margin: "0 auto 60px auto",
+            width: "100%",
+            paddingBottom: "0",
           }}>
-            {/* Icon */}
-            <div style={{
-              fontSize: "80px",
-              marginBottom: "24px",
-              animation: "float 3s ease-in-out infinite",
-            }}>
-              ✨
-            </div>
-
-            {/* Main Title */}
-            <h1 style={{
-              fontSize: "42px",
-              fontWeight: "800",
-              marginBottom: "12px",
-              background: "linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              margin: "0 0 12px 0",
-            }}>
-              Apex AI Coach
-            </h1>
-
-            {/* Subtitle */}
-            <p style={{
-              fontSize: "18px",
-              color: "#64748b",
-              fontWeight: "500",
-              marginBottom: "8px",
-              margin: "0 0 8px 0",
-            }}>
-              Votre assistant personnel de trading
-            </p>
-
-            {/* Description */}
-            <div style={{
-              background: "rgba(255,255,255,0.8)",
-              border: "1px solid rgba(203, 213, 225, 0.8)",
-              borderRadius: "12px",
-              padding: "16px 20px",
-              marginTop: "20px",
-              color: "#475569",
-              fontSize: "14px",
-              lineHeight: "1.6",
-            }}>
-              📊 Analysez vos trades • 📈 Optimisez votre stratégie • 💡 Obtenez des insights
-            </div>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage(input)}
+              placeholder="Ask me something..."
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                padding: "20px 24px",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "10px",
+                color: "#ffffff",
+                fontSize: "16px",
+                outline: "none",
+                transition: "all 0.3s",
+                minHeight: "56px",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+                e.currentTarget.style.borderColor = "rgba(16,181,145,0.5)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+              }}
+            />
+            <button
+              onClick={() => handleSendMessage(input)}
+              disabled={isLoading || !input.trim()}
+              style={{
+                padding: "20px 32px",
+                background: "#10B981",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "10px",
+                fontSize: "15px",
+                fontWeight: "600",
+                cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
+                opacity: isLoading || !input.trim() ? 0.5 : 1,
+                transition: "all 0.3s",
+                minHeight: "56px",
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading && input.trim()) {
+                  e.currentTarget.style.background = "#0ea572";
+                  e.currentTarget.style.transform = "scale(1.02)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#10B981";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {isLoading ? "..." : "Send"}
+            </button>
           </div>
 
           {/* Suggestions Grid */}
@@ -303,21 +384,21 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
             maxWidth: "1100px",
           }}>
             <div style={{
-              fontSize: "12px",
-              fontWeight: "700",
-              color: "#94a3b8",
-              marginBottom: "24px",
+              fontSize: "14px",
+              fontWeight: "600",
+              color: "#666666",
+              marginBottom: "32px",
               textAlign: "center",
               textTransform: "uppercase",
               letterSpacing: "1px",
             }}>
-              📌 Questions suggérées
+              Tailored prompts for you
             </div>
 
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: "16px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              gap: "20px",
               width: "100%",
             }}>
               {prompts.map((prompt, idx) => (
@@ -325,52 +406,45 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
                   key={idx}
                   onClick={() => handleSendMessage(prompt.text)}
                   style={{
-                    background: "white",
-                    border: "2px solid rgba(203, 213, 225, 0.8)",
-                    borderRadius: "16px",
-                    padding: "20px",
+                    background: "rgba(20,20,20,0.8)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: "12px",
+                    padding: "24px",
                     textAlign: "left",
                     cursor: "pointer",
                     transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    color: "#1e293b",
-                    fontSize: "14px",
+                    color: "#ffffff",
+                    fontSize: "15px",
                     fontWeight: "500",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "12px",
+                    gap: "16px",
                     position: "relative",
                     overflow: "hidden",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = prompt.color;
-                    e.currentTarget.style.background = `${prompt.color}08`;
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                    e.currentTarget.style.background = "rgba(30,30,30,1)";
                     e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = `0 12px 24px ${prompt.color}20`;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(203, 213, 225, 0.8)";
-                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
+                    e.currentTarget.style.background = "rgba(20,20,20,0.8)";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   {/* Category Badge */}
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
+                    gap: "12px",
                   }}>
                     <span style={{
-                      fontSize: "16px",
-                    }}>
-                      {prompt.emoji}
-                    </span>
-                    <span style={{
                       background: prompt.color,
-                      color: "#fff",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "11px",
+                      color: "#ffffff",
+                      padding: "6px 12px",
+                      borderRadius: "20px",
+                      fontSize: "12px",
                       fontWeight: "700",
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
@@ -381,19 +455,20 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
 
                   {/* Question Text */}
                   <div style={{
-                    fontSize: "15px",
+                    fontSize: "16px",
                     fontWeight: "600",
-                    color: "#1e293b",
+                    color: "#ffffff",
+                    lineHeight: "1.5",
                   }}>
                     {prompt.text}
                   </div>
 
                   {/* Arrow */}
                   <div style={{
-                    fontSize: "18px",
-                    marginTop: "8px",
-                    color: prompt.color,
-                    opacity: "0.6",
+                    fontSize: "20px",
+                    marginTop: "12px",
+                    color: "#10B981",
+                    opacity: "1",
                     transition: "all 0.3s",
                   }}>
                     →
@@ -406,9 +481,9 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
 
         {/* Input Section */}
         <div style={{
-          padding: "20px",
-          background: "white",
-          borderTop: "1px solid rgba(203, 213, 225, 0.3)",
+          padding: "24px",
+          background: "#0a0a0a",
+          borderTop: "1px solid rgba(255,255,255,0.1)",
         }}>
           <div style={{
             display: "flex",
@@ -421,57 +496,55 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && handleSendMessage(input)}
-              placeholder="Posez votre question..."
+              placeholder="Ask me something..."
               disabled={isLoading}
               style={{
                 flex: 1,
-                padding: "12px 16px",
-                background: "rgba(226, 232, 240, 0.5)",
-                border: "1px solid rgba(203, 213, 225, 0.8)",
+                padding: "14px 18px",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.2)",
                 borderRadius: "10px",
-                color: "#1e293b",
-                fontSize: "14px",
+                color: "#ffffff",
+                fontSize: "15px",
                 outline: "none",
-                transition: "all 0.2s",
-                fontFamily: "inherit",
+                transition: "all 0.3s",
               }}
               onFocus={(e) => {
-                e.currentTarget.style.background = "rgba(226, 232, 240, 1)";
-                e.currentTarget.style.borderColor = "#06B6D4";
+                e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+                e.currentTarget.style.borderColor = "rgba(16,181,145,0.5)";
               }}
               onBlur={(e) => {
-                e.currentTarget.style.background = "rgba(226, 232, 240, 0.5)";
-                e.currentTarget.style.borderColor = "rgba(203, 213, 225, 0.8)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
               }}
             />
             <button
               onClick={() => handleSendMessage(input)}
               disabled={isLoading || !input.trim()}
               style={{
-                padding: "12px 32px",
-                background: "#06B6D4",
-                color: "#fff",
+                padding: "14px 24px",
+                background: "#10B981",
+                color: "#ffffff",
                 border: "none",
                 borderRadius: "10px",
-                cursor: input.trim() && !isLoading ? "pointer" : "not-allowed",
-                fontWeight: "700",
-                fontSize: "14px",
+                fontSize: "15px",
+                fontWeight: "600",
+                cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
                 opacity: isLoading || !input.trim() ? 0.5 : 1,
-                transition: "all 0.2s",
-                whiteSpace: "nowrap",
+                transition: "all 0.3s",
               }}
               onMouseEnter={(e) => {
                 if (!isLoading && input.trim()) {
-                  e.currentTarget.style.background = "#0891B2";
+                  e.currentTarget.style.background = "#0ea572";
                   e.currentTarget.style.transform = "scale(1.02)";
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#06B6D4";
+                e.currentTarget.style.background = "#10B981";
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              {isLoading ? "⏳" : "Envoyer"}
+              {isLoading ? "..." : "Send"}
             </button>
           </div>
         </div>
@@ -493,10 +566,162 @@ export default function ApexChat({ userId, trades = [], journalNotes = [] }: Ape
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+        background: "#0a0a0a",
         overflow: "hidden",
       }}
     >
+      {/* 🔧 DEBUG BLOCK */}
+      <div style={{
+        background: "#f0f9ff",
+        borderBottom: "2px solid #0284c7",
+        padding: "12px 20px",
+      }}>
+        <div 
+          onClick={() => setDebugExpanded(!debugExpanded)}
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontWeight: "600",
+            fontSize: "12px",
+            color: "#0284c7",
+          }}
+        >
+          <span>{debugExpanded ? "▼" : "▶"}</span>
+          🔧 DEBUG - Données envoyées à l'IA
+        </div>
+        
+        {debugExpanded && (
+          <div style={{
+            marginTop: "12px",
+            background: "white",
+            borderRadius: "8px",
+            padding: "12px",
+            fontSize: "11px",
+            fontFamily: "monospace",
+            border: "1px solid #cbd5e1",
+            maxHeight: "300px",
+            overflowY: "auto",
+          }}>
+            <div style={{ marginBottom: "8px", color: "#0284c7", fontWeight: "bold" }}>📊 RÉSUMÉ DES DONNÉES:</div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>Trades:</div>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#0284c7" }}>
+                  {Array.isArray(trades) ? trades.length : 0}
+                </div>
+              </div>
+              
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>Strategies:</div>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#8b5cf6" }}>
+                  {Array.isArray(strategies) ? strategies.length : 0}
+                </div>
+              </div>
+              
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>Strategy Stats:</div>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#ec4899" }}>
+                  {Array.isArray(strategyStats) ? strategyStats.length : 0}
+                </div>
+              </div>
+              
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>Daily Notes:</div>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#f59e0b" }}>
+                  {dailyNotes ? Object.keys(dailyNotes).length : 0}
+                </div>
+              </div>
+              
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>Journal Notes:</div>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#10b981" }}>
+                  {Array.isArray(journalNotes) ? journalNotes.length : 0}
+                </div>
+              </div>
+              
+              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
+                <div style={{ color: "#666" }}>User ID:</div>
+                <div style={{ fontSize: "11px", fontWeight: "bold", color: "#6366f1", wordBreak: "break-all" }}>
+                  {userId ? (userId.substring(0, 12) + "...") : "N/A"}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px", marginTop: "8px" }}>
+              <div style={{ color: "#0284c7", fontWeight: "bold", marginBottom: "4px" }}>📝 DÉTAILS:</div>
+              
+              {Array.isArray(trades) && trades.length > 0 && (
+                <div style={{ marginBottom: "8px", color: "#475569" }}>
+                  <strong>Trades (premiers 3):</strong>
+                  <div style={{ marginLeft: "8px" }}>
+                    {trades.slice(0, 3).map((t: any, i: number) => (
+                      <div key={i} style={{ fontSize: "10px" }}>
+                        • {t.symbol} {t.direction} @ {t.entry_time?.split('T')[0]}: P&L {t.pnl}$
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {Array.isArray(strategies) && strategies.length > 0 && (
+                <div style={{ marginBottom: "8px", color: "#475569" }}>
+                  <strong>Strategies:</strong>
+                  <div style={{ marginLeft: "8px" }}>
+                    {strategies.slice(0, 3).map((s: any, i: number) => (
+                      <div key={i} style={{ fontSize: "10px" }}>
+                        • {s.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {Array.isArray(strategyStats) && strategyStats.length > 0 && (
+                <div style={{ marginBottom: "8px", color: "#475569" }}>
+                  <strong>Strategy Stats (premiers 3):</strong>
+                  <div style={{ marginLeft: "8px" }}>
+                    {strategyStats.slice(0, 3).map((stat: any, i: number) => (
+                      <div key={i} style={{ fontSize: "10px" }}>
+                        • {stat.name}: {stat.tradeCount} trades, WR {stat.winRate}%, P&L {stat.totalPnL}$
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {dailyNotes && Object.keys(dailyNotes).length > 0 && (
+                <div style={{ marginBottom: "8px", color: "#475569" }}>
+                  <strong>Daily Notes (premières 3):</strong>
+                  <div style={{ marginLeft: "8px" }}>
+                    {Object.entries(dailyNotes).slice(0, 3).map(([date, note]: any, i: number) => (
+                      <div key={i} style={{ fontSize: "10px" }}>
+                        • {date}: {String(note).substring(0, 50)}...
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {Array.isArray(journalNotes) && journalNotes.length > 0 && (
+                <div style={{ color: "#475569" }}>
+                  <strong>Journal Notes (premiers 2):</strong>
+                  <div style={{ marginLeft: "8px" }}>
+                    {journalNotes.slice(0, 2).map((note: any, i: number) => (
+                      <div key={i} style={{ fontSize: "10px" }}>
+                        • Trade {note.trade_id}: {note.notes?.substring(0, 40)}... [Émotions: {note.emotion_tags?.join(', ')}]
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Messages Container */}
       <div
         style={{

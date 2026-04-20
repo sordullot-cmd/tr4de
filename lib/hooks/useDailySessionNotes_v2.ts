@@ -1,6 +1,7 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/utils/errorUtils";
+import { getLocalDateString } from "@/lib/dateUtils";
 import { useState, useEffect, useCallback } from "react";
 
 /**
@@ -46,7 +47,7 @@ export function useDailySessionNotes() {
             .from("daily_session_notes")
             .select("date, notes")
             .eq("user_id", user.id)
-            .gte("date", startDate.toISOString().split('T')[0])
+            .gte("date", getLocalDateString(startDate))
             .order("date", { ascending: false });
 
           if (err) {

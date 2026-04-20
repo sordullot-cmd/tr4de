@@ -59,11 +59,26 @@ function Pill({ children, color="gray", small }) {
 
 export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId = () => {} }) {
   // ✅ Utiliser les hooks Supabase au lieu de localStorage
-  const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
-  const { trades } = useTrades();
+  const strategiesHook = useStrategies();
+  const tradesHook = useTrades();
+  
+  // ✅ Destructure with safe defaults
+  const { strategies = [], addStrategy = async () => {}, updateStrategy = async () => {}, deleteStrategy = async () => {} } = strategiesHook || {};
+  const { trades = [] } = tradesHook || {};
+  
+  // ✅ Debug logs
+  React.useEffect(() => {
+    console.log("🔍 StrategyPage Hook Status:");
+    console.log("   strategiesHook:", strategiesHook ? "✅ returned" : "❌ null/undefined");
+    console.log("   strategies array:", Array.isArray(strategies) ? `✅ ${strategies.length} items` : "❌ not array");
+    console.log("   tradesHook:", tradesHook ? "✅ returned" : "❌ null/undefined");
+    console.log("   trades array:", Array.isArray(trades) ? `✅ ${trades.length} items` : "❌ not array");
+  }, [strategies, trades]);
   
   const [loading, setLoading] = useState(false);
   const [showStrategyForm, setShowStrategyForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [strategyToDelete, setStrategyToDelete] = useState(null);
   const [formData, setFormData] = useState({name:"",description:"",color:"#22C55E",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
   const [editingStrategyId, setEditingStrategyId] = useState(null);
   
@@ -192,6 +207,36 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
     setShowStrategyForm(true);
   };
 
+  const handleDeleteStrategy = async (strategyId) => {
+    // Open confirmation dialog
+    setStrategyToDelete(strategyId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!strategyToDelete) return;
+    try {
+      setLoading(true);
+      await deleteStrategy(strategyToDelete);
+      console.log('✅ Stratégie supprimée');
+      setShowDeleteConfirm(false);
+      setStrategyToDelete(null);
+    } catch (err) {
+      const errMsg = err?.message || JSON.stringify(err) || 'Unknown error';
+      console.error('❌ Erreur suppression stratégie:', errMsg);
+      alert(`❌ Erreur lors de la suppression: ${errMsg}`);
+      setShowDeleteConfirm(false);
+      setStrategyToDelete(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setStrategyToDelete(null);
+  };
+
   const handleCancelEdit = () => {
     setShowStrategyForm(false);
     setEditingStrategyId(null);
@@ -249,7 +294,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       </div>
 
       {/* STRATEGIES LIST - VERTICAL */}
-      {strategies.length > 0 && (
+      {strategies && Array.isArray(strategies) && strategies.length > 0 && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {/* DEBUG INFO */}
           <div style={{padding:"12px",background:"#f0f0f0",borderRadius:8,fontSize:12,color:"#666",marginBottom:12}}>
@@ -403,12 +448,15 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               });
               
               // Créer le path
-              let pathData = `M 0 ${height}`;
+              const startY = isPositive ? height : 0;
+              const endY = isPositive ? height : 0;
+              let pathData = `M 0 ${startY}`;
               normalized.forEach((y, i) => {
                 const x = (i / (normalized.length - 1 || 1)) * width;
-                pathData += ` L ${x} ${height - y}`;
+                const plotY = isPositive ? height - y : y;
+                pathData += ` L ${x} ${plotY}`;
               });
-              pathData += ` L ${width} ${height} Z`;
+              pathData += ` L ${width} ${endY} Z`;
               
               const gradColor = isPositive ? T.green : T.red;
               
@@ -516,7 +564,54 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
                 {/* ========== RIGHT SECTION: RULES ========== */}
                 <div style={{display:"flex",flexDirection:"column",gap:12,paddingLeft:16}}>
-                  <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Rules</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Rules</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {/* Delete Button - Small X Icon */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteStrategy(strategy.id);
+                        }}
+                        style={{
+                          padding:"4px 8px",
+                          fontSize:10,
+                          borderRadius:4,
+                          border:`1px solid ${T.border}`,
+                          background:T.white,
+                          color:T.red,
+                          cursor:"pointer",
+                          whiteSpace:"nowrap",
+                          flexShrink:0,
+                          transition:"all .2s"
+                        }}
+                      >
+                        ✕
+                      </button>
+                      
+                      {/* Edit Button - Small Pencil Icon */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditStrategy(strategy);
+                        }}
+                        style={{
+                          padding:"4px 8px",
+                          fontSize:10,
+                          borderRadius:4,
+                          border:`1px solid ${T.border}`,
+                          background:T.white,
+                          color:T.textSub,
+                          cursor:"pointer",
+                          whiteSpace:"nowrap",
+                          flexShrink:0,
+                          transition:"all .2s"
+                        }}
+                      >
+                        ✎
+                      </button>
+                    </div>
+                  </div>
                   
                   <div style={{display:"flex",flexDirection:"column",gap:8,flex:1,overflowY:"auto",maxHeight:160}}>
                     {strategy.groups && strategy.groups.length > 0 ? (
@@ -532,26 +627,6 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                               <div style={{fontSize:11,color:T.text,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                                 {rule.text || `Rule ${idx+1}`}
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditStrategy(strategy);
-                                }}
-                                style={{
-                                  padding:"4px 8px",
-                                  fontSize:10,
-                                  borderRadius:4,
-                                  border:`1px solid ${T.border}`,
-                                  background:T.white,
-                                  color:T.textSub,
-                                  cursor:"pointer",
-                                  whiteSpace:"nowrap",
-                                  flexShrink:0,
-                                  transition:"all .2s"
-                                }}
-                              >
-                                ✎
-                              </button>
                             </div>
                           ))}
                         </div>
@@ -560,28 +635,6 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                       <div style={{fontSize:11,color:T.textMut,fontStyle:"italic"}}>No rules</div>
                     )}
                   </div>
-                  
-                  {/* Edit Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditStrategy(strategy);
-                    }}
-                    style={{
-                      padding:"8px 12px",
-                      fontSize:11,
-                      fontWeight:600,
-                      borderRadius:6,
-                      border:`1px solid ${T.accent}`,
-                      background:T.accent,
-                      color:"#fff",
-                      cursor:"pointer",
-                      transition:"all .2s",
-                      marginTop:"auto"
-                    }}
-                  >
-                    Éditer
-                  </button>
                 </div>
               </div>
             );
@@ -590,13 +643,48 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       )}
 
       {/* EMPTY STATE */}
-      {strategies.length === 0 && (
+      {(!strategies || !Array.isArray(strategies) || strategies.length === 0) && (
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"80px 40px",textAlign:"center",minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
           <div style={{fontSize:64,marginBottom:20}}>🎯</div>
           <div style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:8}}>Pas encore de stratégies</div>
           <div style={{fontSize:14,color:T.textSub,marginBottom:24,maxWidth:400}}>Créez votre première stratégie de trading avec des règles pour suivre comment tout s'agit.</div>
           <button onClick={()=>setShowStrategyForm(true)} style={{padding:"12px 24px",borderRadius:8,background:"#000",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",border:"none"}}>+ Créer votre première stratégie</button>
+          {(!strategies || !Array.isArray(strategies)) && (
+            <div style={{marginTop:32,padding:16,background:"#fff3cd",borderRadius:8,fontSize:11,color:"#666",border:`1px solid #ffc107`}}>
+              <strong>🔍 Debug Info:</strong><br/>
+              strategies type: {typeof strategies}<br/>
+              strategies is array: {Array.isArray(strategies) ? "yes" : "no"}<br/>
+              Check browser console for more details
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ─── MODALE DE CONFIRMATION DE SUPPRESSION ─── */}
+      {showDeleteConfirm && ReactDOM.createPortal(
+        <div onClick={cancelDelete} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:12,padding:32,maxWidth:400,width:"90%",boxShadow:"0 20px 25px -5px rgba(0,0,0,0.1)"}}>
+            <h2 style={{fontSize:18,fontWeight:700,color:T.text,textAlign:"left",marginBottom:12}}>Supprimer cette stratégie?</h2>
+            <p style={{fontSize:14,color:T.textSub,textAlign:"left",marginBottom:24,lineHeight:1.5}}>Cette action est irréversible. Toutes les données associées à cette stratégie seront supprimées.</p>
+            
+            <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
+              <button 
+                onClick={cancelDelete}
+                style={{padding:"10px 20px",borderRadius:8,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,transition:"all .2s"}}
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={confirmDelete}
+                disabled={loading}
+                style={{padding:"10px 20px",borderRadius:8,border:"none",background:T.red,fontSize:13,fontWeight:600,cursor:loading?"not-allowed":"pointer",color:"#fff",transition:"all .2s",opacity:loading?0.6:1}}
+              >
+                {loading ? "Suppression..." : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ─── MODALE DE CRÉATION/ÉDITION ─── */}
