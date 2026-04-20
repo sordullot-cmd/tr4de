@@ -5,14 +5,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { 
-      messages, 
-      userId, 
-      trades = [], 
+    const {
+      messages,
+      userId,
+      trades = [],
       journalNotes = [],
       strategies = [],
       strategyStats = [],
-      dailyNotes = {}
+      dailyNotes = {},
+      accountInfo = null,
+      weeklyStats = [],
+      monthlyStats = [],
+      disciplineSummary = [],
+      psychEvents = []
     } = await request.json();
 
     const supabase = await createClient();
@@ -63,7 +68,50 @@ export async function POST(request: NextRequest) {
     if (journalNotes && journalNotes.length > 0) {
       contextData += `\n📝 NOTES DE TRADES RÉCENTES:\n`;
       journalNotes.slice(0, 5).forEach((note: any) => {
-        contextData += `  • Trade ${note.trade_id}: ${note.notes?.substring(0, 80) || 'Pas de note'} [Émotions: ${note.emotion_tags?.join(', ') || 'Aucune'}]\n`;
+        const emotions = note.emotion_tags?.join(', ') || 'Aucune';
+        const errors = note.error_tags?.length ? ` [Erreurs: ${note.error_tags.join(', ')}]` : '';
+        contextData += `  • Trade ${note.trade_id}: ${note.notes?.substring(0, 80) || 'Pas de note'} [Émotions: ${emotions}]${errors}\n`;
+      });
+    }
+
+    // 🆕 Compte de trading
+    if (accountInfo) {
+      contextData += `\n💼 COMPTE DE TRADING:\n`;
+      contextData += `  • Type: ${accountInfo.type || 'N/A'}${accountInfo.evalSize ? ` (${accountInfo.evalSize})` : ''}\n`;
+      contextData += `  • Comptes actifs: ${accountInfo.selectedAccountsCount || 0}/${accountInfo.totalAccountsCount || 0}\n`;
+    }
+
+    // 🆕 Stats hebdomadaires
+    if (weeklyStats && weeklyStats.length > 0) {
+      contextData += `\n📅 STATS HEBDOMADAIRES (semaine du lundi):\n`;
+      weeklyStats.slice(0, 6).forEach((w: any) => {
+        contextData += `  • ${w.period}: ${w.trades} trades, WR ${w.winRate}%, P&L ${w.pnl}$\n`;
+      });
+    }
+
+    // 🆕 Stats mensuelles
+    if (monthlyStats && monthlyStats.length > 0) {
+      contextData += `\n🗓️ STATS MENSUELLES:\n`;
+      monthlyStats.slice(0, 6).forEach((m: any) => {
+        contextData += `  • ${m.period}: ${m.trades} trades, WR ${m.winRate}%, P&L ${m.pnl}$\n`;
+      });
+    }
+
+    // 🆕 Discipline
+    if (disciplineSummary && disciplineSummary.length > 0) {
+      contextData += `\n✅ DISCIPLINE (14 derniers jours):\n`;
+      disciplineSummary.slice(0, 10).forEach((d: any) => {
+        const violated = d.violated?.length ? ` — violé: ${d.violated.join(', ')}` : '';
+        contextData += `  • ${d.date}: ${d.respected}/${d.total} règles (${d.score}%)${violated}\n`;
+      });
+    }
+
+    // 🆕 Événements psychologiques
+    if (psychEvents && psychEvents.length > 0) {
+      contextData += `\n🧠 ÉVÉNEMENTS PSYCHOLOGIQUES DÉTECTÉS:\n`;
+      psychEvents.slice(0, 12).forEach((e: any) => {
+        const date = e.date ? `${e.date} ` : '';
+        contextData += `  • ${date}[${e.type}] ${e.detail}\n`;
       });
     }
 
@@ -74,11 +122,14 @@ ${contextData}
 
 🎯 TON RÔLE
 • Analyser les TRADES et identifier les patterns
-• Évaluer la PERFORMANCE par stratégie
+• Évaluer la PERFORMANCE par stratégie et par période (semaine / mois)
 • Lire les NOTES JOURNALIÈRES pour comprendre l'état mental du trader
+• Utiliser la DISCIPLINE (règles respectées/violées) pour juger la rigueur
+• Prendre en compte le type de COMPTE (live vs eval, taille) dans les conseils
+• Exploiter les ÉMOTIONS et ERREURS taguées sur les trades
+• Confirmer/nuancer les ÉVÉNEMENTS PSYCHOLOGIQUES détectés (revenge, overtrading, tilt)
 • Donner des INSIGHTS concrets basés sur les données
 • Proposer des AMÉLIORATIONS spécifiques
-• Détecter les RED FLAGS (revenge trading, overtrading, etc.)
 
 📊 RÈGLES DE FORMATAGE - IMPORTANT
 1. Pas de ### ou #### - utilise UNE SEULE # pour les titres majeurs

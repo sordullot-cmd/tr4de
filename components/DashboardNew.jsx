@@ -948,70 +948,12 @@ function JournalPage({ trades = [] }) {
       {/* HEADER */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{fontSize:18,fontWeight:700}}>📔 Journal de Trading</div>
-        {/* DATE FILTER */}
+        {/* DATE INPUTS */}
         <div style={{display:"flex",gap:12,alignItems:"center"}}>
-          <div style={{fontSize:12,fontWeight:600,color:T.textMut}}>Filtre:</div>
-          {/* FILTER MODE BUTTONS */}
-          <div style={{display:"flex",gap:6}}>
-            <button
-              onClick={() => {
-                setFilterMode("week");
-                const range = getWeekRange();
-                setFilterStartDate(range.start);
-                setFilterEndDate(range.end);
-              }}
-              style={{
-                padding:"6px 12px",
-                fontSize:11,
-                fontWeight:600,
-                border:`1px solid ${filterMode === "week" ? T.green : T.border}`,
-                background:filterMode === "week" ? T.green : "transparent",
-                color:filterMode === "week" ? T.white : T.text,
-                borderRadius:4,
-                cursor:"pointer",
-                textTransform:"uppercase"
-              }}
-            >
-              Semaine
-            </button>
-            <button
-              onClick={() => setFilterMode("custom")}
-              style={{
-                padding:"6px 12px",
-                fontSize:11,
-                fontWeight:600,
-                border:`1px solid ${filterMode === "custom" ? T.green : T.border}`,
-                background:filterMode === "custom" ? T.green : "transparent",
-                color:filterMode === "custom" ? T.white : T.text,
-                borderRadius:4,
-                cursor:"pointer",
-                textTransform:"uppercase"
-              }}
-            >
-              Custom
-            </button>
-          </div>
-          {filterMode === "custom" && (
-            <>
-              <input
-                type="date"
-                value={filterStartDate}
-                onChange={(e) => setFilterStartDate(e.target.value)}
-                style={{
-                  padding:"8px 12px",
-                  fontSize:12,
-                  border:`1px solid ${T.border}`,
-                  borderRadius:6,
-                  background:T.white,
-                  color:T.text,
-                  cursor:"pointer"
-                }}
-              />
-              <div style={{fontSize:12,color:T.textMut}}>à</div>
-              <input
-                type="date"
-                value={filterEndDate}
-                onChange={(e) => setFilterEndDate(e.target.value)}
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
             style={{
               padding:"8px 12px",
               fontSize:12,
@@ -1021,9 +963,22 @@ function JournalPage({ trades = [] }) {
               color:T.text,
               cursor:"pointer"
             }}
-              />
-            </>
-          )}
+          />
+          <div style={{fontSize:12,color:T.textMut}}>à</div>
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            style={{
+              padding:"8px 12px",
+              fontSize:12,
+              border:`1px solid ${T.border}`,
+              borderRadius:6,
+              background:T.white,
+              color:T.text,
+              cursor:"pointer"
+            }}
+          />
         </div>
       </div>
 
@@ -1209,7 +1164,8 @@ function JournalPage({ trades = [] }) {
                       <table style={{width:"100%",borderCollapse:"collapse"}}>
                         <thead style={{background:T.bg,borderBottom:`1px solid ${T.border}`}}>
                           <tr>
-                            <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Time</th>
+                            <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Entry Time</th>
+                            <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Exit Time</th>
                             <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Symbol</th>
                             <th style={{padding:"8px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Side</th>
                             <th style={{padding:"8px 12px",textAlign:"right",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Net P&L</th>
@@ -1218,7 +1174,8 @@ function JournalPage({ trades = [] }) {
                         </thead>
                         <tbody>
                           {dayTrades.map((trade, i) => {
-                            const time = new Date(trade.date).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                            const entryTime = new Date(trade.entry_time || trade.date).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                            const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : "—";
                             const tradeId = getTradeId(trade);
                             const isExpanded = expandedTrades[tradeId];
                             const hasNote = tradeNotes[tradeId] && tradeNotes[tradeId].trim().length > 0;
@@ -1226,7 +1183,8 @@ function JournalPage({ trades = [] }) {
                             return (
                               <React.Fragment key={i}>
                                 <tr style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?T.bg:"transparent"}}>
-                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{time}</td>
+                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{entryTime}</td>
+                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{exitTime}</td>
                                   <td style={{padding:"8px 12px",fontSize:11,fontWeight:600,color:T.text}}>{trade.symbol}</td>
                                   <td style={{padding:"8px 12px",fontSize:11,color:T.text}}><span style={{color:trade.side==="Long"?T.blue:T.red}}>{trade.side || "Long"}</span></td>
                                   <td style={{padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:600,color:trade.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{fmt(trade.pnl,true)}</td>
@@ -4412,6 +4370,10 @@ export default function App() {
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
   const { notes: agentTradeNotes } = useTradeNotes();
   const { notes: agentDailyNotes } = useDailySessionNotes();
+  const { emotionTags: agentEmotionTags } = useTradeEmotionTags();
+  const { errorTags: agentErrorTags } = useTradeErrorTags();
+  const { disciplineData: agentDisciplineData, baseRules: agentBaseRules } = useDisciplineTracking();
+  const { customRules: agentCustomRules } = useCustomDisciplineRules();
   const [userId, setUserId] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [accounts, setAccounts] = useState([]);
@@ -4614,20 +4576,23 @@ export default function App() {
   // Si SEUL le placeholder est sélectionné → aucun trade
   // Sinon → filtrer par account_id
   const filteredTrades = (() => {
-    const onlyPlaceholder = selectedAccountIds.length === 1 && 
-                           user?.id && 
-                           selectedAccountIds[0] === getPlaceholderAccountId(user.id);
+    // Si aucun compte real n'est sélectionné, montrer tous les trades (même avec placeholder)
+    const hasRealAccounts = selectedAccountIds.some(id => !isPlaceholderAccount(id));
+    const placeholderId = user?.id ? getPlaceholderAccountId(user.id) : null;
+    const onlyPlaceholder = selectedAccountIds.length === 1 && selectedAccountIds[0] === placeholderId;
     
-    if (onlyPlaceholder) {
-      console.log("🪐 Only placeholder selected - showing no trades");
-      return [];
+    // Si on a que le placeholder (pas de vrais comptes), afficher tous les trades
+    if (onlyPlaceholder || !hasRealAccounts) {
+      console.log("📊 No real accounts selected - showing all trades");
+      return trades;
     }
     
     if (selectedAccountIds.length === 0) {
-      console.log("❌ No accounts selected - showing no trades");
-      return [];
+      console.log("❌ No accounts selected - showing all trades anyway");
+      return trades;
     }
     
+    // Filtrer par comptes réels si présents
     const filtered = trades.filter(t => selectedAccountIds.includes(t.account_id));
     console.log(`📊 Filtering ${trades.length} trades by ${selectedAccountIds.length} account(s), got ${filtered.length}`);
     return filtered;
@@ -4758,7 +4723,11 @@ export default function App() {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
         .filter(([, n]) => n && String(n).trim())
-        .map(([trade_id, notes]) => ({ trade_id, notes: String(notes) }));
+        .map(([trade_id, notes]) => {
+          const emotions = (agentEmotionTags || {})[trade_id] || [];
+          const errors = (agentErrorTags || {})[trade_id] || [];
+          return { trade_id, notes: String(notes), emotion_tags: emotions, error_tags: errors };
+        });
 
       // Calculer les stats par stratégie en utilisant le mapping localStorage
       let assignments = {};
@@ -4789,6 +4758,133 @@ export default function App() {
         };
       }).filter(Boolean);
 
+      // Infos compte
+      const accountInfo = {
+        type: accountType,
+        evalSize: accountType === "eval" ? selectedEvalAccount : null,
+        selectedAccountsCount: (selectedAccountIds || []).length,
+        totalAccountsCount: (accounts || []).length,
+      };
+
+      // Helpers dates
+      const dayKey = (d) => {
+        try { return getLocalDateString(new Date(d)); } catch { return null; }
+      };
+      const weekKey = (d) => {
+        try {
+          const dt = new Date(d);
+          const day = (dt.getDay() + 6) % 7; // Monday = 0
+          const monday = new Date(dt);
+          monday.setDate(dt.getDate() - day);
+          return getLocalDateString(monday);
+        } catch { return null; }
+      };
+      const monthKey = (d) => {
+        try { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`; } catch { return null; }
+      };
+
+      const aggregate = (list, keyFn) => {
+        const map = {};
+        (list || []).forEach((t) => {
+          const k = keyFn(t.entry_time || t.date);
+          if (!k) return;
+          if (!map[k]) map[k] = { key: k, trades: 0, wins: 0, losses: 0, pnl: 0 };
+          map[k].trades += 1;
+          const p = Number(t.pnl) || 0;
+          if (p > 0) map[k].wins += 1;
+          else if (p < 0) map[k].losses += 1;
+          map[k].pnl += p;
+        });
+        return Object.values(map)
+          .sort((a, b) => (a.key < b.key ? 1 : -1))
+          .slice(0, 12)
+          .map((r) => ({
+            period: r.key,
+            trades: r.trades,
+            wins: r.wins,
+            losses: r.losses,
+            winRate: r.trades ? ((r.wins / r.trades) * 100).toFixed(1) : "0",
+            pnl: r.pnl.toFixed(2),
+          }));
+      };
+
+      const weeklyStats = aggregate(filteredTrades, weekKey);
+      const monthlyStats = aggregate(filteredTrades, monthKey);
+
+      // Discipline: synthèse par jour (% de règles respectées)
+      const allRuleIds = [
+        ...(agentBaseRules || []).map((r) => ({ id: r.id, label: r.label })),
+        ...(agentCustomRules || []).map((r) => ({ id: r.rule_id || r.id, label: r.text })),
+      ];
+      const disciplineSummary = Object.entries(agentDisciplineData || {})
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+        .slice(0, 14)
+        .map(([date, rules]) => {
+          const total = allRuleIds.length || Object.keys(rules || {}).length;
+          const respected = Object.values(rules || {}).filter(Boolean).length;
+          const violated = allRuleIds
+            .filter((r) => rules && rules[r.id] === false)
+            .map((r) => r.label);
+          return {
+            date,
+            respected,
+            total,
+            score: total ? Math.round((respected / total) * 100) : 0,
+            violated,
+          };
+        });
+
+      // Événements psychologiques (heuristiques simples)
+      const psychEvents = [];
+      const tradesByDay = {};
+      (filteredTrades || []).forEach((t) => {
+        const k = dayKey(t.entry_time || t.date);
+        if (!k) return;
+        (tradesByDay[k] = tradesByDay[k] || []).push(t);
+      });
+      Object.entries(tradesByDay).forEach(([date, dayTrades]) => {
+        dayTrades.sort((a, b) => new Date(a.entry_time || a.date) - new Date(b.entry_time || b.date));
+        // Overtrading
+        if (dayTrades.length >= 6) {
+          psychEvents.push({ date, type: "overtrading", detail: `${dayTrades.length} trades dans la journée` });
+        }
+        // Revenge trading: trade <15min après une perte
+        for (let i = 1; i < dayTrades.length; i++) {
+          const prev = dayTrades[i - 1];
+          const cur = dayTrades[i];
+          if ((Number(prev.pnl) || 0) < 0) {
+            const dt = (new Date(cur.entry_time || cur.date) - new Date(prev.entry_time || prev.date)) / 60000;
+            if (dt > 0 && dt < 15) {
+              psychEvents.push({ date, type: "revenge_trading", detail: `Trade ${dt.toFixed(0)}min après une perte de ${prev.pnl}$` });
+              break;
+            }
+          }
+        }
+        // Tilted: 3 pertes consécutives
+        let streak = 0, maxStreak = 0;
+        dayTrades.forEach((t) => {
+          if ((Number(t.pnl) || 0) < 0) { streak += 1; maxStreak = Math.max(maxStreak, streak); }
+          else streak = 0;
+        });
+        if (maxStreak >= 3) {
+          psychEvents.push({ date, type: "losing_streak", detail: `${maxStreak} pertes consécutives` });
+        }
+      });
+      // Émotions négatives répétées
+      const negativeEmotions = ["angry", "colère", "fear", "peur", "fomo", "frustré", "revenge", "tilt"];
+      const emotionCount = {};
+      Object.values(agentEmotionTags || {}).forEach((tags) => {
+        (tags || []).forEach((tag) => {
+          const low = String(tag).toLowerCase();
+          if (negativeEmotions.some((n) => low.includes(n))) {
+            emotionCount[tag] = (emotionCount[tag] || 0) + 1;
+          }
+        });
+      });
+      Object.entries(emotionCount).forEach(([tag, count]) => {
+        if (count >= 2) psychEvents.push({ date: "", type: "emotional_pattern", detail: `"${tag}" signalé sur ${count} trades` });
+      });
+
       return (
         <ApexChatNew
           userId={user?.id}
@@ -4797,6 +4893,11 @@ export default function App() {
           strategyStats={strategyStats}
           journalNotes={journalNotesArr}
           dailyNotes={agentDailyNotes || {}}
+          accountInfo={accountInfo}
+          weeklyStats={weeklyStats}
+          monthlyStats={monthlyStats}
+          disciplineSummary={disciplineSummary}
+          psychEvents={psychEvents.slice(0, 20)}
         />
       );
     })(),

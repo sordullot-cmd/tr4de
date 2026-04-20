@@ -11,7 +11,7 @@ export function useTradeDetails() {
   const supabase = createClient();
   const [details, setDetails] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les détails des trades
   useEffect(() => {
@@ -35,7 +35,7 @@ export function useTradeDetails() {
         setDetails(detailsMap);
       } catch (err) {
         console.error("❌ Erreur récupération détails trades:", err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
@@ -157,7 +157,7 @@ export function useTradingAccounts() {
   const supabase = createClient();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les comptes de trading
   useEffect(() => {
@@ -273,7 +273,7 @@ export function useTrades() {
   const supabase = createClient();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // ⚡ FAST PATH: Charger localStorage immédiatement, puis syncer Supabase en arrière-plan
   useEffect(() => {

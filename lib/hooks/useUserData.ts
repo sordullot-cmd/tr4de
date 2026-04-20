@@ -19,13 +19,16 @@ export function useStrategies() {
       return;
     }
 
-    // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT
+    // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT (client-side only)
     try {
-      const stored = localStorage.getItem("tr4de_strategies");
-      const cachedStrategies = stored ? JSON.parse(stored) : [];
-      setStrategies(cachedStrategies);
+      // ✅ Vérifier qu'on est en client-side
+      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+        const stored = localStorage.getItem("tr4de_strategies");
+        const cachedStrategies = stored ? JSON.parse(stored) : [];
+        setStrategies(cachedStrategies);
+        console.log("⚡ Stratégies chargées depuis localStorage:", cachedStrategies.length);
+      }
       setLoading(false); // ✅ UI prête instantanément
-      console.log("⚡ Stratégies chargées depuis localStorage:", cachedStrategies.length);
     } catch (parseErr) {
       console.error("Erreur parsing localStorage:", parseErr);
       setStrategies([]);

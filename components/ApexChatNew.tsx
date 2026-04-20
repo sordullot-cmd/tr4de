@@ -9,6 +9,16 @@ interface ApexChatProps {
   strategies?: any[];
   strategyStats?: any[];
   dailyNotes?: Record<string, string>;
+  accountInfo?: {
+    type?: string;
+    evalSize?: string | null;
+    selectedAccountsCount?: number;
+    totalAccountsCount?: number;
+  };
+  weeklyStats?: any[];
+  monthlyStats?: any[];
+  disciplineSummary?: any[];
+  psychEvents?: any[];
 }
 
 interface Message {
@@ -16,878 +26,552 @@ interface Message {
   content: string;
 }
 
-export default function ApexChat({ 
-  userId, 
-  trades = [], 
+const T = {
+  bg: "#FFFFFF",
+  panel: "#F5F5F5",
+  panelHover: "#EEEEEE",
+  border: "rgba(0,0,0,0.1)",
+  borderHover: "rgba(0,0,0,0.2)",
+  text: "#000000",
+  textSub: "#666666",
+  textMut: "#999999",
+  accent: "#22C55E",
+  accentDark: "#16A34A",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Trades: "#22C55E",
+  "Net P&L": "#3B82F6",
+  Mind: "#A855F7",
+};
+
+const PROMPTS = [
+  { category: "Trades", text: "Donne-moi un résumé de mon trading" },
+  { category: "Net P&L", text: "Qu'est-ce qui me donne le plus de succès ?" },
+  { category: "Mind", text: "Où suis-je le plus rentable ?" },
+  { category: "Trades", text: "Où suis-je le moins rentable ?" },
+  { category: "Net P&L", text: "Comment améliorer mon trading ?" },
+  { category: "Mind", text: "Comment améliorer ma stratégie ?" },
+  { category: "Trades", text: "Où est-ce que je manque dans mon trading ?" },
+  { category: "Net P&L", text: "Qu'est-ce qui m'empêche de gagner plus ?" },
+];
+
+const cleanString = (str: any): string => {
+  if (!str) return "";
+  return String(str)
+    .replace(/[\n\r\t]/g, " ")
+    .replace(/[\\"]/g, (m) => (m === '"' ? '\\"' : m === "\\" ? "\\\\" : m))
+    .replace(/[\x00-\x1F\x7F]/g, "");
+};
+
+export default function ApexChatNew({
+  userId,
+  trades = [],
   journalNotes = [],
   strategies = [],
   strategyStats = [],
-  dailyNotes = {}
+  dailyNotes = {},
+  accountInfo,
+  weeklyStats = [],
+  monthlyStats = [],
+  disciplineSummary = [],
+  psychEvents = [],
 }: ApexChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [debugExpanded, setDebugExpanded] = useState(false);
+  const [contextSent, setContextSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (Array.isArray(trades) && trades.length > 0) {
-      console.log("🎯 ApexChat reçu trades:", trades.length, "trades");
-    }
-    if (Array.isArray(journalNotes) && journalNotes.length > 0) {
-      console.log("📔 ApexChat reçu journal notes:", journalNotes.length, "notes");
-    }
-    if (Array.isArray(strategies) && strategies.length > 0) {
-      console.log("📊 ApexChat reçu strategies:", strategies.length, "stratégies");
-    }
-    if (Array.isArray(strategyStats) && strategyStats.length > 0) {
-      console.log("📈 ApexChat reçu strategy stats:", strategyStats.length, "stats");
-    }
-    if (dailyNotes && Object.keys(dailyNotes).length > 0) {
-      console.log("📅 ApexChat reçu daily notes:", Object.keys(dailyNotes).length, "notes");
-    }
-  }, [trades, journalNotes, strategies, strategyStats, dailyNotes]);
+  const buildPayload = (msgs: Message[]) => {
+    const cleanTrades = (trades || []).map((t: any) => ({
+      id: cleanString(t?.id),
+      pnl: Number(t?.pnl) || 0,
+      setup_name: cleanString(t?.setup_name || "Unknown"),
+      entry_time: cleanString(t?.entry_time || new Date().toISOString()),
+      quantity: Number(t?.quantity) || 0,
+      symbol: cleanString(t?.symbol || ""),
+      direction: cleanString(t?.direction || ""),
+    }));
 
-  // Envoyer automatiquement le contexte complet avec toutes les données au chargement
-  useEffect(() => {
-    const initializeContext = async () => {
-      // Attendre que les données soient disponibles
-      if ((trades.length > 0 || journalNotes.length > 0 || strategies.length > 0) && messages.length === 0) {
-        console.log("📡 Initialisation du contexte complet pour l'IA...");
-        
-        // Envoyer automatiquement un message système avec les données
-        const cleanString = (str: any): string => {
-          if (!str) return "";
-          const s = String(str);
-          return s
-            .replace(/[\n\r\t]/g, " ")
-            .replace(/[\\"]/g, m => m === '"' ? '\\"' : m === '\\' ? '\\\\' : m)
-            .replace(/[\x00-\x1F\x7F]/g, "");
-        };
+    const cleanJournalNotes = (journalNotes || []).map((n: any) => ({
+      id: cleanString(n?.id),
+      trade_id: cleanString(n?.trade_id),
+      notes: cleanString(n?.notes || ""),
+      emotion_tags: Array.isArray(n?.emotion_tags)
+        ? n.emotion_tags.map((tag: any) => cleanString(tag))
+        : [],
+      error_tags: Array.isArray(n?.error_tags)
+        ? n.error_tags.map((tag: any) => cleanString(tag))
+        : [],
+      quality_score: Number(n?.quality_score) || null,
+      created_at: cleanString(n?.created_at || new Date().toISOString()),
+    }));
 
-        const cleanTrades = Array.isArray(trades) ? trades.map((t: any) => ({
-          id: cleanString(t?.id),
-          pnl: Number(t?.pnl) || 0,
-          setup_name: cleanString(t?.setup_name || "Unknown"),
-          entry_time: cleanString(t?.entry_time || new Date().toISOString()),
-          quantity: Number(t?.quantity) || 0,
-          symbol: cleanString(t?.symbol || ""),
-          direction: cleanString(t?.direction || ""),
-        })) : [];
-
-        const cleanJournalNotes = Array.isArray(journalNotes) ? journalNotes.map((note: any) => ({
-          id: cleanString(note?.id),
-          trade_id: cleanString(note?.trade_id),
-          notes: cleanString(note?.notes || ""),
-          emotion_tags: Array.isArray(note?.emotion_tags) ? note.emotion_tags.map((tag: any) => cleanString(tag)) : [],
-          quality_score: Number(note?.quality_score) || null,
-          created_at: cleanString(note?.created_at || new Date().toISOString()),
-        })) : [];
-
-        // 🆕 Nettoyer les stratégies
-        const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
-          id: cleanString(s?.id),
-          name: cleanString(s?.name),
-          description: cleanString(s?.description || ""),
-          color: cleanString(s?.color),
-        })) : [];
-
-        // 🆕 Nettoyer les stats de stratégie
-        const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
-          id: cleanString(stat?.id),
-          name: cleanString(stat?.name),
-          tradeCount: Number(stat?.tradeCount) || 0,
-          wins: Number(stat?.wins) || 0,
-          losses: Number(stat?.losses) || 0,
-          winRate: cleanString(stat?.winRate),
-          totalPnL: cleanString(stat?.totalPnL),
-          avgPnL: cleanString(stat?.avgPnL),
-        })) : [];
-
-        // 🆕 Nettoyer les notes journalières
-        const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
-          acc[date] = cleanString(note);
-          return acc;
-        }, {} as Record<string, string>) : {};
-
-        const payload = {
-          messages: [],
-          userId: cleanString(userId || "unknown"),
-          trades: cleanTrades,
-          journalNotes: cleanJournalNotes,
-          strategies: cleanStrategies,
-          strategyStats: cleanStrategyStats,
-          dailyNotes: cleanDailyNotes,
-        };
-
-        try {
-          const response = await fetch("/api/ai/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify(payload),
-          });
-
-          if (response.ok) {
-            console.log("✅ Contexte initialisé - L'IA a accès aux données");
-            // Message automatique désactivé - le chat reste vide jusqu'à la première question
-          }
-        } catch (err) {
-          console.error("Erreur lors de l'initialisation:", err);
+    const cleanAccountInfo = accountInfo
+      ? {
+          type: cleanString(accountInfo.type || ""),
+          evalSize: cleanString(accountInfo.evalSize || ""),
+          selectedAccountsCount: Number(accountInfo.selectedAccountsCount) || 0,
+          totalAccountsCount: Number(accountInfo.totalAccountsCount) || 0,
         }
-      }
-    };
+      : null;
 
-    initializeContext();
-  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, userId]);
-
-  const prompts = [
-    { category: "Trades", color: "#06B6D4", emoji: "", text: "Résumé de mes trades" },
-    { category: "Analyse", color: "#8B5CF6", emoji: "", text: "Facteurs de succès" },
-    { category: "Performance", color: "#EC4899", emoji: "", text: "Rentabilité maximale" },
-    { category: "Risque", color: "#F59E0B", emoji: "", text: "Zones de faiblesse" },
-    { category: "Amélioration", color: "#10B981", emoji: "", text: "Optimisation du trading" },
-    { category: "Stratégie", color: "#3B82F6", emoji: "", text: "Raffinement stratégique" },
-    { category: "Diagnostic", color: "#06B6D4", emoji: "", text: "Analyse diagnostic" },
-    { category: "Discipline", color: "#8B5CF6", emoji: "", text: "Amélioration discipline" },
-  ];
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const cleanString = (str: any): string => {
-    if (!str) return "";
-    const s = String(str);
-    return s
-      .replace(/[\n\r\t]/g, " ")
-      .replace(/[\\"]/g, m => m === '"' ? '\\"' : m === '\\' ? '\\\\' : m)
-      .replace(/[\x00-\x1F\x7F]/g, "");
-  };
-
-  const handleSendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
-
-    const newMessage: Message = { role: "user", content: messageText };
-    setMessages((prev) => [...prev, newMessage]);
-    setInput("");
-    setIsLoading(true);
-    setShowSuggestions(false);
-
-    try {
-      const cleanMessages = messages.concat(newMessage).map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: cleanString(m.content),
+    const cleanPeriods = (arr: any[]) =>
+      (arr || []).map((r: any) => ({
+        period: cleanString(r?.period),
+        trades: Number(r?.trades) || 0,
+        wins: Number(r?.wins) || 0,
+        losses: Number(r?.losses) || 0,
+        winRate: cleanString(r?.winRate),
+        pnl: cleanString(r?.pnl),
       }));
 
-      const cleanTrades = Array.isArray(trades) ? trades.map((t: any) => ({
-        id: cleanString(t?.id),
-        pnl: Number(t?.pnl) || 0,
-        setup_name: cleanString(t?.setup_name || "Unknown"),
-        entry_time: cleanString(t?.entry_time || new Date().toISOString()),
-        quantity: Number(t?.quantity) || 0,
-        symbol: cleanString(t?.symbol || ""),
-        direction: cleanString(t?.direction || ""),
-      })) : [];
+    const cleanDiscipline = (disciplineSummary || []).map((d: any) => ({
+      date: cleanString(d?.date),
+      respected: Number(d?.respected) || 0,
+      total: Number(d?.total) || 0,
+      score: Number(d?.score) || 0,
+      violated: Array.isArray(d?.violated) ? d.violated.map((v: any) => cleanString(v)) : [],
+    }));
 
-      const cleanJournalNotes = Array.isArray(journalNotes) ? journalNotes.map((note: any) => ({
-        id: cleanString(note?.id),
-        trade_id: cleanString(note?.trade_id),
-        notes: cleanString(note?.notes || ""),
-        emotion_tags: Array.isArray(note?.emotion_tags) ? note.emotion_tags.map((tag: any) => cleanString(tag)) : [],
-        quality_score: Number(note?.quality_score) || null,
-        created_at: cleanString(note?.created_at || new Date().toISOString()),
-      })) : [];
+    const cleanPsychEvents = (psychEvents || []).map((e: any) => ({
+      date: cleanString(e?.date),
+      type: cleanString(e?.type),
+      detail: cleanString(e?.detail),
+    }));
 
-      // 🆕 Construire les stratégies avec nettoyage strict
-      const cleanStrategies = Array.isArray(strategies) ? strategies.map((s: any) => ({
-        id: cleanString(s?.id),
-        name: cleanString(s?.name),
-        description: cleanString(s?.description || ""),
-        color: cleanString(s?.color),
-      })) : [];
+    const cleanStrategies = (strategies || []).map((s: any) => ({
+      id: cleanString(s?.id),
+      name: cleanString(s?.name),
+      description: cleanString(s?.description || ""),
+      color: cleanString(s?.color),
+    }));
 
-      // 🆕 Construire les stats de stratégie avec nettoyage strict
-      const cleanStrategyStats = Array.isArray(strategyStats) ? strategyStats.map((stat: any) => ({
-        id: cleanString(stat?.id),
-        name: cleanString(stat?.name),
-        tradeCount: Number(stat?.tradeCount) || 0,
-        wins: Number(stat?.wins) || 0,
-        losses: Number(stat?.losses) || 0,
-        winRate: cleanString(stat?.winRate),
-        totalPnL: cleanString(stat?.totalPnL),
-        avgPnL: cleanString(stat?.avgPnL),
-      })) : [];
+    const cleanStrategyStats = (strategyStats || []).map((s: any) => ({
+      id: cleanString(s?.id),
+      name: cleanString(s?.name),
+      tradeCount: Number(s?.tradeCount) || 0,
+      wins: Number(s?.wins) || 0,
+      losses: Number(s?.losses) || 0,
+      winRate: cleanString(s?.winRate),
+      totalPnL: cleanString(s?.totalPnL),
+      avgPnL: cleanString(s?.avgPnL),
+    }));
 
-      // 🆕 Construire les notes journalières avec nettoyage strict
-      const cleanDailyNotes = dailyNotes ? Object.entries(dailyNotes).reduce((acc, [date, note]) => {
+    const cleanDailyNotes = Object.entries(dailyNotes || {}).reduce(
+      (acc, [date, note]) => {
         acc[date] = cleanString(note);
         return acc;
-      }, {} as Record<string, string>) : {};
+      },
+      {} as Record<string, string>
+    );
 
-      const payload = {
-        messages: cleanMessages,
-        userId: cleanString(userId || "unknown"),
-        trades: cleanTrades,
-        journalNotes: cleanJournalNotes,
-        strategies: cleanStrategies,
-        strategyStats: cleanStrategyStats,
-        dailyNotes: cleanDailyNotes,
-      };
+    return {
+      messages: msgs.map((m) => ({ role: m.role, content: cleanString(m.content) })),
+      userId: cleanString(userId || "unknown"),
+      trades: cleanTrades,
+      journalNotes: cleanJournalNotes,
+      strategies: cleanStrategies,
+      strategyStats: cleanStrategyStats,
+      dailyNotes: cleanDailyNotes,
+      accountInfo: cleanAccountInfo,
+      weeklyStats: cleanPeriods(weeklyStats),
+      monthlyStats: cleanPeriods(monthlyStats),
+      disciplineSummary: cleanDiscipline,
+      psychEvents: cleanPsychEvents,
+    };
+  };
 
-      const bodyStr = JSON.stringify(payload, (key, value) => {
-        if (typeof value === "string") {
-          return cleanString(value);
-        }
-        return value;
-      });
+  useEffect(() => {
+    if (contextSent) return;
+    const hasAny =
+      trades.length > 0 ||
+      journalNotes.length > 0 ||
+      strategies.length > 0 ||
+      Object.keys(dailyNotes || {}).length > 0;
+    if (!hasAny) return;
 
+    const init = async () => {
+      try {
+        const payload = buildPayload([
+          {
+            role: "user",
+            content: `Contexte: ${trades.length} trades, ${strategies.length} stratégies, ${journalNotes.length} notes de trade, ${Object.keys(dailyNotes).length} notes journalières.`,
+          },
+        ]);
+        await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify(payload),
+        });
+        setContextSent(true);
+      } catch (err) {
+        console.error("Init context error:", err);
+      }
+    };
+    init();
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, contextSent]);
+
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => { scrollToBottom(); }, [messages]);
+
+  const handleSendMessage = async (messageText: string) => {
+    const text = messageText.trim();
+    if (!text || isLoading) return;
+
+    const userMsg: Message = { role: "user", content: text };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const payload = buildPayload(nextMessages);
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: bodyStr,
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error(`Erreur du serveur: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Erreur serveur: ${response.status}`);
 
-      const contentType = response.headers.get("content-type");
+      const contentType = response.headers.get("content-type") || "";
+      let assistantText = "";
 
-      if (contentType?.includes("application/json")) {
+      if (contentType.includes("application/json")) {
         const data = await response.json();
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: data.content || "Pas de contenu" },
-        ]);
-      } else if (contentType?.includes("text/event-stream")) {
+        assistantText = data.content || data.error || "Pas de contenu";
+      } else if (contentType.includes("text/event-stream") || contentType.includes("text/plain")) {
         const reader = response.body?.getReader();
         if (!reader) throw new Error("Pas de response body");
-
         const decoder = new TextDecoder();
-        let fullResponse = "";
-
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          fullResponse += decoder.decode(value);
+          assistantText += decoder.decode(value);
         }
-
-        setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }]);
       } else {
-        const text = await response.text();
-        setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+        assistantText = await response.text();
       }
-    } catch (error) {
-      console.error("❌ ERREUR:", error);
-      const errorMsg = error instanceof Error ? error.message : "Erreur inconnue";
-      setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${errorMsg}` }]);
+
+      setMessages((prev) => [...prev, { role: "assistant", content: assistantText }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${msg}` }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Si messages vides, afficher le home screen
-  if (messages.length === 0 && showSuggestions) {
-    return (
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        background: "#0a0a0a",
-        paddingBottom: "0",
-      }}>
-        {/* Scrollable Content Area */}
-        <div style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          padding: "40px 20px",
-        }}>
-          {/* Input Section - JUSTE AU DESSUS DES SUGGESTIONS */}
-          <div style={{
-            display: "flex",
-            gap: "12px",
-            maxWidth: "1100px",
-            margin: "0 auto 60px auto",
-            width: "100%",
-            paddingBottom: "0",
-          }}>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage(input)}
-              placeholder="Ask me something..."
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: "20px 24px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "10px",
-                color: "#ffffff",
-                fontSize: "16px",
-                outline: "none",
-                transition: "all 0.3s",
-                minHeight: "56px",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.12)";
-                e.currentTarget.style.borderColor = "rgba(16,181,145,0.5)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-              }}
-            />
-            <button
-              onClick={() => handleSendMessage(input)}
-              disabled={isLoading || !input.trim()}
-              style={{
-                padding: "20px 32px",
-                background: "#10B981",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "10px",
-                fontSize: "15px",
-                fontWeight: "600",
-                cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
-                opacity: isLoading || !input.trim() ? 0.5 : 1,
-                transition: "all 0.3s",
-                minHeight: "56px",
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading && input.trim()) {
-                  e.currentTarget.style.background = "#0ea572";
-                  e.currentTarget.style.transform = "scale(1.02)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#10B981";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              {isLoading ? "..." : "Send"}
-            </button>
-          </div>
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(input);
+    }
+  };
 
-          {/* Suggestions Grid */}
-          <div style={{
-            width: "100%",
-            maxWidth: "1100px",
-          }}>
-            <div style={{
-              fontSize: "14px",
-              fontWeight: "600",
-              color: "#666666",
-              marginBottom: "32px",
-              textAlign: "center",
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-            }}>
-              Tailored prompts for you
-            </div>
+  const hasMessages = messages.length > 0;
 
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "20px",
-              width: "100%",
-            }}>
-              {prompts.map((prompt, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(prompt.text)}
-                  style={{
-                    background: "rgba(20,20,20,0.8)",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    borderRadius: "12px",
-                    padding: "24px",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    color: "#ffffff",
-                    fontSize: "15px",
-                    fontWeight: "500",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
-                    e.currentTarget.style.background = "rgba(30,30,30,1)";
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
-                    e.currentTarget.style.background = "rgba(20,20,20,0.8)";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  {/* Category Badge */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                  }}>
-                    <span style={{
-                      background: prompt.color,
-                      color: "#ffffff",
-                      padding: "6px 12px",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                    }}>
-                      {prompt.category}
-                    </span>
-                  </div>
-
-                  {/* Question Text */}
-                  <div style={{
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    color: "#ffffff",
-                    lineHeight: "1.5",
-                  }}>
-                    {prompt.text}
-                  </div>
-
-                  {/* Arrow */}
-                  <div style={{
-                    fontSize: "20px",
-                    marginTop: "12px",
-                    color: "#10B981",
-                    opacity: "1",
-                    transition: "all 0.3s",
-                  }}>
-                    →
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Input Section */}
-        <div style={{
-          padding: "24px",
-          background: "#0a0a0a",
-          borderTop: "1px solid rgba(255,255,255,0.1)",
-        }}>
-          <div style={{
-            display: "flex",
-            gap: "12px",
-            maxWidth: "1100px",
-            margin: "0 auto",
-          }}>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage(input)}
-              placeholder="Ask me something..."
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: "14px 18px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "10px",
-                color: "#ffffff",
-                fontSize: "15px",
-                outline: "none",
-                transition: "all 0.3s",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.12)";
-                e.currentTarget.style.borderColor = "rgba(16,181,145,0.5)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-              }}
-            />
-            <button
-              onClick={() => handleSendMessage(input)}
-              disabled={isLoading || !input.trim()}
-              style={{
-                padding: "14px 24px",
-                background: "#10B981",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "10px",
-                fontSize: "15px",
-                fontWeight: "600",
-                cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
-                opacity: isLoading || !input.trim() ? 0.5 : 1,
-                transition: "all 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading && input.trim()) {
-                  e.currentTarget.style.background = "#0ea572";
-                  e.currentTarget.style.transform = "scale(1.02)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#10B981";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              {isLoading ? "..." : "Send"}
-            </button>
-          </div>
-        </div>
-
-        <style>{`
-          @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-          }
-        `}</style>
-      </div>
-    );
-  }
-
-  // Chat view with messages
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "#0a0a0a",
-        overflow: "hidden",
+        width: "100%",
+        background: T.bg,
+        color: T.text,
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {/* 🔧 DEBUG BLOCK */}
-      <div style={{
-        background: "#f0f9ff",
-        borderBottom: "2px solid #0284c7",
-        padding: "12px 20px",
-      }}>
-        <div 
-          onClick={() => setDebugExpanded(!debugExpanded)}
-          style={{
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: "600",
-            fontSize: "12px",
-            color: "#0284c7",
-          }}
-        >
-          <span>{debugExpanded ? "▼" : "▶"}</span>
-          🔧 DEBUG - Données envoyées à l'IA
-        </div>
-        
-        {debugExpanded && (
-          <div style={{
-            marginTop: "12px",
-            background: "white",
-            borderRadius: "8px",
-            padding: "12px",
-            fontSize: "11px",
-            fontFamily: "monospace",
-            border: "1px solid #cbd5e1",
-            maxHeight: "300px",
-            overflowY: "auto",
-          }}>
-            <div style={{ marginBottom: "8px", color: "#0284c7", fontWeight: "bold" }}>📊 RÉSUMÉ DES DONNÉES:</div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>Trades:</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#0284c7" }}>
-                  {Array.isArray(trades) ? trades.length : 0}
-                </div>
-              </div>
-              
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>Strategies:</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#8b5cf6" }}>
-                  {Array.isArray(strategies) ? strategies.length : 0}
-                </div>
-              </div>
-              
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>Strategy Stats:</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#ec4899" }}>
-                  {Array.isArray(strategyStats) ? strategyStats.length : 0}
-                </div>
-              </div>
-              
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>Daily Notes:</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#f59e0b" }}>
-                  {dailyNotes ? Object.keys(dailyNotes).length : 0}
-                </div>
-              </div>
-              
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>Journal Notes:</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#10b981" }}>
-                  {Array.isArray(journalNotes) ? journalNotes.length : 0}
-                </div>
-              </div>
-              
-              <div style={{ background: "#f0f9ff", padding: "8px", borderRadius: "4px" }}>
-                <div style={{ color: "#666" }}>User ID:</div>
-                <div style={{ fontSize: "11px", fontWeight: "bold", color: "#6366f1", wordBreak: "break-all" }}>
-                  {userId ? (userId.substring(0, 12) + "...") : "N/A"}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px", marginTop: "8px" }}>
-              <div style={{ color: "#0284c7", fontWeight: "bold", marginBottom: "4px" }}>📝 DÉTAILS:</div>
-              
-              {Array.isArray(trades) && trades.length > 0 && (
-                <div style={{ marginBottom: "8px", color: "#475569" }}>
-                  <strong>Trades (premiers 3):</strong>
-                  <div style={{ marginLeft: "8px" }}>
-                    {trades.slice(0, 3).map((t: any, i: number) => (
-                      <div key={i} style={{ fontSize: "10px" }}>
-                        • {t.symbol} {t.direction} @ {t.entry_time?.split('T')[0]}: P&L {t.pnl}$
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {Array.isArray(strategies) && strategies.length > 0 && (
-                <div style={{ marginBottom: "8px", color: "#475569" }}>
-                  <strong>Strategies:</strong>
-                  <div style={{ marginLeft: "8px" }}>
-                    {strategies.slice(0, 3).map((s: any, i: number) => (
-                      <div key={i} style={{ fontSize: "10px" }}>
-                        • {s.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {Array.isArray(strategyStats) && strategyStats.length > 0 && (
-                <div style={{ marginBottom: "8px", color: "#475569" }}>
-                  <strong>Strategy Stats (premiers 3):</strong>
-                  <div style={{ marginLeft: "8px" }}>
-                    {strategyStats.slice(0, 3).map((stat: any, i: number) => (
-                      <div key={i} style={{ fontSize: "10px" }}>
-                        • {stat.name}: {stat.tradeCount} trades, WR {stat.winRate}%, P&L {stat.totalPnL}$
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {dailyNotes && Object.keys(dailyNotes).length > 0 && (
-                <div style={{ marginBottom: "8px", color: "#475569" }}>
-                  <strong>Daily Notes (premières 3):</strong>
-                  <div style={{ marginLeft: "8px" }}>
-                    {Object.entries(dailyNotes).slice(0, 3).map(([date, note]: any, i: number) => (
-                      <div key={i} style={{ fontSize: "10px" }}>
-                        • {date}: {String(note).substring(0, 50)}...
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {Array.isArray(journalNotes) && journalNotes.length > 0 && (
-                <div style={{ color: "#475569" }}>
-                  <strong>Journal Notes (premiers 2):</strong>
-                  <div style={{ marginLeft: "8px" }}>
-                    {journalNotes.slice(0, 2).map((note: any, i: number) => (
-                      <div key={i} style={{ fontSize: "10px" }}>
-                        • Trade {note.trade_id}: {note.notes?.substring(0, 40)}... [Émotions: {note.emotion_tags?.join(', ')}]
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Messages Container */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "24px 20px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          maxWidth: "100%",
-        }}
-      >
-        {messages.map((msg, idx) => (
+      {hasMessages ? (
+        <>
           <div
-            key={idx}
-            style={{
-              display: "flex",
-              justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-              animation: "slideIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                maxWidth: "70%",
-                padding: "14px 18px",
-                borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                background: msg.role === "user"
-                  ? "linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)"
-                  : "white",
-                color: msg.role === "user" ? "#fff" : "#1e293b",
-                fontSize: "14px",
-                lineHeight: "1.6",
-                fontWeight: msg.role === "user" ? "600" : "400",
-                boxShadow: msg.role === "user"
-                  ? "0 4px 12px rgba(6, 182, 212, 0.3)"
-                  : "0 2px 8px rgba(0, 0, 0, 0.08)",
-                wordWrap: "break-word",
-              }}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-
-        {isLoading && (
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", paddingLeft: "4px" }}>
-            <div
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: "#06B6D4",
-                animation: "loading 1.4s infinite",
-              }}
-            />
-            <div
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: "#06B6D4",
-                animation: "loading 1.4s infinite 0.2s",
-              }}
-            />
-            <div
-              style={{
-                width: "10px",
-                height: "10px",
-                borderRadius: "50%",
-                background: "#06B6D4",
-                animation: "loading 1.4s infinite 0.4s",
-              }}
-            />
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Section */}
-      <div style={{
-        padding: "16px 20px",
-        background: "white",
-        borderTop: "1px solid rgba(203, 213, 225, 0.3)",
-        borderBottom: "none",
-      }}>
-        <div style={{ display: "flex", gap: "12px", maxWidth: "100%" }}>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSendMessage(input)}
-            placeholder="Votre message..."
-            disabled={isLoading}
             style={{
               flex: 1,
-              padding: "12px 16px",
-              background: "rgba(226, 232, 240, 0.5)",
-              border: "1px solid rgba(203, 213, 225, 0.8)",
-              borderRadius: "10px",
-              color: "#1e293b",
-              fontSize: "14px",
-              outline: "none",
-              transition: "all 0.2s",
-              fontFamily: "inherit",
-              opacity: isLoading ? 0.6 : 1,
-            }}
-            onFocus={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.background = "rgba(226, 232, 240, 1)";
-                e.currentTarget.style.borderColor = "#06B6D4";
-              }
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.background = "rgba(226, 232, 240, 0.5)";
-              e.currentTarget.style.borderColor = "rgba(203, 213, 225, 0.8)";
-            }}
-          />
-          <button
-            onClick={() => handleSendMessage(input)}
-            disabled={isLoading || !input.trim()}
-            style={{
-              padding: "12px 28px",
-              background: "#06B6D4",
-              color: "#fff",
-              border: "none",
-              borderRadius: "10px",
-              cursor: input.trim() && !isLoading ? "pointer" : "not-allowed",
-              fontWeight: "700",
-              fontSize: "13px",
-              opacity: isLoading || !input.trim() ? 0.5 : 1,
-              transition: "all 0.2s",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading && input.trim()) {
-                e.currentTarget.style.background = "#0891B2";
-                e.currentTarget.style.transform = "scale(1.02)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#06B6D4";
-              e.currentTarget.style.transform = "scale(1)";
+              overflowY: "auto",
+              padding: "32px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
             }}
           >
-            {isLoading ? "..." : "Envoyer"}
-          </button>
+            <div style={{ width: "100%", maxWidth: 760, display: "flex", flexDirection: "column", gap: 16 }}>
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: "80%",
+                      padding: "12px 16px",
+                      borderRadius: m.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                      background: m.role === "user" ? "#DDDDDD" : T.panel,
+                      color: m.role === "user" ? "#333333" : T.text,
+                      fontSize: 14,
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      border: m.role === "user" ? "none" : `1px solid ${T.border}`,
+                      fontWeight: m.role === "user" ? 500 : 400,
+                    }}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+
+              {isLoading && (
+                <div style={{ display: "flex", gap: 6, padding: "12px 4px" }}>
+                  <span style={dotStyle(0)} />
+                  <span style={dotStyle(0.2)} />
+                  <span style={dotStyle(0.4)} />
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+          <InputBar
+            input={input}
+            setInput={setInput}
+            onSubmit={() => handleSendMessage(input)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            compact
+          />
+        </>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "48px 24px 32px",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 600,
+              margin: 0,
+              marginBottom: 28,
+              letterSpacing: -0.5,
+              textAlign: "center",
+            }}
+          >
+            En quoi puis-je vous aider ?
+          </h1>
+
+          <div style={{ width: "100%", maxWidth: 760 }}>
+            <InputBar
+              input={input}
+              setInput={setInput}
+              onSubmit={() => handleSendMessage(input)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 40,
+              fontSize: 13,
+              color: T.textSub,
+              fontWeight: 500,
+              letterSpacing: 0.2,
+            }}
+          >
+            Suggestions pour vous
+          </div>
+
+          <div
+            style={{
+              marginTop: 18,
+              width: "100%",
+              maxWidth: 960,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {PROMPTS.map((p, i) => {
+              const color = CATEGORY_COLORS[p.category] || T.accent;
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleSendMessage(p.text)}
+                  disabled={isLoading}
+                  style={{
+                    background: T.panel,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                    textAlign: "left",
+                    color: T.text,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    transition: "all 0.15s ease",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 18,
+                    minHeight: 104,
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = T.borderHover;
+                    e.currentTarget.style.background = T.panelHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = T.border;
+                    e.currentTarget.style.background = T.panel;
+                  }}
+                >
+                  <span
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      border: `1px solid ${color}`,
+                      color,
+                      background: "transparent",
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {p.category}
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <span style={{ fontSize: 14, lineHeight: 1.35, color: T.text }}>
+                      {p.text}
+                    </span>
+                    <span style={{ color: T.textMut, fontSize: 16, flexShrink: 0 }}>→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <style>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes loading {
+        @keyframes apex-blink {
           0%, 100% { opacity: 0.3; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.2); }
         }
+        textarea::placeholder { color: ${T.textMut}; }
       `}</style>
     </div>
   );
 }
 
+function dotStyle(delay: number): React.CSSProperties {
+  return {
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+    background: T.accent,
+    display: "inline-block",
+    animation: `apex-blink 1.2s infinite ${delay}s`,
+  };
+}
+
+function InputBar({
+  input,
+  setInput,
+  onSubmit,
+  onKeyDown,
+  disabled,
+  compact,
+}: {
+  input: string;
+  setInput: (v: string) => void;
+  onSubmit: () => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  disabled: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        maxWidth: compact ? 760 : "100%",
+        margin: compact ? "0 auto" : undefined,
+        padding: compact ? "16px 24px 20px" : 0,
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          background: T.panel,
+          border: `1px solid ${T.border}`,
+          borderRadius: 14,
+          padding: "14px 56px 14px 18px",
+        }}
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Posez votre question, je suis là pour aider !"
+          disabled={disabled}
+          rows={compact ? 1 : 3}
+          style={{
+            width: "100%",
+            minHeight: compact ? 24 : 64,
+            maxHeight: 180,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            color: T.text,
+            fontSize: 14,
+            lineHeight: 1.5,
+            padding: 0,
+            fontFamily: "inherit",
+          }}
+        />
+        <button
+          onClick={onSubmit}
+          disabled={disabled || !input.trim()}
+          aria-label="Envoyer"
+          style={{
+            position: "absolute",
+            right: 10,
+            bottom: 10,
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            border: "none",
+            background: input.trim() && !disabled ? T.accent : "rgba(34,197,94,0.25)",
+            color: "#000",
+            cursor: input.trim() && !disabled ? "pointer" : "not-allowed",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background 0.15s",
+            fontWeight: 700,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <polyline points="5 12 12 5 19 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
