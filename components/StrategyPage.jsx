@@ -287,9 +287,22 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
+      {/* DEBUG: Show if hook is null */}
+      {!strategiesHook && (
+        <div style={{padding:"20px",background:"#fee2e2",border:"1px solid #fecaca",borderRadius:8,color:"#991b1b"}}>
+          ❌ strategiesHook is null/undefined - Hook not initialized
+        </div>
+      )}
+      
+      {strategiesHook && !Array.isArray(strategies) && (
+        <div style={{padding:"20px",background:"#fee2e2",border:"1px solid #fecaca",borderRadius:8,color:"#991b1b"}}>
+          ❌ strategies is not an array: {typeof strategies}
+        </div>
+      )}
+
       {/* HEADER */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-        <h1 style={{fontSize:24,fontWeight:700}}>🎯 Stratégies</h1>
+        <h1 style={{fontSize:24,fontWeight:700}}>🎯 Stratégies ({strategies?.length || 0})</h1>
         <button onClick={() => setShowStrategyForm(true)} style={{padding:"10px 20px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>+ Créer une stratégie</button>
       </div>
 

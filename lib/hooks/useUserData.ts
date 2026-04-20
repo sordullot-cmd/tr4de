@@ -14,11 +14,6 @@ export function useStrategies() {
 
   // Charger les stratégies depuis localStorage IMMÉDIATEMENT, puis syncer Supabase en arrière-plan
   useEffect(() => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
     // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT (client-side only)
     try {
       // ✅ Vérifier qu'on est en client-side
@@ -33,6 +28,12 @@ export function useStrategies() {
       console.error("Erreur parsing localStorage:", parseErr);
       setStrategies([]);
       setLoading(false);
+    }
+
+    // ✅ Si pas d'utilisateur, arrêter ici
+    if (!user?.id) {
+      console.log("⏸️  No user, skipping Supabase sync");
+      return;
     }
 
     // 🔄 BACKGROUND: Syncer Supabase sans bloquer l'UI
