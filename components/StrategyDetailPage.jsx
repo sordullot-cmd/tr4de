@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -27,7 +28,7 @@ const T = {
   blueBg:  "#EFF6FF",
 };
 
-const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 function Pill({ children, color="gray", small }) {
   const map = {

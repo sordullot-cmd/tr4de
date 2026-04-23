@@ -25,6 +25,7 @@ import SettingsPage from "@/components/pages/SettingsPage";
 import Sidebar from "@/components/ui/Sidebar";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import DateRangePicker from "@/components/ui/DateRangePicker";
+import { getCurrencySymbol, getUserTimezone } from "@/lib/userPrefs";
 import {
   LayoutDashboard,
   LineChart as LucideLineChart,
@@ -47,7 +48,12 @@ import {
   Check as LucideCheck,
   User,
   Moon,
+  Sun,
   LogOut,
+  Star,
+  Pencil,
+  Plus,
+  GripVertical,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -86,16 +92,25 @@ const css = `
   .card-hover:hover { border-color: ${T.border2} !important; box-shadow: 0 4px 12px rgba(0,0,0,.06) !important; }
 `;
 
-const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 // Bouton compte utilisateur dans la barre du haut (à droite du gris)
 function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
   const [open, setOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
     const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+  // Synchronise l'état visuel du toggle avec l'attribut sur <html>
+  useEffect(() => {
+    const sync = () => setIsDark(document.documentElement.dataset.theme === "dark");
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
   }, []);
   const firstName = (user.name || "").split(" ")[0];
   return (
@@ -138,8 +153,33 @@ function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
             </button>
           )}
           {onDarkMode && (
-            <button onClick={() => { setOpen(false); onDarkMode(); }} style={menuItemStyle()}>
-              <Moon size={14} strokeWidth={1.75} /><span>Mode Sombre</span>
+            <button onClick={() => onDarkMode()} style={{ ...menuItemStyle(), justifyContent: "space-between" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                {isDark
+                  ? <Sun size={14} strokeWidth={1.75} />
+                  : <Moon size={14} strokeWidth={1.75} />}
+                <span>Mode Sombre</span>
+              </span>
+              {/* Mini toggle visuel */}
+              <span
+                aria-hidden
+                style={{
+                  position: "relative",
+                  width: 28, height: 16, borderRadius: 999,
+                  background: isDark ? "#10A37F" : "#D4D4D4",
+                  transition: "background 150ms ease",
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 2,
+                  left: isDark ? 14 : 2,
+                  width: 12, height: 12, borderRadius: "50%",
+                  background: "#FFFFFF",
+                  transition: "left 150ms ease",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
+                }}/>
+              </span>
             </button>
           )}
           {onLogout && (onProfile || onSettings || onDarkMode) && (
@@ -908,7 +948,7 @@ function Dashboard({ trades = [], setPage }) {
               return [...dayFilteredTrades].reverse().slice(0,6).map((t,i)=>(
                 <div key={i} style={{padding:8,background:T.bg,borderRadius:6,display:"grid",gridTemplateColumns:"1fr 0.6fr",gap:8,fontSize:11}}>
                   <div><div style={{fontWeight:600,color:T.text}}>{t.symbol}</div><div style={{fontSize:9,color:(t.direction === 'Short' ? T.red : T.blue)}}>{t.direction || 'Long'}</div></div>
-                  <div style={{textAlign:"right",fontWeight:600,color:t.pnl>=0?T.green:T.red}}>{t.pnl>=0?"+":""}${t.pnl.toFixed(0)}</div>
+                  <div style={{textAlign:"right",fontWeight:500,color:t.pnl>=0?T.green:T.red}}>{t.pnl>=0?"+":""}{getCurrencySymbol()}{t.pnl.toFixed(0)}</div>
                 </div>
               ));
             })()}
@@ -2776,6 +2816,57 @@ function NavItem({ icon, label, active, onClick, badge }) {
 function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, accountType, setAccountType, selectedEvalAccount, setSelectedEvalAccount, accounts = [], selectedAccountIds = [], addTrade, addStrategy, strategies = [], user }) {
   const [accountName, setAccountName] = useState("");
   const [selectedBroker, setSelectedBroker] = useState("tradovate");
+
+  // Favoris brokers : localStorage = cache rapide, Supabase = source de vérité.
+  const [favoriteBrokers, setFavoriteBrokers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tr4de_favorite_brokers") || "[]"); }
+    catch { return []; }
+  });
+
+  // Charger depuis Supabase au montage + au focus
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const supabase = createClient();
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_preferences")
+          .select("favorite_brokers")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) {
+          if (error.message?.includes("Could not find the table") || error.code === "PGRST116") return;
+          throw error;
+        }
+        if (cancelled) return;
+        const list = Array.isArray(data?.favorite_brokers) ? data.favorite_brokers : [];
+        setFavoriteBrokers(list);
+        try { localStorage.setItem("tr4de_favorite_brokers", JSON.stringify(list)); } catch {}
+      } catch (e) { console.error("⚠️ load favorite_brokers failed:", e?.message || e); }
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); };
+  }, [user?.id]);
+
+  const toggleFavoriteBroker = (id) => {
+    setFavoriteBrokers(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      try { localStorage.setItem("tr4de_favorite_brokers", JSON.stringify(next)); } catch {}
+      // Push vers Supabase (upsert sur user_id UNIQUE)
+      if (user?.id) {
+        const supabase = createClient();
+        supabase.from("user_preferences")
+          .upsert([{ user_id: user.id, favorite_brokers: next }], { onConflict: "user_id" })
+          .then(({ error }) => {
+            if (error) console.error("⚠️ save favorite_brokers failed:", error.message);
+          });
+      }
+      return next;
+    });
+  };
   const [fileName, setFileName] = useState("");
   const [fileContent, setFileContent] = useState("");
   const [preview, setPreview] = useState([]);
@@ -2874,57 +2965,179 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
   };
 
   const brokers = [
-    { id: "mt5", name: "MetaTrader 5", format: "html", icon: "🔷", iconPath: "/MetaTrader_5.png" },
-    { id: "tradovate", name: "Tradovate", format: "csv", icon: "📊", iconPath: "/trado.png" },
-    { id: "wealthcharts", name: "WealthCharts", format: "csv", icon: "💰", iconPath: "/weal.webp" },
+    // Futures / Prop firms
+    { id: "tradovate",     name: "Tradovate",            format: "csv",  iconPath: "/trado.png" },
+    { id: "rithmic",       name: "Rithmic R|Trader",     format: "csv",  iconPath: "/brokers/rithmic.png" },
+    { id: "ninjatrader",   name: "NinjaTrader",          format: "csv",  iconPath: "/brokers/ninja%20trader.png" },
+    { id: "topstep",       name: "Topstep X",            format: "csv",  iconPath: "/brokers/Topstep_Logo.jpg" },
+    { id: "ftmo",          name: "FTMO",                 format: "csv",  iconPath: "/brokers/ftmo.png" },
+    // Plateformes
+    { id: "tradingview",   name: "TradingView",          format: "csv",  iconPath: "/brokers/tradingview.webp" },
+    { id: "mt5",           name: "MetaTrader 5",         format: "html", iconPath: "/MetaTrader_5.png" },
+    { id: "mt4",           name: "MetaTrader 4",         format: "html", iconPath: "/brokers/MetaTrader_4.png" },
+    { id: "thinkorswim",   name: "thinkorswim",          format: "csv",  iconPath: "/brokers/thinkorswim.png" },
+    { id: "wealthcharts",  name: "WealthCharts",         format: "csv",  iconPath: "/weal.webp" },
+    // Brokers actions / CFD
+    { id: "ibkr",          name: "Interactive Brokers",  format: "csv",  iconPath: "/brokers/Interactive%20broker.png" },
+    { id: "capitalcom",    name: "Capital.com",          format: "csv",  iconPath: "/brokers/capital.png" },
+    { id: "ig",            name: "IG",                   format: "csv",  iconPath: "/brokers/if%20logo.png" },
+    { id: "webull",        name: "Webull",               format: "csv",  iconPath: "/brokers/webull.png" },
   ];
 
   const getBrokerInstructions = () => {
-    if (selectedBroker === "tradovate") {
-      return {
-        icon: "📊",
-        iconPath: "/trado.png",
-        name: "Tradovate",
-        title: "Tradovate",
-        subtext: "Types d'actifs supportés: Contrats à terme",
+    const broker = brokers.find(b => b.id === selectedBroker);
+    const iconPath = broker?.iconPath || "/trado.png";
+    const name = broker?.name || "Broker";
+
+    const map = {
+      tradovate: {
+        subtext: "Actifs : Futures (CME, ICE, Eurex)",
         steps: [
-          "1. Aller dans l'onglet Compte dans Tradovate",
-          "2. Cliquer sur les paramètres de votre compte",
-          "3. Aller dans l'onglet Ordres",
-          "4. Sélectionner votre plage de dates et cliquer Aller",
-          "5. Cliquer Télécharger le rapport"
+          "1. Ouvrir l'onglet Account de Tradovate",
+          "2. Aller dans Settings → Orders",
+          "3. Sélectionner la plage de dates et cliquer Go",
+          "4. Cliquer Download Report (export CSV)",
+          "5. Charger le fichier CSV ici"
         ]
-      };
-    }
-    if (selectedBroker === "wealthcharts") {
-      return {
-        icon: "💰",
-        iconPath: "/weal.webp",
-        name: "WealthCharts",
-        title: "WealthCharts",
-        subtext: "Types d'actifs supportés: Contrats, Actions, Indices",
+      },
+      rithmic: {
+        subtext: "Actifs : Futures (multi-bourses)",
+        steps: [
+          "1. Ouvrir Rithmic R|Trader Pro",
+          "2. Menu Reports → Order History (ou Trade History)",
+          "3. Choisir la plage de dates puis Run Report",
+          "4. Bouton Save / Export → format CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      ninjatrader: {
+        subtext: "Actifs : Futures, Forex, Actions",
+        steps: [
+          "1. Ouvrir NinjaTrader Control Center",
+          "2. Menu Account → Account Performance (ou Trade Performance)",
+          "3. Filtrer par compte et période",
+          "4. Clic-droit sur le tableau des Trades → Export → CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      topstep: {
+        subtext: "Prop firm Futures – plateforme TopstepX",
+        steps: [
+          "1. Se connecter au dashboard TopstepX",
+          "2. Onglet Performance / Trade History",
+          "3. Filtrer par compte et plage de dates",
+          "4. Bouton Export → CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      ftmo: {
+        subtext: "Prop firm Forex / CFD – via MetaTrader",
+        steps: [
+          "1. Ouvrir MetaTrader 4/5 connecté au compte FTMO",
+          "2. Onglet Toolbox → History",
+          "3. Clic-droit → Custom Period et choisir la plage",
+          "4. Clic-droit à nouveau → Save as Report (HTML)",
+          "5. Charger le fichier HTML ici"
+        ]
+      },
+      tradingview: {
+        subtext: "Charts + brokers connectés",
+        steps: [
+          "1. Ouvrir le panneau Trading en bas de TradingView",
+          "2. Onglet History des ordres ou trades",
+          "3. Bouton Export ou ⋯ → Download CSV",
+          "4. Charger le fichier CSV ici"
+        ]
+      },
+      mt5: {
+        subtext: "Forex, Actions, Indices, Crypto",
+        steps: [
+          "1. Ouvrir le terminal MetaTrader 5",
+          "2. Onglet Toolbox → History",
+          "3. Clic-droit → Custom Period et choisir la plage",
+          "4. Clic-droit à nouveau → Report → Open XML (HTML)",
+          "5. Charger le fichier HTML ici"
+        ]
+      },
+      mt4: {
+        subtext: "Forex, CFD",
+        steps: [
+          "1. Ouvrir le terminal MetaTrader 4",
+          "2. Onglet Terminal → Account History",
+          "3. Clic-droit → All History (ou période personnalisée)",
+          "4. Clic-droit à nouveau → Save as Detailed Report (HTML)",
+          "5. Charger le fichier HTML ici"
+        ]
+      },
+      thinkorswim: {
+        subtext: "Charles Schwab – Actions, Options, Futures",
+        steps: [
+          "1. Ouvrir thinkorswim Desktop",
+          "2. Onglet Monitor → Account Statement",
+          "3. Sélectionner la plage de dates",
+          "4. Bouton menu (icône ⚙) → Export to File → CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      wealthcharts: {
+        subtext: "Plateforme charts – Futures, Actions, Indices",
         steps: [
           "1. Ouvrir WealthCharts Trading Platform",
-          "2. Aller dans Ordres ou Historique",
-          "3. Exporter vos ordres en CSV",
-          "4. Assurez-vous que le fichier contient: order_id, qty_sent, qty_done, price_done",
-          "5. Charger le fichier CSV pour importer"
+          "2. Aller dans Orders ou History",
+          "3. Exporter en CSV",
+          "4. Vérifier que le fichier contient : order_id, qty_sent, qty_done, price_done",
+          "5. Charger le fichier CSV ici"
         ]
-      };
-    }
+      },
+      ibkr: {
+        subtext: "Actions, Options, Futures, Forex (multi-marchés)",
+        steps: [
+          "1. Se connecter au Client Portal IBKR",
+          "2. Performance & Reports → Statements ou Flex Queries",
+          "3. Configurer une Flex Query Trades / Executions",
+          "4. Lancer la requête et télécharger le CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      capitalcom: {
+        subtext: "CFD sur Forex, Actions, Indices, Crypto",
+        steps: [
+          "1. Se connecter au compte Capital.com (web)",
+          "2. Menu My Account → Statements / Reports",
+          "3. Filtrer par période → onglet Trades / Closed positions",
+          "4. Bouton Export → CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      ig: {
+        subtext: "CFD, Spread Betting, Actions",
+        steps: [
+          "1. Se connecter à My IG (Web)",
+          "2. Menu History (Live Account)",
+          "3. Sélectionner la plage de dates",
+          "4. Bouton Download → CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+      webull: {
+        subtext: "Actions, Options, Crypto (US)",
+        steps: [
+          "1. Ouvrir l'app Webull Desktop ou Web",
+          "2. Menu Account → Statements (Activity Statements)",
+          "3. Choisir la période et type Trade Activity",
+          "4. Export en CSV",
+          "5. Charger le fichier CSV ici"
+        ]
+      },
+    };
+
+    const cfg = map[selectedBroker] || map.tradovate;
     return {
-      icon: "🔷",
-      iconPath: "/MetaTrader_5.png",
-      name: "MetaTrader 5",
-      title: "MetaTrader 5",
-      subtext: "Types d'actifs supportés: Forex, Actions, Crypto",
-      steps: [
-        "1. Ouvrir le terminal MetaTrader 5",
-        "2. Ouvrir l'Historique depuis le menu Outils",
-        "3. Sélectionner votre compte de trading",
-        "4. Clic-droit sur les trades et exporter en HTML",
-        "5. Charger le fichier HTML pour importer"
-      ]
+      iconPath,
+      name,
+      title: name,
+      subtext: cfg.subtext,
+      steps: cfg.steps,
     };
   };
 
@@ -3337,7 +3550,43 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             <SearchableSelect
               value={selectedBroker}
               onChange={(id) => { setSelectedBroker(id); setError(""); }}
-              options={brokers.map(b => ({ id: b.id, label: b.name, iconUrl: b.iconPath }))}
+              options={(() => {
+                const isFav = (id) => favoriteBrokers.includes(id);
+                const sorted = [...brokers].sort((a, b) => {
+                  const fa = isFav(a.id), fb = isFav(b.id);
+                  if (fa !== fb) return fa ? -1 : 1;          // favoris en haut
+                  return a.name.localeCompare(b.name);        // puis alphabétique
+                });
+                return sorted.map(b => ({
+                  id: b.id,
+                  label: b.name,
+                  iconUrl: b.iconPath,
+                  accessory: (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={isFav(b.id) ? "Retirer des favoris" : "Ajouter aux favoris"}
+                      title={isFav(b.id) ? "Retirer des favoris" : "Ajouter aux favoris"}
+                      onClick={() => toggleFavoriteBroker(b.id)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleFavoriteBroker(b.id); } }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 22, height: 22, borderRadius: 4,
+                        background: "transparent", cursor: "pointer", padding: 0,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <Star
+                        size={13}
+                        strokeWidth={1.75}
+                        color={isFav(b.id) ? "#F59E0B" : "#8E8E8E"}
+                        fill={isFav(b.id) ? "#F59E0B" : "none"}
+                      />
+                    </span>
+                  ),
+                }));
+              })()}
               searchPlaceholder="Rechercher un courtier..."
               emptyLabel="Aucun courtier"
               small
@@ -3692,9 +3941,12 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
     const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
     for (let i = 0; i < adjustedFirstDay; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    // Padding : on force toujours 6 semaines (42 cellules) pour que tous les mois
+    // aient la même hauteur et que le fond de sélection couvre toute la cellule.
+    while (cells.length < 42) cells.push(null);
 
     return (
-      <div key={monthIdx} style={{background: expandedMonth === monthIdx ? "#FAFAFA" : T.white,padding:"16px 18px",cursor:"pointer",fontFamily:"var(--font-sans)",transition:"background .12s ease"}} onClick={()=>{
+      <div key={monthIdx} style={{background: expandedMonth === monthIdx ? "#FAFAFA" : T.white,padding:"16px 18px",cursor:"pointer",fontFamily:"var(--font-sans)",transition:"background .12s ease",height:"100%",boxSizing:"border-box"}} onClick={()=>{
         if (expandedMonth === monthIdx) {
           setExpandedMonth(null);
         } else {
@@ -3813,9 +4065,9 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
         
         <div style={{padding:"20px 24px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <div style={{fontSize:16,fontWeight:600,color:T.textMut}}>{monthName}</div>
-            <div style={{fontSize:18,fontWeight:700,color:monthPnL>=0?T.green:T.red,marginTop:4}}>
-              {monthPnL>=0?"+":""}${monthPnL.toFixed(2)}
+            <div style={{fontSize:16,fontWeight:500,color:T.textMut}}>{monthName}</div>
+            <div style={{fontSize:18,fontWeight:500,color:monthPnL>=0?T.green:T.red,marginTop:4}}>
+              {monthPnL>=0?"+":""}{getCurrencySymbol()}{monthPnL.toFixed(2)}
             </div>
           </div>
           
@@ -3823,9 +4075,9 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
             {accountType === "eval" && (
               <div style={{display:"flex",flexDirection:"column",gap:8,minWidth:160,alignItems:"flex-end"}}>
                 <div>
-                  <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:4}}>EVAL ${evalAccountSize.toUpperCase()}</div>
-                  <div style={{fontSize:14,fontWeight:700,color:totalPnL >= evalObjectives[evalAccountSize] ? T.green : T.text}}>
-                    ${totalPnL.toFixed(2)} / ${evalObjectives[evalAccountSize]}
+                  <div style={{fontSize:11,fontWeight:500,color:T.textMut,marginBottom:4}}>EVAL {getCurrencySymbol()}{evalAccountSize.toUpperCase()}</div>
+                  <div style={{fontSize:14,fontWeight:500,color:totalPnL >= evalObjectives[evalAccountSize] ? T.green : T.text}}>
+                    {getCurrencySymbol()}{totalPnL.toFixed(2)} / {getCurrencySymbol()}{evalObjectives[evalAccountSize]}
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
@@ -3894,7 +4146,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
                         <td key={day} style={{padding:"10px 12px",background:bg,verticalAlign:"top",textAlign:"left",borderRight:cellBorder}}>
                           <div style={{fontWeight:500,color:textColor,fontSize:13,marginBottom:6}}>{String(day).padStart(2, '0')}</div>
                           <div style={{color:tradesCount > 0 ? valueColor : T.textMut,fontWeight:400,fontSize:12,marginBottom:2}}>
-                            {tradesCount > 0 ? `${pnl>=0?"+":""}$${pnl.toFixed(0)}` : "$0"}
+                            {tradesCount > 0 ? `${pnl>=0?"+":""}${getCurrencySymbol()}${pnl.toFixed(0)}` : `${getCurrencySymbol()}0`}
                           </div>
                           <div style={{color:T.textMut,fontSize:10,fontWeight:500}}>{tradesCount} trade{tradesCount !== 1 ? "s" : ""}</div>
                         </td>
@@ -3903,7 +4155,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
                     <td style={{padding:"10px 12px",background:T.white,verticalAlign:"top",textAlign:"left",borderLeft:`1px solid ${T.border}`}}>
                       <div style={{fontWeight:400,color:T.text,fontSize:13,marginBottom:6}}>Semaine {weekIdx + 1}</div>
                       <div style={{color:weekPnL>=0?T.green:weekPnL<0?T.red:T.textMut,fontWeight:400,fontSize:12,marginBottom:2}}>
-                        {weekPnL>=0?"+":""}${weekPnL.toFixed(0)}
+                        {weekPnL>=0?"+":""}{getCurrencySymbol()}{weekPnL.toFixed(0)}
                       </div>
                       <div style={{color:T.textMut,fontSize:10,fontWeight:500}}>{weekTrades} trade{weekTrades !== 1 ? "s" : ""}</div>
                     </td>
@@ -3985,8 +4237,371 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
   );
 }
 
+// === Sous-composants pour les blocs Bias / Règles / Erreurs ===
+function reorder(arr, from, to) {
+  const next = [...arr];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+// Édition inline : le bloc lui-même devient éditable (pas de modale ni de drawer).
+// On affiche les items en cards éditables avec poignée + champ + corbeille.
+function EditListModal({ open, title, accent, items, isCheckList, onClose, onSave }) {
+  const [draft, setDraft] = useState([]);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  useEffect(() => {
+    if (open) setDraft(items.map(it => isCheckList ? { ...it } : { label: it }));
+  }, [open, items, isCheckList]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  const update = (i, val) => setDraft(d => d.map((x, idx) => idx === i ? { ...x, label: val } : x));
+  const remove = (i) => setDraft(d => d.filter((_, idx) => idx !== i));
+  const add = () => setDraft(d => [...d, isCheckList ? { id: `personal_${Date.now()}_${d.length}`, label: "" } : { label: "" }]);
+  const move = (from, to) => setDraft(d => reorder(d, from, to));
+  const save = () => {
+    const cleaned = draft.map(x => ({ ...x, label: (x.label || "").trim() })).filter(x => x.label);
+    if (isCheckList) onSave(cleaned);
+    else onSave(cleaned.map(x => x.label));
+    onClose();
+  };
+  return ReactDOM.createPortal(
+    <>
+      {/* Backdrop avec slide-in fade */}
+      <div onClick={onClose} style={{
+        position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:9998,
+        animation:"tr4de-drawer-fade 180ms ease both",
+      }}/>
+
+      {/* Drawer latéral */}
+      <aside style={{
+        position:"fixed",top:0,right:0,bottom:0,width:"min(440px, 92vw)",
+        background:"#FFFFFF",borderLeft:"1px solid #E5E5E5",
+        zIndex:9999,display:"flex",flexDirection:"column",
+        boxShadow:"-12px 0 40px rgba(0,0,0,0.10)",
+        fontFamily:"var(--font-sans)",
+        animation:"tr4de-drawer-slide 240ms cubic-bezier(0.22, 1, 0.36, 1) both",
+      }}>
+
+        {/* Header avec accent à gauche */}
+        <div style={{display:"flex",alignItems:"stretch",borderBottom:"1px solid #F0F0F0"}}>
+          <div style={{width:3,background:accent,flexShrink:0}}/>
+          <div style={{flex:1,display:"flex",alignItems:"center",gap:10,padding:"18px 20px"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#8E8E8E",textTransform:"uppercase",letterSpacing:0.5,marginBottom:2}}>Édition</div>
+              <h2 style={{fontSize:16,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{title}</h2>
+            </div>
+            <button onClick={onClose} aria-label="Fermer"
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,background:"transparent",border:"none",cursor:"pointer",color:"#8E8E8E",borderRadius:8,flexShrink:0}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5";e.currentTarget.style.color="#0D0D0D"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#8E8E8E"}}>
+              <LucideX size={18} strokeWidth={1.75}/>
+            </button>
+          </div>
+        </div>
+
+        {/* Liste éditable */}
+        <div className="scroll-thin" style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+          {draft.length === 0 ? (
+            <div style={{padding:"48px 16px",textAlign:"center",color:"#8E8E8E",fontSize:13}}>
+              Aucune règle pour l'instant.<br/>
+              <span style={{fontSize:12,color:"#B4B4B4"}}>Ajoute-en une avec le bouton ci-dessous.</span>
+            </div>
+          ) : (
+            <ol style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:8}}>
+              {draft.map((it, i) => (
+                <li key={i}
+                  draggable
+                  onDragStart={()=>setDragIdx(i)}
+                  onDragOver={(e)=>{e.preventDefault();setOverIdx(i)}}
+                  onDragLeave={()=>setOverIdx(null)}
+                  onDrop={()=>{ if (dragIdx!==null && dragIdx!==i) move(dragIdx, i); setDragIdx(null); setOverIdx(null); }}
+                  onDragEnd={()=>{setDragIdx(null);setOverIdx(null)}}
+                  style={{
+                    display:"flex",alignItems:"center",gap:6,
+                    background: overIdx===i && dragIdx!==i ? "#F5F5F5" : "#FFFFFF",
+                    border:`1px solid ${overIdx===i && dragIdx!==i ? accent : "#E5E5E5"}`,
+                    borderRadius:10,
+                    padding:"4px 8px 4px 4px",
+                    opacity: dragIdx===i ? 0.4 : 1,
+                    transition:"border-color .12s ease, background .12s ease, opacity .12s ease",
+                  }}>
+                  <span style={{cursor:"grab",color:"#C8C8C8",display:"inline-flex",padding:"6px 4px",flexShrink:0}} title="Glisser pour réordonner">
+                    <GripVertical size={14} strokeWidth={1.75}/>
+                  </span>
+                  <input
+                    type="text" value={it.label} placeholder={`Règle ${i+1}`}
+                    onChange={(e)=>update(i, e.target.value)}
+                    style={{flex:1,padding:"8px 0",border:"none",outline:"none",fontSize:13,fontFamily:"inherit",color:"#0D0D0D",background:"transparent"}}
+                  />
+                  <button type="button" onClick={()=>remove(i)} title="Supprimer"
+                    style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",border:"none",background:"transparent",cursor:"pointer",color:"#B4B4B4",borderRadius:6,flexShrink:0,transition:"color .12s ease, background .12s ease"}}
+                    onMouseEnter={(e)=>{e.currentTarget.style.color="#EF4444";e.currentTarget.style.background="#FEF2F2"}}
+                    onMouseLeave={(e)=>{e.currentTarget.style.color="#B4B4B4";e.currentTarget.style.background="transparent"}}>
+                    <LucideTrash2 size={14} strokeWidth={1.75}/>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {/* Bouton ajouter */}
+          <button type="button" onClick={add}
+            style={{
+              display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+              padding:"10px",fontSize:13,fontWeight:500,
+              color:"#0D0D0D",background:"transparent",
+              border:"1px dashed #D4D4D4",cursor:"pointer",borderRadius:10,
+              fontFamily:"inherit",width:"100%",marginTop:draft.length === 0 ? 0 : 8,
+              transition:"background .12s ease, border-color .12s ease",
+            }}
+            onMouseEnter={(e)=>{e.currentTarget.style.background=accent+"14";e.currentTarget.style.borderColor=accent}}
+            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="#D4D4D4"}}>
+            <Plus size={14} strokeWidth={2}/> Ajouter une règle
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center",padding:"14px 20px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
+          <span style={{fontSize:11,color:"#8E8E8E",fontVariantNumeric:"tabular-nums"}}>
+            {draft.filter(d => (d.label || "").trim()).length} règle{draft.length > 1 ? "s" : ""}
+          </span>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onClose} style={{padding:"0 16px",height:34,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            <button onClick={save} style={{padding:"0 16px",height:34,borderRadius:8,border:"1px solid #0D0D0D",background:"#0D0D0D",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
+          </div>
+        </div>
+
+      </aside>
+
+      <style>{`
+        @keyframes tr4de-drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tr4de-drawer-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      `}</style>
+    </>,
+    document.body
+  );
+}
+function EditableTextList({ title, iconBg, icon, items, onSave, renderPrefix, accent }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState([]);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const enterEdit = () => { setDraft(items.map(it => ({ label: it }))); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setDraft([]); };
+  const saveEdit = () => {
+    const cleaned = draft.map(x => (x.label || "").trim()).filter(Boolean);
+    onSave(cleaned);
+    setEditing(false); setDraft([]);
+  };
+  const update = (i, val) => setDraft(d => d.map((x, idx) => idx === i ? { ...x, label: val } : x));
+  const removeRow = (i) => setDraft(d => d.filter((_, idx) => idx !== i));
+  const addRow = () => setDraft(d => [...d, { label: "" }]);
+  const move = (from, to) => setDraft(d => reorder(d, from, to));
+  return (
+    <div
+      style={{background:"#FFFFFF",border:`1px solid ${editing ? accent : "#E5E5E5"}`,borderRadius:12,overflow:"hidden",transition:"border-color .15s ease"}}
+      onMouseEnter={(e)=>{ if (!editing) { const btn = e.currentTarget.querySelector('[data-edit-btn]'); if (btn) btn.style.opacity = 1; } }}
+      onMouseLeave={(e)=>{ if (!editing) { const btn = e.currentTarget.querySelector('[data-edit-btn]'); if (btn) btn.style.opacity = 0; } }}>
+      {/* Header */}
+      <div style={{padding:"14px 16px 12px",borderBottom:`1px solid ${editing ? accent + "30" : "#E5E5E5"}`,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:24,height:24,borderRadius:6,background:iconBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{icon}</div>
+        <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.1,flex:1}}>{title}</div>
+        {editing ? (
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={cancelEdit} style={{height:26,padding:"0 10px",border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#5C5C5C",fontSize:12,fontWeight:500,cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}>Annuler</button>
+            <button onClick={saveEdit} style={{height:26,padding:"0 10px",border:`1px solid ${accent}`,background:accent,color:"#FFFFFF",fontSize:12,fontWeight:600,cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}>OK</button>
+          </div>
+        ) : (
+          <button data-edit-btn type="button" onClick={enterEdit} title="Modifier"
+            style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,border:"none",background:"transparent",cursor:"pointer",color:"#8E8E8E",borderRadius:6,opacity:0,transition:"opacity .15s ease"}}
+            onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0";e.currentTarget.style.color="#0D0D0D"}}
+            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#8E8E8E"}}>
+            <Pencil size={13} strokeWidth={1.75}/>
+          </button>
+        )}
+      </div>
+
+      {/* Corps */}
+      {editing ? (
+        <div style={{padding:"8px 10px 12px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {draft.map((it,i)=>(
+              <div key={i}
+                draggable
+                onDragStart={()=>setDragIdx(i)}
+                onDragOver={(e)=>{e.preventDefault();setOverIdx(i)}}
+                onDragLeave={()=>setOverIdx(null)}
+                onDrop={()=>{ if (dragIdx!==null && dragIdx!==i) move(dragIdx,i); setDragIdx(null); setOverIdx(null); }}
+                onDragEnd={()=>{setDragIdx(null);setOverIdx(null)}}
+                style={{display:"flex",alignItems:"center",gap:4,padding:"2px 4px",borderRadius:6,
+                  background: overIdx===i && dragIdx!==i ? "#F5F5F5" : "transparent",
+                  opacity: dragIdx===i ? 0.4 : 1,
+                  transition:"background .12s ease",
+                }}>
+                <span style={{cursor:"grab",color:"#C8C8C8",display:"inline-flex",padding:4,flexShrink:0}}><GripVertical size={12} strokeWidth={1.75}/></span>
+                <input
+                  type="text" value={it.label} placeholder={`Règle ${i+1}`}
+                  onChange={(e)=>update(i, e.target.value)}
+                  onKeyDown={(e)=>{ if (e.key==="Enter"){ e.preventDefault(); addRow(); } }}
+                  style={{flex:1,fontSize:12,padding:"6px 8px",border:"1px solid transparent",borderRadius:6,outline:"none",fontFamily:"inherit",color:"#0D0D0D",background:"#FAFAFA"}}
+                  onFocus={(e)=>{e.currentTarget.style.borderColor=accent;e.currentTarget.style.background="#FFFFFF"}}
+                  onBlur={(e)=>{e.currentTarget.style.borderColor="transparent";e.currentTarget.style.background="#FAFAFA"}}
+                />
+                <button type="button" onClick={()=>removeRow(i)} title="Supprimer"
+                  style={{width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",border:"none",background:"transparent",cursor:"pointer",color:"#B4B4B4",borderRadius:4,flexShrink:0}}
+                  onMouseEnter={(e)=>{e.currentTarget.style.color="#EF4444"}} onMouseLeave={(e)=>{e.currentTarget.style.color="#B4B4B4"}}>
+                  <LucideTrash2 size={12} strokeWidth={1.75}/>
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addRow}
+            style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:6,padding:"6px 8px",fontSize:12,color:"#5C5C5C",background:"transparent",border:"none",cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}
+            onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5";e.currentTarget.style.color="#0D0D0D"}}
+            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#5C5C5C"}}>
+            <Plus size={12} strokeWidth={2}/> Ajouter
+          </button>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",padding:"8px 6px"}}>
+          {items.length === 0 && (
+            <div style={{padding:"12px",fontSize:12,color:"#8E8E8E",textAlign:"center"}}>Aucun élément. Survolez et cliquez ✎ pour ajouter.</div>
+          )}
+          {items.map((txt,i)=>(
+            <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"6px 10px",borderRadius:6,transition:"background .12s ease"}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
+              {renderPrefix?.(i)}
+              <div style={{fontSize:12,color:"#0D0D0D",fontWeight:400,lineHeight:1.5,flex:1}}>{txt}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditableCheckList({ title, iconBg, icon, items, checkedRuleIds, onToggleCheck, onSave, accent }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState([]);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const checkedCount = items.filter(r => !!checkedRuleIds[r.id]).length;
+  const enterEdit = () => { setDraft(items.map(it => ({...it}))); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setDraft([]); };
+  const saveEdit = () => {
+    const cleaned = draft.map(x => ({...x, label: (x.label||"").trim()})).filter(x => x.label);
+    onSave(cleaned);
+    setEditing(false); setDraft([]);
+  };
+  const update = (i, val) => setDraft(d => d.map((x,idx) => idx===i ? {...x, label: val} : x));
+  const removeRow = (i) => setDraft(d => d.filter((_,idx) => idx!==i));
+  const addRow = () => setDraft(d => [...d, { id: `personal_${Date.now()}_${d.length}`, label: "" }]);
+  const move = (from, to) => setDraft(d => reorder(d, from, to));
+  return (
+    <div style={{background:"#FFFFFF",border:`1px solid ${editing ? accent : "#E5E5E5"}`,borderRadius:12,overflow:"hidden",transition:"border-color .15s ease"}}
+      onMouseEnter={(e)=>{ if (!editing) { const btn = e.currentTarget.querySelector('[data-edit-btn]'); if (btn) btn.style.opacity = 1; } }}
+      onMouseLeave={(e)=>{ if (!editing) { const btn = e.currentTarget.querySelector('[data-edit-btn]'); if (btn) btn.style.opacity = 0; } }}>
+      <div style={{padding:"14px 16px 12px",borderBottom:`1px solid ${editing ? accent + "30" : "#E5E5E5"}`,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:24,height:24,borderRadius:6,background:iconBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{icon}</div>
+        <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.1,flex:1}}>{title}</div>
+        {editing ? (
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={cancelEdit} style={{height:26,padding:"0 10px",border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#5C5C5C",fontSize:12,fontWeight:500,cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}>Annuler</button>
+            <button onClick={saveEdit} style={{height:26,padding:"0 10px",border:`1px solid ${accent}`,background:accent,color:"#FFFFFF",fontSize:12,fontWeight:600,cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}>OK</button>
+          </div>
+        ) : (
+          <>
+            <div style={{fontSize:11,color:"#8E8E8E",fontVariantNumeric:"tabular-nums"}}>{checkedCount}/{items.length}</div>
+            <button data-edit-btn type="button" onClick={enterEdit} title="Modifier"
+              style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,border:"none",background:"transparent",cursor:"pointer",color:"#8E8E8E",borderRadius:6,opacity:0,transition:"opacity .15s ease"}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0";e.currentTarget.style.color="#0D0D0D"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#8E8E8E"}}>
+              <Pencil size={13} strokeWidth={1.75}/>
+            </button>
+          </>
+        )}
+      </div>
+
+      {editing ? (
+        <div style={{padding:"8px 10px 12px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {draft.map((it,i)=>(
+              <div key={i}
+                draggable
+                onDragStart={()=>setDragIdx(i)}
+                onDragOver={(e)=>{e.preventDefault();setOverIdx(i)}}
+                onDragLeave={()=>setOverIdx(null)}
+                onDrop={()=>{ if (dragIdx!==null && dragIdx!==i) move(dragIdx,i); setDragIdx(null); setOverIdx(null); }}
+                onDragEnd={()=>{setDragIdx(null);setOverIdx(null)}}
+                style={{display:"flex",alignItems:"center",gap:4,padding:"2px 4px",borderRadius:6,
+                  background: overIdx===i && dragIdx!==i ? "#F5F5F5" : "transparent",
+                  opacity: dragIdx===i ? 0.4 : 1,
+                  transition:"background .12s ease",
+                }}>
+                <span style={{cursor:"grab",color:"#C8C8C8",display:"inline-flex",padding:4,flexShrink:0}}><GripVertical size={12} strokeWidth={1.75}/></span>
+                <input
+                  type="text" value={it.label} placeholder={`Règle ${i+1}`}
+                  onChange={(e)=>update(i, e.target.value)}
+                  onKeyDown={(e)=>{ if (e.key==="Enter"){ e.preventDefault(); addRow(); } }}
+                  style={{flex:1,fontSize:12,padding:"6px 8px",border:"1px solid transparent",borderRadius:6,outline:"none",fontFamily:"inherit",color:"#0D0D0D",background:"#FAFAFA"}}
+                  onFocus={(e)=>{e.currentTarget.style.borderColor=accent;e.currentTarget.style.background="#FFFFFF"}}
+                  onBlur={(e)=>{e.currentTarget.style.borderColor="transparent";e.currentTarget.style.background="#FAFAFA"}}
+                />
+                <button type="button" onClick={()=>removeRow(i)} title="Supprimer"
+                  style={{width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",border:"none",background:"transparent",cursor:"pointer",color:"#B4B4B4",borderRadius:4,flexShrink:0}}
+                  onMouseEnter={(e)=>{e.currentTarget.style.color="#EF4444"}} onMouseLeave={(e)=>{e.currentTarget.style.color="#B4B4B4"}}>
+                  <LucideTrash2 size={12} strokeWidth={1.75}/>
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addRow}
+            style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:6,padding:"6px 8px",fontSize:12,color:"#5C5C5C",background:"transparent",border:"none",cursor:"pointer",borderRadius:6,fontFamily:"inherit"}}
+            onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5";e.currentTarget.style.color="#0D0D0D"}}
+            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#5C5C5C"}}>
+            <Plus size={12} strokeWidth={2}/> Ajouter
+          </button>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",padding:"8px 6px"}}>
+          {items.length === 0 && (
+            <div style={{padding:"12px",fontSize:12,color:"#8E8E8E",textAlign:"center"}}>Aucune règle. Survolez et cliquez ✎ pour en ajouter.</div>
+          )}
+          {items.map(r => {
+            const checked = !!checkedRuleIds[r.id];
+            return (
+              <label key={r.id}
+                style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:6,cursor:"pointer",background:"transparent",transition:"background .12s ease"}}
+                onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
+                onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
+                <input type="checkbox" checked={checked} onChange={()=>onToggleCheck(r.id)}
+                  style={{width:14,height:14,accentColor:"#10A37F",cursor:"pointer",margin:0,flexShrink:0}}/>
+                <span style={{fontSize:12, color: checked ? "#8E8E8E" : "#0D0D0D", fontWeight:400, lineHeight:1.5, textDecoration: checked ? "line-through" : "none"}}>
+                  {r.label}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DisciplinePage({ trades = [] }) {
   // ✅ Utiliser les hooks Supabase
+  const { user } = useAuth();
   const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules, disciplineData } = useDisciplineTracking();
   const { customRules, loading: rulesLoading, addRule, deleteRule } = useCustomDisciplineRules();
   
@@ -4019,6 +4634,99 @@ function DisciplinePage({ trades = [] }) {
       return {};
     }
   });
+
+  // Listes éditables pour Bias / Règles à suivre / Erreurs à éviter
+  const DEFAULT_BIAS = [
+    "Identifier le balayage de liquidité (HTF Liquidity Sweep)",
+    "Définir l'objectif de prix (Draw on Liquidity)",
+    "Vérifier les respects/discrédits (FVG/OB)",
+    "Comparer les divergences SMT (Corrélation d'actifs)",
+    "Appliquer les profils de session (Asie/Londres/New York)",
+  ];
+  const DEFAULT_PERSONAL = [
+    { id: "personal_sl_be",       label: "Ne pas bouger son SL en BE" },
+    { id: "personal_ifvg",        label: "Bien attendre le iFVG" },
+    { id: "personal_focus",       label: "Être attentif sur le marché" },
+    { id: "personal_no_hesitate", label: "Ne pas hésiter" },
+  ];
+  const DEFAULT_ERRORS = [
+    "FVG au-dessus du SL (sauf si trend forte)",
+    "Zone de liquidité juste au-dessus du SL (range, plus hauts, etc.)",
+    "Si la majeure sellside a été prise, ne pas prendre le premier setup, attendre un meilleur retracement",
+    "Rentrer sans confirmation",
+  ];
+  const [biasItems, setBiasItems] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("tr4de_bias_items") || "null");
+      return Array.isArray(saved) ? saved : DEFAULT_BIAS;
+    } catch { return DEFAULT_BIAS; }
+  });
+  const [personalRules, setPersonalRules] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("tr4de_personal_rules") || "null");
+      return Array.isArray(saved) ? saved : DEFAULT_PERSONAL;
+    } catch { return DEFAULT_PERSONAL; }
+  });
+  const [errorItems, setErrorItems] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("tr4de_error_items") || "null");
+      return Array.isArray(saved) ? saved : DEFAULT_ERRORS;
+    } catch { return DEFAULT_ERRORS; }
+  });
+  React.useEffect(() => { try { localStorage.setItem("tr4de_bias_items", JSON.stringify(biasItems)); } catch {} }, [biasItems]);
+  React.useEffect(() => { try { localStorage.setItem("tr4de_personal_rules", JSON.stringify(personalRules)); } catch {} }, [personalRules]);
+  React.useEffect(() => { try { localStorage.setItem("tr4de_error_items", JSON.stringify(errorItems)); } catch {} }, [errorItems]);
+
+  // === Sync online (Supabase user_preferences) des 3 listes Discipline ===
+  const [listsLoadedFromCloud, setListsLoadedFromCloud] = useState(false);
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const supabase = createClient();
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_preferences")
+          .select("bias_items, error_items, personal_rules")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) {
+          console.warn("⚠️ load discipline lists:", error.code, error.message);
+        } else if (!cancelled && data) {
+          if (Array.isArray(data.bias_items))     setBiasItems(data.bias_items);
+          if (Array.isArray(data.error_items))    setErrorItems(data.error_items);
+          if (Array.isArray(data.personal_rules)) setPersonalRules(data.personal_rules);
+        }
+      } catch (e) { console.error("⚠️ load discipline lists failed:", e?.message || e); }
+      finally { if (!cancelled) setListsLoadedFromCloud(true); }
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); };
+  }, [user?.id]);
+
+  // Auto-save (debounced) à chaque modification d'une des 3 listes
+  React.useEffect(() => {
+    if (!user?.id || !listsLoadedFromCloud) return;
+    const supabase = createClient();
+    const handle = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from("user_preferences")
+          .upsert([{
+            user_id: user.id,
+            bias_items: biasItems,
+            error_items: errorItems,
+            personal_rules: personalRules,
+            updated_at: new Date().toISOString(),
+          }], { onConflict: "user_id" });
+        if (error) console.error("⚠️ save discipline lists failed:", error.message);
+      } catch (e) { console.error("⚠️ save discipline lists error:", e); }
+    }, 600);
+    return () => clearTimeout(handle);
+  }, [biasItems, errorItems, personalRules, user?.id, listsLoadedFromCloud]);
+
   const heatmapScrollRef = useRef(null);
   const today = getLocalDateString();
   const todayDate = new Date();
@@ -4119,7 +4827,9 @@ function DisciplinePage({ trades = [] }) {
     journal: "Consigner votre analyse et vos apprentissages après la fermeture du marché"
   };
 
-  const allRules = [
+  // Liste quotidienne uniquement (base + custom Supabase). Affichée dans la
+  // section "Liste quotidienne".
+  const dailyRules = [
     { id: "premarket", label: "Pre Market Routine", uuid: null },
     { id: "biais", label: "Biais Journalier", uuid: null },
     { id: "news", label: "News et Key Levels", uuid: null },
@@ -4128,9 +4838,27 @@ function DisciplinePage({ trades = [] }) {
     ...customRules.map(r => ({ id: r.rule_id, label: r.text, uuid: r.id })),
   ].map(r => ({ ...r, status: checkedRuleIds[r.id] || false }));
 
+  // Le progress tracker / la heatmap ne comptent QUE la liste quotidienne.
+  // Les règles perso "Règles à suivre" sont indépendantes.
+  const allRules = dailyRules;
+
   const completedCount = allRules.filter(r => r.status).length;
   const completeProgress = (completedCount / Math.max(allRules.length, 1)) * 100;
   const currentDate = new Date();
+
+  // Auto-toggle "Followed All Rules" quand toutes les règles perso sont cochées.
+  // (Les règles perso ne comptent toujours PAS dans le progress tracker, mais elles
+  // pilotent cette case-là, qui elle est dans la liste quotidienne.)
+  React.useEffect(() => {
+    if (!personalRules.length) return;
+    const allChecked = personalRules.every(r => !!checkedRuleIds[r.id]);
+    const followAllCurrent = !!checkedRuleIds["followall"];
+    if (allChecked && !followAllCurrent) {
+      toggleRule("followall", allRules);
+    } else if (!allChecked && followAllCurrent) {
+      toggleRule("followall", allRules);
+    }
+  }, [checkedRuleIds, personalRules]);
 
   const saveDisciplineRules = () => {
     localStorage.setItem("tr4de_discipline_rules_config", JSON.stringify(disciplineRules));
@@ -4234,87 +4962,45 @@ function DisciplinePage({ trades = [] }) {
             </div>
           </div>
 
-          {/* TROUVER LE BIAS JOURNALIER */}
-          <div style={{background:"linear-gradient(135deg, #F0F9FF 0%, #F9FAFB 100%)",border:`2px solid #93C5FD`,borderRadius:12,padding:16,borderLeft:`4px solid #3B82F6`}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <div style={{fontSize:16,fontWeight:700,color:"#1E40AF"}}>📊</div>
-              <div style={{fontSize:12,fontWeight:700,color:"#1E40AF",textTransform:"uppercase",letterSpacing:"0.5px"}}>Bias Journalier</div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#3B82F6",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#1E3A8A",fontWeight:500,lineHeight:1.4}}>Identifier le balayage de liquidité (HTF Liquidity Sweep)</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#3B82F6",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#1E3A8A",fontWeight:500,lineHeight:1.4}}>Définir l'objectif de prix (Draw on Liquidity)</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#3B82F6",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#1E3A8A",fontWeight:500,lineHeight:1.4}}>Vérifier les respects/discrédits (FVG/OB)</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#3B82F6",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#1E3A8A",fontWeight:500,lineHeight:1.4}}>Comparer les divergences SMT (Corrélation d'actifs)</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#3B82F6",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#1E3A8A",fontWeight:500,lineHeight:1.4}}>Appliquer les profils de session (Asie/Londres/New York)</div>
-              </div>
-            </div>
-          </div>
+          {/* BIAS JOURNALIER */}
+          <EditableTextList
+            title="Bias Journalier"
+            iconBg="#EFF6FF"
+            accent="#3B82F6"
+            icon={<LucideTrendingUp size={13} strokeWidth={1.75} color="#3B82F6"/>}
+            items={biasItems}
+            onSave={setBiasItems}
+            renderPrefix={(i)=>(
+              <div style={{minWidth:18,fontSize:11,color:T.textMut,fontVariantNumeric:"tabular-nums",marginTop:1}}>{i+1}.</div>
+            )}
+          />
 
           {/* REGLES A SUIVRE */}
-          <div style={{background:"linear-gradient(135deg, #F0FDF4 0%, #FAFBF9 100%)",border:`2px solid #BBF7D0`,borderRadius:12,padding:16,borderLeft:`4px solid #10A37F`}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <div style={{fontSize:16,fontWeight:700,color:"#15803D"}}>✓</div>
-              <div style={{fontSize:12,fontWeight:700,color:"#15803D",textTransform:"uppercase",letterSpacing:"0.5px"}}>Règles à suivre</div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Ne pas bouger son SL en BE</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Bien attendre le iFVG</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Être attentif sur le marché</div>
-              </div>
-              <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Ne pas hésiter</div>
-              </div>
-            </div>
-          </div>
+          <EditableCheckList
+            title="Règles à suivre"
+            iconBg="#E6F7F1"
+            accent={T.green}
+            icon={<LucideCheck size={13} strokeWidth={2} color={T.green}/>}
+            items={personalRules}
+            checkedRuleIds={checkedRuleIds}
+            onToggleCheck={(id)=>toggleRule(id, allRules)}
+            onSave={setPersonalRules}
+          />
 
           {/* ERREURS A EVITER */}
-          <div style={{background:"linear-gradient(135deg, #FEF2F2 0%, #FEF9F9 100%)",border:`2px solid #FECACA`,borderRadius:12,padding:16,borderLeft:`4px solid #EF4444`}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <div style={{fontSize:16,fontWeight:700,color:"#DC2626"}}>⚠</div>
-              <div style={{fontSize:12,fontWeight:700,color:"#DC2626",textTransform:"uppercase",letterSpacing:"0.5px"}}>Erreurs à éviter</div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:6,height:6,background:"#EF4444",borderRadius:"50%",marginTop:5,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#7F1D1D",fontWeight:500,lineHeight:1.5}}>FVG au-dessus du SL (sauf si trend forte)</div>
+          <EditableTextList
+            title="Erreurs à éviter"
+            iconBg="#FEF2F2"
+            accent={T.red}
+            icon={<LucideX size={13} strokeWidth={2} color={T.red}/>}
+            items={errorItems}
+            onSave={setErrorItems}
+            renderPrefix={()=>(
+              <div style={{minWidth:18,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <LucideX size={11} strokeWidth={2.25} color={T.red}/>
               </div>
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:6,height:6,background:"#EF4444",borderRadius:"50%",marginTop:5,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#7F1D1D",fontWeight:500,lineHeight:1.5}}>Zone de liquidité juste au-dessus du SL ( range, plus hauts ect…. )</div>
-              </div>
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:6,height:6,background:"#EF4444",borderRadius:"50%",marginTop:5,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#7F1D1D",fontWeight:500,lineHeight:1.5}}>Si la majeur sellside a été prise, ne pas prendre le premier setup, attendre un meilleur retracement</div>
-              </div>
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:6,height:6,background:"#EF4444",borderRadius:"50%",marginTop:5,flexShrink:0}}/>
-                <div style={{fontSize:11,color:"#7F1D1D",fontWeight:500,lineHeight:1.5}}>Rentrer sans confirmation</div>
-              </div>
-            </div>
-          </div>
+            )}
+          />
         </div>
 
         {/* MIDDLE SECTION - 2 COLUMNS */}
@@ -4326,12 +5012,12 @@ function DisciplinePage({ trades = [] }) {
                 <div style={{fontSize:13,fontWeight:600,color:T.text}}>Liste quotidienne</div>
                 <div style={{fontSize:11,color:T.textMut}}>{currentDay} {currentMonth.toLowerCase()}.</div>
               </div>
-              <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{completedCount}/{allRules.length}</div>
+              <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{dailyRules.filter(r=>r.status).length}/{dailyRules.length}</div>
             </div>
             <div style={{maxHeight:"none",overflowY:"visible",paddingTop:8}}>
-              {allRules.map(rule => (
-                <div 
-                  key={rule.id} 
+              {dailyRules.map(rule => (
+                <div
+                  key={rule.id}
                   onClick={() => toggleRule(rule.id, allRules)}
                   style={{
                     padding:"12px 16px",
@@ -4372,7 +5058,7 @@ function DisciplinePage({ trades = [] }) {
           <div key={heatmapVersion} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:28,minWidth:0,overflow:"hidden"}}>
             <div style={{marginBottom:24}}>
               <div style={{fontSize:13,fontWeight:600,color:T.text}}>Progress Tracker</div>
-              <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{Object.values(checkedRuleIds).filter(v => v === true).length}/{allRules.length}</div>
+              <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{dailyRules.filter(r => r.status).length}/{dailyRules.length}</div>
               
               {(() => {
                 // Calculer la streak de jours consécutifs (Supabase d'abord, localStorage en fallback)
@@ -4462,7 +5148,15 @@ function DisciplinePage({ trades = [] }) {
                       if (stored) checked = JSON.parse(stored);
                     }
                     if (checked) {
-                      const checkedCount = Object.values(checked).filter(v => v === true).length;
+                      // On ne compte QUE les règles de la liste quotidienne
+                      // (les règles perso "Règles à suivre" sont exclues).
+                      const dailyIds = new Set([
+                        "premarket","biais","news","followall","journal",
+                        ...customRules.map(r => r.rule_id),
+                      ]);
+                      const checkedCount = Object.entries(checked)
+                        .filter(([id, v]) => v === true && dailyIds.has(id))
+                        .length;
                       const totalRules = 5 + customRules.length;
                       const percentage = Math.round((checkedCount / Math.max(totalRules, 1)) * 100);
                       return { percentage, hadTrading: true, rulesRespected: checkedCount, totalRules };
@@ -4686,8 +5380,8 @@ function DisciplinePage({ trades = [] }) {
                     "journal": { type: "Auto", condition: disciplineRules.journalTime, ruleKey: "journal" },
                     "strategy": { type: "Auto", condition: "—", ruleKey: "strategy" },
                     "stoploss": { type: "Auto", condition: "—", ruleKey: "stoploss" },
-                    "maxLossPerTrade": { type: "Auto", condition: `$${disciplineRules.maxLossPerTrade}`, ruleKey: "maxLossPerTrade" },
-                    "maxLossPerDay": { type: "Auto", condition: `$${disciplineRules.maxLossPerDay}`, ruleKey: "maxLossPerDay" },
+                    "maxLossPerTrade": { type: "Auto", condition: `${getCurrencySymbol()}${disciplineRules.maxLossPerTrade}`, ruleKey: "maxLossPerTrade" },
+                    "maxLossPerDay": { type: "Auto", condition: `${getCurrencySymbol()}${disciplineRules.maxLossPerDay}`, ruleKey: "maxLossPerDay" },
                   };
                   
                   const data = ruleData[rule.id];
@@ -4854,6 +5548,14 @@ function DisciplinePage({ trades = [] }) {
 export default function App() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
+
+  // Re-render quand l'utilisateur change la devise / le fuseau horaire dans Settings.
+  const [, forcePrefRefresh] = useState(0);
+  useEffect(() => {
+    const onPrefs = () => forcePrefRefresh(v => v + 1);
+    window.addEventListener("tr4de:prefs-changed", onPrefs);
+    return () => window.removeEventListener("tr4de:prefs-changed", onPrefs);
+  }, []);
   const [accountType, setAccountType] = useState(() => {
     try {
       const saved = localStorage.getItem('accountType');
@@ -5022,9 +5724,19 @@ export default function App() {
 
         const loadedAccounts = data || [];
         setAccounts(loadedAccounts);
-        
-        // ⚠️ Pas de sélection automatique : si l'utilisateur n'a rien sélectionné,
-        // on garde la sélection vide → 0 trades affichés.
+
+        // À chaque chargement de la page : si rien n'est sélectionné (premier visit
+        // OU sélection vide sauvegardée), on coche tous les comptes par défaut.
+        try {
+          const saved = localStorage.getItem("selectedAccountIds");
+          let current = [];
+          try { current = saved ? JSON.parse(saved) : []; } catch {}
+          if ((!Array.isArray(current) || current.length === 0) && loadedAccounts.length > 0) {
+            const allIds = loadedAccounts.map(a => a.id);
+            setSelectedAccountIds(allIds);
+            localStorage.setItem("selectedAccountIds", JSON.stringify(allIds));
+          }
+        } catch {}
       } catch (err) {
         console.error("Error loading accounts:", err);
         setAccounts([]);
@@ -5516,7 +6228,12 @@ export default function App() {
                 onLogout={handleLogout}
                 onSettings={() => setPage("settings")}
                 onProfile={() => setPage("settings")}
-                onDarkMode={() => console.log("Dark mode placeholder")}
+                onDarkMode={() => {
+                  const cur = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+                  const next = cur === "dark" ? "light" : "dark";
+                  document.documentElement.dataset.theme = next;
+                  try { localStorage.setItem("tr4de_theme", next); } catch {}
+                }}
               />
             </div>
           </div>

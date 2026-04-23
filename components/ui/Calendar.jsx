@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 
 const CALENDAR_DATA = {
   "2026-03-03": 540,
@@ -386,7 +387,7 @@ export default function Calendar() {
                     backgroundColor: getHeatmapColor(dayValue),
                     color: getCellClass(dayValue),
                   }}
-                  title={dayValue ? `$${dayValue}` : ""}
+                  title={dayValue ? `${getCurrencySymbol()}${dayValue}` : ""}
                 >
                   {day}
                 </div>

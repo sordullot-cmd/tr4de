@@ -7,6 +7,7 @@ import TradingAccountsPage from "@/components/pages/TradingAccountsPage";
 import { useTradingAccounts } from "@/lib/hooks/useTradingAccounts";
 import AccountSelector from "@/components/AccountSelector";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -48,7 +49,7 @@ const css = ` @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght
   .card-hover:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07) !important; }
 `;
 
-const fmt = (n, sign=false) => `${sign && n>0?"+":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmt = (n, sign=false) => `${sign && n>0?"+":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 function Pill({ children, color="gray", small }) {
   const map = {

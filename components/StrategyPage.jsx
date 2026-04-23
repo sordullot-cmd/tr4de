@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Pencil, Trash2, Plus, X, Target, TrendingUp, TrendingDown, Percent, Activity } from "lucide-react";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { useStrategies } from "@/lib/hooks/useUserData";
 import { useTrades } from "@/lib/hooks/useTradeData";
@@ -39,7 +40,7 @@ const css = `
   .anim-1 { animation: fadeUp .25s ease both; }
 `;
 
-const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 function Pill({ children, color="gray", small }) {
   const map = {

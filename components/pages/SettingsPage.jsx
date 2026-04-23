@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 
 const T = {
@@ -524,6 +525,8 @@ function AccountsSection() {
 
 /* =================== GLOBAL SETTINGS =================== */
 function GlobalsSection() {
+  const { user } = useAuth();
+  const supabase = createClient();
   const [timezone, setTimezone] = useState(() => {
     if (typeof window === "undefined") return "America/New_York";
     try {
@@ -535,6 +538,78 @@ function GlobalsSection() {
     return localStorage.getItem("tr4de_base_currency") || "USD";
   });
   const [savedMsg, setSavedMsg] = useState("");
+  const [loadedFromCloud, setLoadedFromCloud] = useState(false);
+
+  // Charger depuis Supabase au montage (et sur focus)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("user_preferences")
+          .select("timezone, base_currency")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) {
+          // Table ou colonnes manquantes → on log et on autorise quand même la sauvegarde
+          // (l'upsert ultérieur aura aussi son propre log d'erreur si rien n'existe).
+          console.warn("⚠️ load preferences error:", error.code, error.message);
+        } else if (!cancelled) {
+          if (data?.timezone) {
+            setTimezone(data.timezone);
+            try { localStorage.setItem("tr4de_timezone", data.timezone); } catch {}
+          }
+          if (data?.base_currency) {
+            setCurrency(data.base_currency);
+            try { localStorage.setItem("tr4de_base_currency", data.base_currency); } catch {}
+          }
+        }
+      } catch (e) {
+        console.error("⚠️ load preferences failed:", e?.message || e);
+      } finally {
+        if (!cancelled) setLoadedFromCloud(true);
+      }
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); };
+  }, [user?.id]);
+
+  // Auto-save dans Supabase + localStorage à chaque changement (debounced 400ms).
+  useEffect(() => {
+    console.log("🔁 prefs effect:", { userId: user?.id, loadedFromCloud, timezone, currency });
+    if (!user?.id) { console.warn("⏭ skip save: pas de user.id"); return; }
+    if (!loadedFromCloud) { console.warn("⏭ skip save: pas encore loadedFromCloud"); return; }
+    try {
+      localStorage.setItem("tr4de_timezone", timezone);
+      localStorage.setItem("tr4de_base_currency", currency);
+      window.dispatchEvent(new Event("tr4de:prefs-changed"));
+    } catch {}
+    const handle = setTimeout(async () => {
+      console.log("📤 upsert prefs:", { user_id: user.id, timezone, base_currency: currency });
+      try {
+        const { data, error } = await supabase
+          .from("user_preferences")
+          .upsert([{
+            user_id: user.id,
+            timezone,
+            base_currency: currency,
+            updated_at: new Date().toISOString(),
+          }], { onConflict: "user_id" })
+          .select();
+        if (error) {
+          console.error("❌ save preferences failed:", error.message, error.code, error.details);
+          return;
+        }
+        console.log("✅ prefs sauvegardées en ligne:", data);
+        setSavedMsg("Sauvegardé");
+        setTimeout(() => setSavedMsg(""), 1500);
+      } catch (e) { console.error("❌ save preferences error:", e); }
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [timezone, currency, user?.id, loadedFromCloud]);
 
   const onSave = () => {
     try {

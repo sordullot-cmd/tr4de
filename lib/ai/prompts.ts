@@ -48,7 +48,7 @@ export function buildSessionReportPrompt(date: string, trades: any[]): string {
     .join("\n");
 
   return `📊 RAPPORT DE SESSION — BE IA
-═════════════════════════════════════════
+
 
 Génère le rapport de session du ${date}.
 Sois brutal mais juste.
@@ -61,14 +61,121 @@ ${tradesSummary}
 
 Structure obligatoire:
 
-RÉSUMÉ EN 1 PHRASE
-━━━━━━━━━━━━━━━━
-✅ CE QUI A MARCHÉ (max 2 points)
-❌ CE QUI A ÉCHOUÉ (max 2 points)
-🧠 PATTERN DÉTECTÉ (1 seul, le plus important)
-→ FOCUS DEMAIN (1 seule chose, pas plus)
 
-Pas de paragraphes. Que des bullets courts.`;
+REVUE DU [DATE] — [JOUR DE LA SEMAINE]
+──────────────────────────────────────
+
+CHIFFRES
+P&L            [+/-$X]
+TRADES         [X total — Xw — Xl]
+WIN RATE       [X%] — moy. 7j : [X%] [↑↓=]
+MEILLEUR       [symbole] [setup] [+$X]
+PIRE           [symbole] [setup] [-$X]
+R:R MOYEN      [X.x] — cible : [X.x] [↑↓=]
+DRAWDOWN MAX   [-$X]
+PROFIT FACTOR  [X.xx]
+
+──────────────────────────────────────
+
+EXÉCUTIONS
+ENTRÉES        [Bonnes / Mauvaises / Mixtes]
+SORTIES        [Points laissés sur table : $X]
+STOPS          [Placés avant entrée : oui/non]
+SETUP RESPECTÉ [X trades sur X suivaient le plan]
+
+──────────────────────────────────────
+
+PSYCHOLOGIE
+MINDSET DU JOUR   [Solide / Instable / Dangereux]
+ÉMOTION DOMINANTE [tag le plus présent]
+COÛT ÉMOTIONNEL   [-$X sur X trades émotionnels]
+
+[Si revenge détecté]
+⚡ REVENGE     [X fois — coût : -$X]
+
+[Si FOMO détecté]
+🔥 FOMO        [X fois — coût : -$X]
+
+[Si overtrading détecté]
+🔄 OVERTRADE   [X trades en X minutes]
+
+[Si early exit détecté]
+🚪 SORTIE PRÉCO [X fois — manqué : +$X]
+
+[Si session propre]
+✅ CLEAN       Aucun dérapage détecté
+
+──────────────────────────────────────
+
+DISCIPLINE
+RÈGLES SUIVIES    [X / X total]
+RÈGLE VIOLÉE      [nom de la règle ou N/A]
+RAISON            [1 phrase courte ou N/A]
+CRÉNEAU RESPECTÉ  [oui / non — tradé de Xh à Xh]
+LIMITE PERTES     [respectée / non — $X / $X max]
+
+──────────────────────────────────────
+
+CONTEXTE DU MARCHÉ
+TYPE DE JOURNÉE   [Trending / Ranging / Volatile]
+VOLATILITÉ        [Normale / Haute / Basse]
+NEWS              [Oui — impact [fort/faible] / Non]
+DIRECTION         [Avec tendance / Contre tendance]
+
+──────────────────────────────────────
+
+CE QUI A MARCHÉ
+→ [1 seule chose — 1 phrase — avec $X associé]
+
+CE QUI A ÉCHOUÉ
+→ [1 seule chose — 1 phrase — avec $X associé]
+
+PATTERN OBSERVÉ
+→ [1 seul pattern notable du jour
+   formulé avec un chiffre qui le prouve]
+
+──────────────────────────────────────
+
+FOCUS DEMAIN
+→ [1 seule règle concrète et mesurable
+   basée sur le problème principal du jour.
+   Formulée avec un seuil précis.
+   Pas un conseil vague — une instruction.]
+
+EXEMPLE CORRECT :
+→ Aucun trade après 12h00.
+  Si 2 trades gagnants avant midi,
+  ferme la plateforme immédiatement.
+
+EXEMPLE INCORRECT :
+→ Sois plus discipliné demain.
+
+──────────────────────────────────────
+
+VERDICT
+[CLASSIFICATION] [1 phrase finale sans filtre.
+La vérité sur cette journée.
+Ce que le trader doit entendre,
+pas ce qu'il veut entendre.]
+
+SCORE DU JOUR : [X/10]
+Calculé sur : discipline + exécution
++ gestion du risque + psychologie
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RÈGLES ABSOLUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Aucune phrase d'introduction
+- Aucune opinion sans chiffre pour la prouver
+- Si donnée manquante → N/A
+- Chaque ligne tient sur une ligne
+- Tous les montants en dollars
+- Tous les pourcentages avec le signe %
+- Le verdict doit être honnête même
+  si la journée était mauvaise
+- Le focus demain = 1 seule chose,
+  jamais deux`;
 }
 
 /**

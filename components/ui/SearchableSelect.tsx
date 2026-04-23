@@ -10,6 +10,7 @@ export interface SearchableOption {
   iconNode?: React.ReactNode;
   sublabel?: string;
   isAction?: boolean;
+  accessory?: React.ReactNode; // Élément interactif rendu à droite (ex: bouton favori)
 }
 
 interface SearchableSelectProps {
@@ -132,9 +133,9 @@ export default function SearchableSelect({
           }}
         >
           {searchable && options.length > 5 && (
-            <div style={{ padding: 8, borderBottom: "1px solid #F0F0F0", background: "#FAFAFA" }}>
+            <div style={{ padding: 4, borderBottom: "1px solid #F0F0F0", background: "#FAFAFA" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 8px" }}>
-                <Search size={13} strokeWidth={1.75} color="#8E8E8E" />
+                <Search size={12} strokeWidth={1.75} color="#8E8E8E" />
                 <input
                   type="text"
                   autoFocus
@@ -146,10 +147,10 @@ export default function SearchableSelect({
                     border: "none",
                     background: "transparent",
                     outline: "none",
-                    fontSize: 13,
+                    fontSize: 12,
                     fontFamily: "inherit",
                     color: "#0D0D0D",
-                    padding: "6px 0",
+                    padding: "4px 0",
                   }}
                 />
               </div>
@@ -195,6 +196,15 @@ export default function SearchableSelect({
                       {opt.iconNode && <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>{opt.iconNode}</span>}
                       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.label}</span>
                       {opt.sublabel && <span style={{ color: "#8E8E8E", fontSize: small ? 11 : 12 }}>{opt.sublabel}</span>}
+                      {opt.accessory && (
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+                        >
+                          {opt.accessory}
+                        </span>
+                      )}
                       {isSelected && <Check size={small ? 12 : 14} strokeWidth={2} color="#0D0D0D" />}
                     </button>
                     {separated && idx < filtered.length - 1 && (
