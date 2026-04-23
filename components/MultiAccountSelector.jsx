@@ -1,28 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 
-export default function MultiAccountSelector({ 
+export default function MultiAccountSelector({
   accounts = [],
   selectedAccountIds = [],
   onSelectionChange,
   onDeleteAccount,
-  T = {} 
+  onCreateAccount,
+  T = {},
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const borderColor = T.border || "#E3E6EB";
-  const bgColor = T.bg || "#F8FAFB";
-  const textColor = T.text || "#1A1F2E";
-  const accentColor = T.accent || "#5F7FB4";
-
-  // Fermer le menu quand on clique ailleurs
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -30,185 +25,204 @@ export default function MultiAccountSelector({
   const handleToggleAccount = (accountId) => {
     let updatedIds;
     if (selectedAccountIds.includes(accountId)) {
-      updatedIds = selectedAccountIds.filter(id => id !== accountId);
+      updatedIds = selectedAccountIds.filter((id) => id !== accountId);
     } else {
       updatedIds = [...selectedAccountIds, accountId];
     }
-    console.log("🔄 Account selection changed:", updatedIds);
     onSelectionChange(updatedIds);
   };
 
   const handleSelectAll = () => {
     if (selectedAccountIds.length === accounts.length) {
-      // Décocher tous
       onSelectionChange([]);
     } else {
-      // Cocher tous
-      onSelectionChange(accounts.map(acc => acc.id));
+      onSelectionChange(accounts.map((acc) => acc.id));
     }
   };
 
-  const displayText = selectedAccountIds.length === 0 
-    ? "No accounts" 
-    : selectedAccountIds.length === accounts.length
-    ? `All accounts (${accounts.length})`
-    : `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? 's' : ''}`;
+  const allSelected = accounts.length > 0 && selectedAccountIds.length === accounts.length;
+  const displayText =
+    selectedAccountIds.length === 0
+      ? "Aucun compte"
+      : allSelected
+      ? `Tous les comptes (${accounts.length})`
+      : selectedAccountIds.length === 1
+      ? accounts.find((a) => a.id === selectedAccountIds[0])?.name || "1 compte"
+      : `${selectedAccountIds.length} comptes`;
 
   return (
-    <div style={{ position: "relative", minWidth: "160px" }} ref={menuRef}>
-      {/* Button */}
+    <div style={{ position: "relative", minWidth: 180, fontFamily: "var(--font-sans)" }} ref={menuRef}>
+      {/* Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
         style={{
-          padding: "8px 12px",
+          width: "100%",
+          padding: "7px 12px",
+          height: 34,
           borderRadius: 8,
-          background: "#fff",
-          border: `1px solid ${borderColor}`,
-          fontSize: 12,
-          fontWeight: 600,
+          background: "#FFFFFF",
+          border: `1px solid ${isOpen ? "#D4D4D4" : "#E5E5E5"}`,
+          fontSize: 13,
+          fontWeight: 500,
           cursor: "pointer",
-          minWidth: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          color: textColor,
-          transition: "all 0.2s"
+          gap: 8,
+          color: "#0D0D0D",
+          fontFamily: "inherit",
+          transition: "border-color 120ms ease",
         }}
-        onMouseEnter={(e) => e.target.style.borderColor = accentColor}
-        onMouseLeave={(e) => e.target.style.borderColor = borderColor}
       >
-        <span suppressHydrationWarning>{displayText}</span>
-        <span style={{ fontSize: 10, marginLeft: 4 }}>∨</span>
+        <span suppressHydrationWarning style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {displayText}
+        </span>
+        {isOpen ? <ChevronUp size={14} strokeWidth={2} color="#8E8E8E" /> : <ChevronDown size={14} strokeWidth={2} color="#8E8E8E" />}
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown menu */}
       {isOpen && (
         <div
+          role="listbox"
           style={{
             position: "absolute",
-            top: "100%",
+            top: "calc(100% + 4px)",
             left: 0,
             right: 0,
-            marginTop: 8,
-            background: "#fff",
-            border: `1px solid ${borderColor}`,
-            borderRadius: 8,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+            background: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.10)",
             zIndex: 100,
-            minWidth: "200px",
-            maxHeight: "400px",
-            overflowY: "auto"
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            padding: 4,
           }}
         >
-          {/* All accounts option */}
+          {/* Tous les comptes */}
           {accounts.length > 0 && (
-          <div
-            style={{
-              padding: "8px 12px",
-              borderBottom: `1px solid ${borderColor}`,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
-              background: selectedAccountIds.length === accounts.length ? "#f0f0f0" : "transparent"
-            }}
-            onClick={handleSelectAll}
-          >
-            <input
-              type="checkbox"
-              checked={selectedAccountIds.length === accounts.length && accounts.length > 0}
-              readOnly
-              style={{ cursor: "pointer" }}
-            />
-            <label style={{ fontSize: 12, fontWeight: 600, cursor: "pointer", flex: 1 }}>
-              All accounts
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: "7px 10px",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                color: "#0D0D0D",
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={handleSelectAll}
+                style={{ width: 14, height: 14, accentColor: "#0D0D0D", cursor: "pointer", margin: 0, flexShrink: 0 }}
+              />
+              <span style={{ flex: 1 }}>Tous les comptes</span>
             </label>
-          </div>
           )}
 
-          {/* My accounts header */}
+          {/* Separateur */}
+          {accounts.length > 0 && (
+            <div style={{ height: 1, background: "#E5E5E5", margin: "4px 0" }} />
+          )}
+
+          {/* Section label */}
           {accounts.length > 0 && (
             <div
               style={{
-                padding: "8px 12px",
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#999",
-                textTransform: "uppercase",
-                background: bgColor,
-                borderBottom: `1px solid ${borderColor}`
+                padding: "4px 10px 4px",
+                fontSize: 11,
+                color: "#8E8E8E",
+                fontWeight: 500,
               }}
             >
-              My accounts
+              Mes comptes
             </div>
           )}
 
-          {/* Account items */}
-          {accounts.map((account) => {
+          {/* Items des comptes */}
+          {accounts.map((account, idx) => {
             const isSelected = selectedAccountIds.includes(account.id);
             return (
-              <div
-                key={account.id}
-                style={{
-                  padding: "8px 12px",
-                  borderBottom: `1px solid ${borderColor}`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: isSelected ? "#f5f5f5" : "transparent",
-                  transition: "all 0.2s"
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "#f9f9f9"}
-                onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? "#f5f5f5" : "transparent"}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => handleToggleAccount(account.id)}
-                  style={{ cursor: "pointer" }}
-                />
-                <label style={{ fontSize: 12, cursor: "pointer", flex: 1 }}>
-                  {account.name}
-                  {account.broker && (
-                    <span style={{ fontSize: 10, color: "#999", marginLeft: 6 }}>
-                      ({account.broker})
-                    </span>
-                  )}
+              <React.Fragment key={account.id}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "7px 10px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    color: "#0D0D0D",
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleAccount(account.id)}
+                    style={{ width: 14, height: 14, accentColor: "#0D0D0D", cursor: "pointer", margin: 0, flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {account.name}
+                  </span>
                 </label>
-                {isSelected && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteAccount(account.id);
-                    }}
-                    title="Delete"
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: 12,
-                      color: "#999",
-                      padding: "2px 4px"
-                    }}
-                  >
-                    🗑️
-                  </button>
+                {idx < accounts.length - 1 && (
+                  <div style={{ height: 1, background: "#F0F0F0", margin: "0 8px" }} />
                 )}
-              </div>
+              </React.Fragment>
             );
           })}
 
           {accounts.length === 0 && (
-            <div
-              style={{
-                padding: "12px",
-                textAlign: "center",
-                fontSize: 12,
-                color: "#999"
-              }}
-            >
-              No accounts
+            <div style={{ padding: "12px", textAlign: "center", fontSize: 12, color: "#8E8E8E" }}>
+              Aucun compte
             </div>
+          )}
+
+          {/* Footer : Creation de compte */}
+          {onCreateAccount && (
+            <>
+              {accounts.length > 0 && <div style={{ height: 1, background: "#E5E5E5", margin: "4px 0" }} />}
+              <button
+                onClick={() => { setIsOpen(false); onCreateAccount(); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  padding: "8px 10px",
+                  border: "none",
+                  background: "transparent",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                  color: "#0D0D0D",
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <Plus size={14} strokeWidth={2} />
+                Créer un compte
+              </button>
+            </>
           )}
         </div>
       )}

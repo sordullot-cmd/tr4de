@@ -1,6 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { MessageCircle } from "lucide-react";
+import {
+  buildSessionReportPrompt,
+  buildWeeklyReviewPrompt,
+} from "@/lib/ai/prompts";
 
 interface ApexChatProps {
   userId: string;
@@ -19,11 +24,19 @@ interface ApexChatProps {
   monthlyStats?: any[];
   disciplineSummary?: any[];
   psychEvents?: any[];
+  onOpenProfile?: () => void;
 }
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface Conversation {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const T = {
@@ -46,14 +59,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const PROMPTS = [
-  { category: "Trades", text: "Donne-moi un résumé de mon trading" },
-  { category: "Net P&L", text: "Qu'est-ce qui me donne le plus de succès ?" },
+  { category: "Trades", text: "Résumé de ma journée de trading" },
   { category: "Mind", text: "Où suis-je le plus rentable ?" },
   { category: "Trades", text: "Où suis-je le moins rentable ?" },
   { category: "Net P&L", text: "Comment améliorer mon trading ?" },
-  { category: "Mind", text: "Comment améliorer ma stratégie ?" },
   { category: "Trades", text: "Où est-ce que je manque dans mon trading ?" },
-  { category: "Net P&L", text: "Qu'est-ce qui m'empêche de gagner plus ?" },
 ];
 
 const cleanString = (str: any): string => {
@@ -76,12 +86,130 @@ export default function ApexChatNew({
   monthlyStats = [],
   disciplineSummary = [],
   psychEvents = [],
+  onOpenProfile,
 }: ApexChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [contextSent, setContextSent] = useState(false);
+  const [showPrompts, setShowPrompts] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [lastConversation, setLastConversation] = useState<Conversation | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Compteur de messages non encore distilles dans la memoire IA
+  const unsavedRef = useRef<number>(0);
+  // Timestamp ms du dernier update declenche (cooldown)
+  const lastUpdateAtRef = useRef<number>(0);
+
+  // Seuil min de messages non distilles pour declencher (1 echange = 2 messages)
+  const MIN_UNSAVED = 2;
+  // Cooldown ms entre deux declenchements
+  const UPDATE_COOLDOWN_MS = 2 * 60 * 1000;
+
+  // Au montage : on detecte juste s'il y a une conversation precedente (sans la charger)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const listRes = await fetch("/api/ai/conversations", { credentials: "include" });
+        if (!listRes.ok) {
+          setHistoryLoaded(true);
+          return;
+        }
+        const { conversations } = await listRes.json();
+        if (cancelled) return;
+        if (conversations && conversations.length > 0) {
+          setLastConversation(conversations[0]);
+        }
+      } catch (err) {
+        console.error("Load history error:", err);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Reprendre la derniere conversation a la demande
+  const handleContinueConversation = async () => {
+    if (!lastConversation) return;
+    try {
+      const detailRes = await fetch(`/api/ai/conversations/${lastConversation.id}`, { credentials: "include" });
+      if (!detailRes.ok) return;
+      const { messages: storedMessages } = await detailRes.json();
+      setConversationId(lastConversation.id);
+      setMessages(
+        (storedMessages || []).map((m: any) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: String(m.content || ""),
+        }))
+      );
+      setContextSent(true);
+    } catch (err) {
+      console.error("Continue conversation error:", err);
+    }
+  };
+
+  const triggerMemoryUpdate = (opts: { useBeacon?: boolean } = {}) => {
+    if (unsavedRef.current < MIN_UNSAVED) return;
+    const now = Date.now();
+    if (now - lastUpdateAtRef.current < UPDATE_COOLDOWN_MS) return;
+    lastUpdateAtRef.current = now;
+
+    const payload = JSON.stringify({});
+    try {
+      if (opts.useBeacon && typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const blob = new Blob([payload], { type: "application/json" });
+        const ok = navigator.sendBeacon("/api/ai/memory/update", blob);
+        if (ok) {
+          unsavedRef.current = 0;
+          return;
+        }
+      }
+      // Fallback fire-and-forget
+      fetch("/api/ai/memory/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: payload,
+        keepalive: true,
+      })
+        .then(() => { unsavedRef.current = 0; })
+        .catch(() => { lastUpdateAtRef.current = 0; }); // Reset cooldown si erreur
+    } catch {}
+  };
+
+  // Auto-update au depart: changement d'onglet/page, fermeture, demontage
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        triggerMemoryUpdate({ useBeacon: true });
+      }
+    };
+    const onPageHide = () => triggerMemoryUpdate({ useBeacon: true });
+    const onBeforeUnload = () => triggerMemoryUpdate({ useBeacon: true });
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      // Demontage (changement de sous-onglet ou de page interne)
+      triggerMemoryUpdate({ useBeacon: true });
+    };
+  }, []);
+
+  const handleNewChat = async () => {
+    if (messages.length >= 2 && unsavedRef.current > 0) triggerMemoryUpdate();
+    setMessages([]);
+    setConversationId(null);
+    setContextSent(false);
+    setInput("");
+  };
 
   const buildPayload = (msgs: Message[]) => {
     const cleanTrades = (trades || []).map((t: any) => ({
@@ -170,6 +298,7 @@ export default function ApexChatNew({
     return {
       messages: msgs.map((m) => ({ role: m.role, content: cleanString(m.content) })),
       userId: cleanString(userId || "unknown"),
+      conversationId: conversationId || undefined,
       trades: cleanTrades,
       journalNotes: cleanJournalNotes,
       strategies: cleanStrategies,
@@ -184,7 +313,7 @@ export default function ApexChatNew({
   };
 
   useEffect(() => {
-    if (contextSent) return;
+    if (contextSent || !historyLoaded) return;
     const hasAny =
       trades.length > 0 ||
       journalNotes.length > 0 ||
@@ -194,12 +323,15 @@ export default function ApexChatNew({
 
     const init = async () => {
       try {
-        const payload = buildPayload([
-          {
-            role: "user",
-            content: `Contexte: ${trades.length} trades, ${strategies.length} stratégies, ${journalNotes.length} notes de trade, ${Object.keys(dailyNotes).length} notes journalières.`,
-          },
-        ]);
+        const payload = {
+          ...buildPayload([
+            {
+              role: "user",
+              content: `Contexte: ${trades.length} trades, ${strategies.length} stratégies, ${journalNotes.length} notes de trade, ${Object.keys(dailyNotes).length} notes journalières.`,
+            },
+          ]),
+          persist: false,
+        };
         await fetch("/api/ai/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -211,7 +343,7 @@ export default function ApexChatNew({
       }
     };
     init();
-  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, contextSent]);
+  }, [trades, journalNotes, strategies, strategyStats, dailyNotes, contextSent, historyLoaded]);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -220,6 +352,49 @@ export default function ApexChatNew({
     const text = messageText.trim();
     if (!text || isLoading) return;
 
+    // Déterminer si c'est un prompt spécialisé
+    let finalText = text;
+    if (text === "Résumé de ma journée de trading") {
+      const today = new Date();
+      const dateStr = today.toLocaleDateString("fr-FR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const tradesToday = trades.filter((t: any) => {
+        const tradeDate = new Date(t.entry_time).toLocaleDateString("fr-FR");
+        return tradeDate === today.toLocaleDateString("fr-FR");
+      });
+      finalText = buildSessionReportPrompt(dateStr, tradesToday);
+    } else if (text === "Revue hebdomadaire - 80/20 analyse") {
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      const weekEnd = new Date(today);
+      weekEnd.setDate(today.getDate() + (6 - today.getDay()));
+      
+      const tradesThisWeek = trades.filter((t: any) => {
+        const tradeDate = new Date(t.entry_time);
+        return tradeDate >= weekStart && tradeDate <= weekEnd;
+      });
+      
+      const dateRange = `${weekStart.toLocaleDateString("fr-FR")} → ${weekEnd.toLocaleDateString("fr-FR")}`;
+      const totalPnL = tradesThisWeek.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
+      const winRate = tradesThisWeek.length > 0
+        ? ((tradesThisWeek.filter((t: any) => t.pnl > 0).length / tradesThisWeek.length) * 100)
+        : 0;
+      
+      finalText = buildWeeklyReviewPrompt(dateRange, {
+        totalTrades: tradesThisWeek.length,
+        winRate,
+        totalPnL,
+        bestSetup: null,
+        worstSetup: null,
+        trades: tradesThisWeek,
+      });
+    }
+
     const userMsg: Message = { role: "user", content: text };
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
@@ -227,7 +402,9 @@ export default function ApexChatNew({
     setIsLoading(true);
 
     try {
-      const payload = buildPayload(nextMessages);
+      // Créer un payload avec le prompt complet pour l'API
+      const payloadMessages: Message[] = [...messages, { role: "user" as const, content: finalText }];
+      const payload = buildPayload(payloadMessages);
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -235,6 +412,11 @@ export default function ApexChatNew({
       });
 
       if (!response.ok) throw new Error(`Erreur serveur: ${response.status}`);
+
+      const returnedConvId = response.headers.get("X-Conversation-Id");
+      if (returnedConvId && returnedConvId !== conversationId) {
+        setConversationId(returnedConvId);
+      }
 
       const contentType = response.headers.get("content-type") || "";
       let assistantText = "";
@@ -255,7 +437,11 @@ export default function ApexChatNew({
         assistantText = await response.text();
       }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: assistantText }]);
+      setMessages((prev) => {
+        const next = [...prev, { role: "assistant" as const, content: assistantText }];
+        unsavedRef.current += 2; // user + assistant
+        return next;
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
       setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${msg}` }]);
@@ -282,11 +468,53 @@ export default function ApexChatNew({
         width: "100%",
         background: T.bg,
         color: T.text,
-        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {hasMessages ? (
         <>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 24px",
+              borderBottom: `1px solid ${T.border}`,
+            }}
+          >
+            <button
+              onClick={handleNewChat}
+              disabled={isLoading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${T.border}`,
+                background: T.panel,
+                color: T.text,
+                cursor: isLoading ? "not-allowed" : "pointer",
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: "inherit",
+                opacity: isLoading ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading) e.currentTarget.style.background = T.panelHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = T.panel;
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Nouveau chat
+            </button>
+          </div>
           <div
             style={{
               flex: 1,
@@ -342,6 +570,13 @@ export default function ApexChatNew({
             onKeyDown={handleKeyDown}
             disabled={isLoading}
             compact
+            showPrompts={showPrompts}
+            setShowPrompts={setShowPrompts}
+            onSelectPrompt={(text) => {
+              setShowPrompts(false);
+              handleSendMessage(text);
+            }}
+            prompts={PROMPTS}
           />
         </>
       ) : (
@@ -352,23 +587,71 @@ export default function ApexChatNew({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: "48px 24px 32px",
+            justifyContent: "center",
+            padding: "32px 24px",
+            position: "relative",
           }}
         >
+          {/* Icone centrale au-dessus du titre (meme que celle de l'onglet) */}
+          <div style={{
+            width: 56,
+            height: 56,
+            borderRadius: 12,
+            background: "#FFFFFF",
+            border: `1px solid ${T.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 18,
+            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+          }}>
+            <MessageCircle size={22} strokeWidth={1.75} color="#0D0D0D" />
+          </div>
+
           <h1
             style={{
-              fontSize: 36,
+              fontSize: 24,
               fontWeight: 600,
               margin: 0,
-              marginBottom: 28,
-              letterSpacing: -0.5,
+              marginBottom: 18,
+              letterSpacing: -0.3,
               textAlign: "center",
+              color: T.text,
             }}
           >
             En quoi puis-je vous aider ?
           </h1>
 
-          <div style={{ width: "100%", maxWidth: 760 }}>
+          {/* Bouton Continuer la conversation precedente */}
+          {historyLoaded && lastConversation && (
+            <button
+              onClick={handleContinueConversation}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                marginBottom: 18,
+                borderRadius: 999,
+                border: `1px solid ${T.border}`,
+                background: T.bg,
+                color: T.text,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 120ms ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.panelHover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = T.bg; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-9 9z"/><polyline points="12 7 12 12 15 14"/></svg>
+              Continuer la conversation précédente
+            </button>
+          )}
+
+          {/* Input bar centre */}
+          <div style={{ width: "100%", maxWidth: 560 }}>
             <InputBar
               input={input}
               setInput={setInput}
@@ -378,89 +661,41 @@ export default function ApexChatNew({
             />
           </div>
 
+          {/* Pills suggestions : flex-wrap, largeurs naturelles */}
           <div
             style={{
-              marginTop: 40,
-              fontSize: 13,
-              color: T.textSub,
-              fontWeight: 500,
-              letterSpacing: 0.2,
+              marginTop: 16,
+              maxWidth: 720,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              justifyContent: "center",
             }}
           >
-            Suggestions pour vous
-          </div>
-
-          <div
-            style={{
-              marginTop: 18,
-              width: "100%",
-              maxWidth: 960,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {PROMPTS.map((p, i) => {
-              const color = CATEGORY_COLORS[p.category] || T.accent;
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleSendMessage(p.text)}
-                  disabled={isLoading}
-                  style={{
-                    background: T.panel,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 12,
-                    padding: "16px 18px",
-                    textAlign: "left",
-                    color: T.text,
-                    cursor: isLoading ? "not-allowed" : "pointer",
-                    transition: "all 0.15s ease",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 18,
-                    minHeight: 104,
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = T.borderHover;
-                    e.currentTarget.style.background = T.panelHover;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = T.border;
-                    e.currentTarget.style.background = T.panel;
-                  }}
-                >
-                  <span
-                    style={{
-                      alignSelf: "flex-start",
-                      padding: "3px 10px",
-                      borderRadius: 999,
-                      border: `1px solid ${color}`,
-                      color,
-                      background: "transparent",
-                      fontSize: 11,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {p.category}
-                  </span>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <span style={{ fontSize: 14, lineHeight: 1.35, color: T.text }}>
-                      {p.text}
-                    </span>
-                    <span style={{ color: T.textMut, fontSize: 16, flexShrink: 0 }}>→</span>
-                  </div>
-                </button>
-              );
-            })}
+            {PROMPTS.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => handleSendMessage(p.text)}
+                disabled={isLoading}
+                style={{
+                  background: "#F0F0F0",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  color: T.text,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  transition: "background 120ms ease",
+                  fontFamily: "inherit",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.background = "#E5E5E5"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#F0F0F0"; }}
+              >
+                {p.text}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -494,6 +729,10 @@ function InputBar({
   onKeyDown,
   disabled,
   compact,
+  showPrompts,
+  setShowPrompts,
+  onSelectPrompt,
+  prompts,
 }: {
   input: string;
   setInput: (v: string) => void;
@@ -501,6 +740,10 @@ function InputBar({
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   disabled: boolean;
   compact?: boolean;
+  showPrompts?: boolean;
+  setShowPrompts?: (v: boolean) => void;
+  onSelectPrompt?: (text: string) => void;
+  prompts?: typeof PROMPTS;
 }) {
   return (
     <div
@@ -516,10 +759,13 @@ function InputBar({
       <div
         style={{
           position: "relative",
-          background: T.panel,
+          background: "#FFFFFF",
           border: `1px solid ${T.border}`,
-          borderRadius: 14,
-          padding: "14px 56px 14px 18px",
+          borderRadius: 999,
+          padding: "6px 52px 6px 18px",
+          display: "flex",
+          alignItems: "center",
+          minHeight: 40,
         }}
       >
         <textarea
@@ -528,45 +774,149 @@ function InputBar({
           onKeyDown={onKeyDown}
           placeholder="Posez votre question, je suis là pour aider !"
           disabled={disabled}
-          rows={compact ? 1 : 3}
+          rows={1}
           style={{
             width: "100%",
-            minHeight: compact ? 24 : 64,
-            maxHeight: 180,
+            minHeight: 22,
+            maxHeight: 100,
             background: "transparent",
             border: "none",
             outline: "none",
             resize: "none",
             color: T.text,
-            fontSize: 14,
-            lineHeight: 1.5,
+            fontSize: 13,
+            lineHeight: "22px",
             padding: 0,
             fontFamily: "inherit",
+            display: "block",
           }}
         />
+        {/* Menu Prompts */}
+        {showPrompts && setShowPrompts && onSelectPrompt && prompts && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 50,
+              right: 10,
+              background: T.panel,
+              border: `1px solid ${T.border}`,
+              borderRadius: 12,
+              boxShadow: "0 10px 32px rgba(0,0,0,0.1)",
+              maxHeight: 320,
+              overflowY: "auto",
+              zIndex: 1000,
+              width: 240,
+            }}
+          >
+            {prompts.map((p, i) => {
+              const color = CATEGORY_COLORS[p.category] || T.accent;
+              return (
+                <button
+                  key={i}
+                  onClick={() => onSelectPrompt(p.text)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    textAlign: "left",
+                    border: "none",
+                    background: i === 0 ? "rgba(34,197,94,0.08)" : "transparent",
+                    borderBottom: i < prompts.length - 1 ? `1px solid ${T.border}` : "none",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(34,197,94,0.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = i === 0 ? "rgba(34,197,94,0.08)" : "transparent";
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        border: `1px solid ${color}`,
+                        color,
+                        background: "transparent",
+                        fontSize: 10,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {p.category}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 13, color: T.text, lineHeight: 1.3 }}>{p.text}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Bouton Prompts - Visible seulement après avoir envoyé une question */}
+        {setShowPrompts && (
+          <button
+            onClick={() => setShowPrompts && setShowPrompts(!showPrompts)}
+            disabled={disabled}
+            aria-label="Suggestions"
+            style={{
+              position: "absolute",
+              right: 50,
+              bottom: 10,
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "none",
+              background: showPrompts ? T.accent : "rgba(0,0,0,0.08)",
+              color: showPrompts ? "#fff" : T.text,
+              cursor: disabled ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.15s",
+              fontWeight: 700,
+            }}
+            onMouseEnter={(e) => {
+              if (!disabled) {
+                e.currentTarget.style.background = showPrompts ? T.accentDark : "rgba(0,0,0,0.12)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = showPrompts ? T.accent : "rgba(0,0,0,0.08)";
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          </button>
+        )}
+
+        {/* Bouton Envoyer */}
         <button
           onClick={onSubmit}
           disabled={disabled || !input.trim()}
           aria-label="Envoyer"
           style={{
             position: "absolute",
-            right: 10,
-            bottom: 10,
-            width: 34,
-            height: 34,
+            right: 6,
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: 28,
+            height: 28,
             borderRadius: "50%",
             border: "none",
-            background: input.trim() && !disabled ? T.accent : "rgba(34,197,94,0.25)",
-            color: "#000",
+            background: input.trim() && !disabled ? "#525252" : "#E5E5E5",
+            color: "#FFFFFF",
             cursor: input.trim() && !disabled ? "pointer" : "not-allowed",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "background 0.15s",
-            fontWeight: 700,
+            transition: "background 120ms ease",
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="19" x2="12" y2="5" />
             <polyline points="5 12 12 5 19 12" />
           </svg>

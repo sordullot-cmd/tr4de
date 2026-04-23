@@ -73,6 +73,11 @@ export function useCustomDisciplineRules() {
     };
 
     fetchRules();
+
+    // Refetch quand la fenêtre reprend le focus (sync entre navigateurs)
+    const onFocus = () => { fetchRules(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [user?.id]);
 
   // Ajouter une nouvelle règle

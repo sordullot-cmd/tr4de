@@ -19,48 +19,164 @@ import StrategyDetailPage from "@/components/StrategyDetailPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
+import AgentPanel from "@/components/AgentPanel";
+import AIReportSummaryCard from "@/components/AIReportSummaryCard";
+import SettingsPage from "@/components/pages/SettingsPage";
+import Sidebar from "@/components/ui/Sidebar";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import DateRangePicker from "@/components/ui/DateRangePicker";
+import {
+  LayoutDashboard,
+  LineChart as LucideLineChart,
+  Calendar as LucideCalendar,
+  ListChecks,
+  NotebookPen,
+  ShieldCheck,
+  Target as LucideTarget,
+  Bot,
+  Upload as LucideUpload,
+  Settings as LucideSettings,
+  FileText as LucideFileText,
+  X as LucideX,
+  ChevronDown as LucideChevronDown,
+  MoreHorizontal as LucideMoreHorizontal,
+  Trash2 as LucideTrash2,
+  TrendingUp as LucideTrendingUp,
+  ArrowDown as LucideArrowDown,
+  SlidersHorizontal as LucideSlidersHorizontal,
+  Check as LucideCheck,
+  User,
+  Moon,
+  LogOut,
+} from "lucide-react";
 
-/* ─── TOKENS ─────────────────────────────────────────────────────── */
+/* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
   white:   "#FFFFFF",
-  bg:      "#F8FAFB",
+  bg:      "#FFFFFF",
   surface: "#FFFFFF",
-  border:  "#E3E6EB",
-  border2: "#CED3DB",
-  text:    "#1A1F2E",
-  textSub: "#5F6B7E",
-  textMut: "#8B95AA",
-  green:   "#16A34A",
-  greenBg: "#DCFCE7",
-  greenBd: "#93C5FD",
-  red:     "#AD6B6B",
-  redBg:   "#F5E6E6",
-  redBd:   "#E0BFBF",
-  accent:  "#5F7FB4",
-  accentBg:"#E3ECFB",
-  accentBd:"#B8CCEB",
-  amber:   "#9D8555",
-  amberBg: "#F5EAE0",
-  blue:    "#5F7FB4",
-  blueBg:  "#E3ECFB",
+  border:  "#E5E5E5",
+  border2: "#D4D4D4",
+  text:    "#0D0D0D",
+  textSub: "#5C5C5C",
+  textMut: "#8E8E8E",
+  green:   "#10A37F",
+  greenBg: "#E6F7F1",
+  greenBd: "#A7E6CF",
+  red:     "#EF4444",
+  redBg:   "#FEF2F2",
+  redBd:   "#FECACA",
+  accent:  "#0D0D0D",
+  accentBg:"#F0F0F0",
+  accentBd:"#D4D4D4",
+  amber:   "#F97316",
+  amberBg: "#FFF4E6",
+  blue:    "#3B82F6",
+  blueBg:  "#EFF6FF",
 };
 
-const css = ` @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #FFFFFF; color: ${T.text}; font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 14px; }
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: ${T.border2}; border-radius: 4px; }
+const css = `
+  body { background: ${T.bg}; color: ${T.text}; font-family: var(--font-sans); min-height: 100vh; font-size: 14px; }
   button { font-family: inherit; cursor: pointer; }
   select { font-family: inherit; }
-  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  .anim-1 { animation: fadeUp .35s ease both; }
-  .anim-2 { animation: fadeUp .35s .05s ease both; }
-  .nav-item:hover { background: ${T.bg} !important; }
-  .card-hover:hover { box-shadow: 0 4px 16px rgba(0,0,0,.07) !important; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .anim-1 { animation: fadeUp .25s ease both; }
+  .anim-2 { animation: fadeUp .25s .05s ease both; }
+  .nav-item:hover { background: ${T.accentBg} !important; }
+  .card-hover:hover { border-color: ${T.border2} !important; box-shadow: 0 4px 12px rgba(0,0,0,.06) !important; }
 `;
 
 const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+// Bouton compte utilisateur dans la barre du haut (à droite du gris)
+function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+  const firstName = (user.name || "").split(" ")[0];
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "4px 12px 4px 4px", borderRadius: 999,
+          background: open ? "#EDEDED" : "transparent", border: "none",
+          cursor: "pointer", fontFamily: "var(--font-sans)", color: "#0D0D0D",
+        }}
+        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = "#EDEDED"; }}
+        onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}
+      >
+        <div style={{
+          width: 32, height: 32, borderRadius: "50%", background: "#FFE0B2",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 14, fontWeight: 700, color: "#9D5800", flexShrink: 0,
+        }}>{user.initials}</div>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{firstName}</span>
+      </button>
+      {open && (
+        <div role="menu" style={{
+          position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 200,
+          background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 10,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.10)", padding: 4, zIndex: 100,
+          fontFamily: "var(--font-sans)",
+        }}>
+          {onProfile && (
+            <button onClick={() => { setOpen(false); onProfile(); }} style={menuItemStyle()}>
+              <User size={14} strokeWidth={1.75} /><span>Profil</span>
+            </button>
+          )}
+          {onSettings && (
+            <button onClick={() => { setOpen(false); onSettings(); }} style={menuItemStyle()}>
+              <LucideSettings size={14} strokeWidth={1.75} /><span>Paramètres</span>
+            </button>
+          )}
+          {onDarkMode && (
+            <button onClick={() => { setOpen(false); onDarkMode(); }} style={menuItemStyle()}>
+              <Moon size={14} strokeWidth={1.75} /><span>Mode Sombre</span>
+            </button>
+          )}
+          {onLogout && (onProfile || onSettings || onDarkMode) && (
+            <div style={{ height: 1, background: "#E5E5E5", margin: "4px 0" }} />
+          )}
+          {onLogout && (
+            <button onClick={() => { setOpen(false); onLogout(); }} style={{ ...menuItemStyle(), color: "#EF4444" }}>
+              <LogOut size={14} strokeWidth={1.75} /><span>Se déconnecter</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+function menuItemStyle() {
+  return {
+    width: "100%", display: "flex", alignItems: "center", gap: 8,
+    textAlign: "left", padding: "8px 10px", borderRadius: 6, border: "none",
+    background: "transparent", color: "#0D0D0D",
+    fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+  };
+}
+
+// Portal: rend ses enfants dans le slot d'en-tête de page (id="tr4de-page-header-slot")
+// si présent. Permet aux pages d'inclure des éléments contrôlés depuis le layout.
+function HeaderSlotPortal({ children }) {
+  const [target, setTarget] = useState(null);
+  useEffect(() => {
+    const find = () => setTarget(document.getElementById("tr4de-page-header-slot"));
+    find();
+    const observer = new MutationObserver(find);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+  if (!target) return null;
+  return ReactDOM.createPortal(children, target);
+}
 
 function Pill({ children, color="gray", small }) {
   const map = {
@@ -77,7 +193,7 @@ function TradingViewChart({ trade }) {
   return null; // Removed chart component
 }
 
-function Dashboard({ trades = [] }) {
+function Dashboard({ trades = [], setPage }) {
   const [emotionTags, setEmotionTags] = React.useState({});
   const [errorTags, setErrorTags] = React.useState({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
@@ -137,7 +253,10 @@ function Dashboard({ trades = [] }) {
   if (!trades || trades.length === 0) {
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
-        <div style={{fontSize:20,fontWeight:700,marginBottom:8}}>📊 Tableau de bord</div>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Tableau de bord</h1>
+          <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+        </div>
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"60px 24px",textAlign:"center"}}>
           <div style={{fontSize:18,fontWeight:600,marginBottom:8,color:T.text}}>Aucun trade à afficher</div>
           <p style={{color:T.textSub}}>Importez votre premier trade pour voir les statistiques et les graphiques de performance.</p>
@@ -251,7 +370,7 @@ function Dashboard({ trades = [] }) {
     }
 
     return (
-      <svg width={size} height={size} style={{display:"block",margin:"0 auto"}}>
+      <svg width={size} height={size} style={{display:"block",margin:"0 auto",overflow:"visible"}}>
         {[20, 40, 60, 80, 100].map((val, i) => {
           const gridPoints = [];
           for (let j = 0; j < 5; j++) {
@@ -266,7 +385,7 @@ function Dashboard({ trades = [] }) {
               key={i}
               points={gridPoints.join(" ")}
               fill="none"
-              stroke="#E5E7EB"
+              stroke="#E5E5E5"
               strokeWidth="1"
               opacity="0.7"
             />
@@ -274,7 +393,7 @@ function Dashboard({ trades = [] }) {
         })}
 
         {points.map((p, i) => (
-          <line key={`axis-${i}`} x1={center} y1={center} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1" opacity="0.5" />
+          <line key={`axis-${i}`} x1={center} y1={center} x2={p.x} y2={p.y} stroke="#E5E5E5" strokeWidth="1" opacity="0.5" />
         ))}
 
         <polygon
@@ -311,7 +430,7 @@ function Dashboard({ trades = [] }) {
                 dominantBaseline="middle"
                 fontSize="10"
                 fontWeight="600"
-                fill="#9CA3AF"
+                fill="#8E8E8E"
                 style={{pointerEvents:"none"}}
               >
                 {p.label}
@@ -323,7 +442,7 @@ function Dashboard({ trades = [] }) {
                 dominantBaseline="middle"
                 fontSize="12"
                 fontWeight="700"
-                fill="#1F2937"
+                fill="#0D0D0D"
                 style={{pointerEvents:"none"}}
               >
                 {p.value.toFixed(1)}
@@ -396,72 +515,73 @@ function Dashboard({ trades = [] }) {
   const dayLabelsFr = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:8}} className="anim-1">
-      {/* TOP STATS - 4 CARDS */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-        {/* NET P&L */}
-        <div style={{background:"#FFFFFF",border:"1px solid #E5E7EB",borderRadius:12,padding:20,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:8,right:8,fontSize:9,fontWeight:600,color:"#22C55E"}}>↑ +12.4%</div>
-          <div style={{fontSize:10,color:"#9CA3AF",marginBottom:12,fontWeight:500}}>P&L Net</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#1F2937"}}>{fmt(totalPnL,true)}</div>
-        </div>
-
-        {/* TRADE WIN */}
-        <div style={{background:"#FFFFFF",border:"1px solid #E5E7EB",borderRadius:12,padding:20,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:8,right:8,fontSize:9,fontWeight:600,color:"#22C55E"}}>↑ +3.2%</div>
-          <div style={{fontSize:10,color:"#9CA3AF",marginBottom:12,fontWeight:500}}>Taux de victoire</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#1F2937"}}>{winRate}%</div>
-        </div>
-
-        {/* PROFIT FACTOR */}
-        <div style={{background:"#FFFFFF",border:"1px solid #E5E7EB",borderRadius:12,padding:20,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:8,right:8,fontSize:9,fontWeight:600,color:"#8B5CF6"}}>↑ +0.3</div>
-          <div style={{fontSize:10,color:"#9CA3AF",marginBottom:12,fontWeight:500}}>Profit factor</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#1F2937"}}>{profitFactor}</div>
-        </div>
-
-        {/* WIN RATE TODAY */}
-        <div style={{background:"#FFFFFF",border:"1px solid #E5E7EB",borderRadius:12,padding:20,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:8,right:8,fontSize:9,fontWeight:600,color:"#EA8A2F"}}>↑ +2.1%</div>
-          <div style={{fontSize:10,color:"#9CA3AF",marginBottom:12,fontWeight:500}}>WR Today</div>
-          <div style={{fontSize:18,fontWeight:700,color:"#1F2937"}}>{winRate}%</div>
-        </div>
+    <div style={{display:"flex",flexDirection:"column",gap:12,fontFamily:"var(--font-sans)"}} className="anim-1">
+      {/* PAGE TITLE */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:4}}>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>Tableau de bord</h1>
+        <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
 
-      {/* P&L CHARTS - 2 COLUMN LAYOUT */}
-      <div style={{display:"grid",gridTemplateColumns:"1.5fr 1fr",gap:8}}>
-      {/* DAILY CUMULATIVE P&L */}
-      <div style={{background:"#FFFFFF",border:`1px solid #E5E7EB`,borderRadius:12,padding:16,position:"relative",display:"flex",flexDirection:"column",alignItems:"stretch",flex:1}}>
-          <div style={{position:"absolute",top:20,right:20,zIndex:10}}>
-            <div style={{fontSize:14,fontWeight:600,color:"#22C55E"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})} $</div>
+      {/* MERGED CARD: 4 KPIs + P&L Cumulatif (style OpenAI Home) */}
+      <div style={{background:"#FFFFFF",border:"1px solid #E5E5E5",borderRadius:12,overflow:"hidden"}}>
+
+        {/* ROW 1: 4 KPIs avec separateurs verticaux */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"1px solid #E5E5E5"}}>
+          {/* NET P&L */}
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +12.4%</div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>P&L Net <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
           </div>
-          <div style={{fontSize:14,fontWeight:700,color:"#1F2937",marginBottom:4}}>P&L Cumulatif</div>
-          <div style={{fontSize:12,color:"#6B7280",marginBottom:16}}>Évolution du capital — {new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}</div>
-          
+
+          {/* TRADE WIN */}
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +3.2%</div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>Taux de victoire <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
+          </div>
+
+          {/* PROFIT FACTOR */}
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#A855F7"}}>↑ +0.3</div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>Profit factor <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{profitFactor}</div>
+          </div>
+
+          {/* WIN RATE TODAY */}
+          <div style={{padding:"14px 18px",position:"relative"}}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#F97316"}}>↑ +2.1%</div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>WR Today <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
+          </div>
+        </div>
+
+        {/* ROW 2: P&L Cumulatif (a l'interieur de la meme carte) */}
+        <div style={{padding:"16px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
+          <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#10A37F"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+          </div>
+          <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",marginBottom:2,display:"inline-flex",alignItems:"center",gap:4}}>P&L Cumulatif <span style={{color:"#8E8E8E",fontWeight:500}}>›</span></div>
+          <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>Évolution du capital — {new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}</div>
+
           {pnlCurve.length > 1 ? (
-            <div style={{position:"relative",flex:1}}>
-              <svg width="100%" height={200} viewBox="0 0 600 240" preserveAspectRatio="xMinYMid slice" style={{display:"block",flex:1}}>
+            <div style={{position:"relative",width:"100%",height:280,paddingLeft:44,paddingBottom:22}}>
+              <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:44,right:8,bottom:22,width:"calc(100% - 52px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
                 <defs>
                   <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{stopColor:"#22C55E",stopOpacity:0.4}}/>
-                    <stop offset="100%" style={{stopColor:"#22C55E",stopOpacity:0.01}}/>
+                    <stop offset="0%" style={{stopColor:"#10A37F",stopOpacity:0.18}}/>
+                    <stop offset="100%" style={{stopColor:"#10A37F",stopOpacity:0.01}}/>
                   </linearGradient>
                 </defs>
-                {/* Axe Y labels */}
-                {Array.from({length:5},(_, i)=>{
-                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                  const value = (maxCum * (4-i)) / 4;
-                  const y = 20 + (i * 50);
-                  return <g key={`y-${i}`}><text x="25" y={y+5} fontSize="7" fill="#6B7280">${value.toFixed(0)}</text></g>;
-                })}
+                {/* Axe Y labels supprimes du SVG (rendus en HTML overlay) */}
                 
-                {/* Grid lines */}
-                {Array.from({length:5},(_, i)=>{
-                  const y = 20 + (i * 50);
-                  return <line key={`grid-${i}`} x1="35" y1={y} x2="600" y2={y} stroke="#E5E7EB" strokeWidth="1"/>;
+                {/* Grid lines horizontales tres fines */}
+                {Array.from({length:4},(_, i)=>{
+                  const y = 20 + (i * (200 / 3));
+                  return <line key={`grid-${i}`} x1="35" y1={y} x2="600" y2={y} stroke="#F0F0F0" strokeWidth="1"/>;
                 })}
-                
-                {/* Chart area */}
+
+                {/* Chart area - smooth Catmull-Rom curve */}
                 <g>
                   {(() => {
                     const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
@@ -472,24 +592,29 @@ function Dashboard({ trades = [] }) {
                       const y = 130 - ((p.cum / range) * 90);
                       return [x, y];
                     });
-                    
-                    // Line path
+
+                    // Catmull-Rom -> Cubic Bezier (courbe lisse)
                     let pathD = `M ${points[0][0]} ${points[0][1]}`;
-                    for (let i = 1; i < points.length; i++) {
-                      const curr = points[i];
-                      const prev = points[i - 1];
-                      const cpx = (curr[0] + prev[0]) / 2;
-                      const cpy = (curr[1] + prev[1]) / 2;
-                      pathD += ` Q ${cpx} ${cpy}, ${curr[0]} ${curr[1]}`;
+                    for (let i = 0; i < points.length - 1; i++) {
+                      const p0 = points[i - 1] || points[i];
+                      const p1 = points[i];
+                      const p2 = points[i + 1];
+                      const p3 = points[i + 2] || p2;
+                      const tension = 0.5;
+                      const cp1x = p1[0] + (p2[0] - p0[0]) / 6 * tension;
+                      const cp1y = p1[1] + (p2[1] - p0[1]) / 6 * tension;
+                      const cp2x = p2[0] - (p3[0] - p1[0]) / 6 * tension;
+                      const cp2y = p2[1] - (p3[1] - p1[1]) / 6 * tension;
+                      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
                     }
-                    
+
                     // Fill path
-                    let fillD = pathD + ` L ${points[points.length - 1][0]} 200 L ${points[0][0]} 200 Z`;
-                    
+                    const fillD = pathD + ` L ${points[points.length - 1][0]} 200 L ${points[0][0]} 200 Z`;
+
                     return (
                       <g>
                         <path d={fillD} fill="url(#chartGradient)" stroke="none"/>
-                        <path d={pathD} stroke="#22C55E" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d={pathD} stroke="#10A37F" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -507,37 +632,88 @@ function Dashboard({ trades = [] }) {
                             onMouseLeave={() => setHoveredChart(null)}
                           />
                         ))}
-                        {/* Hovered point indicator */}
-                        {hoveredChart !== null && (
-                          <circle
-                            cx={(() => {
-                              const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                              const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                              const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
-                              const p = pnlCurve[hoveredChart];
-                              const x = 35 + (hoveredChart / (pnlCurve.length - 1 || 1)) * 565;
-                              return x;
-                            })()}
-                            cy={(() => {
-                              const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                              const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                              const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
-                              const p = pnlCurve[hoveredChart];
-                              const y = 130 - ((p.cum / range) * 90);
-                              return y;
-                            })()}
-                            r="5"
-                            fill="#22C55E"
-                            stroke="#fff"
-                            strokeWidth="2"
-                          />
-                        )}
                       </g>
                     );
                   })()}
                 </g>
-                
-                {/* Axe X labels */}
+
+                {/* Axe X labels supprimes du SVG (rendus en HTML overlay) */}
+              </svg>
+
+              {/* Y-axis labels (chiffres ronds) */}
+              <div style={{position:"absolute",top:0,left:0,width:40,height:"calc(100% - 22px)",pointerEvents:"none"}}>
+                {(() => {
+                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                  // Algo "nice number": trouver un step rond (100, 250, 500, 1000, 2500, 5000...)
+                  const niceStep = (max) => {
+                    const rough = max / 3;
+                    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+                    const n = rough / mag;
+                    const nice = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+                    return nice * mag;
+                  };
+                  const step = niceStep(maxCum);
+                  const topMax = Math.ceil(maxCum / step) * step;
+                  const ticks = [];
+                  for (let v = 0; v <= topMax; v += step) ticks.push(v);
+                  return ticks.map((value, i) => {
+                    // Map 0 -> 91%, topMax -> 8% (inverted)
+                    const topPct = 91 - ((value / topMax) * 83);
+                    return (
+                      <div key={`yh-${i}`} style={{position:"absolute",top:`${topPct}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500,textAlign:"right"}}>
+                        ${value.toLocaleString("en-US")}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Dot final persistant (style OpenAI) */}
+              {(() => {
+                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
+                const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
+                const last = pnlCurve[pnlCurve.length - 1];
+                const topPct = (130 - ((last.cum / range) * 90)) / 240 * 100;
+                return (
+                  <div style={{
+                    position:"absolute",
+                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
+                    right:8,
+                    width:8, height:8, borderRadius:"50%",
+                    background:"#FFFFFF",
+                    border:"2px solid #10A37F",
+                    transform:"translate(50%, -50%)",
+                    pointerEvents:"none",
+                  }} />
+                );
+              })()}
+
+              {/* Dot au hover - render en HTML pour eviter l'ecrasement */}
+              {hoveredChart !== null && pnlCurve[hoveredChart] && (() => {
+                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
+                const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
+                const p = pnlCurve[hoveredChart];
+                const topPct = (130 - ((p.cum / range) * 90)) / 240 * 100;
+                const leftPct = hoveredChart / Math.max(pnlCurve.length - 1, 1) * 100;
+                return (
+                  <div style={{
+                    position:"absolute",
+                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
+                    left:`calc(44px + ${leftPct}% * (100% - 52px) / 100%)`,
+                    width:10, height:10, borderRadius:"50%",
+                    background:"#10A37F",
+                    border:"2px solid #FFFFFF",
+                    boxShadow:"0 0 0 1px rgba(16, 163, 127, 0.2)",
+                    transform:"translate(-50%, -50%)",
+                    pointerEvents:"none",
+                  }} />
+                );
+              })()}
+
+              {/* X-axis labels en HTML - sous le graphique */}
+              <div style={{position:"absolute",bottom:2,left:44,right:8,height:18,pointerEvents:"none"}}>
                 {(() => {
                   const step = Math.max(1, Math.floor(pnlCurve.length / 5));
                   return pnlCurve.map((p, i) => {
@@ -545,13 +721,17 @@ function Dashboard({ trades = [] }) {
                       const dateStr = p.date || '';
                       const date = new Date(dateStr);
                       const label = isNaN(date.getTime()) ? '' : date.toLocaleDateString('fr-FR',{month:'short',day:'numeric'});
-                      const x = 50 + (i / Math.max(pnlCurve.length - 1, 1)) * 530;
-                      return <text key={`x-${i}`} x={x} y="235" fontSize="7" fill="#6B7280" textAnchor="middle">{label}</text>;
+                      const leftPct = (i / Math.max(pnlCurve.length - 1, 1)) * 100;
+                      return (
+                        <div key={`xh-${i}`} style={{position:"absolute",left:`${leftPct}%`,top:0,transform:"translateX(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500,whiteSpace:"nowrap"}}>
+                          {label}
+                        </div>
+                      );
                     }
                     return null;
                   });
                 })()}
-              </svg>
+              </div>
               
               {/* Tooltip */}
               {hoveredChart !== null && pnlCurve[hoveredChart] && (
@@ -560,7 +740,7 @@ function Dashboard({ trades = [] }) {
                   left:`${(tooltipPos.x / 600) * 100}%`,
                   top:`${(tooltipPos.y / 240) * 100}%`,
                   transform:"translate(-50%, -120%)",
-                  background:"#1F2937",
+                  background:"#0D0D0D",
                   color:"#FFF",
                   padding:"8px 12px",
                   borderRadius:"6px",
@@ -572,59 +752,69 @@ function Dashboard({ trades = [] }) {
                   boxShadow:"0 2px 8px rgba(0,0,0,0.15)"
                 }}>
                   <div>{new Date(pnlCurve[hoveredChart].date).toLocaleDateString('fr-FR',{weekday:'short',month:'short',day:'numeric'})}</div>
-                  <div style={{fontSize:"13px",fontWeight:"700",color:pnlCurve[hoveredChart].pnl>=0?"#22C55E":"#EF4444"}}>
+                  <div style={{fontSize:"13px",fontWeight:"700",color:pnlCurve[hoveredChart].pnl>=0?"#10A37F":"#EF4444"}}>
                     {pnlCurve[hoveredChart].pnl>=0?"+":""}${Math.abs(pnlCurve[hoveredChart].pnl).toFixed(0)}
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#9CA3AF"}}>
+            <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
               Pas de données
             </div>
           )}
         </div>
 
+      </div>  {/* fin MERGED CARD (KPIs + P&L Cumulatif) */}
+
+      {/* GRID: tr4de score + Rapport IA */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1.5fr",gap:8}}>
+
       {/* TR4DE SCORE CARD */}
-      <div style={{background:"#FFFFFF",border:`1px solid #E5E7EB`,borderRadius:12,padding:24}}>
-        <div style={{fontSize:14,fontWeight:700,color:"#1F2937",marginBottom:20}}>tr4de score</div>
-        
-        <div style={{display:"flex",flexDirection:"column",gap:20}}>
-          {/* PENTAGON CHART - CENTERED */}
-          <div style={{display:"flex",justifyContent:"center",width:"100%"}}>
+      <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)"}}>
+        {/* Header: titre + sous-titre */}
+        <div style={{marginBottom:16}}>
+          <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>tr4de score</h3>
+          <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>Évaluation globale de ta performance</p>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {/* PENTAGON CHART - CENTRE (NE PAS TOUCHER) */}
+          <div style={{display:"flex",justifyContent:"center",width:"100%",paddingTop:12,overflow:"visible"}}>
             <PentagonRadar metrics={pentagonMetrics} size={280} />
           </div>
 
-          {/* PROGRESS BAR WITH SCORE ON LEFT */}
-          <div style={{paddingTop:12,borderTop:`1px solid #E5E7EB`}}>
-            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:8}}>
-              <div>
-                <div style={{fontSize:9,color:"#9CA3AF",fontWeight:600,marginBottom:4,textTransform:"uppercase"}}>Votre tr4de score</div>
-                <div style={{fontSize:24,fontWeight:700,color:"#5F7FB4"}}>{pentagonMetrics.overallScore}</div>
+          {/* Score + progress (moderne, sans divider vertical) */}
+          <div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+                <span style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2,lineHeight:1}}>
+                  {pentagonMetrics.overallScore}
+                </span>
+                <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
               </div>
-              <div style={{width:"1px",height:40,background:"#E5E7EB"}}/>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:10,color:"#9CA3AF",fontWeight:600}}>
-                  <span>Progression du score</span>
-                  <span>{pentagonMetrics.overallScore} / 100</span>
-                </div>
-                <div style={{width:"100%",height:8,background:"#E5E7EB",borderRadius:4,overflow:"hidden"}}>
-                  <div 
-                    style={{
-                      width:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                      height:"100%",
-                      background:"#5F7FB4",
-                      transition:"width 0.6s ease",
-                      borderRadius:4
-                    }}
-                  />
-                </div>
-              </div>
+              <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>Score global</span>
+            </div>
+
+            <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
+              <div
+                style={{
+                  width:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                  height:"100%",
+                  background:"#10A37F",
+                  transition:"width 0.6s ease",
+                  borderRadius:2,
+                }}
+              />
             </div>
           </div>
         </div>
       </div>
-      </div>  {/* Close P&L CHARTS grid */}
+
+      {/* AI REPORT SUMMARY (droite) */}
+      <AIReportSummaryCard onOpenReports={setPage ? () => setPage("agent") : undefined} />
+
+      </div>  {/* Close tr4de + Rapport IA grid */}
 
       {/* CALENDAR + RECENT TRADES + EMOTIONAL IMPACT */}
       <div style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 1.1fr",gap:8}}>
@@ -733,8 +923,7 @@ function Dashboard({ trades = [] }) {
         <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
           {allEmotionTags.map(tag => {
             const tradesWithTag = filteredTrades.filter(t => {
-              const tradeId = t.date + t.symbol + t.entry;
-              return emotionTags[tradeId] && emotionTags[tradeId].includes(tag.id);
+              return emotionTags[t.id] && emotionTags[t.id].includes(tag.id);
             });
             
             if (tradesWithTag.length === 0) return null;
@@ -914,17 +1103,8 @@ function JournalPage({ trades = [] }) {
     }));
   };
 
-  // Filter trades by date range
-  const filteredTrades = trades.filter(t => {
-    try {
-      const d = new Date(t.date);
-      if (isNaN(d.getTime())) return false;
-      const dateStr = d.toISOString().split('T')[0];
-      return dateStr >= filterStartDate && dateStr <= filterEndDate;
-    } catch (e) {
-      return false;
-    }
-  });
+  // Date filtering géré globalement par le layout
+  const filteredTrades = trades;
 
   // Group trades by date
   const tradesByDate = {};
@@ -946,40 +1126,9 @@ function JournalPage({ trades = [] }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}} className="anim-1">
       {/* HEADER */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:18,fontWeight:700}}>📔 Journal de Trading</div>
-        {/* DATE INPUTS */}
-        <div style={{display:"flex",gap:12,alignItems:"center"}}>
-          <input
-            type="date"
-            value={filterStartDate}
-            onChange={(e) => setFilterStartDate(e.target.value)}
-            style={{
-              padding:"8px 12px",
-              fontSize:12,
-              border:`1px solid ${T.border}`,
-              borderRadius:6,
-              background:T.white,
-              color:T.text,
-              cursor:"pointer"
-            }}
-          />
-          <div style={{fontSize:12,color:T.textMut}}>à</div>
-          <input
-            type="date"
-            value={filterEndDate}
-            onChange={(e) => setFilterEndDate(e.target.value)}
-            style={{
-              padding:"8px 12px",
-              fontSize:12,
-              border:`1px solid ${T.border}`,
-              borderRadius:6,
-              background:T.white,
-              color:T.text,
-              cursor:"pointer"
-            }}
-          />
-        </div>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Journal de Trading</h1>
+        <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
 
       {/* TRADES BY DATE */}
@@ -1134,29 +1283,26 @@ function JournalPage({ trades = [] }) {
 
                 {/* RIGHT - NOTES + TRADES TABLE */}
                 <div style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
-                  {/* DAILY NOTES */}
-                  <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,height:240,display:"flex",flexDirection:"column"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",marginBottom:8}}>Notes du jour</div>
-                    <textarea
-                      placeholder="Notes pour cette journée..."
-                      value={dailyNotes[dateStr] || ""}
-                      onChange={(e) => updateDailyNote(dateStr, e.target.value)}
-                      style={{
-                        width:"100%",
-                        flex:1,
-                        border:`1px solid ${T.border}`,
-                        borderRadius:8,
-                        padding:12,
-                        fontSize:12,
-                        fontFamily:"DM Sans",
-                        color:T.text,
-                        background:T.white,
-                        resize:"none",
-                        outline:"none",
-                        boxSizing:"border-box"
-                      }}
-                    />
-                  </div>
+                  {/* DAILY NOTES (sans contour ni label) */}
+                  <textarea
+                    placeholder="Notes pour cette journée..."
+                    value={dailyNotes[dateStr] || ""}
+                    onChange={(e) => updateDailyNote(dateStr, e.target.value)}
+                    style={{
+                      width:"100%",
+                      height:200,
+                      border:`1px solid ${T.border}`,
+                      borderRadius:12,
+                      padding:14,
+                      fontSize:12,
+                      fontFamily:"var(--font-sans)",
+                      color:T.text,
+                      background:T.white,
+                      resize:"none",
+                      outline:"none",
+                      boxSizing:"border-box",
+                    }}
+                  />
 
                   {/* TRADES TABLE */}
                   <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
@@ -1187,7 +1333,7 @@ function JournalPage({ trades = [] }) {
                                   <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{exitTime}</td>
                                   <td style={{padding:"8px 12px",fontSize:11,fontWeight:600,color:T.text}}>{trade.symbol}</td>
                                   <td style={{padding:"8px 12px",fontSize:11,color:T.text}}><span style={{color:trade.side==="Long"?T.blue:T.red}}>{trade.side || "Long"}</span></td>
-                                  <td style={{padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:600,color:trade.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{fmt(trade.pnl,true)}</td>
+                                  <td style={{padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:600,color:trade.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{fmt(trade.pnl,true)}</td>
                                   <td style={{padding:"8px 12px",textAlign:"center"}}>
                                     <button
                                       onClick={() => toggleExpanded(tradeId)}
@@ -1223,7 +1369,7 @@ function JournalPage({ trades = [] }) {
                                             borderRadius:8,
                                             padding:12,
                                             fontSize:12,
-                                            fontFamily:"DM Sans",
+                                            fontFamily:"var(--font-sans)",
                                             color:T.text,
                                             background:T.white,
                                             resize:"none",
@@ -1258,8 +1404,40 @@ function JournalPage({ trades = [] }) {
 }
 
 function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades }) {
+  const { user } = useAuth();
+  const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
+  const { emotionTags: emotionsFromHook, addEmotion, removeEmotion } = useTradeEmotionTags();
+  const { errorTags: errorsFromHook, addError, removeError } = useTradeErrorTags();
   const [selectedTrade, setSelectedTrade] = useState(null);
-  const [dateFilter, setDateFilter] = useState("all"); // "day", "week", "month", "year", "all"
+  // Date range filter (default = current week)
+  const getInitWeekRange = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { start: monday.toISOString().split('T')[0], end: sunday.toISOString().split('T')[0] };
+  };
+  const [filterStartDate, setFilterStartDate] = useState(() => getInitWeekRange().start);
+  const [filterEndDate, setFilterEndDate] = useState(() => getInitWeekRange().end);
+  // Selection multiple via checkbox
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [hoveredRowId, setHoveredRowId] = useState(null);
+  const [showBulkStrategyDropdown, setShowBulkStrategyDropdown] = useState(false);
+  const [openStratMenuId, setOpenStratMenuId] = useState(null);
+
+  // Fermer le menu strategie au clic exterieur
+  React.useEffect(() => {
+    if (!openStratMenuId) return;
+    const handler = (e) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-strat-menu]')) setOpenStratMenuId(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openStratMenuId]);
   const [tradeNotes, setTradeNotes] = useState({});
   const [tradeStrategies, setTradeStrategies] = useState({});
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -1268,6 +1446,9 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
   const [errorTags, setErrorTags] = useState({});
   const [loadedStrategies, setLoadedStrategies] = useState([]);
   const [activeTab, setActiveTab] = useState("infos");
+
+  // Helper pour identifier un trade de maniere unique
+  const tradeKey = (t) => `${t.date}_${t.symbol}_${t.entry}_${t.entryTime || ''}`;
 
   const allEmotionTags = [
     { id: "fomo", label: "FOMO", color: "#C94F4F" },
@@ -1290,6 +1471,39 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
     { id: "impulsive", label: "Impulsif", color: "#D4A574" },
     { id: "wronganalysis", label: "Mauvaise analyse", color: "#8B6BB6" }
   ];
+
+  // ✅ Sync depuis Supabase (notes/emotions/errors): hook = source de vérité.
+  React.useEffect(() => {
+    if (notesFromHook && Object.keys(notesFromHook).length > 0) {
+      setTradeNotes(notesFromHook);
+      try { localStorage.setItem("tr4de_trade_notes", JSON.stringify(notesFromHook)); } catch {}
+    }
+  }, [notesFromHook]);
+  React.useEffect(() => {
+    if (emotionsFromHook && Object.keys(emotionsFromHook).length > 0) {
+      setEmotionTags(emotionsFromHook);
+      try { localStorage.setItem("tr4de_emotion_tags", JSON.stringify(emotionsFromHook)); } catch {}
+    }
+  }, [emotionsFromHook]);
+  React.useEffect(() => {
+    if (errorsFromHook && Object.keys(errorsFromHook).length > 0) {
+      setErrorTags(errorsFromHook);
+      try { localStorage.setItem("tr4de_error_tags", JSON.stringify(errorsFromHook)); } catch {}
+    }
+  }, [errorsFromHook]);
+
+  // Debounce notes Supabase save (textarea fires per keystroke)
+  const noteSaveTimers = React.useRef({});
+  const persistNote = React.useCallback((tradeId, text) => {
+    if (!tradeId) { console.warn("⚠️ persistNote: tradeId manquant — note non sauvegardée en ligne"); return; }
+    if (noteSaveTimers.current[tradeId]) clearTimeout(noteSaveTimers.current[tradeId]);
+    noteSaveTimers.current[tradeId] = setTimeout(() => {
+      console.log("📤 Sauvegarde note (Supabase) trade:", tradeId);
+      setNoteHook(tradeId, text)
+        .then(() => console.log("✅ Note sauvée"))
+        .catch(err => console.error("❌ Save note failed:", err?.message || err));
+    }, 600);
+  }, [setNoteHook]);
 
   // Charger l'onglet actif depuis localStorage au démarrage
   React.useEffect(() => {
@@ -1314,11 +1528,10 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
         setTradeNotes(JSON.parse(savedNotes));
       }
       
-      // ✅ CRITICAL: Always reload trade strategies from localStorage
+      // ✅ Fast path: localStorage. Sync depuis Supabase juste après (voir useEffect dédié).
       const savedTradeStrategies = localStorage.getItem("tr4de_trade_strategies");
       if (savedTradeStrategies) {
         const parsed = JSON.parse(savedTradeStrategies);
-        console.log("✅ Loaded trade strategies:", Object.keys(parsed).length, "trades with strategies");
         setTradeStrategies(parsed);
       }
       
@@ -1365,13 +1578,99 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
     }
   }, []); // Empty dependency - runs ONLY on component mount
 
-  // Auto-save trade strategies to localStorage whenever they change
+  // Charger les assignments trade↔strategy depuis Supabase (source de vérité).
+  // Refetch sur focus pour synchroniser entre navigateurs.
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const supabase = createClient();
+    let cancelled = false;
+
+    const loadFromSupabase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("trade_strategies")
+          .select("trade_id, strategy_id")
+          .eq("user_id", user.id);
+        if (error) {
+          if (error.message?.includes("Could not find the table") || error.code === "PGRST116") return;
+          throw error;
+        }
+        if (cancelled) return;
+        const map = {};
+        (data || []).forEach((row) => {
+          if (!map[row.trade_id]) map[row.trade_id] = [];
+          map[row.trade_id].push(row.strategy_id);
+        });
+        setTradeStrategies(map);
+        try { localStorage.setItem("tr4de_trade_strategies", JSON.stringify(map)); } catch {}
+      } catch (err) {
+        console.error("❌ Erreur chargement trade_strategies:", err?.message || err);
+      }
+    };
+
+    loadFromSupabase();
+    const onFocus = () => loadFromSupabase();
+    window.addEventListener("focus", onFocus);
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); };
+  }, [user?.id]);
+
+  // Auto-save trade strategies: localStorage immédiat + Supabase (debounced full sync)
+  const lastSyncedRef = React.useRef(null);
   React.useEffect(() => {
     if (Object.keys(tradeStrategies).length > 0) {
-      console.log("💾 Auto-saving trade strategies:", Object.keys(tradeStrategies).length, "trades");
-      localStorage.setItem("tr4de_trade_strategies", JSON.stringify(tradeStrategies));
+      try { localStorage.setItem("tr4de_trade_strategies", JSON.stringify(tradeStrategies)); } catch {}
     }
-  }, [tradeStrategies]);
+
+    if (!user?.id) return;
+    const snapshot = JSON.stringify(tradeStrategies);
+    if (snapshot === lastSyncedRef.current) return;
+
+    const handle = setTimeout(async () => {
+      const supabase = createClient();
+      try {
+        // Fetch existant pour diff
+        const { data: existing, error: fetchErr } = await supabase
+          .from("trade_strategies")
+          .select("trade_id, strategy_id")
+          .eq("user_id", user.id);
+        if (fetchErr) {
+          if (fetchErr.message?.includes("Could not find the table") || fetchErr.code === "PGRST116") return;
+          throw fetchErr;
+        }
+        const existingSet = new Set((existing || []).map(r => `${r.trade_id}::${r.strategy_id}`));
+        const desiredSet = new Set();
+        const desiredRows = [];
+        Object.entries(tradeStrategies).forEach(([tradeId, stratIds]) => {
+          (stratIds || []).forEach(sid => {
+            const key = `${tradeId}::${sid}`;
+            desiredSet.add(key);
+            desiredRows.push({ user_id: user.id, trade_id: String(tradeId), strategy_id: String(sid) });
+          });
+        });
+
+        const toDelete = (existing || []).filter(r => !desiredSet.has(`${r.trade_id}::${r.strategy_id}`));
+        const toInsert = desiredRows.filter(r => !existingSet.has(`${r.trade_id}::${r.strategy_id}`));
+
+        // Delete supprimés
+        for (const row of toDelete) {
+          await supabase.from("trade_strategies")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("trade_id", row.trade_id)
+            .eq("strategy_id", row.strategy_id);
+        }
+        // Insert ajoutés
+        if (toInsert.length > 0) {
+          await supabase.from("trade_strategies").insert(toInsert);
+        }
+        lastSyncedRef.current = snapshot;
+      } catch (err) {
+        console.error("❌ Erreur sync trade_strategies:", err?.message || err);
+      }
+    }, 600);
+
+    return () => clearTimeout(handle);
+  }, [tradeStrategies, user?.id]);
 
   // Auto-save checked rules to localStorage
   React.useEffect(() => {
@@ -1394,42 +1693,29 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
     }
   }, [trades]);
 
-  // Fonction de filtrage par date
+  // Filtrage par plage de dates (debut + fin)
   const getFilteredTrades = () => {
-    if (dateFilter === "all") return trades;
-    
-    const now = new Date();
-    let startDate = new Date();
-    
-    switch (dateFilter) {
-      case "day":
-        startDate.setDate(now.getDate() - 1);
-        break;
-      case "week":
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case "year":
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        return trades;
-    }
-    
+    if (!filterStartDate || !filterEndDate) return trades;
+    const start = new Date(filterStartDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(filterEndDate);
+    end.setHours(23, 59, 59, 999);
     return trades.filter(t => {
       const tradeDate = new Date(t.date);
-      return tradeDate >= startDate;
+      return tradeDate >= start && tradeDate <= end;
     });
   };
 
-  const filteredTrades = getFilteredTrades();
+  // Le filtrage par date est désormais géré globalement dans le layout.
+  const filteredTrades = trades;
 
   if (!trades || trades.length === 0) {
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
-        <div style={{fontSize:18,fontWeight:700}}>📈 Journal de trading</div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Journal de Trading</h1>
+          <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+        </div>
         <div style={{background:T.white,border:`2px dashed ${T.accent}`,borderRadius:12,padding:"48px 24px",textAlign:"center"}}>
           <div style={{fontSize:20,fontWeight:600,marginBottom:8,color:T.text}}>📥 Aucun trade importé</div>
           <p style={{color:T.textSub,marginBottom:20}}>Importez vos trades pour commencer à analyser vos performances</p>
@@ -1490,131 +1776,186 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-        <div style={{fontSize:20,fontWeight:700}}>📈 Trades</div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={onImportClick} style={{padding:"8px 16px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>+ Importer</button>
-          <button onClick={handleClearFilteredTrades} style={{padding:"8px 16px",borderRadius:8,background:T.red,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>× Supprimer {dateFilter === "all" ? "tous" : `(${dateFilter})`}</button>
+      <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Trades</h1>
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
+          <button onClick={onImportClick} style={{padding:"7px 14px",height:34,borderRadius:8,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>+ Importer</button>
         </div>
+        <div id="tr4de-page-header-slot" />
       </div>
 
       {/* LAYOUT WITH TABLE + SIDE PANEL WITH TABS */}
       <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
         {/* LEFT - TRADES TABLE */}
-        <div style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
+        <div style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
-          {/* DATE FILTER BUTTONS */}
-          <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[
-              {id:"all",label:"Tous"},
-              {id:"day",label:"Aujourd'hui"},
-              {id:"week",label:"Semaine"},
-              {id:"month",label:"Mois"},
-              {id:"year",label:"Année"}
-            ].map(filter => (
-              <button 
-                key={filter.id}
-                onClick={() => setDateFilter(filter.id)}
-                style={{
-                  padding:"6px 12px",
-                  fontSize:12,
-                  fontWeight:dateFilter === filter.id ? 600 : 500,
-                  border:`1px solid ${dateFilter === filter.id ? T.accent : T.border}`,
-                  borderRadius:6,
-                  background:dateFilter === filter.id ? T.accentBg : "transparent",
-                  color:dateFilter === filter.id ? T.accent : T.textMut,
-                  cursor:"pointer",
-                  transition:"all .2s"
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
-            <div style={{marginLeft:"auto",fontSize:11,color:T.textMut,display:"flex",alignItems:"center"}}>
-              {filteredTrades.length} trade{filteredTrades.length !== 1 ? 's' : ''}
-            </div>
-          </div>
 
           <div style={{overflowX:"auto",overflowY:"auto",flex:1}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <table style={{width:"max-content",minWidth:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:"var(--font-sans)"}}>
               <thead style={{position:"sticky",top:0,background:T.bg,zIndex:10}}>
                 <tr style={{borderBottom:`1px solid ${T.border}`}}>
-                  {["Symbole","Type","Date ouverture","Actif","Direction","Heure ouverture","Entrée","Date fermeture","Heure fermeture","Sortie","Taille lot","Volume","P&L","P&L %","Supprimer"].map(h=>(
-                    <th key={h} style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:600,color:T.textMut,whiteSpace:"nowrap",background:T.bg}}>{h}</th>
+                  {/* Symbol : master checkbox quand >= 1 selectionne */}
+                  <th style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg,height:42,minWidth:130,width:130}}>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
+                      {selectedIds.size > 0 && (
+                        <input
+                          type="checkbox"
+                          checked={filteredTrades.length > 0 && filteredTrades.every(t => selectedIds.has(tradeKey(t)))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const next = new Set(selectedIds);
+                              filteredTrades.forEach(t => next.add(tradeKey(t)));
+                              setSelectedIds(next);
+                            } else {
+                              setSelectedIds(new Set());
+                            }
+                          }}
+                          style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle"}}
+                          onClick={(e)=>e.stopPropagation()}
+                        />
+                      )}
+                      <span>Symbol</span>
+                    </span>
+                  </th>
+                  {[
+                    {label:"Asset"},
+                    {label:"Side"},
+                    {label:"Open Date",sorted:true},
+                    {label:"Open Time"},
+                    {label:"Entry"},
+                    {label:"Close Date"},
+                    {label:"Close Time"},
+                    {label:"Exit"},
+                    {label:"Lot Size"},
+                    {label:"Volume"},
+                    {label:"Net P&L"},
+                    {label:"P&L %"},
+                    {label:"Duration"},
+                  ].map(h=>(
+                    <th key={h.label} style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg}}>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                        {h.label}
+                        {h.sorted && <LucideArrowDown size={11} strokeWidth={1.75} />}
+                      </span>
+                    </th>
                   ))}
+                  {/* Settings column header */}
+                  <th style={{padding:"12px 8px",textAlign:"right",background:T.bg,width:32}}>
+                    <button
+                      aria-label="Configurer colonnes"
+                      style={{background:"transparent",border:"none",padding:4,cursor:"pointer",color:T.textMut,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"background .12s ease"}}
+                      onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
+                      onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                    >
+                      <LucideSlidersHorizontal size={14} strokeWidth={1.75} />
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {[...filteredTrades].sort((a,b)=>{
-                  const timeA = a.entryTime || "00:00:00";
-                  const timeB = b.entryTime || "00:00:00";
-                  return timeB.localeCompare(timeA);
-                }).map((t,i)=>{
+                {(() => {
+                  const fmtTime = (v) => {
+                    if (!v) return '—';
+                    // Si c'est déjà une heure formatée "HH:MM" ou "HH:MM:SS"
+                    if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v);
+                    // Sinon parser comme date
+                    const d = new Date(v);
+                    if (isNaN(d.getTime())) return '—';
+                    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                  };
+                  return [...filteredTrades].sort((a,b)=>{
+                    const timeA = a.entryTime || a.entry_time || "00:00:00";
+                    const timeB = b.entryTime || b.entry_time || "00:00:00";
+                    return String(timeB).localeCompare(String(timeA));
+                  }).map((t,i)=>{
                   const ret = ((t.pnl/(t.entry*100))*100).toFixed(2);
                   const dateObj = new Date(t.date);
                   const openDate = dateObj.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-                  const openTime = t.entryTime || '—';
+                  const openTime = fmtTime(t.entryTime || t.entry_time);
                   const closeDate = openDate;
-                  const closeTime = t.exitTime || '—';
-                  
+                  const closeTime = fmtTime(t.exitTime || t.exit_time);
+                  const tKey = tradeKey(t);
+                  const isChecked = selectedIds.has(tKey);
+                  const isHovered = hoveredRowId === tKey;
+                  const showCheckbox = isChecked || isHovered;
+                  const selectedBg = "#F0F0F0";
+                  const hoverBg = "#FAFAFA";
+
                   return (
-                    <tr 
-                      key={i} 
+                    <tr
+                      key={i}
                       style={{
                         borderBottom:`1px solid ${T.border}`,
-                        background:t.pnl>0?`${T.greenBg}40`:t.pnl<0?`${T.redBg}40`:T.white,
+                        background: isChecked ? selectedBg : (isHovered ? hoverBg : T.white),
                         cursor:"pointer",
-                        transition:"all .2s"
+                        transition:"background .12s ease",
                       }}
                       onClick={()=>{
-                        const isSelected = selectedTrade && selectedTrade.date === t.date && selectedTrade.symbol === t.symbol && selectedTrade.entry === t.entry;
-                        if(isSelected) {
+                        const isSelectedDetail = selectedTrade && selectedTrade.date === t.date && selectedTrade.symbol === t.symbol && selectedTrade.entry === t.entry;
+                        if(isSelectedDetail) {
                           setSelectedTrade(null);
                         } else {
                           setSelectedTrade(t);
                           setActiveTab("infos");
                         }
                       }}
-                      onMouseOver={(e)=>e.currentTarget.style.background=t.pnl>0?`${T.greenBg}60`:t.pnl<0?`${T.redBg}60`:`${T.bg}`}
-                      onMouseOut={(e)=>e.currentTarget.style.background=t.pnl>0?`${T.greenBg}40`:t.pnl<0?`${T.redBg}40`:T.white}
+                      onMouseEnter={()=>setHoveredRowId(tKey)}
+                      onMouseLeave={()=>setHoveredRowId(null)}
                     >
-                      <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"DM Mono"}}>{t.symbol}</td>
-                      <td style={{padding:"12px 14px",fontSize:11,fontWeight:600,color:t.contract_type==='micro'?'#FF6B6B':t.contract_type==='mini'?'#4ECDC4':'#95A5A6',textTransform:'uppercase',textAlign:"center"}}>
-                        {t.contract_type || 'std'}
+                      {/* Symbol + checkbox conditionnelle + icone trending */}
+                      <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"var(--font-sans)",height:42,minWidth:130,width:130}}>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
+                          {showCheckbox ? (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const next = new Set(selectedIds);
+                                if (e.target.checked) next.add(tKey); else next.delete(tKey);
+                                setSelectedIds(next);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
+                            />
+                          ) : (
+                            <LucideTrendingUp size={13} strokeWidth={1.75} color={t.pnl>=0?T.green:T.red} style={{flexShrink:0}} />
+                          )}
+                          <span>{t.symbol}</span>
+                        </span>
+                      </td>
+                      <td style={{padding:"12px 14px",color:T.textSub}}>Future</td>
+                      <td style={{padding:"12px 14px",fontWeight:600,color:t.direction==="Long"?T.green:T.red,fontSize:13}}>
+                        {t.direction}
                       </td>
                       <td style={{padding:"12px 14px",color:T.textSub}}>{openDate}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub}}>Future</td>
-                      <td style={{padding:"12px 14px"}}>
-                        <Pill color={t.direction==="Long"?"green":"red"} small>{t.direction}</Pill>
-                      </td>
                       <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>{openTime}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,fontFamily:"DM Mono",fontSize:12}}>${t.entry.toFixed(2)}</td>
+                      <td style={{padding:"12px 14px",color:T.text,fontFamily:"var(--font-sans)",fontSize:13}}>${t.entry.toFixed(2)}</td>
                       <td style={{padding:"12px 14px",color:T.textSub}}>{closeDate}</td>
                       <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>{closeTime}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,fontFamily:"DM Mono",fontSize:12}}>${t.exit.toFixed(2)}</td>
+                      <td style={{padding:"12px 14px",color:T.text,fontFamily:"var(--font-sans)",fontSize:13}}>${t.exit.toFixed(2)}</td>
                       <td style={{padding:"12px 14px",color:T.textSub,textAlign:"center"}}>1</td>
                       <td style={{padding:"12px 14px",color:T.textSub,textAlign:"center"}}>2</td>
-                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{t.pnl>=0?"+":""}{fmt(t.pnl,false)}</td>
-                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{ret>0?"+":""}{ret}%</td>
-                      <td style={{padding:"12px 14px",textAlign:"center"}}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onDeleteTrade) {
-                              onDeleteTrade(t);
-                            }
-                          }}
-                          style={{background:"transparent",border:"none",fontSize:16,cursor:"pointer",color:T.red,transition:"all .2s",opacity:0.6,fontWeight:600}}
-                          onMouseOver={(e) => e.currentTarget.style.opacity = "1"}
-                          onMouseOut={(e) => e.currentTarget.style.opacity = "0.6"}
-                        >
-                          ×
-                        </button>
+                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{t.pnl>=0?"+":""}{fmt(t.pnl,false)}</td>
+                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{ret>0?"+":""}{ret}%</td>
+                      <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>
+                        {(() => {
+                          if (!t.entryTime || !t.exitTime) return "—";
+                          const [h1,m1,s1] = t.entryTime.split(":").map(Number);
+                          const [h2,m2,s2] = t.exitTime.split(":").map(Number);
+                          const sec = (h2*3600+m2*60+(s2||0)) - (h1*3600+m1*60+(s1||0));
+                          if (Number.isNaN(sec) || sec < 0) return "—";
+                          if (sec < 60) return `${sec}s`;
+                          if (sec < 3600) return `${Math.floor(sec/60)}m`;
+                          return `${Math.floor(sec/3600)}h${Math.floor((sec%3600)/60)}m`;
+                        })()}
                       </td>
+                      {/* Cellule vide pour aligner avec le header settings */}
+                      <td style={{padding:"12px 8px",width:32}} />
                     </tr>
                   );
-                })}
+                });
+                })()}
               </tbody>
             </table>
           </div>
@@ -1622,40 +1963,46 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
 
         {/* RIGHT - DETAIL PANEL WITH TABS */}
         {selectedTrade && (
-          <div style={{width:360,maxHeight:"100vh",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
+          <div style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
             
             {/* HEADER WITH TABS */}
             <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",gap:16}}>
                 {[
-                  {id:"infos",label:"Trades",icon:"📝"},
-                  {id:"strategies",label:"Strategy",icon:"🎯"}
-                ].map(tab=>(
-                  <button
-                    key={tab.id}
-                    onClick={()=>setActiveTab(tab.id)}
-                    style={{
-                      padding:"6px 0",
-                      border:"none",
-                      background:"transparent",
-                      cursor:"pointer",
-                      display:"flex",
-                      alignItems:"center",
-                      gap:4,
-                      fontSize:12,
-                      fontWeight:activeTab===tab.id?600:500,
-                      color:activeTab===tab.id?T.text:T.textMut,
-                      transition:"all .2s",
-                      borderBottom:activeTab===tab.id?`2px solid ${T.accent}`:"none",
-                      paddingBottom:"6px"
-                    }}
-                  >
-                    <span style={{fontSize:11}}>{tab.icon}</span>
-                    {tab.label}
-                  </button>
-                ))}
+                  {id:"infos",label:"Trade",Icon:LucideFileText},
+                  {id:"strategies",label:"Stratégie",Icon:LucideTarget}
+                ].map(tab=>{
+                  const Icon = tab.Icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={()=>setActiveTab(tab.id)}
+                      style={{
+                        padding:"6px 0",
+                        border:"none",
+                        background:"transparent",
+                        cursor:"pointer",
+                        display:"inline-flex",
+                        alignItems:"center",
+                        gap:6,
+                        fontSize:13,
+                        fontWeight:activeTab===tab.id?600:500,
+                        color:activeTab===tab.id?T.text:T.textMut,
+                        transition:"color .12s ease, border-color .12s ease",
+                        borderBottom:activeTab===tab.id?`2px solid #0D0D0D`:"2px solid transparent",
+                        paddingBottom:"6px",
+                        fontFamily:"var(--font-sans)",
+                      }}
+                    >
+                      <Icon size={14} strokeWidth={1.75} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
-              <button onClick={()=>setSelectedTrade(null)} style={{background:"transparent",border:"none",fontSize:16,cursor:"pointer",color:T.textMut}}>✕</button>
+              <button onClick={()=>setSelectedTrade(null)} aria-label="Fermer" style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center"}}>
+                <LucideX size={16} strokeWidth={2} />
+              </button>
             </div>
 
             {/* TRADE HEADER INFO */}
@@ -1667,33 +2014,45 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
               {activeTab === "infos" && (
                 <>
                   {/* INFO ROW - DIRECTION */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Direction</div>
-                    <div style={{fontSize:14,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red,fontFamily:"DM Mono"}}>{selectedTrade.direction}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
+                  </div>
+
+                  {/* INFO ROW - HEURE D'OUVERTURE */}
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entryTime || "—"}</div>
+                  </div>
+
+                  {/* INFO ROW - HEURE DE FERMETURE */}
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exitTime || "—"}</div>
                   </div>
 
                   {/* INFO ROW - ENTRY */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Entrée</div>
-                    <div style={{fontSize:14,fontWeight:700,color:T.text,fontFamily:"DM Mono"}}>{selectedTrade.entry.toFixed(4)}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entry.toFixed(4)}</div>
                   </div>
 
                   {/* INFO ROW - EXIT */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Sortie</div>
-                    <div style={{fontSize:14,fontWeight:700,color:T.text,fontFamily:"DM Mono"}}>{selectedTrade.exit.toFixed(4)}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exit.toFixed(4)}</div>
                   </div>
 
                   {/* INFO ROW - P&L */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
-                    <div style={{fontSize:14,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
                   </div>
 
                   {/* INFO ROW - P&L % */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L %</div>
-                    <div style={{fontSize:14,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red,fontFamily:"DM Mono"}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
+                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
                   </div>
 
                   {/* EMOTION TAGS */}
@@ -1701,18 +2060,21 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Tags Émotionnels</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allEmotionTags.map(tag=>{
-                        const tradeId = selectedTrade.date + selectedTrade.symbol + selectedTrade.entry;
+                        const tradeId = selectedTrade.id;
                         const isSelected = emotionTags[tradeId] && emotionTags[tradeId].includes(tag.id);
                         return (
                           <button
                             key={tag.id}
                             onClick={()=>{
+                              if (!tradeId) return;
                               const current = emotionTags[tradeId] || [];
                               let updated;
                               if(isSelected){
                                 updated = {...emotionTags,[tradeId]: current.filter(t=>t!==tag.id)};
+                                removeEmotion(tradeId, tag.id).catch(err => console.error("❌ Remove emotion failed:", err?.message));
                               } else {
                                 updated = {...emotionTags,[tradeId]: [...current, tag.id]};
+                                addEmotion(tradeId, tag.id).catch(err => console.error("❌ Add emotion failed:", err?.message));
                               }
                               setEmotionTags(updated);
                               localStorage.setItem("tr4de_emotion_tags", JSON.stringify(updated));
@@ -1741,18 +2103,21 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Erreurs</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allErrorTags.map(tag=>{
-                        const tradeId = selectedTrade.date + selectedTrade.symbol + selectedTrade.entry;
+                        const tradeId = selectedTrade.id;
                         const isSelected = errorTags[tradeId] && errorTags[tradeId].includes(tag.id);
                         return (
                           <button
                             key={tag.id}
                             onClick={()=>{
+                              if (!tradeId) return;
                               const current = errorTags[tradeId] || [];
                               let updated;
                               if(isSelected){
                                 updated = {...errorTags,[tradeId]: current.filter(t=>t!==tag.id)};
+                                removeError(tradeId, tag.id).catch(err => console.error("❌ Remove error failed:", err?.message));
                               } else {
                                 updated = {...errorTags,[tradeId]: [...current, tag.id]};
+                                addError(tradeId, tag.id).catch(err => console.error("❌ Add error failed:", err?.message));
                               }
                               setErrorTags(updated);
                               localStorage.setItem("tr4de_error_tags", JSON.stringify(updated));
@@ -1781,12 +2146,14 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Notes</div>
                     <textarea
                       placeholder="What happened? Why did you take this trade?"
-                      value={tradeNotes[selectedTrade.date + selectedTrade.symbol + selectedTrade.entry] || ""}
+                      value={tradeNotes[selectedTrade.id] || ""}
                       onChange={(e)=>{
-                        const key = selectedTrade.date + selectedTrade.symbol + selectedTrade.entry;
+                        const key = selectedTrade.id;
+                        if (!key) return;
                         const updated = {...tradeNotes, [key]: e.target.value};
                         setTradeNotes(updated);
                         localStorage.setItem("tr4de_trade_notes", JSON.stringify(updated));
+                        persistNote(key, e.target.value);
                       }}
                       style={{
                         flex:1,
@@ -1795,7 +2162,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                         borderRadius:8,
                         padding:12,
                         fontSize:12,
-                        fontFamily:"DM Sans",
+                        fontFamily:"var(--font-sans)",
                         color:T.text,
                         background:T.bg,
                         resize:"none",
@@ -1828,32 +2195,42 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                   <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,padding:"16px",alignItems:"center",justifyContent:"flex-start",width:"100%",overflow:"auto",minHeight:500}}>
                     {selectedIds.length === 0 ? (
                       <>
-                        <div style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
-                          <div style={{fontSize:40,opacity:0.6}}>⚙️</div>
-                          <div>
-                            <div style={{fontSize:13,fontWeight:600,color:T.textSub,marginBottom:4,textAlign:"center"}}>Ajoute une stratégie à ton trade et suis ce qui fonctionne</div>
+                        <div style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:14,paddingTop:48,fontFamily:"var(--font-sans)"}}>
+                          <div style={{
+                            width:44,height:44,borderRadius:"50%",
+                            background:"#F5F5F5",
+                            display:"flex",alignItems:"center",justifyContent:"center",
+                          }}>
+                            <LucideTarget size={20} strokeWidth={1.5} color="#5C5C5C" />
+                          </div>
+                          <div style={{fontSize:13,color:"#5C5C5C",textAlign:"center",maxWidth:240,lineHeight:1.4}}>
+                            Ajoute une stratégie à ton trade et suis ce qui fonctionne
                           </div>
                         </div>
-                        <div style={{position:"relative",width:"100%",display:"flex",justifyContent:"center"}}>
-                          <button 
+                        <div style={{position:"relative",width:"100%",display:"flex",justifyContent:"center",marginTop:4}}>
+                          <button
                             onClick={()=>setShowStrategyDropdown(!showStrategyDropdown)}
                             style={{
                               padding:"8px 16px",
-                              borderRadius:6,
-                              border:`1px solid ${T.border}`,
-                              background:T.white,
-                              fontSize:12,
-                              fontWeight:600,
-                              color:T.text,
+                              borderRadius:8,
+                              border:`1px solid #E5E5E5`,
+                              background:"#FFFFFF",
+                              fontSize:13,
+                              fontWeight:500,
+                              color:"#0D0D0D",
                               cursor:"pointer",
-                              display:"flex",
+                              display:"inline-flex",
                               alignItems:"center",
-                              gap:6,
-                              transition:"all .2s"
+                              gap:8,
+                              transition:"background .12s ease",
+                              fontFamily:"var(--font-sans)",
+                              boxShadow:"0 1px 2px rgba(0,0,0,0.03)",
                             }}
+                            onMouseEnter={(e)=>{e.currentTarget.style.background="#FAFAFA"}}
+                            onMouseLeave={(e)=>{e.currentTarget.style.background="#FFFFFF"}}
                           >
                             Ajouter une stratégie
-                            <span style={{fontSize:10}}>∨</span>
+                            <LucideChevronDown size={14} strokeWidth={1.75} />
                           </button>
                           
                           {/* STRATEGY DROPDOWN */}
@@ -1922,14 +2299,57 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                                     <div style={{width:12,height:12,borderRadius:3,background:strat.color}}/>
                                     <div style={{fontSize:12,fontWeight:700,color:T.text}}>{strat.name}</div>
-                                    <button onClick={()=>{
-                                      const newIds = selectedIds.filter(id=>id!==strat.id);
-                                      const newTradeStrategies = {...tradeStrategies,[tradeId]: newIds};
-                                      setTradeStrategies(newTradeStrategies);
-                                      // ✅ SAVE TO LOCALSTORAGE!
-                                      localStorage.setItem("tr4de_trade_strategies", JSON.stringify(newTradeStrategies));
-                                      console.log(`✓ Strategy unlinked for trade ${tradeId}:`, newTradeStrategies);
-                                    }} style={{marginLeft:"auto",background:"transparent",border:"none",cursor:"pointer",fontSize:14,color:T.textMut}}>⋯</button>
+                                    <div data-strat-menu style={{marginLeft:"auto",position:"relative"}}>
+                                      <button
+                                        onClick={(e)=>{e.stopPropagation();setOpenStratMenuId(openStratMenuId===strat.id?null:strat.id);}}
+                                        aria-label="Options stratégie"
+                                        style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"background .12s ease"}}
+                                        onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
+                                        onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                                      >
+                                        <LucideMoreHorizontal size={16} strokeWidth={2} />
+                                      </button>
+                                      {openStratMenuId === strat.id && (
+                                        <div
+                                          role="menu"
+                                          style={{
+                                            position:"absolute",
+                                            top:"calc(100% + 4px)",
+                                            right:0,
+                                            background:"#FFFFFF",
+                                            border:"1px solid #E5E5E5",
+                                            borderRadius:8,
+                                            boxShadow:"0 8px 24px rgba(0,0,0,0.10)",
+                                            minWidth:180,
+                                            padding:4,
+                                            zIndex:50,
+                                            fontFamily:"var(--font-sans)",
+                                          }}
+                                        >
+                                          <button
+                                            onClick={(e)=>{
+                                              e.stopPropagation();
+                                              const newIds = selectedIds.filter(id=>id!==strat.id);
+                                              const newTradeStrategies = {...tradeStrategies,[tradeId]: newIds};
+                                              setTradeStrategies(newTradeStrategies);
+                                              localStorage.setItem("tr4de_trade_strategies", JSON.stringify(newTradeStrategies));
+                                              setOpenStratMenuId(null);
+                                            }}
+                                            style={{
+                                              display:"flex",alignItems:"center",gap:8,width:"100%",
+                                              padding:"8px 10px",borderRadius:6,border:"none",
+                                              background:"transparent",color:"#EF4444",
+                                              fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                                            }}
+                                            onMouseEnter={(e)=>{e.currentTarget.style.background="#FEF2F2"}}
+                                            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                                          >
+                                            <LucideTrash2 size={14} strokeWidth={1.75} />
+                                            Enlever la stratégie
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                   {/* PROGRESS BAR */}
                                   <div style={{width:"100%",marginBottom:12}}>
@@ -1982,6 +2402,111 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
         )}
 
       </div>
+
+      {/* BOTTOM ACTION BAR (visible quand au moins 1 trade selectionne) */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position:"fixed",
+          bottom:24,
+          left:"50%",
+          transform:"translateX(-50%)",
+          background:"#FFFFFF",
+          color:"#0D0D0D",
+          borderRadius:12,
+          padding:"10px 14px",
+          display:"flex",
+          alignItems:"center",
+          gap:14,
+          fontFamily:"var(--font-sans)",
+          fontSize:13,
+          border:"1px solid #E5E5E5",
+          boxShadow:"0 12px 32px rgba(0,0,0,0.14)",
+          zIndex:100,
+        }}>
+          <span style={{fontWeight:600}}>
+            {selectedIds.size} trade{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
+          </span>
+
+          <span style={{width:1,height:18,background:"#E5E5E5"}} />
+
+          {/* Ajouter une strategie */}
+          <div style={{position:"relative"}}>
+            <button
+              onClick={() => setShowBulkStrategyDropdown(v => !v)}
+              style={{background:"transparent",border:"none",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit",padding:"4px 8px",borderRadius:6,display:"inline-flex",alignItems:"center",gap:4}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+            >
+              + Ajouter une stratégie
+            </button>
+            {showBulkStrategyDropdown && (
+              <div style={{
+                position:"absolute",
+                bottom:"calc(100% + 6px)",
+                left:0,
+                background:"#FFFFFF",
+                color:"#0D0D0D",
+                border:"1px solid #E5E5E5",
+                borderRadius:10,
+                boxShadow:"0 8px 24px rgba(0,0,0,0.10)",
+                minWidth:200,
+                maxHeight:240,
+                overflowY:"auto",
+                padding:4,
+              }}>
+                {(loadedStrategies && loadedStrategies.length > 0) ? loadedStrategies.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      const next = {...tradeStrategies};
+                      selectedIds.forEach(id => { next[id] = s.id; });
+                      setTradeStrategies(next);
+                      localStorage.setItem("tr4de_trade_strategies", JSON.stringify(next));
+                      setShowBulkStrategyDropdown(false);
+                    }}
+                    style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:500,color:"#0D0D0D",borderRadius:6,textAlign:"left"}}
+                    onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
+                    onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                  >
+                    <span style={{width:8,height:8,borderRadius:"50%",background:s.color||"#10A37F"}}/>
+                    {s.name}
+                  </button>
+                )) : (
+                  <div style={{padding:"10px 10px",fontSize:12,color:"#8E8E8E"}}>Aucune stratégie disponible</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <span style={{width:1,height:18,background:"#E5E5E5"}} />
+
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Supprimer ${selectedIds.size} trade${selectedIds.size > 1 ? "s" : ""} ?`)) return;
+              const tradesToDelete = filteredTrades.filter(t => selectedIds.has(tradeKey(t)));
+              for (const t of tradesToDelete) {
+                if (onDeleteTrade) await onDeleteTrade(t);
+              }
+              setSelectedIds(new Set());
+            }}
+            style={{background:"transparent",border:"none",color:"#EF4444",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit",padding:"4px 8px",borderRadius:6}}
+            onMouseEnter={(e)=>{e.currentTarget.style.background="#FEF2F2"}}
+            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+          >
+            Supprimer
+          </button>
+
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            aria-label="Tout désélectionner"
+            style={{background:"transparent",border:"none",color:"#8E8E8E",fontSize:16,cursor:"pointer",fontFamily:"inherit",padding:"2px 6px",lineHeight:1}}
+            onMouseEnter={(e)=>{e.currentTarget.style.color="#0D0D0D"}}
+            onMouseLeave={(e)=>{e.currentTarget.style.color="#8E8E8E"}}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1991,7 +2516,7 @@ function StrategiesPage({ strategies, setStrategies, onCreateClick }) {
   const [editingStrategyId, setEditingStrategyId] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [menuPos, setMenuPos] = useState({top:0, left:0});
-  const getDefaultFormData = () => ({name:"",description:"",color:"#22C55E",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
+  const getDefaultFormData = () => ({name:"",description:"",color:"#10A37F",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
   const [formData, setFormData] = useState(getDefaultFormData());
   
   const colors = ["#9B7D94","#997B5D","#A5956B","#6B9B6F","#4A9D6F","#6B9D68","#5F8BA0","#5F7FB4","#6B8BB4","#8B7BA4","#A07B94","#7F7F7F"];
@@ -2090,9 +2615,10 @@ function StrategiesPage({ strategies, setStrategies, onCreateClick }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
       {/* HEADER */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-        <div style={{fontSize:20,fontWeight:700}}>🎯 Stratégies</div>
-        <button onClick={()=>setShowForm(true)} style={{padding:"8px 16px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>+ Créer une stratégie</button>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Stratégies</h1>
+        <button onClick={()=>setShowForm(true)} style={{marginLeft:"auto",padding:"7px 14px",height:34,borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>+ Créer une stratégie</button>
+        <div id="tr4de-page-header-slot" />
       </div>
 
       {/* CONTENT */}
@@ -2133,7 +2659,7 @@ function StrategiesPage({ strategies, setStrategies, onCreateClick }) {
                       <td style={{padding:"14px 16px",textAlign:"center",color:T.text,fontWeight:600}}>{totalRules}</td>
                       <td style={{padding:"14px 16px",textAlign:"center",color:T.text,fontWeight:600}}>0</td>
                       <td style={{padding:"14px 16px",textAlign:"center",color:T.text,fontWeight:600}}>—</td>
-                      <td style={{padding:"14px 16px",textAlign:"right",color:T.text,fontWeight:600,fontFamily:"DM Mono"}}>—</td>
+                      <td style={{padding:"14px 16px",textAlign:"right",color:T.text,fontWeight:600,fontFamily:"var(--font-sans)"}}>—</td>
                       <td style={{padding:"14px 16px",textAlign:"center",position:"relative"}}>
                         <button onClick={(e)=>{e.stopPropagation();const rect = e.currentTarget.getBoundingClientRect();setMenuPos({top: rect.bottom + 4, left: rect.left - 100});setOpenMenuId(openMenuId===strat.id?null:strat.id);}} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:16,color:T.textMut,padding:"4px 8px"}}>⋯</button>
                       </td>
@@ -2705,7 +3231,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             trade.id                                                // Supabase UUID - NEW!
           ];
           
-          const strategyId = parseInt(selectedImportStrategy);
+          const strategyId = String(selectedImportStrategy);
           let keyUsed = null;
           
           // Try each key format, in case there's a format mismatch
@@ -2807,28 +3333,14 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
               Courtier
             </label>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: "6px", background: T.white, cursor: "pointer" }}>
-              <img src={brokers.find(b => b.id === selectedBroker)?.iconPath} alt="broker" style={{ width: "20px", height: "20px", objectFit: "contain" }} />
-              <select
-                value={selectedBroker}
-                onChange={(e) => { setSelectedBroker(e.target.value); setError(""); }}
-                style={{
-                  flex: 1,
-                  border: "none",
-                  fontSize: "12px",
-                  fontFamily: "inherit",
-                  outline: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                {brokers.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              value={selectedBroker}
+              onChange={(id) => { setSelectedBroker(id); setError(""); }}
+              options={brokers.map(b => ({ id: b.id, label: b.name, iconUrl: b.iconPath }))}
+              searchPlaceholder="Rechercher un courtier..."
+              emptyLabel="Aucun courtier"
+              small
+            />
           </div>
           <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 14px -24px" }}></div>
 
@@ -2844,24 +3356,25 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
                   onClick={() => setAccountType(type)}
                   onMouseEnter={(e) => {
                     if (accountType !== type) {
-                      e.currentTarget.style.background = "#F3F4F6";
+                      e.currentTarget.style.background = "#F5F5F5";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (accountType !== type) {
-                      e.currentTarget.style.background = T.bg;
+                      e.currentTarget.style.background = T.white;
                     }
                   }}
                   style={{
                     padding: "8px 12px",
-                    border: accountType === type ? `2px solid ${T.accent}` : `1px solid ${T.border}`,
-                    borderRadius: "6px",
-                    background: accountType === type ? T.accentBg : T.bg,
-                    color: accountType === type ? T.accent : T.text,
-                    fontSize: "12px",
-                    fontWeight: "600",
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 8,
+                    background: accountType === type ? "#F0F0F0" : T.white,
+                    color: T.text,
+                    fontSize: 13,
+                    fontWeight: accountType === type ? 600 : 500,
                     cursor: "pointer",
-                    transition: "all 0.2s",
+                    transition: "background 120ms ease, font-weight 0ms",
+                    fontFamily: "var(--font-sans)",
                   }}
                 >
                   {type === "live" ? "Compte Live" : "Compte Eval"}
@@ -2873,24 +3386,17 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
                 <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
                   Montant du Compte
                 </label>
-                <select
+                <SearchableSelect
                   value={selectedEvalAccount}
-                  onChange={(e) => setSelectedEvalAccount(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontFamily: "inherit",
-                    background: T.white,
-                  }}
-                >
-                  <option value="25k">$25,000</option>
-                  <option value="50k">$50,000</option>
-                  <option value="100k">$100,000</option>
-                  <option value="150k">$150,000</option>
-                </select>
+                  onChange={setSelectedEvalAccount}
+                  options={[
+                    { id: "25k", label: "$25,000" },
+                    { id: "50k", label: "$50,000" },
+                    { id: "100k", label: "$100,000" },
+                    { id: "150k", label: "$150,000" },
+                  ]}
+                  searchable={false}
+                />
               </div>
             )}
             
@@ -2926,36 +3432,29 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
               Stratégie (optionnel)
             </label>
-            <select
+            <SearchableSelect
               value={selectedImportStrategy}
-              onChange={(e) => {
-                if (e.target.value === "create_new") {
+              onChange={(id) => {
+                if (id === "create_new") {
                   setShowStrategyForm(true);
                   setStrategyFormData(getDefaultStrategyFormData());
                 } else {
-                  setSelectedImportStrategy(e.target.value);
+                  setSelectedImportStrategy(id);
                 }
               }}
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                border: `1px solid ${T.border}`,
-                borderRadius: "6px",
-                fontSize: "12px",
-                fontFamily: "inherit",
-                background: T.white,
-              }}
-            >
-              <option value="">Aucune stratégie sélectionnée</option>
-              {strategies.map((strategy) => (
-                <option key={strategy.id} value={strategy.id}>
-                  {strategy.name}
-                </option>
-              ))}
-              <option value="create_new">
-                ➕ Créer une stratégie
-              </option>
-            </select>
+              options={[
+                { id: "", label: "Aucune stratégie" },
+                ...strategies.map((s) => ({
+                  id: s.id,
+                  label: s.name,
+                  iconNode: <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color || "#10A37F", display: "inline-block" }} />,
+                })),
+                { id: "create_new", label: "+ Créer une stratégie", isAction: true },
+              ]}
+              searchPlaceholder="Rechercher une stratégie..."
+              emptyLabel="Aucune stratégie"
+              placeholder="Sélectionner une stratégie"
+            />
           </div>
           <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>
 
@@ -2973,12 +3472,18 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
               background: T.bg,
             }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file && fileInputRef.current) { const dt = new DataTransfer(); dt.items.add(file); fileInputRef.current.files = dt.files; handleFileSelect({ target: { files: [file] } }); } }}>
               <input ref={fileInputRef} type="file" onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
-              <button onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", width: "100%" }}>
-                {!fileName && <div style={{ fontSize: "24px" }}>📁</div>}
-                <div style={{ fontSize: "11px", color: T.accent, fontWeight: "600" }}>
-                  {fileName ? `✓ ${fileName}` : "Drop your file here or browse"}
+              <button onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", fontFamily: "var(--font-sans)" }}>
+                {!fileName ? (
+                  <LucideUpload size={22} strokeWidth={1.5} color={T.textMut} />
+                ) : (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#10A37F" }}>
+                    <LucideCheck size={16} strokeWidth={2} />
+                  </span>
+                )}
+                <div style={{ fontSize: 12, color: fileName ? "#0D0D0D" : T.textSub, fontWeight: 500 }}>
+                  {fileName || "Glissez votre fichier ici ou parcourir"}
                 </div>
-                {!fileName && <div style={{ fontSize: "10px", color: T.textSub }}>CSV, TXT, or HTML</div>}
+                {!fileName && <div style={{ fontSize: 11, color: T.textMut }}>CSV, TXT, ou HTML</div>}
               </button>
             </div>
           </div>
@@ -3038,7 +3543,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
               opacity: fileContent && accountName.trim() && !loading ? 1 : 0.6,
             }}
           >
-            {loading ? "⏳ Traitement..." : "✓ Importer les trades"}
+            {loading ? "Traitement…" : "Importer les trades"}
           </button>
 
           {/* STRATEGY FORM MODAL */}
@@ -3046,7 +3551,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
             <div onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
               <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:12,padding:40,maxWidth:600,width:"90%",maxHeight:"90vh",overflowY:"auto"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                  <h2 style={{fontSize:20,fontWeight:700}}>🎯 Créer une stratégie</h2>
+                  <h2 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Créer une stratégie</h2>
                   <button onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{background:"transparent",border:"none",fontSize:24,cursor:"pointer",color:T.textMut}}>✕</button>
                 </div>
 
@@ -3188,7 +3693,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
     return (
-      <div key={monthIdx} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,minWidth:320,cursor:"pointer"}} onClick={()=>{
+      <div key={monthIdx} style={{background: expandedMonth === monthIdx ? "#FAFAFA" : T.white,padding:"16px 18px",cursor:"pointer",fontFamily:"var(--font-sans)",transition:"background .12s ease"}} onClick={()=>{
         if (expandedMonth === monthIdx) {
           setExpandedMonth(null);
         } else {
@@ -3196,53 +3701,46 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
           window.scrollTo({top:0,behavior:"smooth"});
         }
       }}>
-        <div style={{fontSize:14,fontWeight:700,marginBottom:16,textAlign:"center",color:T.text}}>{months[monthIdx]}</div>
-        
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:12,color:T.text,letterSpacing:-0.1,textAlign:"center"}}>{months[monthIdx]}</div>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
           {dayLabels.map(d=>(
-            <div key={d} style={{fontSize:10,fontWeight:600,textAlign:"center",color:T.textMut,height:24,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div key={d} style={{fontSize:10,fontWeight:500,textAlign:"center",color:T.textMut,paddingBottom:4}}>
               {d}
             </div>
           ))}
-          
+
           {cells.map((day,idx)=>{
-            if (day === null) return <div key={`empty-${idx}`}/>;
-            
+            if (day === null) return <div key={`empty-${idx}`} style={{aspectRatio:"1 / 1"}}/>;
+
             const dateStr = `${year}-${String(monthIdx + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
             const pnl = pnlByDate[dateStr] || 0;
-            
-            let bg = T.white;
+
+            let bg = "transparent";
             let textColor = T.textMut;
-            
+
             if (pnl > 0) {
-              bg = T.greenBg;
+              bg = "rgba(16, 163, 127, 0.18)";
               textColor = T.green;
             } else if (pnl < 0) {
-              bg = T.redBg;
+              bg = "rgba(239, 68, 68, 0.18)";
               textColor = T.red;
             }
-            
+
             return (
               <div key={day} style={{
                 display:"flex",
-                flexDirection:"column",
                 alignItems:"center",
                 justifyContent:"center",
-                height:60,
+                aspectRatio:"1 / 1",
                 background:bg,
-                borderRadius:8,
-                cursor:"pointer",
-                transition:"all .2s",
-                border: pnl !== 0 ? `2px solid ${textColor}` : `1px solid ${T.border}`
-              }}
-              onMouseOver={(e)=>{e.currentTarget.style.transform="scale(1.05)"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.1)"}}
-              onMouseOut={(e)=>{e.currentTarget.style.transform="scale(1)"; e.currentTarget.style.boxShadow="none"}}>
-                <div style={{fontSize:11,fontWeight:600,color:T.text}}>{day}</div>
-                {pnl !== 0 && (
-                  <div style={{fontSize:10,fontWeight:700,color:textColor,marginTop:2}}>
-                    {pnl > 0 ? "+" : ""}{pnl.toFixed(0)}
-                  </div>
-                )}
+                borderRadius:6,
+                fontSize:11,
+                fontWeight: pnl !== 0 ? 600 : 400,
+                color: pnl !== 0 ? textColor : T.textMut,
+                transition:"background .12s ease",
+              }}>
+                {String(day).padStart(2,'0')}
               </div>
             );
           })}
@@ -3331,7 +3829,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                   <div style={{flex:1,height:6,background:T.border,borderRadius:3,overflow:"hidden",minWidth:100}}>
-                    <div style={{height:"100%",background:totalPnL >= evalObjectives[evalAccountSize] ? T.green : T.accent,width:`${Math.min(100, (totalPnL / evalObjectives[evalAccountSize]) * 100)}%`,transition:"width 0.3s"}}/>
+                    <div style={{height:"100%",background:totalPnL >= evalObjectives[evalAccountSize] ? T.green : "#8E8E8E",width:`${Math.min(100, (totalPnL / evalObjectives[evalAccountSize]) * 100)}%`,transition:"width 0.3s"}}/>
                   </div>
                   <div style={{fontSize:11,color:T.textMut,minWidth:35,textAlign:"right"}}>{((totalPnL / evalObjectives[evalAccountSize]) * 100).toFixed(0)}%</div>
                 </div>
@@ -3341,102 +3839,74 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
           </div>
         </div>
 
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
+        <div style={{overflowX:"auto",fontFamily:"var(--font-sans)"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900,tableLayout:"fixed"}}>
             <thead>
-              <tr style={{borderBottom:`2px solid ${T.border}`}}>
-                {dayLabels.map(day => (
-                  <th key={day} style={{padding:"12px 8px",textAlign:"center",fontWeight:600,color:T.textMut,width:"12.5%"}}>
+              <tr style={{borderBottom:`1px solid ${T.border}`}}>
+                {dayLabels.map((day) => (
+                  <th key={day} style={{padding:"10px 12px",textAlign:"center",fontWeight:500,color:T.textMut,width:"12.5%",fontSize:11}}>
                     {day}
                   </th>
                 ))}
-                <th style={{padding:"12px 8px",textAlign:"center",fontWeight:600,color:T.textMut,width:"12.5%"}}>Total</th>
+                <th style={{padding:"10px 12px",textAlign:"center",fontWeight:500,color:T.textMut,width:"12.5%",fontSize:11}}>Total</th>
               </tr>
             </thead>
             <tbody>
               {weeks.map((week, weekIdx) => {
                 const weekPnL = week.reduce((sum, d) => sum + (d && d > 0 && dayStats[d] ? dayStats[d].pnl : 0), 0);
                 const weekTrades = week.reduce((sum, d) => sum + (d && d > 0 && dayStats[d] ? dayStats[d].trades : 0), 0);
-                
+
                 return (
-                  <React.Fragment key={weekIdx}>
-                    {/* Day Numbers and P&L */}
-                    <tr style={{borderBottom:`1px solid ${T.border}`}}>
-                      {week.map((day, dayIdx) => {
-                        if (day === null) {
-                          return <td key={`empty-${dayIdx}`} style={{padding:"8px",background:T.bg}}></td>;
-                        }
-                        
-                        // Previous month days (negative values)
-                        if (day < 0) {
-                          const prevDay = Math.abs(day);
-                          return (
-                            <td key={`prev-${dayIdx}`} style={{padding:"12px 8px",background:T.white,border:`1px solid ${T.border}`,textAlign:"center",opacity:0.4}}>
-                              <div style={{fontWeight:600,color:T.text,marginBottom:4}}>{String(prevDay).padStart(2, '0')}</div>
-                              <div style={{color:T.textMut,fontWeight:600,fontSize:11}}>—</div>
-                            </td>
-                          );
-                        }
-                        
-                        const stats = dayStats[day];
-                        const pnl = stats.pnl;
-                        let bg = T.white;
-                        let textColor = T.textMut;
-                        
-                        if (pnl > 0) {
-                          bg = "#D1FAE5";
-                          textColor = T.green;
-                        } else if (pnl < 0) {
-                          bg = "#FEE2E2";
-                          textColor = T.red;
-                        }
-                        
+                  <tr key={weekIdx} style={{borderBottom:`1px solid ${T.border}`,height:88}}>
+                    {week.map((day, dayIdx) => {
+                      const cellBorder = `1px solid ${T.border}`;
+                      if (day === null) {
+                        return <td key={`empty-${dayIdx}`} style={{padding:"10px 12px",background:"transparent",verticalAlign:"top",borderRight:cellBorder}} />;
+                      }
+
+                      // Previous month days (negative values)
+                      if (day < 0) {
+                        const prevDay = Math.abs(day);
                         return (
-                          <td key={day} style={{padding:"12px 8px",background:bg,border:`1px solid ${T.border}`,textAlign:"center"}}>
-                            <div style={{fontWeight:600,color:T.text,marginBottom:4}}>{String(day).padStart(2, '0')}</div>
-                            <div style={{color:textColor,fontWeight:600,fontSize:11}}>{pnl>=0?"+":""}${pnl.toFixed(0)}</div>
+                          <td key={`prev-${dayIdx}`} style={{padding:"10px 12px",background:T.white,verticalAlign:"top",opacity:0.35,borderRight:cellBorder}}>
+                            <div style={{fontWeight:500,color:T.textMut,fontSize:13}}>{String(prevDay).padStart(2, '0')}</div>
                           </td>
                         );
-                      })}
-                      <td style={{padding:"12px 8px",background:T.bg,border:`1px solid ${T.border}`,textAlign:"center",fontWeight:600}}>
-                        <div style={{color:T.text}}>Week {weekIdx + 1}</div>
-                        <div style={{color:weekPnL>=0?T.green:T.red,marginTop:2,fontSize:11}}>
-                          {weekPnL>=0?"+":""}${weekPnL.toFixed(0)}
-                          {accountType === "eval" && (
-                            <> / ${evalObjectives[evalAccountSize]}</>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    
-                    {/* Trade Counts */}
-                    <tr style={{borderBottom:`1px solid ${T.border}`}}>
-                      {week.map((day, dayIdx) => {
-                        if (day === null) {
-                          return <td key={`trades-empty-${dayIdx}`} style={{padding:"8px",background:T.bg}}></td>;
-                        }
-                        
-                        // Previous month days (negative values)
-                        if (day < 0) {
-                          return (
-                            <td key={`trades-prev-${dayIdx}`} style={{padding:"8px",background:T.white,border:`1px solid ${T.border}`,textAlign:"center",color:T.textSub,fontSize:10,opacity:0.4}}>
-                              —
-                            </td>
-                          );
-                        }
-                        
-                        const trades = dayStats[day].trades;
-                        return (
-                          <td key={`trades-${day}`} style={{padding:"8px",background:T.white,border:`1px solid ${T.border}`,textAlign:"center",color:T.textSub,fontSize:10}}>
-                            {trades} trades
-                          </td>
-                        );
-                      })}
-                      <td style={{padding:"8px",background:T.bg,border:`1px solid ${T.border}`,textAlign:"center",color:T.textSub,fontSize:10}}>
-                        {weekTrades} trades
-                      </td>
-                    </tr>
-                  </React.Fragment>
+                      }
+
+                      const stats = dayStats[day];
+                      const pnl = stats.pnl;
+                      const tradesCount = stats.trades;
+                      let bg = T.white;
+                      let textColor = T.text;
+                      let valueColor = T.textMut;
+
+                      if (pnl > 0) {
+                        bg = "rgba(16, 163, 127, 0.02)";
+                        valueColor = T.green;
+                      } else if (pnl < 0) {
+                        bg = "rgba(239, 68, 68, 0.02)";
+                        valueColor = T.red;
+                      }
+
+                      return (
+                        <td key={day} style={{padding:"10px 12px",background:bg,verticalAlign:"top",textAlign:"left",borderRight:cellBorder}}>
+                          <div style={{fontWeight:500,color:textColor,fontSize:13,marginBottom:6}}>{String(day).padStart(2, '0')}</div>
+                          <div style={{color:tradesCount > 0 ? valueColor : T.textMut,fontWeight:400,fontSize:12,marginBottom:2}}>
+                            {tradesCount > 0 ? `${pnl>=0?"+":""}$${pnl.toFixed(0)}` : "$0"}
+                          </div>
+                          <div style={{color:T.textMut,fontSize:10,fontWeight:500}}>{tradesCount} trade{tradesCount !== 1 ? "s" : ""}</div>
+                        </td>
+                      );
+                    })}
+                    <td style={{padding:"10px 12px",background:T.white,verticalAlign:"top",textAlign:"left",borderLeft:`1px solid ${T.border}`}}>
+                      <div style={{fontWeight:400,color:T.text,fontSize:13,marginBottom:6}}>Semaine {weekIdx + 1}</div>
+                      <div style={{color:weekPnL>=0?T.green:weekPnL<0?T.red:T.textMut,fontWeight:400,fontSize:12,marginBottom:2}}>
+                        {weekPnL>=0?"+":""}${weekPnL.toFixed(0)}
+                      </div>
+                      <div style={{color:T.textMut,fontSize:10,fontWeight:500}}>{weekTrades} trade{weekTrades !== 1 ? "s" : ""}</div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -3449,14 +3919,20 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:24}} className="anim-1">
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Calendrier</h1>
+        <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+      </div>
       {renderMonthDetail()}
 
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-        <div style={{display:"flex",gap:12,alignItems:"center"}}>
-          <button onClick={()=>setYear(year-1)} style={{padding:"6px 12px",borderRadius:8,background:T.bg,border:`1px solid ${T.border}`,fontSize:12,cursor:"pointer",color:T.text,fontWeight:600}}>← {year-1}</button>
-          <div style={{fontSize:24,fontWeight:700,color:T.accent,minWidth:60,textAlign:"center"}}>{year}</div>
-          <button onClick={()=>setYear(year+1)} style={{padding:"6px 12px",borderRadius:8,background:T.bg,border:`1px solid ${T.border}`,fontSize:12,cursor:"pointer",color:T.text,fontWeight:600}}>{year+1} →</button>
-        </div>
+      <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+        <button onClick={()=>setYear(year-1)} aria-label="Année précédente" style={{padding:6,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",color:T.textSub,display:"inline-flex",alignItems:"center",transition:"background .12s ease"}} onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}} onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
+          <span style={{fontSize:14,fontWeight:600,lineHeight:1}}>‹</span>
+        </button>
+        <div style={{fontSize:15,fontWeight:600,color:T.text,minWidth:48,textAlign:"center"}}>{year}</div>
+        <button onClick={()=>setYear(year+1)} aria-label="Année suivante" style={{padding:6,borderRadius:8,background:"transparent",border:"none",cursor:"pointer",color:T.textSub,display:"inline-flex",alignItems:"center",transition:"background .12s ease"}} onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}} onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
+          <span style={{fontSize:14,fontWeight:600,lineHeight:1}}>›</span>
+        </button>
       </div>
 
       {trades.length === 0 && (
@@ -3466,8 +3942,28 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,background:T.bg,borderRadius:12}}>
-        {[...Array(12)].map((_,i)=>renderMonth(i))}
+      {/* Year grid : 12 mois colles, separes par des lignes */}
+      <div style={{
+        background:T.white,
+        border:`1px solid ${T.border}`,
+        borderRadius:12,
+        overflow:"hidden",
+        display:"grid",
+        gridTemplateColumns:"repeat(3,1fr)",
+        gap:0,
+      }}>
+        {[...Array(12)].map((_,i)=>{
+          const col = i % 3;
+          const row = Math.floor(i / 3);
+          return (
+            <div key={i} style={{
+              borderRight: col < 2 ? `1px solid ${T.border}` : "none",
+              borderBottom: row < 3 ? `1px solid ${T.border}` : "none",
+            }}>
+              {renderMonth(i)}
+            </div>
+          );
+        })}
       </div>
 
       <div style={{display:"flex",gap:24,fontSize:12,padding:16,background:T.white,borderRadius:12,border:`1px solid ${T.border}`}}>
@@ -3490,7 +3986,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
 
 function DisciplinePage({ trades = [] }) {
   // ✅ Utiliser les hooks Supabase
-  const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules } = useDisciplineTracking();
+  const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules, disciplineData } = useDisciplineTracking();
   const { customRules, loading: rulesLoading, addRule, deleteRule } = useCustomDisciplineRules();
   
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -3498,7 +3994,8 @@ function DisciplinePage({ trades = [] }) {
   const [heatmapVersion, setHeatmapVersion] = useState(0);
   const [checkedRuleIds, setCheckedRuleIds] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("tr4de_checked_rules") || "{}");
+      const todayKey = getLocalDateString();
+      return JSON.parse(localStorage.getItem(`tr4de_checked_rules_${todayKey}`) || "{}");
     } catch {
       return {};
     }
@@ -3533,19 +4030,13 @@ function DisciplinePage({ trades = [] }) {
   const todayRules = getDayDiscipline(today);
   const todayScore = getDayScore(today);
   
-  // ✅ Charger les règles depuis Supabase (dépend de `today` pour éviter boucle infinie)
+  // ✅ disciplineData (depuis Supabase) est la source de vérité.
+  //    setRuleCompleted fait un optimistic update synchrone, donc cet effet
+  //    reflète toujours soit Supabase, soit la dernière action utilisateur.
   React.useEffect(() => {
-    console.log("📌 Chargement règles depuis Supabase pour:", today);
-    const rules = getDayDiscipline(today);
-    if (rules && rules.length > 0) {
-      const rulesMap = {};
-      rules.forEach(rule => {
-        rulesMap[rule.id] = rule.completed;
-        console.log(`   ${rule.id}: ${rule.completed ? '✅' : '❌'}`);
-      });
-      setCheckedRuleIds(rulesMap);
-    }
-  }, [today, getDayDiscipline]); // Dépend de `today`, pas de `todayRules`
+    const fromSupabase = (disciplineData && disciplineData[today]) || {};
+    setCheckedRuleIds(fromSupabase);
+  }, [today, disciplineData]);
 
   // Auto-update journal rule when daily notes change
   React.useEffect(() => {
@@ -3577,6 +4068,10 @@ function DisciplinePage({ trades = [] }) {
       clearInterval(interval);
     };
   }, []);
+
+  React.useEffect(() => {
+    setHeatmapVersion(v => v + 1);
+  }, [disciplineData]);
 
   React.useEffect(() => {
     if (heatmapScrollRef.current) {
@@ -3689,6 +4184,10 @@ function DisciplinePage({ trades = [] }) {
   return (
     <>
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Discipline</h1>
+          <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+        </div>
         {/* TOP SECTION - 4 COLUMNS */}
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:12}}>
           {/* DATE */}
@@ -3704,12 +4203,12 @@ function DisciplinePage({ trades = [] }) {
                   {/* Background circle */}
                   <circle cx="35" cy="35" r="30" fill="none" stroke={T.bg} strokeWidth="4"/>
                   {/* Progress circle */}
-                  <circle 
-                    cx="35" 
-                    cy="35" 
-                    r="30" 
-                    fill="none" 
-                    stroke={T.accent} 
+                  <circle
+                    cx="35"
+                    cy="35"
+                    r="30"
+                    fill="none"
+                    stroke={T.green}
                     strokeWidth="4"
                     strokeDasharray={`${30 * 2 * Math.PI}`}
                     strokeDashoffset={`${30 * 2 * Math.PI * (1 - completeProgress / 100)}`}
@@ -3765,26 +4264,26 @@ function DisciplinePage({ trades = [] }) {
           </div>
 
           {/* REGLES A SUIVRE */}
-          <div style={{background:"linear-gradient(135deg, #F0FDF4 0%, #FAFBF9 100%)",border:`2px solid #BBF7D0`,borderRadius:12,padding:16,borderLeft:`4px solid #16A34A`}}>
+          <div style={{background:"linear-gradient(135deg, #F0FDF4 0%, #FAFBF9 100%)",border:`2px solid #BBF7D0`,borderRadius:12,padding:16,borderLeft:`4px solid #10A37F`}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
               <div style={{fontSize:16,fontWeight:700,color:"#15803D"}}>✓</div>
               <div style={{fontSize:12,fontWeight:700,color:"#15803D",textTransform:"uppercase",letterSpacing:"0.5px"}}>Règles à suivre</div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#16A34A",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
+                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
                 <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Ne pas bouger son SL en BE</div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#16A34A",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
+                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
                 <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Bien attendre le iFVG</div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#16A34A",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
+                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
                 <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Être attentif sur le marché</div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-                <div style={{width:5,height:5,background:"#16A34A",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
+                <div style={{width:5,height:5,background:"#10A37F",borderRadius:"50%",marginTop:6,flexShrink:0}}/>
                 <div style={{fontSize:11,color:"#3F6212",fontWeight:500,lineHeight:1.4}}>Ne pas hésiter</div>
               </div>
             </div>
@@ -3875,14 +4374,21 @@ function DisciplinePage({ trades = [] }) {
               <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{Object.values(checkedRuleIds).filter(v => v === true).length}/{allRules.length}</div>
               
               {(() => {
-                // Calculer la streak de jours consécutifs
+                // Calculer la streak de jours consécutifs (Supabase d'abord, localStorage en fallback)
                 let streak = 0;
                 const cursor = new Date();
                 while (true) {
                   const dateStr = getLocalDateString(cursor);
-                  const checkedRulesData = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
-                  if (checkedRulesData) {
-                    const checked = JSON.parse(checkedRulesData);
+                  let checked = null;
+                  if (disciplineData && disciplineData[dateStr]) {
+                    checked = disciplineData[dateStr];
+                  } else {
+                    const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
+                    if (stored) {
+                      try { checked = JSON.parse(stored); } catch {}
+                    }
+                  }
+                  if (checked) {
                     const hasAnyRule = Object.values(checked).some(v => v === true);
                     if (hasAnyRule) {
                       streak++;
@@ -3940,25 +4446,25 @@ function DisciplinePage({ trades = [] }) {
                   if (percentage <= 20) return '#F0FDF4'; // Vert très très pâle (1-20%)
                   if (percentage <= 40) return '#DCFCE7'; // Vert très pâle (21-40%)
                   if (percentage <= 60) return '#86EFAC'; // Vert moyen (41-60%)
-                  if (percentage <= 80) return '#22C55E'; // Vert clair (61-80%)
-                  return '#16A34A'; // Vert vif (81-100%)
+                  if (percentage <= 80) return '#10A37F'; // Vert clair (61-80%)
+                  return '#10A37F'; // Vert vif (81-100%)
                 };
                 
-                // Function to get daily completion data by reading checked rules for that day
+                // Function to get daily completion data: prioritize Supabase (disciplineData), fallback to localStorage
                 const getDailyData = (dateStr) => {
                   try {
-                    const checkedRulesData = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
-                    if (checkedRulesData) {
-                      const checked = JSON.parse(checkedRulesData);
+                    let checked = null;
+                    if (disciplineData && disciplineData[dateStr]) {
+                      checked = disciplineData[dateStr];
+                    } else {
+                      const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
+                      if (stored) checked = JSON.parse(stored);
+                    }
+                    if (checked) {
                       const checkedCount = Object.values(checked).filter(v => v === true).length;
-                      const totalRules = 5 + customRules.length; // 5 base rules (premarket, biais, news, followall, journal) + manual rules
+                      const totalRules = 5 + customRules.length;
                       const percentage = Math.round((checkedCount / Math.max(totalRules, 1)) * 100);
-                      return { 
-                        percentage, 
-                        hadTrading: true, 
-                        rulesRespected: checkedCount, 
-                        totalRules 
-                      };
+                      return { percentage, hadTrading: true, rulesRespected: checkedCount, totalRules };
                     }
                   } catch (e) {}
                   return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0 };
@@ -4140,8 +4646,8 @@ function DisciplinePage({ trades = [] }) {
                 '#F0FDF4',
                 '#DCFCE7',
                 '#86EFAC',
-                '#22C55E',
-                '#16A34A'
+                '#10A37F',
+                '#10A37F'
               ].map((color, i) => (
                 <div
                   key={i}
@@ -4312,7 +4818,7 @@ function DisciplinePage({ trades = [] }) {
                       addManualRule();
                     }
                   }}
-                  style={{padding:"8px 16px",background:"#1F2937",color:"white",border:"none",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}
+                  style={{padding:"8px 16px",background:"#0D0D0D",color:"white",border:"none",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}
                 >
                   Ajouter
                 </button>
@@ -4325,7 +4831,7 @@ function DisciplinePage({ trades = [] }) {
                 onClick={() => setShowRulesModal(false)}
                 style={{
                   padding:"10px 20px",
-                  background:"#1F2937",
+                  background:"#0D0D0D",
                   color:"white",
                   border:"none",
                   borderRadius:6,
@@ -4365,6 +4871,26 @@ export default function App() {
   });
   const [page, setPage] = useState("dashboard");
   const [selectedStrategyId, setSelectedStrategyId] = useState(null);
+  const [aiReportsUnread, setAiReportsUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch("/api/ai/reports?limit=30", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const unread = (data.reports || []).filter((r) => !r.is_read).length;
+        setAiReportsUnread(unread);
+      } catch (e) {
+        // silent
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [page]);
   // ✅ Utiliser les hooks pour Trades et Stratégies (auto-stockés dans Supabase)
   const { trades, addTrade, updateTrade, deleteTrade } = useTrades();
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
@@ -4402,14 +4928,7 @@ export default function App() {
     console.log("💾 Saved selectedAccountIds to localStorage:", selectedAccountIds);
   }, [selectedAccountIds]);
 
-  // ✅ Initialiser avec le compte placeholder si aucun compte n'est sélectionné
-  useEffect(() => {
-    if (user?.id && selectedAccountIds.length === 0) {
-      const placeholderId = getPlaceholderAccountId(user.id);
-      setSelectedAccountIds([placeholderId]);
-      console.log("🪐 Initialized with placeholder account:", placeholderId);
-    }
-  }, [user?.id]);
+  // (On ne ré-injecte plus le placeholder : aucune sélection = 0 trades)
 
   // ✅ Nettoyer le placeholder quand un vrai compte est sélectionné
   useEffect(() => {
@@ -4503,21 +5022,8 @@ export default function App() {
         const loadedAccounts = data || [];
         setAccounts(loadedAccounts);
         
-        // ✅ FIX: If no accounts are selected, auto-select all loaded accounts
-        // Check localStorage to see if any accounts were previously selected
-        try {
-          const savedSelection = localStorage.getItem('selectedAccountIds');
-          const currentSelection = savedSelection ? JSON.parse(savedSelection) : [];
-          
-          if (currentSelection.length === 0 && loadedAccounts.length > 0) {
-            const allAccountIds = loadedAccounts.map(acc => acc.id);
-            setSelectedAccountIds(allAccountIds);
-            localStorage.setItem('selectedAccountIds', JSON.stringify(allAccountIds));
-            console.log("✅ Auto-selected all accounts:", allAccountIds);
-          }
-        } catch (e) {
-          console.error("Error auto-selecting accounts:", e);
-        }
+        // ⚠️ Pas de sélection automatique : si l'utilisateur n'a rien sélectionné,
+        // on garde la sélection vide → 0 trades affichés.
       } catch (err) {
         console.error("Error loading accounts:", err);
         setAccounts([]);
@@ -4572,30 +5078,53 @@ export default function App() {
   // ✅ Filtrer les comptes visibles (exclure le placeholder)
   const visibleAccounts = accounts.filter(acc => !isPlaceholderAccount(acc.id));
 
-  // ✅ Filtrer les trades par compte sélectionné
-  // Si SEUL le placeholder est sélectionné → aucun trade
-  // Sinon → filtrer par account_id
+  // Plage de dates par page (chaque page garde sa propre sélection).
+  const iso = (d) => d.toISOString().split("T")[0];
+  const defaultDateRange = (pageId) => {
+    const today = new Date();
+    // Dashboard / Stratégies : tout depuis le premier trade
+    if (pageId === "dashboard" || pageId === "strategies" || pageId === "calendar" || pageId === "discipline") {
+      const earliest = (trades || []).reduce((min, t) => {
+        try {
+          const d = new Date(t.date);
+          if (isNaN(d.getTime())) return min;
+          return !min || d < min ? d : min;
+        } catch { return min; }
+      }, null);
+      const start = earliest || new Date(today.getFullYear(), 0, 1);
+      return { start: iso(start), end: iso(today) };
+    }
+    // Trades / Journal : semaine en cours
+    const dow = today.getDay();
+    const monday = new Date(today); monday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    return { start: iso(monday), end: iso(sunday) };
+  };
+  const [dateRangesByPage, setDateRangesByPage] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tr4de_date_ranges_by_page");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem("tr4de_date_ranges_by_page", JSON.stringify(dateRangesByPage)); } catch {}
+  }, [dateRangesByPage]);
+  const globalDateRange = dateRangesByPage[page] || defaultDateRange(page);
+  const setGlobalDateRange = (r) => setDateRangesByPage(prev => ({ ...prev, [page]: r }));
+
   const filteredTrades = (() => {
-    // Si aucun compte real n'est sélectionné, montrer tous les trades (même avec placeholder)
-    const hasRealAccounts = selectedAccountIds.some(id => !isPlaceholderAccount(id));
-    const placeholderId = user?.id ? getPlaceholderAccountId(user.id) : null;
-    const onlyPlaceholder = selectedAccountIds.length === 1 && selectedAccountIds[0] === placeholderId;
-    
-    // Si on a que le placeholder (pas de vrais comptes), afficher tous les trades
-    if (onlyPlaceholder || !hasRealAccounts) {
-      console.log("📊 No real accounts selected - showing all trades");
-      return trades;
-    }
-    
-    if (selectedAccountIds.length === 0) {
-      console.log("❌ No accounts selected - showing all trades anyway");
-      return trades;
-    }
-    
-    // Filtrer par comptes réels si présents
-    const filtered = trades.filter(t => selectedAccountIds.includes(t.account_id));
-    console.log(`📊 Filtering ${trades.length} trades by ${selectedAccountIds.length} account(s), got ${filtered.length}`);
-    return filtered;
+    const realSelected = selectedAccountIds.filter(id => !isPlaceholderAccount(id));
+    if (realSelected.length === 0) return [];
+    const byAccount = trades.filter(t => realSelected.includes(t.account_id));
+    const { start, end } = globalDateRange || {};
+    if (!start || !end) return byAccount;
+    return byAccount.filter(t => {
+      try {
+        const d = (t.date || "").split("T")[0];
+        return d >= start && d <= end;
+      } catch { return true; }
+    });
   })();
 
   // ✅ DEBUG: Log when account selection changes
@@ -4612,11 +5141,18 @@ export default function App() {
 
   const handleImport = async (data) => {
     const { trades: newTrades } = data;
-    // ✅ Ajouter les nouveaux trades directement à Supabase via le hook
     for (const newTrade of newTrades) {
-      const exists = trades.some(t => t.date === newTrade.date && t.symbol === newTrade.symbol && t.entry === newTrade.entry);
-      if (!exists) {
+      const existing = trades.find(t => t.date === newTrade.date && t.symbol === newTrade.symbol && t.entry === newTrade.entry);
+      if (!existing) {
         await addTrade(newTrade);
+      } else {
+        // Backfill des champs manquants (ex: entry_time / exit_time après ajout du parser)
+        const patch = {};
+        if (newTrade.entryTime && !existing.entry_time && !existing.entryTime) patch.entry_time = newTrade.entryTime;
+        if (newTrade.exitTime && !existing.exit_time && !existing.exitTime) patch.exit_time = newTrade.exitTime;
+        if (Object.keys(patch).length > 0) {
+          try { await updateTrade(existing.id, patch); } catch (err) { console.error("⚠️ updateTrade failed:", err); }
+        }
       }
     }
   };
@@ -4699,19 +5235,29 @@ export default function App() {
     }
   };
 
-  const NAV = [
-    { id:"add-trade",     icon:"📂", label:"Ajouter des Trades" },
-    { id:"dashboard",     icon:"📊", label:"Tableau de bord" },
-    { id:"calendar",      icon:"📅", label:"Calendrier" },
-    { id:"trades",        icon:"📈", label:"Trades", badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
-    { id:"journal",       icon:"📝", label:"Journal de Trading", badge: filteredTrades.filter(t => {try { const d = new Date(t.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
-    { id:"discipline",    icon:"✓", label:"Discipline" },
-    { id:"strategies",    icon:"🎯", label:"Stratégies" },
-    { id:"agent",         icon:"🤖", label:"Agent IA" },
+  const SIDEBAR_SECTIONS = [
+    {
+      label: "Trading",
+      items: [
+        { id: "add-trade",  icon: LucideUpload,       label: "Ajouter des Trades" },
+        { id: "dashboard",  icon: LayoutDashboard,    label: "Tableau de bord" },
+        { id: "calendar",   icon: LucideCalendar,     label: "Calendrier" },
+        { id: "trades",     icon: ListChecks,         label: "Trades", badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
+        { id: "strategies", icon: LucideTarget,       label: "Stratégies" },
+      ],
+    },
+    {
+      label: "Analyse",
+      items: [
+        { id: "journal",    icon: NotebookPen,        label: "Journal", badge: filteredTrades.filter(t => {try { const d = new Date(t.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
+        { id: "discipline", icon: ShieldCheck,        label: "Discipline" },
+        { id: "agent",      icon: Bot,                label: "Agent IA", badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
+      ],
+    },
   ];
 
   const pages = {
-    dashboard:  <Dashboard trades={filteredTrades} />,
+    dashboard:  <Dashboard trades={filteredTrades} setPage={setPage} />,
     "add-trade": <AddTradePage trades={filteredTrades} setPage={setPage} setAccounts={setAccounts} setSelectedAccountIds={setSelectedAccountIds} accountType={accountType} setAccountType={setAccountType} selectedEvalAccount={selectedEvalAccount} setSelectedEvalAccount={setSelectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} addTrade={addTrade} addStrategy={addStrategy} strategies={strategies} user={user} />,
     trades:     <TradesPage trades={filteredTrades} strategies={strategies} onImportClick={() => setPage("add-trade")} onDeleteTrade={handleDeleteTrade} onClearTrades={handleClearTrades} />,
     calendar:   <CalendarPage trades={filteredTrades} accountType={accountType} evalAccountSize={selectedEvalAccount} />,
@@ -4886,7 +5432,7 @@ export default function App() {
       });
 
       return (
-        <ApexChatNew
+        <AgentPanel
           userId={user?.id}
           trades={filteredTrades}
           strategies={strategies || []}
@@ -4901,6 +5447,7 @@ export default function App() {
         />
       );
     })(),
+    settings: <SettingsPage user={user} onBack={() => setPage("dashboard")} />,
   };
 
   // ✅ Afficher un écran de chargement pendant que l'authentification se charge
@@ -4927,173 +5474,87 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{display:"flex",minHeight:"100vh",background:T.bg}}>
-        {/* SIDEBAR */}
-        <div style={{width:220,flexShrink:0,background:T.white,borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",position:"sticky",top:0,height:"100vh",overflowY:"auto"}}>
-          <div style={{padding:"20px 18px 16px",borderBottom:`1px solid ${T.border}`}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:30,height:30,borderRadius:8,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#fff",fontWeight:700}}>A</div>
-              <div>
-                <div style={{fontSize:14,fontWeight:700,letterSpacing:"0px"}}>tr4de</div>
-              </div>
-            </div>
-          </div>
-          <div style={{padding:"12px 8px",flex:1}}>
-            {NAV.map(n=>(
-              <NavItem key={n.id} icon={n.icon} label={n.label} active={page===n.id} onClick={()=>{
-                // Si on quitte "add-trade" vers une autre page
-                if (page === "add-trade" && n.id !== "add-trade") {
-                  // Restaurer l'ancienne sélection
-                  setSelectedAccountIds(previousSelectedAccountIds);
-                  localStorage.setItem('selectedAccountIds', JSON.stringify(previousSelectedAccountIds));
-                }
-                
-                // Sauvegarder la sélection actuelle avant d'aller sur "add-trade"
-                if (n.id === "add-trade") {
-                  setPreviousSelectedAccountIds(selectedAccountIds);
-                  setSelectedAccountIdHeader("");
-                  setSelectedAccountIds([]);
-                }
-                setPage(n.id);
-              }} badge={n.badge}/>
-            ))}
-          </div>
-          <div 
-            style={{
-              padding:"12px 8px",
-              borderTop:`1px solid ${T.border}`,
-              cursor:"pointer",
-              position:"relative"
-            }}
-            onClick={() => setShowAccountSettings(!showAccountSettings)}
-          >
-            <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderRadius:8,transition:"all 0.2s",background:showAccountSettings ? T.accentBg : "transparent",border:showAccountSettings ? `1px solid ${T.accentBd}` : "none"}}>
-              <div style={{width:30,height:30,borderRadius:8,background:T.accentBg,border:`1px solid ${T.accentBd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.accent}}>{displayUser.initials}</div>
-              <div style={{overflow:"hidden",flex:1}}>
-                <div style={{fontSize:12,fontWeight:600,color:T.text}}>{displayUser.name}</div>
-                <div style={{fontSize:10,color:T.textMut}}>{displayUser.email}</div>
-              </div>
-              <div style={{fontSize:12,color:T.textMut,transition:"transform 0.2s",transform:showAccountSettings ? "rotate(180deg)" : "rotate(0deg)"}}>
-                ▼
-              </div>
-            </div>
-            
-            {/* Menu de paramètres du compte */}
-            {showAccountSettings && (
-              <div style={{
-                position:"absolute",
-                bottom:"100%",
-                left:8,
-                right:8,
-                background:T.white,
-                border:`1px solid ${T.border}`,
-                borderRadius:8,
-                boxShadow:`0 10px 25px rgba(0,0,0,0.1)`,
-                zIndex:100,
-                marginBottom:8,
-                overflow:"hidden"
-              }}>
-                {/* Option Paramètres */}
-                <div style={{
-                  padding:"12px 14px",
-                  borderBottom:`1px solid ${T.border}`,
-                  cursor:"pointer",
-                  display:"flex",
-                  alignItems:"center",
-                  gap:10,
-                  transition:"all 0.2s",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = T.bgHover}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                onClick={() => {
-                  console.log("⚙️ Paramètres du compte");
-                  setShowAccountSettings(false);
-                }}
-                >
-                  <span style={{fontSize:14}}>⚙️</span>
-                  <span style={{fontSize:12,color:T.text,fontWeight:500}}>Paramètres du compte</span>
-                </div>
-                
-                {/* Option Profil */}
-                <div style={{
-                  padding:"12px 14px",
-                  borderBottom:`1px solid ${T.border}`,
-                  cursor:"pointer",
-                  display:"flex",
-                  alignItems:"center",
-                  gap:10,
-                  transition:"all 0.2s",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = T.bgHover}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                onClick={() => {
-                  console.log("👤 Profil");
-                  setShowAccountSettings(false);
-                }}
-                >
-                  <span style={{fontSize:14}}>👤</span>
-                  <span style={{fontSize:12,color:T.text,fontWeight:500}}>Profil</span>
-                </div>
-                
-                {/* Option Se déconnecter */}
-                <div style={{
-                  padding:"12px 14px",
-                  cursor:"pointer",
-                  display:"flex",
-                  alignItems:"center",
-                  gap:10,
-                  transition:"all 0.2s",
-                  color:T.red,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = T.redBg}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                onClick={() => {
-                  handleLogout();
-                }}
-                >
-                  <span style={{fontSize:14}}>🚪</span>
-                  <span style={{fontSize:12,fontWeight:500}}>Se déconnecter</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      <div style={{display:"flex",minHeight:"100vh",background:"#F5F5F5"}}>
+        {/* SIDEBAR (OpenAI-style) */}
+        <Sidebar
+          brand="tr4de"
+          workspace={(() => {
+            if (selectedAccountIds.length === 1) {
+              const acc = accounts.find(a => a.id === selectedAccountIds[0]);
+              if (acc) return { id: acc.id, name: acc.name || "Compte" };
+            }
+            if (selectedAccountIds.length > 1) return { id: "multi", name: `${selectedAccountIds.length} comptes` };
+            return null;
+          })()}
+          workspaces={visibleAccounts.map(a => ({ id: a.id, name: a.name || "Compte" }))}
+          onSelectWorkspace={(id) => setSelectedAccountIds([id])}
+          onCreateWorkspace={() => setPage("add-trade")}
+          sections={SIDEBAR_SECTIONS}
+          activeId={page}
+          onSelect={(id) => {
+            if (page === "add-trade" && id !== "add-trade") {
+              setSelectedAccountIds(previousSelectedAccountIds);
+              localStorage.setItem('selectedAccountIds', JSON.stringify(previousSelectedAccountIds));
+            }
+            if (id === "add-trade") {
+              setPreviousSelectedAccountIds(selectedAccountIds);
+              setSelectedAccountIdHeader("");
+              setSelectedAccountIds([]);
+            }
+            setPage(id);
+          }}
+        />
+
 
         {/* MAIN */}
-        <div style={{flex:1,overflowY:"auto",minWidth:0}}>
-          <div style={{position:"sticky",top:0,zIndex:10,background:T.white+"F0",backdropFilter:"blur(8px)",borderBottom:`1px solid ${T.border}`,padding:"8px 28px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div>
-              {/* TEMPORARY: Account verification display */}
-              {selectedAccountIds.length === 1 && accounts.length > 0 && (() => {
-                const selectedAccount = accounts.find(acc => acc.id === selectedAccountIds[0]);
-                if (selectedAccount && selectedAccount.account_type) {
-                  const objectives = { "25k": 1500, "50k": 3000, "100k": 6000, "150k": 9000 };
-                  const objective = selectedAccount.account_type === "eval" ? objectives[selectedAccount.eval_account_size] : null;
-                  return (
-                    <div style={{ padding: "8px 12px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: "6px", fontSize: "11px", fontWeight: "600", color: "#92400E" }}>
-                      {selectedAccount.account_type === "live" ? "🔴 LIVE" : `🟢 EVAL ${selectedAccount.eval_account_size} - Objectif: $${objective}`}
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-            <div style={{display:"flex",gap:12,alignItems:"center"}}>
-              {trades.length > 0 && (
-                <button onClick={handleClearTrades} style={{padding:"6px 12px",borderRadius:8,background:T.redBg,border:`1px solid ${T.redBd}`,color:T.red,fontSize:12,fontWeight:600,cursor:"pointer"}}>Effacer</button>
-              )}
-              {/* Sélecteur multi-compte */}
-              <MultiAccountSelector
-                accounts={visibleAccounts}
-                selectedAccountIds={selectedAccountIds}
-                onSelectionChange={setSelectedAccountIds}
-                onDeleteAccount={handleDeleteAccount}
-                T={T}
+        <div style={{flex:1,minWidth:0,height:"100vh",display:"flex",flexDirection:"column",background:"transparent"}}>
+          <div style={{flexShrink:0,zIndex:10,background:"#F5F5F5",padding:"10px 28px",display:"flex",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+            <div style={{marginLeft:"auto"}}>
+              <TopBarUserMenu
+                user={{ name: displayUser.name, initials: displayUser.initials }}
+                onLogout={handleLogout}
+                onSettings={() => setPage("settings")}
+                onProfile={() => setPage("settings")}
+                onDarkMode={() => console.log("Dark mode placeholder")}
               />
             </div>
           </div>
-          <div style={{padding: page === "add-trade" ? "0" : "16px 28px", display: page === "add-trade" ? "flex" : "block", height: page === "add-trade" ? "100%" : "auto", width: "100%"}}>
-            {pages[page] || pages.dashboard}
+          <div style={{flex:1,minHeight:0,padding: "0 8px 8px 0",display:"flex"}}>
+            <div className="scroll-thin" style={{
+              background: "#FFFFFF",
+              border: "1px solid rgba(0, 0, 0, 0.06)",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+              padding: page === "add-trade" ? "0" : "20px 24px",
+              display: page === "add-trade" ? "flex" : "block",
+              width: "100%",
+              flex: 1,
+              overflowY: "auto",
+              overflowX: "hidden",
+              position: "relative",
+            }}>
+              {page !== "add-trade" && (
+                <HeaderSlotPortal>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {["dashboard","strategies","journal","trades","calendar","discipline"].includes(page) && (
+                      <DateRangePicker
+                        value={globalDateRange}
+                        onChange={(r) => setGlobalDateRange(r)}
+                      />
+                    )}
+                    <MultiAccountSelector
+                      accounts={visibleAccounts}
+                      selectedAccountIds={selectedAccountIds}
+                      onSelectionChange={setSelectedAccountIds}
+                      onDeleteAccount={handleDeleteAccount}
+                      onCreateAccount={() => setPage("add-trade")}
+                      T={T}
+                    />
+                  </div>
+                </HeaderSlotPortal>
+              )}
+              {pages[page] || pages.dashboard}
+            </div>
           </div>
         </div>
       </div>

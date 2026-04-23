@@ -149,7 +149,7 @@ export default function StrategiesNew() {
   };
 
   return (
-    <div style={{ background: "#0F0F23", minHeight: "100vh", color: "#FFFFFF", padding: "24px", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: "#0F0F23", minHeight: "100vh", color: "#FFFFFF", padding: "24px", fontFamily: "var(--font-sans)" }}>
       <style>{`
         * { box-sizing: border-box; }
         .metric-card {

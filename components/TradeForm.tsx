@@ -264,19 +264,19 @@ export default function TradeForm({
 
   const T = {
     white: "#FFFFFF",
-    bg: "#F8FAFB",
-    border: "#E3E6EB",
-    text: "#1A1F2E",
-    textSub: "#5F6B7E",
-    textMut: "#8B95AA",
-    accent: "#5F7FB4",
-    accentBg: "#E3ECFB",
-    green: "#4A9D6F",
-    greenBg: "#E6F3EB",
-    red: "#AD6B6B",
-    redBg: "#F5E6E6",
-    amber: "#9D8555",
-    amberBg: "#F5EAE0",
+    bg: "#FFFFFF",
+    border: "#E5E5E5",
+    text: "#0D0D0D",
+    textSub: "#5C5C5C",
+    textMut: "#8E8E8E",
+    accent: "#0D0D0D",
+    accentBg: "#F0F0F0",
+    green: "#10A37F",
+    greenBg: "#E6F7F1",
+    red: "#EF4444",
+    redBg: "#FEF2F2",
+    amber: "#F97316",
+    amberBg: "#FFF4E6",
   };
 
   return (

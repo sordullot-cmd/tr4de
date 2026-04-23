@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
-export default function QuickAccountSelector({ 
+const BROKER_ICONS = {
+  tradovate: "/trado.png",
+  mt5: "/MetaTrader_5.png",
+  wealthcharts: "/weal.webp",
+};
+
+export default function QuickAccountSelector({
   selectedAccountName,
   onAccountNameChange,
-  T = {} 
+  T = {}
 }) {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState([]);
@@ -13,80 +20,87 @@ export default function QuickAccountSelector({
   const [newAccountName, setNewAccountName] = useState("");
   const supabase = createClient();
 
-  // Charger les comptes existants depuis Supabase
-  useEffect(() => {
-    const loadAccounts = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("trading_accounts")
-          .select("*")
-          .eq("user_id", user?.id)
-          .order("created_at", { ascending: false });
+  const loadAccounts = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from("trading_accounts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-        if (error) {
-          console.error("Error loading accounts:", error);
-          setAccounts([]);
-          return;
-        }
-
-        setAccounts(data || []);
-      } catch (err) {
-        console.error("Error:", err);
+      if (error) {
+        console.error("Error loading accounts:", error);
         setAccounts([]);
+        return;
       }
-    };
 
-    if (user?.id) {
-      loadAccounts();
+      setAccounts(data || []);
+    } catch (err) {
+      console.error("Error:", err);
+      setAccounts([]);
     }
+  };
+
+  useEffect(() => {
+    loadAccounts();
   }, [user?.id]);
 
-  const handleSelectChange = (e) => {
-    const value = e.target.value;
-    if (value === "CREATE_NEW") {
+  const handleChange = (id) => {
+    if (id === "CREATE_NEW") {
       setShowCreateForm(true);
       setNewAccountName("");
-      onAccountNameChange(""); // Vider le compte sélectionné
-    } else if (value === "") {
+      onAccountNameChange("");
+    } else if (id === "") {
       onAccountNameChange("");
       setShowCreateForm(false);
     } else {
-      onAccountNameChange(value);
+      onAccountNameChange(id);
       setShowCreateForm(false);
     }
   };
 
-  const borderColor = T.border || "#E3E6EB";
-  const bgColor = T.bg || "#F8FAFB";
-  const textColor = T.text || "#1A1F2E";
-  const accentColor = T.accent || "#5F7FB4";
+  const borderColor = T.border || "#E5E5E5";
+
+  // Construit les options pour SearchableSelect
+  const resolveBrokerIcon = (broker) => {
+    if (!broker) return null;
+    const key = String(broker).toLowerCase().trim();
+    if (BROKER_ICONS[key]) return BROKER_ICONS[key];
+    // Fallback heuristique
+    if (key.includes("trado")) return BROKER_ICONS.tradovate;
+    if (key.includes("mt5") || key.includes("meta")) return BROKER_ICONS.mt5;
+    if (key.includes("wealth")) return BROKER_ICONS.wealthcharts;
+    return null;
+  };
+
+  const options = [
+    { id: "CREATE_NEW", label: "+ Ajouter un nouveau compte", isAction: true },
+    ...accounts.map((acc) => {
+      const brokerIcon = resolveBrokerIcon(acc.broker);
+      const brokerName = acc.broker ? acc.broker.charAt(0).toUpperCase() + acc.broker.slice(1) : null;
+      return {
+        id: acc.name,
+        label: acc.name,
+        sublabel: brokerName ? `(${brokerName})` : undefined,
+        iconUrl: brokerIcon,
+      };
+    }),
+  ];
 
   return (
     <div>
-      {/* Sélecteur de compte */}
-      <select
+      <SearchableSelect
         value={selectedAccountName || ""}
-        onChange={handleSelectChange}
-        style={{
-          width: "100%",
-          padding: "8px 10px",
-          border: `1px solid ${borderColor}`,
-          borderRadius: 6,
-          fontSize: 12,
-          fontFamily: "inherit",
-          backgroundColor: "white",
-        }}
-      >
-        <option value="">{showCreateForm ? "Ajouter un nouveau compte" : "-- Sélectionnez un compte --"}</option>
-        {accounts.map((acc) => (
-          <option key={acc.id} value={acc.name}>
-            📊 {acc.name}
-          </option>
-        ))}
-        {!showCreateForm && <option value="CREATE_NEW">➕ Créer un nouveau compte</option>}
-      </select>
+        onChange={handleChange}
+        onOpen={loadAccounts}
+        options={options}
+        placeholder="Sélectionner un compte"
+        searchPlaceholder="Rechercher un compte..."
+        emptyLabel="Aucun compte"
+        separated
+      />
 
-      {/* Formulaire de création */}
       {showCreateForm && (
         <div>
           <input
@@ -97,7 +111,6 @@ export default function QuickAccountSelector({
               setNewAccountName(e.target.value);
             }}
             onBlur={() => {
-              // Mettre à jour le parent seulement quand on quitte l'input
               if (newAccountName.trim()) {
                 onAccountNameChange(newAccountName.trim());
               }
@@ -115,12 +128,14 @@ export default function QuickAccountSelector({
             autoFocus
             style={{
               width: "100%",
-              padding: "6px 8px",
+              padding: "8px 12px",
               border: `1px solid ${borderColor}`,
-              borderRadius: 4,
-              fontSize: 12,
-              marginTop: 12,
+              borderRadius: 8,
+              fontSize: 13,
+              marginTop: 8,
               boxSizing: "border-box",
+              fontFamily: "var(--font-sans)",
+              outline: "none",
             }}
           />
         </div>

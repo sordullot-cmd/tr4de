@@ -377,13 +377,15 @@ export function useTrades() {
       try {
         console.log("➕ Adding trade:", tradeData);
         
-        // Créer localement d'abord
-        const newTrade = {
+        // Créer localement d'abord (mapping camelCase → snake_case pour Supabase)
+        const newTrade: any = {
           ...tradeData,
           id: tradeData.id || crypto.randomUUID?.() || Date.now().toString(),
           user_id: user.id,
           created_at: new Date().toISOString()
         };
+        if (tradeData.entryTime && !newTrade.entry_time) newTrade.entry_time = tradeData.entryTime;
+        if (tradeData.exitTime && !newTrade.exit_time) newTrade.exit_time = tradeData.exitTime;
         
         // Update local state
         setTrades(prev => [newTrade, ...prev]);
@@ -394,10 +396,17 @@ export function useTrades() {
           return prev;
         });
         
-        // Essayer Supabase en arrière-plan
+        // Essayer Supabase en arrière-plan (ne garder que les colonnes existantes)
+        const allowed = [
+          "id","user_id","account_id","date","symbol","direction","entry","exit",
+          "pnl","entry_time","exit_time","contract_type","quantity","volume","created_at"
+        ];
+        const dbTrade: any = {};
+        for (const k of allowed) if (newTrade[k] !== undefined) dbTrade[k] = newTrade[k];
+
         const { data, error: err } = await supabase
           .from("apex_trades")
-          .insert([newTrade])
+          .insert([dbTrade])
           .select();
 
         if (err) {

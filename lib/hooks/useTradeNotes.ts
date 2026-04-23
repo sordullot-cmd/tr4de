@@ -62,6 +62,9 @@ export function useTradeNotes() {
     };
 
     fetchNotes();
+    const onFocus = () => fetchNotes();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [user?.id]);
 
   // Obtenir la note d'un trade spécifique
@@ -86,38 +89,19 @@ export function useTradeNotes() {
           [tradeId]: noteText
         }));
 
-        // Essayer Supabase
+        // Essayer Supabase via upsert (UNIQUE user_id+trade_id)
         try {
-          // Récupérer ou créer le trade_detail
-          const { data: existing } = await supabase
+          const { error: err } = await supabase
             .from("trade_details")
-            .select("id")
-            .eq("trade_id", tradeId)
-            .eq("user_id", user.id)
-            .single();
-
-          if (existing) {
-            // Mettre à jour
-            const { error: err } = await supabase
-              .from("trade_details")
-              .update({ notes: noteText, updated_at: new Date().toISOString() })
-              .eq("id", existing.id);
-
-            if (err) throw err;
-          } else {
-            // Créer nouveau
-            const { error: err } = await supabase
-              .from("trade_details")
-              .insert([{
-                trade_id: tradeId,
-                user_id: user.id,
-                notes: noteText,
-              }]);
-
-            if (err) throw err;
-          }
-        } catch (supabaseErr) {
-          console.log("⚠️ Supabase save failed, using localStorage");
+            .upsert([{
+              user_id: user.id,
+              trade_id: tradeId,
+              notes: noteText,
+              updated_at: new Date().toISOString(),
+            }], { onConflict: "user_id,trade_id" });
+          if (err) throw err;
+        } catch (supabaseErr: any) {
+          console.error("❌ Supabase upsert trade_details FAILED:", supabaseErr?.message || supabaseErr, "code:", supabaseErr?.code, "details:", supabaseErr?.details, "hint:", supabaseErr?.hint);
           // Fallback to localStorage
           const allNotes = JSON.parse(localStorage.getItem("tr4de_trade_notes") || "{}");
           allNotes[tradeId] = noteText;

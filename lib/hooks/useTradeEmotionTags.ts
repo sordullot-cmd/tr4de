@@ -48,6 +48,9 @@ export function useTradeEmotionTags() {
     };
 
     fetchEmotions();
+    const onFocus = () => fetchEmotions();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [user?.id]);
 
   // Obtenir les emotions d'un trade
@@ -176,6 +179,9 @@ export function useTradeErrorTags() {
     };
 
     fetchErrors();
+    const onFocus = () => fetchErrors();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [user?.id]);
 
   // Obtenir les erreurs d'un trade

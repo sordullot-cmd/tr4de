@@ -36,37 +36,34 @@ export function useDisciplineTracking() {
   ];
 
   // Charger les données de discipline: localStorage IMMÉDIATEMENT, puis Supabase en arrière-plan
+  // Refetch automatique quand la fenêtre reprend le focus (sync entre navigateurs)
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
       return;
     }
 
-    // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT pour aujourd'hui
     const today = getLocalDateString();
+
+    // ⚡ FAST PATH: Charger localStorage IMMÉDIATEMENT pour aujourd'hui (évite le flicker)
     try {
       const stored = localStorage.getItem(`tr4de_checked_rules_${today}`);
       const rulesData = stored ? JSON.parse(stored) : {};
-      const cachedDataMap: DailyDisciplineState = {};
-      cachedDataMap[today] = rulesData;
-      setDisciplineData(cachedDataMap);
-      setLoading(false); // ✅ UI prête instantanément
-      console.log("⚡ Données discipline chargées depuis localStorage");
-    } catch (parseErr) {
-      console.error("Erreur parsing localStorage:", parseErr);
+      setDisciplineData({ [today]: rulesData });
+      setLoading(false);
+    } catch {
       setDisciplineData({ [today]: {} });
       setLoading(false);
     }
 
-    // 🔄 BACKGROUND: Syncer Supabase (90 derniers jours) sans bloquer l'UI
+    // 🔄 Sync depuis Supabase: REMPLACE complètement disciplineData (Supabase = source de vérité).
+    //    Les optimistic updates de setRuleCompleted modifient disciplineData synchronement,
+    //    donc tout toggle utilisateur après le sync est préservé tel quel.
     const syncFromSupabase = async () => {
       try {
-        console.log("📋 Synchronisation données discipline depuis Supabase pour user:", user.id);
-        
-        // Charger les 90 derniers jours
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 90);
-        
+
         const { data, error: err } = await supabase
           .from("daily_discipline_tracking")
           .select("date, rule_id, completed")
@@ -75,42 +72,32 @@ export function useDisciplineTracking() {
           .order("date", { ascending: false });
 
         if (err) {
-          // Si la table n'existe pas, garder les données localStorage
           if (err.message?.includes("Could not find the table") || err.code === "PGRST116") {
-            console.log("📌 Table daily_discipline_tracking pas encore créée sur Supabase");
             return;
           }
           throw err;
         }
 
-        // Convertir en state map: date -> { ruleId -> completed }
         const dataMap: DailyDisciplineState = {};
         data?.forEach((entry) => {
-          if (!dataMap[entry.date]) {
-            dataMap[entry.date] = {};
-          }
+          if (!dataMap[entry.date]) dataMap[entry.date] = {};
           dataMap[entry.date][entry.rule_id] = entry.completed;
         });
 
-        // Fusionner avec les données locales (localStorage en priorité pour aujourd'hui)
-        setDisciplineData(prev => {
-          // Garder les valeurs localStorage pour aujourd'hui, ajouter les données Supabase pour les autres jours
-          const merged = { ...dataMap };
-          if (prev[today]) {
-            merged[today] = prev[today]; // Priorité aux données locales d'aujourd'hui
-          }
-          return merged;
-        });
-
-        console.log(`🔄 Données discipline synchronisées: ${Object.keys(dataMap).length} jours depuis Supabase`);
+        // Remplacer entièrement: Supabase est source de vérité.
+        setDisciplineData(dataMap);
         setError(null);
       } catch (err: unknown) {
-        console.error("❌ Erreur synchronisation Supabase discipline:", getErrorMessage(err));
-        // Pas d'erreur affichée car on a déjà les données localStorage
+        console.error("❌ Erreur sync discipline:", getErrorMessage(err));
       }
     };
 
-    syncFromSupabase(); // Fire and forget
+    syncFromSupabase();
+
+    // Refetch quand la fenêtre reprend le focus (autre navigateur a peut-être modifié)
+    const onFocus = () => { syncFromSupabase(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [user?.id]);
 
   // Obtenir l'état de discipline pour une date
@@ -163,7 +150,6 @@ export function useDisciplineTracking() {
               date: dateStr,
               rule_id: ruleId,
               completed,
-              updated_at: new Date().toISOString(),
             }], {
               onConflict: "user_id,date,rule_id"
             });

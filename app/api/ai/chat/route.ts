@@ -1,13 +1,16 @@
-﻿import { streamText } from "ai";
+import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { buildSystemPrompt, getUserStats } from "@/lib/ai/context";
 
 export async function POST(request: NextRequest) {
   try {
     const {
       messages,
       userId,
+      conversationId: providedConversationId,
+      persist = true,
       trades = [],
       journalNotes = [],
       strategies = [],
@@ -27,10 +30,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // 🆕 Construire le contexte enrichi avec toutes les données
+    // === PERSISTANCE: trouver ou creer la conversation ===
+    let conversationId: string | null = null;
+    const shouldPersist = persist && !!user;
+
+    if (shouldPersist) {
+      if (providedConversationId) {
+        const { data: existing } = await supabase
+          .from("ai_conversations")
+          .select("id")
+          .eq("id", providedConversationId)
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        if (existing) conversationId = existing.id;
+      }
+
+      if (!conversationId) {
+        const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+        const title = lastUserMsg?.content ? String(lastUserMsg.content).slice(0, 80) : "Nouvelle conversation";
+        const { data: created } = await supabase
+          .from("ai_conversations")
+          .insert({ user_id: user!.id, title })
+          .select("id")
+          .single();
+        if (created) conversationId = created.id;
+      }
+
+      // Sauver uniquement le dernier message user (les precedents sont deja en DB)
+      const lastMessage = messages[messages.length - 1];
+      if (conversationId && lastMessage?.role === "user" && lastMessage?.content) {
+        await supabase.from("ai_messages").insert({
+          conversation_id: conversationId,
+          user_id: user!.id,
+          role: "user",
+          content: String(lastMessage.content),
+        });
+      }
+    }
+
+    // === CONTEXTE ENRICHI ===
     let contextData = "=== CONTEXTE IA ===\n";
-    
-    // Données de trades
+
     if (trades && trades.length > 0) {
       contextData += `\n📊 TRADES (${trades.length}):\n`;
       trades.slice(0, 10).forEach((trade: any) => {
@@ -38,7 +78,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Données de stratégies
     if (strategies && strategies.length > 0) {
       contextData += `\n🎯 STRATÉGIES (${strategies.length}):\n`;
       strategies.forEach((strat: any) => {
@@ -46,7 +85,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Stats de stratégies
     if (strategyStats && strategyStats.length > 0) {
       contextData += `\n📈 PERFORMANCE PAR STRATÉGIE:\n`;
       strategyStats.forEach((stat: any) => {
@@ -54,7 +92,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Notes journalières
     if (dailyNotes && Object.keys(dailyNotes).length > 0) {
       contextData += `\n📅 NOTES JOURNALIÈRES RÉCENTES:\n`;
       Object.entries(dailyNotes)
@@ -64,7 +101,6 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // Notes de trades
     if (journalNotes && journalNotes.length > 0) {
       contextData += `\n📝 NOTES DE TRADES RÉCENTES:\n`;
       journalNotes.slice(0, 5).forEach((note: any) => {
@@ -74,14 +110,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Compte de trading
     if (accountInfo) {
       contextData += `\n💼 COMPTE DE TRADING:\n`;
       contextData += `  • Type: ${accountInfo.type || 'N/A'}${accountInfo.evalSize ? ` (${accountInfo.evalSize})` : ''}\n`;
       contextData += `  • Comptes actifs: ${accountInfo.selectedAccountsCount || 0}/${accountInfo.totalAccountsCount || 0}\n`;
     }
 
-    // 🆕 Stats hebdomadaires
     if (weeklyStats && weeklyStats.length > 0) {
       contextData += `\n📅 STATS HEBDOMADAIRES (semaine du lundi):\n`;
       weeklyStats.slice(0, 6).forEach((w: any) => {
@@ -89,7 +123,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Stats mensuelles
     if (monthlyStats && monthlyStats.length > 0) {
       contextData += `\n🗓️ STATS MENSUELLES:\n`;
       monthlyStats.slice(0, 6).forEach((m: any) => {
@@ -97,7 +130,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Discipline
     if (disciplineSummary && disciplineSummary.length > 0) {
       contextData += `\n✅ DISCIPLINE (14 derniers jours):\n`;
       disciplineSummary.slice(0, 10).forEach((d: any) => {
@@ -106,7 +138,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 🆕 Événements psychologiques
     if (psychEvents && psychEvents.length > 0) {
       contextData += `\n🧠 ÉVÉNEMENTS PSYCHOLOGIQUES DÉTECTÉS:\n`;
       psychEvents.slice(0, 12).forEach((e: any) => {
@@ -115,43 +146,68 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let systemPrompt = `Tu es APEX, le coach IA spécialisé en trading pour la plateforme tr4de.
+    // Stats utilisateur + patterns persistés pour le system prompt
+    const effectiveUserId = user?.id || userId;
+    const userStats = await getUserStats(effectiveUserId);
 
-Tu as accès aux données complètes de l'utilisateur:
-${contextData}
+    let patternsBlock = "";
+    let memoryBlock = "";
+    if (user) {
+      const { data: patterns } = await supabase
+        .from("ai_patterns")
+        .select("pattern_type, pattern_data, occurrences, avg_pnl_impact, last_detected_at")
+        .eq("user_id", user.id)
+        .order("occurrences", { ascending: false })
+        .limit(5);
 
-🎯 TON RÔLE
-• Analyser les TRADES et identifier les patterns
-• Évaluer la PERFORMANCE par stratégie et par période (semaine / mois)
-• Lire les NOTES JOURNALIÈRES pour comprendre l'état mental du trader
-• Utiliser la DISCIPLINE (règles respectées/violées) pour juger la rigueur
-• Prendre en compte le type de COMPTE (live vs eval, taille) dans les conseils
-• Exploiter les ÉMOTIONS et ERREURS taguées sur les trades
-• Confirmer/nuancer les ÉVÉNEMENTS PSYCHOLOGIQUES détectés (revenge, overtrading, tilt)
-• Donner des INSIGHTS concrets basés sur les données
-• Proposer des AMÉLIORATIONS spécifiques
+      if (patterns && patterns.length > 0) {
+        patternsBlock = "\n\n🧠 PATTERNS PERSONNALISÉS DÉTECTÉS:\n";
+        patterns.forEach((p: any) => {
+          const impact = p.avg_pnl_impact != null ? ` (impact moyen: ${p.avg_pnl_impact > 0 ? "+" : ""}${Number(p.avg_pnl_impact).toFixed(2)}$)` : "";
+          const detail = p.pattern_data?.detail || p.pattern_data?.description || "";
+          patternsBlock += `  • [${p.pattern_type}] ${detail} — ${p.occurrences} occurrences${impact}\n`;
+        });
+        patternsBlock += "Utilise ces patterns dans tes reponses quand pertinent. Cite les chiffres exacts.\n";
+      }
 
-📊 RÈGLES DE FORMATAGE - IMPORTANT
-1. Pas de ### ou #### - utilise UNE SEULE # pour les titres majeurs
-2. Pas de gras excessif - utilise * TRÈS rarement pour les points clés
-3. Utilise des tirets simples • pour les listes, pas de -
-4. Ajoute des ESPACEMENTS entre les sections (lignes blanches)
-5. Titre + petite intro, puis détails - pas de rappels du titre
-6. Maximum 3-4 sections par réponse
-7. Les chiffres au format simple: "10 trades" pas "**10** trades"
-8. Évite les tableaux - utilise du texte fluide avec des paragraphes courts
+      // Memoire long-terme du trader
+      const { data: memory } = await supabase
+        .from("ai_user_memory")
+        .select("trading_style, recurring_errors, strengths, emotional_patterns, goals, coach_notes")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-💡 STRUCTURE TYPE D'UNE BONNE RÉPONSE
-# Titre Principal
-Une phrase de contexte courte
+      if (memory) {
+        const hasContent =
+          memory.trading_style ||
+          (Array.isArray(memory.recurring_errors) && memory.recurring_errors.length > 0) ||
+          (Array.isArray(memory.strengths) && memory.strengths.length > 0) ||
+          (Array.isArray(memory.emotional_patterns) && memory.emotional_patterns.length > 0) ||
+          (Array.isArray(memory.goals) && memory.goals.length > 0) ||
+          memory.coach_notes;
 
-Section 1
-Description et données
+        if (hasContent) {
+          memoryBlock = "\n\n🧬 CE QUE TU SAIS DE CE TRADER (memoire long-terme construite a partir de vos echanges precedents):\n";
+          if (memory.trading_style) memoryBlock += `• Style: ${memory.trading_style}\n`;
+          if (Array.isArray(memory.recurring_errors) && memory.recurring_errors.length > 0) {
+            memoryBlock += `• Erreurs recurrentes:\n  - ${memory.recurring_errors.join("\n  - ")}\n`;
+          }
+          if (Array.isArray(memory.strengths) && memory.strengths.length > 0) {
+            memoryBlock += `• Forces:\n  - ${memory.strengths.join("\n  - ")}\n`;
+          }
+          if (Array.isArray(memory.emotional_patterns) && memory.emotional_patterns.length > 0) {
+            memoryBlock += `• Patterns emotionnels:\n  - ${memory.emotional_patterns.join("\n  - ")}\n`;
+          }
+          if (Array.isArray(memory.goals) && memory.goals.length > 0) {
+            memoryBlock += `• Objectifs:\n  - ${memory.goals.join("\n  - ")}\n`;
+          }
+          if (memory.coach_notes) memoryBlock += `• Notes coach: ${memory.coach_notes}\n`;
+          memoryBlock += "Exploite cette memoire: rappelle-lui ses erreurs passees, valorise ses forces, suis ses goals. Tu n'as PAS a re-decouvrir ce trader a chaque echange.\n";
+        }
+      }
+    }
 
-Section 2  
-Description et données
-
-Conclusion/Action`;
+    const systemPrompt = buildSystemPrompt(userStats) + patternsBlock + memoryBlock;
 
     const enrichedMessages = [
       { role: "user" as const, content: contextData },
@@ -162,9 +218,25 @@ Conclusion/Action`;
       model: openai("gpt-4o"),
       system: systemPrompt,
       messages: enrichedMessages,
+      onFinish: async ({ text }) => {
+        if (shouldPersist && conversationId && text) {
+          try {
+            await supabase.from("ai_messages").insert({
+              conversation_id: conversationId,
+              user_id: user!.id,
+              role: "assistant",
+              content: text,
+            });
+          } catch (e) {
+            console.error("Failed to persist assistant message:", e);
+          }
+        }
+      },
     });
 
-    return result.toTextStreamResponse();
+    const response = result.toTextStreamResponse();
+    if (conversationId) response.headers.set("X-Conversation-Id", conversationId);
+    return response;
   } catch (error) {
     console.error("API Error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

@@ -181,7 +181,7 @@ export default function TradeManagement() {
           padding: 24px;
           background: #F7F8FA;
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-sans);
         }
 
         .management-header {

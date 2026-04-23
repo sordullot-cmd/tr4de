@@ -93,7 +93,7 @@ export default function Calendar() {
           padding: 24px;
           background: #F7F8FA;
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-sans);
         }
 
         .calendar-header {

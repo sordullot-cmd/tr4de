@@ -2,29 +2,29 @@
 
 import React, { useState, useEffect } from "react";
 
-/* ─── TOKENS ─────────────────────────────────────────────────────── */
+/* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
   white:   "#FFFFFF",
-  bg:      "#F8FAFB",
+  bg:      "#FFFFFF",
   surface: "#FFFFFF",
-  border:  "#E3E6EB",
-  border2: "#CED3DB",
-  text:    "#1A1F2E",
-  textSub: "#5F6B7E",
-  textMut: "#8B95AA",
-  green:   "#16A34A",
-  greenBg: "#DCFCE7",
-  greenBd: "#93C5FD",
-  red:     "#AD6B6B",
-  redBg:   "#F5E6E6",
-  redBd:   "#E0BFBF",
-  accent:  "#5F7FB4",
-  accentBg:"#E3ECFB",
-  accentBd:"#B8CCEB",
-  amber:   "#9D8555",
-  amberBg: "#F5EAE0",
-  blue:    "#5F7FB4",
-  blueBg:  "#E3ECFB",
+  border:  "#E5E5E5",
+  border2: "#D4D4D4",
+  text:    "#0D0D0D",
+  textSub: "#5C5C5C",
+  textMut: "#8E8E8E",
+  green:   "#10A37F",
+  greenBg: "#E6F7F1",
+  greenBd: "#A7E6CF",
+  red:     "#EF4444",
+  redBg:   "#FEF2F2",
+  redBd:   "#FECACA",
+  accent:  "#0D0D0D",
+  accentBg: "#F0F0F0",
+  accentBd: "#D4D4D4",
+  amber:   "#F97316",
+  amberBg: "#FFF4E6",
+  blue:    "#3B82F6",
+  blueBg:  "#EFF6FF",
 };
 
 const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}$${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -554,205 +554,186 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         <button
           onClick={() => setPage('strategies')}
           style={{
-            padding:"8px 12px",
-            fontSize:14,
+            padding:"6px 12px",
+            fontSize:13,
             border:`1px solid ${T.border}`,
             background:T.white,
-            borderRadius:6,
+            borderRadius:8,
             cursor:"pointer",
-            color:T.textSub
+            color:T.textSub,
+            fontFamily:"var(--font-sans)",
+            fontWeight:500,
           }}
         >← Retour</button>
         <div>
-          <h1 style={{fontSize:28,fontWeight:700,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{width:16,height:16,borderRadius:"50%",background:selectedStrategy.color}}/>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{width:10,height:10,borderRadius:"50%",background:selectedStrategy.color}}/>
             {selectedStrategy.name}
           </h1>
-          <p style={{fontSize:13,color:T.textMut,marginTop:4}}>{selectedStrategy.description}</p>
+          {selectedStrategy.description && (
+            <p style={{fontSize:12,color:T.textMut,marginTop:2,marginBottom:0,fontFamily:"var(--font-sans)"}}>{selectedStrategy.description}</p>
+          )}
         </div>
       </div>
 
-      {/* MAIN 4-COLUMN METRICS */}
+      {/* CARD 1 : 4 KPIs fusionnes (separateurs internes) */}
       {filteredTrades.length > 0 && (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-          
-          {/* 1. NET P&L */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:10,color:T.textMut,marginBottom:10,fontWeight:600,textTransform:"uppercase"}}>P&L Net</div>
-            <div style={{fontSize:26,fontWeight:700,color:totalPnL >= 0 ? T.green : T.red,marginBottom:8}}>{fmt(totalPnL,true)}</div>
-            <div style={{fontSize:11,color:T.textMut}}>Total: {filteredTrades.length} trades</div>
-          </div>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)"}}>
 
-          {/* 2. SUIVI RÈGLES - 2 GROUPS (WITH vs WITHOUT RULES) */}
-          {hasRules && (
-            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={{fontSize:10,color:T.textMut,fontWeight:600,textTransform:"uppercase"}}>Suivi Règles</div>
-                <div style={{display:"flex",alignItems:"center",gap:6,background:impactColor+"20",border:`1px solid ${impactColor}`,borderRadius:6,padding:"4px 8px"}}>
-                  <div style={{fontSize:9,fontWeight:700,color:impactColor}}>
+            {/* 1. P&L Net */}
+            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+                P&L Net <span style={{color:T.textMut}}>›</span>
+              </div>
+              <div style={{fontSize:22,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {fmt(totalPnL,true)}
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length} trades</div>
+            </div>
+
+            {/* 2. Taux de Victoire */}
+            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+                Taux de victoire <span style={{color:T.textMut}}>›</span>
+              </div>
+              <div style={{fontSize:22,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {winRate}%
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>{winCount}W · {lossCount}L</div>
+            </div>
+
+            {/* 3. Meilleur vs Pire (compact) */}
+            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+                Meilleur vs pire <span style={{color:T.textMut}}>›</span>
+              </div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
+                <span style={{fontSize:18,fontWeight:600,color:T.green,letterSpacing:-0.2}}>{fmt(maxWin)}</span>
+                <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>/</span>
+                <span style={{fontSize:18,fontWeight:600,color:T.red,letterSpacing:-0.2}}>{fmt(maxLoss)}</span>
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>Plus haut / plus bas</div>
+            </div>
+
+            {/* 4. Suivi Regles (ou stat de fallback) */}
+            {hasRules ? (
+              <div style={{padding:"16px 20px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:12,color:T.textSub,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+                    Suivi des règles <span style={{color:T.textMut}}>›</span>
+                  </div>
+                  <span style={{fontSize:10,fontWeight:600,color:impactColor,padding:"2px 6px",borderRadius:999,background:impactColor+"15"}}>
                     {rulesImpact > 0 ? "+" : ""}{rulesImpact}%
-                  </div>
+                  </span>
                 </div>
+                <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
+                  <span style={{fontSize:18,fontWeight:600,color:T.text,letterSpacing:-0.2}}>{statsAllChecked.winRate}%</span>
+                  <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>vs</span>
+                  <span style={{fontSize:18,fontWeight:600,color:T.textSub,letterSpacing:-0.2}}>{statsNone.winRate}%</span>
+                </div>
+                <div style={{fontSize:11,color:T.textMut}}>Avec règles / sans règles</div>
               </div>
-              
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                {/* WITH RULES */}
-                <div style={{borderRight:`1px solid ${T.border}`,paddingRight:12}}>
-                  <div style={{fontSize:8,fontWeight:600,color:T.textMut,textTransform:"uppercase",marginBottom:8}}>Avec Règles</div>
-                  <div style={{fontSize:20,fontWeight:700,color:statsAllChecked.totalPnL >= 0 ? T.green : T.red,marginBottom:4}}>
-                    {statsAllChecked.winRate}%
-                  </div>
-                  <div style={{fontSize:9,color:T.textMut}}>
-                    {statsAllChecked.wins}W / {statsAllChecked.losses}L
-                  </div>
+            ) : (
+              <div style={{padding:"16px 20px"}}>
+                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+                  Volume <span style={{color:T.textMut}}>›</span>
                 </div>
+                <div style={{fontSize:22,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                  {filteredTrades.length}
+                </div>
+                <div style={{fontSize:11,color:T.textMut}}>trades exécutés</div>
+              </div>
+            )}
 
-                {/* WITHOUT RULES */}
-                <div style={{paddingLeft:12}}>
-                  <div style={{fontSize:8,fontWeight:600,color:T.textMut,textTransform:"uppercase",marginBottom:8}}>Sans Règles</div>
-                  <div style={{fontSize:20,fontWeight:700,color:statsNone.totalPnL >= 0 ? T.green : T.red,marginBottom:4}}>
-                    {statsNone.winRate}%
-                  </div>
-                  <div style={{fontSize:9,color:T.textMut}}>
-                    {statsNone.wins}W / {statsNone.losses}L
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 3. MEILLEUR VS PIRE */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:10,color:T.textMut,marginBottom:12,fontWeight:600,textTransform:"uppercase"}}>Meilleur vs Pire Trade</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              {/* BEST TRADE */}
-              <div style={{background:`${T.green}15`,border:`1px solid ${T.green}30`,borderRadius:8,padding:14,textAlign:"center"}}>
-                <div style={{fontSize:9,color:T.green,marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>Meilleur Trade</div>
-                <div style={{fontSize:20,fontWeight:700,color:T.green}}>{fmt(maxWin)}</div>
-              </div>
-              {/* WORST TRADE */}
-              <div style={{background:`${T.red}15`,border:`1px solid ${T.red}30`,borderRadius:8,padding:14,textAlign:"center"}}>
-                <div style={{fontSize:9,color:T.red,marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"}}>Pire Trade</div>
-                <div style={{fontSize:20,fontWeight:700,color:T.red}}>{fmt(maxLoss)}</div>
-              </div>
-            </div>
           </div>
-
-          {/* 4. WIN RATE */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:10,color:T.textMut,marginBottom:10,fontWeight:600,textTransform:"uppercase"}}>Taux de Victoire</div>
-            <div style={{fontSize:26,fontWeight:700,color:T.text,marginBottom:8}}>{winRate}%</div>
-            <div style={{fontSize:11,color:T.textMut}}>
-              {winCount} gains / {lossCount} pertes
-            </div>
-          </div>
-
         </div>
       )}
 
-
-
-      {/* TRADEPATH SCORE + CONDITIONS SIDE BY SIDE */}
+      {/* CARDS 2 + 3 : cote a cote avec gap */}
       {filteredTrades.length > 0 && (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-          {/* CONDITION PROBABILITÉ */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:16,borderBottom:`1px solid ${T.border}`}}>
-              <div style={{fontSize:14,fontWeight:700,color:T.text}}>Condition probabilité</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"stretch"}}>
+        {/* CARD 2 : Condition probabilite */}
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
+              Condition probabilité <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr"}}>
-              {/* BEST CONDITIONS - LEFT SIDE (GREEN) */}
-              <div style={{padding:16}}>
-                <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                {/* BEST DAY */}
+            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Meilleurs et pires créneaux pour cette stratégie</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr"}}>
+            {/* BEST */}
+            <div style={{padding:16,borderRight:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Meilleur jour</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{bestDay.day}</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleur jour</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestDay.day}</div>
                 </div>
-                {/* BEST HOUR */}
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Meilleure fenêtre</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{bestHour.hour}</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleure fenêtre</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestHour.hour}</div>
                 </div>
-                {/* BEST SYMBOL */}
                 <div>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Meilleur asset</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{bestSymbol.symbol}</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleur asset</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestSymbol.symbol}</div>
                 </div>
               </div>
             </div>
-
-            {/* WORST CONDITIONS - RIGHT SIDE (RED) */}
+            {/* WORST */}
             <div style={{padding:16}}>
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                {/* WORST DAY */}
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Pire jour</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{worstDay.day}</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire jour</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstDay.day}</div>
                 </div>
-                {/* WORST HOUR */}
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Pire fenêtre</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{worstHour.hour}</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire fenêtre</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstHour.hour}</div>
                 </div>
-                {/* WORST SYMBOL */}
                 <div>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:600,textTransform:"uppercase"}}>Pire asset</div>
-                  <div style={{fontSize:16,fontWeight:700,color:T.text}}>{worstSymbol.symbol}</div>
-                </div>
-              </div>
-            </div>
-            </div>
-          </div>
-
-          {/* TRADEPATH PENTAGON SCORE */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:24}}>
-            {/* Header */}
-            <div style={{display:"flex",justifyContent:"flex-start",alignItems:"center",marginBottom:24}}>
-              <h3 style={{fontSize:14,fontWeight:700,color:T.text}}>tr4de score</h3>
-            </div>
-
-            {/* Pentagon Chart - Centered */}
-            <div style={{marginBottom:32}}>
-              <PentagonRadar metrics={pentagonMetrics} size={320} />
-            </div>
-
-            {/* Divider Line */}
-            <div style={{borderTop:`1px solid ${T.border}`,marginBottom:16}}/>
-
-            {/* Overall Score Bar */}
-            <div style={{display:"flex",flexDirection:"row",gap:16,alignItems:"center"}}>
-              {/* Score Block */}
-              <div style={{display:"flex",flexDirection:"column",gap:4,paddingRight:16,borderRight:`1px solid ${T.border}`}}>
-                <div style={{fontSize:11,color:T.textMut,fontWeight:600,textTransform:"uppercase"}}>Votre tr4de score</div>
-                <div style={{fontSize:28,fontWeight:700,color:selectedStrategy.color}}>{pentagonMetrics.overallScore}</div>
-              </div>
-
-              {/* Progress Bar */}
-              <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
-                <div style={{width:"100%",height:12,background:T.border,borderRadius:6,overflow:"hidden"}}>
-                  <div 
-                    style={{
-                      width:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                      height:"100%",
-                      background:selectedStrategy.color,
-                      transition:"width 0.6s ease",
-                      borderRadius:6
-                    }}
-                  />
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.textMut}}>
-                  <span>0</span>
-                  <span>20</span>
-                  <span>40</span>
-                  <span>60</span>
-                  <span>80</span>
-                  <span>100</span>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire asset</div>
+                  <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstSymbol.symbol}</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* CARD 3 : tr4de score */}
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
+              tr4de score <span style={{color:T.textMut,fontWeight:500}}>›</span>
+            </div>
+            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Performance globale de la stratégie</div>
+          </div>
+          <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:16}}>
+            <div style={{display:"flex",justifyContent:"center"}}>
+              <PentagonRadar metrics={pentagonMetrics} size={280} />
+            </div>
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+                  <span style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1}}>{pentagonMetrics.overallScore}</span>
+                  <span style={{fontSize:12,color:T.textMut,fontWeight:500}}>/ 100</span>
+                </div>
+                <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>Score global</span>
+              </div>
+              <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
+                <div
+                  style={{
+                    width:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                    height:"100%",
+                    background:T.green,
+                    transition:"width 0.6s ease",
+                    borderRadius:2,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       )}
 
       {/* EMPTY STATE */}

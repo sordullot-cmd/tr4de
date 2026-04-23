@@ -6,35 +6,36 @@ import TradeValidator from "@/components/trade/TradeValidator";
 import TradingAccountsPage from "@/components/pages/TradingAccountsPage";
 import { useTradingAccounts } from "@/lib/hooks/useTradingAccounts";
 import AccountSelector from "@/components/AccountSelector";
+import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 
-/* ─── TOKENS ─────────────────────────────────────────────────────── */
+/* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
   white:   "#FFFFFF",
-  bg:      "#F8FAFB",
+  bg:      "#FAFAFA",
   surface: "#FFFFFF",
-  border:  "#E3E6EB",
-  border2: "#CED3DB",
-  text:    "#1A1F2E",
-  textSub: "#5F6B7E",
-  textMut: "#8B95AA",
-  green:   "#4A9D6F",
-  greenBg: "#E6F3EB",
-  greenBd: "#BFDCCF",
-  red:     "#AD6B6B",
-  redBg:   "#F5E6E6",
-  redBd:   "#E0BFBF",
-  accent:  "#5F7FB4",
-  accentBg:"#E3ECFB",
-  accentBd:"#B8CCEB",
-  amber:   "#9D8555",
-  amberBg: "#F5EAE0",
-  blue:    "#5F7FB4",
-  blueBg:  "#E3ECFB",
+  border:  "#E5E5E5",
+  border2: "#D4D4D4",
+  text:    "#0D0D0D",
+  textSub: "#5C5C5C",
+  textMut: "#8E8E8E",
+  green:   "#10A37F",
+  greenBg: "#E6F7F1",
+  greenBd: "#A7E6CF",
+  red:     "#EF4444",
+  redBg:   "#FEF2F2",
+  redBd:   "#FECACA",
+  accent:  "#0D0D0D",
+  accentBg:"#F0F0F0",
+  accentBd:"#D4D4D4",
+  amber:   "#F97316",
+  amberBg: "#FFF4E6",
+  blue:    "#3B82F6",
+  blueBg:  "#EFF6FF",
 };
 
 const css = ` @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: ${T.bg}; color: ${T.text}; font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 13px; }
+  body { background: ${T.bg}; color: ${T.text}; font-family: var(--font-sans); min-height: 100vh; font-size: 13px; }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: ${T.border2}; border-radius: 4px; }
@@ -64,7 +65,7 @@ function TradingViewChart({ trade }) {
   return null; // Removed chart component
 }
 
-function Dashboard({ trades = [] }) {
+function Dashboard({ trades = [], setPage }) {
   if (!trades || trades.length === 0) {
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
@@ -161,33 +162,36 @@ function Dashboard({ trades = [] }) {
   const dayLabelsFull = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:24}} className="anim-1">
+    <div style={{display:"flex",flexDirection:"column",gap:24,fontFamily:"var(--font-sans)"}} className="anim-fade-up">
       {/* HEADER */}
       <div>
-        <h1 style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:4}}>Performance Dashboard</h1>
-        <p style={{fontSize:11,color:T.textSub}}>Real-time trading metrics and analysis</p>
+        <h1 style={{fontSize:24,fontWeight:700,color:T.text,margin:0,letterSpacing:-0.2}}>Tableau de bord</h1>
+        <p style={{fontSize:13,color:T.textSub,marginTop:4}}>Vue d&apos;ensemble de tes performances de trading</p>
       </div>
 
-      {/* KPI CARDS - 4 COLUMNS */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+      {/* KPI CARDS - 4 COLUMNS (style OpenAI: bordure fine, valeur 28px, label uppercase muted) */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
         {[
-          {label:"Profit Factor",value:profitFactor,subtext:"Risk-Reward Ratio"},
-          {label:"Win Rate",value:`${winRate}%`,subtext:`${winCount}W ${lossCount}L`},
+          {label:"Profit Factor",value:profitFactor,subtext:"Ratio gains / pertes"},
+          {label:"Win Rate",value:`${winRate}%`,subtext:`${winCount}W · ${lossCount}L`},
           {label:"Avg Win/Loss",value:(Math.abs(avgWin)/Math.abs(avgLoss||1)).toFixed(2),subtext:`${fmt(avgWin,true)} / ${fmt(avgLoss,true)}`},
-          {label:"Total P&L",value:fmt(totalPnL,true),subtext:`${trades.length} trades`,color:totalPnL>=0?T.green:T.red}
+          {label:"P&L Total",value:fmt(totalPnL,true),subtext:`${trades.length} trades`,color:totalPnL>=0?T.green:T.red}
         ].map((stat,i)=>(
-          <div key={i} style={{background:T.white,borderRadius:12,padding:"24px",borderBottom:`3px solid ${stat.color||T.border}`,boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
-            <div style={{fontSize:11,color:T.textMut,marginBottom:12,fontWeight:500,letterSpacing:"0.5px",textTransform:"uppercase"}}>{stat.label}</div>
-            <div style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:8}}>{stat.value}</div>
+          <div key={i} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"18px 20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:11,color:T.textMut,marginBottom:10,fontWeight:500,letterSpacing:"0.4px",textTransform:"uppercase"}}>{stat.label}</div>
+            <div style={{fontSize:26,fontWeight:600,color:stat.color||T.text,marginBottom:6,lineHeight:1.1}}>{stat.value}</div>
             <div style={{fontSize:11,color:T.textSub}}>{stat.subtext}</div>
           </div>
         ))}
       </div>
 
+      {/* AI REPORT SUMMARY */}
+      <AIReportSummaryCard onOpenReports={setPage ? () => setPage("agent") : undefined} />
+
       {/* CHARTS SECTION */}
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:16}}>
         {/* P&L Curve */}
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <div style={{marginBottom:20}}>
             <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:4}}>Cumulative P&L</h3>
             <p style={{fontSize:10,color:T.textSub}}>Evolution of your trading performance</p>
@@ -202,7 +206,7 @@ function Dashboard({ trades = [] }) {
         </div>
 
         {/* Performance Metrics */}
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:16}}>Key Metrics</h3>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {[
@@ -223,7 +227,7 @@ function Dashboard({ trades = [] }) {
       {/* THREE COLUMN SECTION */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
         {/* Calendar */}
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:16}}>{new Date(year,month).toLocaleString('en-US',{month:'long'})}</h3>
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
             {["S","M","T","W","T","F","S"].map(d=>(
@@ -257,7 +261,7 @@ function Dashboard({ trades = [] }) {
         </div>
 
         {/* Profit by Hour */}
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:16}}>Profit by Hour</h3>
           <div style={{height:140,display:"flex",alignItems:"flex-end",gap:1,background:T.bg,borderRadius:8,padding:"12px 4px"}}>
             {Array.from({length:24},(_, h)=>{
@@ -308,7 +312,7 @@ function Dashboard({ trades = [] }) {
 
       {/* SYMBOL ANALYSIS */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:16}}>Top Symbols</h3>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {topSymbols.map(([sym,data],i)=>(
@@ -323,7 +327,7 @@ function Dashboard({ trades = [] }) {
           </div>
         </div>
 
-        <div style={{background:T.white,borderRadius:12,padding:"24px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
           <h3 style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:16}}>Win/Loss Summary</h3>
           <div style={{display:"flex",gap:16}}>
             <div style={{flex:1}}>
@@ -616,7 +620,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick }) {
                 borderRadius: 8,
                 padding: 12,
                 fontSize: 12,
-                fontFamily: "DM Sans",
+                fontFamily: "var(--font-sans)",
                 color: T.text,
                 background: T.bg,
                 resize: "none",

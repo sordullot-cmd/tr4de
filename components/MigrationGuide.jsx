@@ -78,7 +78,7 @@ export default function MigrationGuide() {
         maxWidth: 900,
         margin: "0 auto",
         padding: "40px 24px",
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
       }}
     >
       {/* En-tête */}
