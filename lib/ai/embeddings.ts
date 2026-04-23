@@ -1,9 +1,16 @@
 import { OpenAI } from "openai";
 import { createClient } from "@/lib/supabase/server";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy init: ne crée le client qu'au premier appel (évite le crash au build sur Vercel
+// quand OPENAI_API_KEY n'est pas encore défini).
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
+const openai: any = new Proxy({}, { get: (_t, p) => (getOpenAI() as any)[p] });
 
 export async function serializeTrade(trade: any, details: any): Promise<string> {
   const {
