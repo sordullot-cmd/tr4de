@@ -4444,11 +4444,11 @@ function DisciplinePage({ trades = [] }) {
                  */
                 const getColorByDiscipline = (percentage) => {
                   if (percentage === 0) return null; // Pas de couleur = gris clair
-                  if (percentage <= 20) return '#F0FDF4'; // Vert très très pâle (1-20%)
-                  if (percentage <= 40) return '#DCFCE7'; // Vert très pâle (21-40%)
-                  if (percentage <= 60) return '#86EFAC'; // Vert moyen (41-60%)
-                  if (percentage <= 80) return '#10A37F'; // Vert clair (61-80%)
-                  return '#10A37F'; // Vert vif (81-100%)
+                  if (percentage <= 20) return '#DCFCE7'; // Vert très pâle (1-20%)
+                  if (percentage <= 40) return '#86EFAC'; // Vert pâle (21-40%)
+                  if (percentage <= 60) return '#4ADE80'; // Vert moyen (41-60%)
+                  if (percentage <= 80) return '#22C55E'; // Vert clair (61-80%)
+                  return '#10A37F';                       // Vert vif (81-100%)
                 };
                 
                 // Function to get daily completion data: prioritize Supabase (disciplineData), fallback to localStorage
@@ -4644,10 +4644,10 @@ function DisciplinePage({ trades = [] }) {
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:20,fontSize:11,color:T.textMut}}>
               <span>Moins</span>
               {[
-                '#F0FDF4',
                 '#DCFCE7',
                 '#86EFAC',
-                '#10A37F',
+                '#4ADE80',
+                '#22C55E',
                 '#10A37F'
               ].map((color, i) => (
                 <div
