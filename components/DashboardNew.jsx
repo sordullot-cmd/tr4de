@@ -113,9 +113,10 @@ function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
         onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}
       >
         <div style={{
-          width: 32, height: 32, borderRadius: "50%", background: "#FFE0B2",
+          width: 32, height: 32, borderRadius: "50%", background: "#F7F7F7",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 14, fontWeight: 700, color: "#9D5800", flexShrink: 0,
+          fontSize: 14, fontWeight: 700, color: "#0D0D0D", flexShrink: 0,
+          border: "1px solid #ECECEC",
         }}>{user.initials}</div>
         <span style={{ fontSize: 14, fontWeight: 600 }}>{firstName}</span>
       </button>
