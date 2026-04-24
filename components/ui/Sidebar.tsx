@@ -10,6 +10,7 @@ import {
   Moon,
   LucideIcon,
 } from "lucide-react";
+import { t, useLang } from "@/lib/i18n";
 
 export interface SidebarItem {
   id: string;
@@ -61,6 +62,7 @@ export default function Sidebar(props: SidebarProps) {
     collapsed = false, onToggleCollapsed,
   } = props;
 
+  useLang(); // re-render sidebar on language change
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
 
@@ -226,7 +228,7 @@ export default function Sidebar(props: SidebarProps) {
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
                 <User size={14} strokeWidth={1.75} />
-                <span>Profil</span>
+                <span>{t("settings.profile")}</span>
               </button>
             )}
             {onSettings && (
@@ -237,7 +239,7 @@ export default function Sidebar(props: SidebarProps) {
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
                 <Settings size={14} strokeWidth={1.75} />
-                <span>Paramètres</span>
+                <span>{t("nav.settings")}</span>
               </button>
             )}
             {onDarkMode && (
@@ -262,7 +264,7 @@ export default function Sidebar(props: SidebarProps) {
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
                 <LogOut size={14} strokeWidth={1.75} />
-                <span>Se déconnecter</span>
+                <span>{t("nav.logout")}</span>
               </button>
             )}
           </div>

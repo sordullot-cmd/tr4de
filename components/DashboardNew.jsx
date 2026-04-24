@@ -26,6 +26,7 @@ import Sidebar from "@/components/ui/Sidebar";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import DateRangePicker from "@/components/ui/DateRangePicker";
 import { getCurrencySymbol, getUserTimezone } from "@/lib/userPrefs";
+import { t, useLang } from "@/lib/i18n";
 import {
   LayoutDashboard,
   LineChart as LucideLineChart,
@@ -1939,23 +1940,23 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                           onClick={(e)=>e.stopPropagation()}
                         />
                       )}
-                      <span>Symbol</span>
+                      <span>Symbole</span>
                     </span>
                   </th>
                   {[
-                    {label:"Asset"},
-                    {label:"Side"},
-                    {label:"Open Date",sorted:true},
-                    {label:"Open Time"},
-                    {label:"Entry"},
-                    {label:"Close Date"},
-                    {label:"Close Time"},
-                    {label:"Exit"},
-                    {label:"Lot Size"},
+                    {label:"Actif"},
+                    {label:"Sens"},
+                    {label:"Date entrée",sorted:true},
+                    {label:"Heure entrée"},
+                    {label:"Entrée"},
+                    {label:"Date sortie"},
+                    {label:"Heure sortie"},
+                    {label:"Sortie"},
+                    {label:"Contrats"},
                     {label:"Volume"},
-                    {label:"Net P&L"},
+                    {label:"P&L net"},
                     {label:"P&L %"},
-                    {label:"Duration"},
+                    {label:"Durée"},
                   ].map(h=>(
                     <th key={h.label} style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg}}>
                       <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
@@ -1995,7 +1996,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                   }).map((t,i)=>{
                   const ret = ((t.pnl/(t.entry*100))*100).toFixed(2);
                   const dateObj = new Date(t.date);
-                  const openDate = dateObj.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+                  const openDate = dateObj.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
                   const openTime = fmtTime(t.entryTime || t.entry_time);
                   const closeDate = openDate;
                   const closeTime = fmtTime(t.exitTime || t.exit_time);
@@ -2043,13 +2044,15 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                               style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
                             />
                           ) : (
-                            <LucideTrendingUp size={13} strokeWidth={1.75} color={t.pnl>=0?T.green:T.red} style={{flexShrink:0}} />
+                            <span style={{width:22,height:22,borderRadius:6,background:T.bg,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
+                            </span>
                           )}
                           <span>{t.symbol}</span>
                         </span>
                       </td>
                       <td style={{padding:"12px 14px",color:T.textSub}}>Future</td>
-                      <td style={{padding:"12px 14px",fontWeight:600,color:t.direction==="Long"?T.green:T.red,fontSize:13}}>
+                      <td style={{padding:"12px 14px",fontWeight:500,color:T.text,fontSize:13}}>
                         {t.direction}
                       </td>
                       <td style={{padding:"12px 14px",color:T.textSub}}>{openDate}</td>
@@ -2064,14 +2067,26 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                       <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{ret>0?"+":""}{ret}%</td>
                       <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>
                         {(() => {
-                          if (!t.entryTime || !t.exitTime) return "—";
-                          const [h1,m1,s1] = t.entryTime.split(":").map(Number);
-                          const [h2,m2,s2] = t.exitTime.split(":").map(Number);
-                          const sec = (h2*3600+m2*60+(s2||0)) - (h1*3600+m1*60+(s1||0));
-                          if (Number.isNaN(sec) || sec < 0) return "—";
+                          const entry = t.entryTime || t.entry_time;
+                          const exit = t.exitTime || t.exit_time;
+                          if (!entry || !exit) return "—";
+                          const toSec = (v) => {
+                            const m = String(v).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                            if (!m) return null;
+                            return (+m[1])*3600 + (+m[2])*60 + (+(m[3]||0));
+                          };
+                          const s1 = toSec(entry);
+                          const s2 = toSec(exit);
+                          if (s1 === null || s2 === null) return "—";
+                          let sec = s2 - s1;
+                          // Si l'heure de sortie est le lendemain (entree 23:50, sortie 00:30)
+                          if (sec < 0) sec += 24*3600;
+                          if (Number.isNaN(sec)) return "—";
                           if (sec < 60) return `${sec}s`;
                           if (sec < 3600) return `${Math.floor(sec/60)}m`;
-                          return `${Math.floor(sec/3600)}h${Math.floor((sec%3600)/60)}m`;
+                          const h = Math.floor(sec/3600);
+                          const m = Math.floor((sec%3600)/60);
+                          return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2,"0")}`;
                         })()}
                       </td>
                       {/* Cellule vide pour aligner avec le header settings */}
@@ -5668,6 +5683,7 @@ function DisciplinePage({ trades = [] }) {
 export default function App() {
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
+  useLang(); // re-render app on language change
 
   // Re-render quand l'utilisateur change la devise / le fuseau horaire dans Settings.
   const [, forcePrefRefresh] = useState(0);
@@ -6070,21 +6086,21 @@ export default function App() {
 
   const SIDEBAR_SECTIONS = [
     {
-      label: "Trading",
+      label: t("nav.trading"),
       items: [
-        { id: "add-trade",  icon: LucideUpload,       label: "Ajouter des Trades" },
-        { id: "dashboard",  icon: LayoutDashboard,    label: "Tableau de bord" },
-        { id: "calendar",   icon: LucideCalendar,     label: "Calendrier" },
-        { id: "trades",     icon: ListChecks,         label: "Trades", badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
-        { id: "strategies", icon: LucideTarget,       label: "Stratégies" },
+        { id: "add-trade",  icon: LucideUpload,       label: t("nav.addTrade") },
+        { id: "dashboard",  icon: LayoutDashboard,    label: t("nav.dashboard") },
+        { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
+        { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
+        { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
       ],
     },
     {
-      label: "Analyse",
+      label: t("nav.analyse"),
       items: [
-        { id: "journal",    icon: NotebookPen,        label: "Journal", badge: filteredTrades.filter(t => {try { const d = new Date(t.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
-        { id: "discipline", icon: ShieldCheck,        label: "Discipline" },
-        { id: "agent",      icon: Bot,                label: "Agent IA", badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
+        { id: "journal",    icon: NotebookPen,        label: t("nav.journal"), badge: filteredTrades.filter(tr => {try { const d = new Date(tr.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
+        { id: "discipline", icon: ShieldCheck,        label: t("nav.discipline") },
+        { id: "agent",      icon: Bot,                label: t("nav.agent"), badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
       ],
     },
   ];

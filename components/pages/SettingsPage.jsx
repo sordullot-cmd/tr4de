@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { getLang, setLang as setLangPref, t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF",
@@ -553,6 +554,7 @@ function GlobalsSection() {
     if (typeof window === "undefined") return "USD";
     return localStorage.getItem("tr4de_base_currency") || "USD";
   });
+  const [lang, setLangState] = useState(() => (typeof window === "undefined" ? "fr" : getLang()));
   const [savedMsg, setSavedMsg] = useState("");
   const [loadedFromCloud, setLoadedFromCloud] = useState(false);
 
@@ -677,6 +679,18 @@ function GlobalsSection() {
         searchable={false}
       />
       <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Devise par défaut affichée dans toute l&apos;application</div>
+
+      <SectionLabel mt={20}>Langue</SectionLabel>
+      <SearchableSelect
+        value={lang}
+        onChange={(v) => { setLangState(v); setLangPref(v); }}
+        options={[
+          { id: "fr", label: "Français" },
+          { id: "en", label: "English" },
+        ]}
+        searchable={false}
+      />
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Langue d&apos;affichage de l&apos;interface</div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 24, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
         {savedMsg && <span style={{ fontSize: 12, color: T.green }}>{savedMsg}</span>}
