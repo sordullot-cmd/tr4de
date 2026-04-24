@@ -245,25 +245,25 @@ function Dashboard({ trades = [], setPage }) {
   const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
 
   const allEmotionTags = [
-    { id: "fomo", label: "FOMO", color: "#C94F4F" },
-    { id: "revenge", label: "Vengeance", color: "#C94F4F" },
-    { id: "overconfident", label: "Trop confiant", color: "#D4A574" },
-    { id: "hesitation", label: "Hésitation", color: "#D4A574" },
-    { id: "calm", label: "Calme & focus", color: "#4A9D6F" },
-    { id: "followed", label: "Plan suivi", color: "#4A9D6F" },
-    { id: "boredom", label: "Trade ennui", color: "#5B7EC9" },
-    { id: "earlyexit", label: "Sortie anticipée", color: "#8B6BB6" }
+    { id: "fomo", label: t("tag.fomo"), color: "#C94F4F" },
+    { id: "revenge", label: t("tag.revenge"), color: "#C94F4F" },
+    { id: "overconfident", label: t("tag.overconfident"), color: "#D4A574" },
+    { id: "hesitation", label: t("tag.hesitation"), color: "#D4A574" },
+    { id: "calm", label: t("tag.calm"), color: "#4A9D6F" },
+    { id: "followed", label: t("tag.followed"), color: "#4A9D6F" },
+    { id: "boredom", label: t("tag.boredom"), color: "#5B7EC9" },
+    { id: "earlyexit", label: t("tag.earlyexit"), color: "#8B6BB6" }
   ];
 
   const allErrorTags = [
-    { id: "poorentry", label: "Mauvaise entrée", color: "#C94F4F" },
-    { id: "poorexit", label: "Mauvaise sortie", color: "#C94F4F" },
-    { id: "nosltp", label: "Pas de SL/TP", color: "#D4A574" },
-    { id: "overleveraged", label: "Sur-leveragé", color: "#D4A574" },
-    { id: "ignoredsignal", label: "Signaux ignorés", color: "#8B6BB6" },
-    { id: "badtiming", label: "Mauvais timing", color: "#C94F4F" },
-    { id: "impulsive", label: "Impulsif", color: "#D4A574" },
-    { id: "wronganalysis", label: "Mauvaise analyse", color: "#8B6BB6" }
+    { id: "poorentry", label: t("errtag.poorentry"), color: "#C94F4F" },
+    { id: "poorexit", label: t("errtag.poorexit"), color: "#C94F4F" },
+    { id: "nosltp", label: t("errtag.nosltp"), color: "#D4A574" },
+    { id: "overleveraged", label: t("errtag.overleveraged"), color: "#D4A574" },
+    { id: "ignoredsignal", label: t("errtag.ignoredsignal"), color: "#8B6BB6" },
+    { id: "badtiming", label: t("errtag.badtiming"), color: "#C94F4F" },
+    { id: "impulsive", label: t("errtag.impulsive"), color: "#D4A574" },
+    { id: "wronganalysis", label: t("errtag.wronganalysis"), color: "#8B6BB6" }
   ];
 
   // Load emotion tags from localStorage
@@ -300,8 +300,8 @@ function Dashboard({ trades = [], setPage }) {
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"60px 24px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:600,marginBottom:8,color:T.text}}>Aucun trade à afficher</div>
-          <p style={{color:T.textSub}}>Importez votre premier trade pour voir les statistiques et les graphiques de performance.</p>
+          <div style={{fontSize:18,fontWeight:600,marginBottom:8,color:T.text}}>{t("dash.noTrades")}</div>
+          <p style={{color:T.textSub}}>{t("dash.noTradesSub")}</p>
         </div>
       </div>
     );
@@ -583,21 +583,21 @@ function Dashboard({ trades = [], setPage }) {
           {/* NET P&L */}
           <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +12.4%</div>
-            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>P&L Net <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.totalPnL")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
           </div>
 
           {/* TRADE WIN */}
           <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +3.2%</div>
-            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>Taux de victoire <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.winRate")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
           </div>
 
           {/* PROFIT FACTOR */}
           <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#A855F7"}}>↑ +0.3</div>
-            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>Profit factor <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.profitFactor")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{profitFactor}</div>
           </div>
 
@@ -614,7 +614,7 @@ function Dashboard({ trades = [], setPage }) {
           <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
             <div style={{fontSize:12,fontWeight:600,color:"#10A37F"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
           </div>
-          <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",marginBottom:2,display:"inline-flex",alignItems:"center",gap:4}}>P&L Cumulatif <span style={{color:"#8E8E8E",fontWeight:500}}>›</span></div>
+          <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",marginBottom:2,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.cumulativePnL")} <span style={{color:"#8E8E8E",fontWeight:500}}>›</span></div>
           <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>Évolution du capital — {new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}</div>
 
           {pnlCurve.length > 1 ? (
@@ -961,7 +961,7 @@ function Dashboard({ trades = [], setPage }) {
 
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedDay !== null ? `Trades du ${["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"][selectedDay]}` : t("dash.recentTrades")}</div>
+            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedDay !== null ? t("trades.tradesOfDay").replace("{day}", [t("wd.monday"),t("wd.tuesday"),t("wd.wednesday"),t("wd.thursday"),t("wd.friday"),t("wd.saturday"),t("wd.sunday")][selectedDay]) : t("dash.recentTrades")}</div>
             <div style={{fontSize:12,color:T.textSub,marginBottom:8}}>
               {selectedDay !== null 
                 ? `${(pnlByDay[selectedDay] || []).length} trades`
@@ -1499,7 +1499,7 @@ function JournalPage({ trades = [] }) {
                                       onMouseEnter={(e) => e.currentTarget.style.background = T.bg}
                                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                     >
-                                      {isDayExpanded ? "Voir moins" : `Voir plus (${hiddenCount})`}
+                                      {isDayExpanded ? t("trades.voirMoins") : t("trades.voirPlus").replace("{n}", String(hiddenCount))}
                                     </button>
                                   </td>
                                 </tr>
@@ -1844,7 +1844,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
         <div style={{background:T.white,border:`2px dashed ${T.accent}`,borderRadius:12,padding:"48px 24px",textAlign:"center"}}>
           <div style={{fontSize:20,fontWeight:600,marginBottom:8,color:T.text}}>📥 Aucun trade importé</div>
           <p style={{color:T.textSub,marginBottom:20}}>Importez vos trades pour commencer à analyser vos performances</p>
-          <button onClick={onImportClick} style={{padding:"12px 24px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>📂 Importer des trades</button>
+          <button onClick={onImportClick} style={{padding:"12px 24px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>{t("addTrade.importError")}</button>
         </div>
       </div>
     );
@@ -2108,8 +2108,8 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
             <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",gap:16}}>
                 {[
-                  {id:"infos",label:"Trade",Icon:LucideFileText},
-                  {id:"strategies",label:"Stratégie",Icon:LucideTarget}
+                  {id:"infos",label:t("trades.tab.infos"),Icon:LucideFileText},
+                  {id:"strategies",label:t("trades.tab.strategies"),Icon:LucideTarget}
                 ].map(tab=>{
                   const Icon = tab.Icon;
                   return (
@@ -2284,7 +2284,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                   <div style={{padding:"16px 16px",flex:1,display:"flex",flexDirection:"column"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Notes</div>
                     <textarea
-                      placeholder="What happened? Why did you take this trade?"
+                      placeholder={t("trades.notePlaceholder")}
                       value={tradeNotes[selectedTrade.id] || ""}
                       onChange={(e)=>{
                         const key = selectedTrade.id;
@@ -2557,11 +2557,11 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                 <LucideTrash2 size={16} strokeWidth={1.75} color="#EF4444"/>
               </div>
               <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
-                Supprimer {selectedIds.size} trade{selectedIds.size > 1 ? "s" : ""} ?
+                {t("trades.deleteConfirm").replace("{n}", String(selectedIds.size)).replace("{s}", selectedIds.size > 1 ? "s" : "")}
               </h3>
             </div>
             <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
-              Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Les trades sélectionnés seront supprimés et ne pourront pas être récupérés.
+              {t("trades.deleteWarning")}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
               <button
@@ -2569,7 +2569,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                 disabled={isDeletingTrades}
                 style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:isDeletingTrades?"not-allowed":"pointer",fontFamily:"inherit",opacity:isDeletingTrades?0.5:1}}
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={async ()=>{
@@ -2589,7 +2589,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                 disabled={isDeletingTrades}
                 style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:isDeletingTrades?"not-allowed":"pointer",fontFamily:"inherit",opacity:isDeletingTrades?0.7:1}}
               >
-                {isDeletingTrades ? "Suppression..." : "Supprimer"}
+                {isDeletingTrades ? t("trades.deleting") : t("common.delete")}
               </button>
             </div>
           </div>
@@ -2618,7 +2618,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
           zIndex:100,
         }}>
           <span style={{fontWeight:600}}>
-            {selectedIds.size} trade{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
+            {t("trades.selected").replace("{n}", String(selectedIds.size)).replace(/\{s\}/g, selectedIds.size > 1 ? "s" : "")}
           </span>
 
           <span style={{width:1,height:18,background:"#E5E5E5"}} />
@@ -2631,7 +2631,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
               onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
               onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
             >
-              + Ajouter une stratégie
+              {t("trades.addStrategy")}
             </button>
             {showBulkStrategyDropdown && (
               <div style={{
@@ -3698,7 +3698,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           {/* ACCOUNT SELECTOR */}
           <div style={{ marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
-              Compte
+              {t("addTrade.account")}
             </label>
             <QuickAccountSelector
               selectedAccountName={accountName}
@@ -3711,7 +3711,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           {/* BROKER */}
           <div style={{ marginTop: "14px", marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
-              Courtier
+              {t("addTrade.broker")}
             </label>
             <SearchableSelect
               value={selectedBroker}
@@ -3763,7 +3763,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           {/* ACCOUNT TYPE */}
           <div style={{ marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
-              Type de Compte
+              {t("addTrade.accountType")}
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {["live", "eval"].map((type) => (
@@ -3793,14 +3793,14 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
                     fontFamily: "var(--font-sans)",
                   }}
                 >
-                  {type === "live" ? "Compte Live" : "Compte Eval"}
+                  {type === "live" ? t("addTrade.live") : t("addTrade.eval")}
                 </button>
               ))}
             </div>
             {accountType === "eval" && (
               <div style={{ marginTop: "12px" }}>
                 <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
-                  Montant du Compte
+                  {t("addTrade.accountSize")}
                 </label>
                 <SearchableSelect
                   value={selectedEvalAccount}
@@ -3821,7 +3821,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           {/* STRATEGY SELECTOR */}
           <div style={{ marginBottom: "14px" }}>
             <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
-              Stratégie (optionnel)
+              {t("addTrade.strategy")}
             </label>
             <SearchableSelect
               value={selectedImportStrategy}
@@ -3934,7 +3934,7 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
               opacity: fileContent && accountName.trim() && !loading ? 1 : 0.6,
             }}
           >
-            {loading ? "Traitement…" : "Importer les trades"}
+            {loading ? t("addTrade.processing") : t("addTrade.importTrades")}
           </button>
 
           {/* STRATEGY FORM MODAL */}
@@ -4331,8 +4331,8 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
 
       {trades.length === 0 && (
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:40,textAlign:"center"}}>
-          <div style={{fontSize:16,fontWeight:600,color:T.text,marginBottom:8}}>📥 Aucun trade importé</div>
-          <p style={{color:T.textSub}}>Importez vos trades pour voir les statistiques par jour</p>
+          <div style={{fontSize:16,fontWeight:600,color:T.text,marginBottom:8}}>{t("cal.noTradesImported")}</div>
+          <p style={{color:T.textSub}}>{t("cal.noTradesImportedSub")}</p>
         </div>
       )}
 
@@ -4363,15 +4363,15 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
       <div style={{display:"flex",gap:24,fontSize:12,padding:16,background:T.white,borderRadius:12,border:`1px solid ${T.border}`}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{width:20,height:20,borderRadius:4,background:T.greenBg,border:`2px solid ${T.green}`}}/>
-          <span style={{color:T.textSub}}>Profits positifs</span>
+          <span style={{color:T.textSub}}>{t("cal.legendPositive")}</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{width:20,height:20,borderRadius:4,background:T.redBg,border:`2px solid ${T.red}`}}/>
-          <span style={{color:T.textSub}}>Pertes négatives</span>
+          <span style={{color:T.textSub}}>{t("cal.legendNegative")}</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{width:20,height:20,borderRadius:4,background:T.border}}/>
-          <span style={{color:T.textSub}}>Pas de trades ({trades.length} trades au total)</span>
+          <span style={{color:T.textSub}}>{t("cal.legendEmpty").replace("{n}", String(trades.length))}</span>
         </div>
       </div>
     </div>

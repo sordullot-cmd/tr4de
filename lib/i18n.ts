@@ -217,6 +217,84 @@ const FR: Dict = {
 
   // Agent
   "agent.title": "Agent IA",
+
+  // Emotion tags (visible labels)
+  "tag.fomo": "FOMO",
+  "tag.revenge": "Vengeance",
+  "tag.overconfident": "Trop confiant",
+  "tag.hesitation": "Hésitation",
+  "tag.calm": "Calme & focus",
+  "tag.followed": "Plan suivi",
+  "tag.boredom": "Trade ennui",
+  "tag.earlyexit": "Sortie anticipée",
+  // Error tags
+  "errtag.poorentry": "Mauvaise entrée",
+  "errtag.poorexit": "Mauvaise sortie",
+  "errtag.nosltp": "Pas de SL/TP",
+  "errtag.overleveraged": "Sur-leveragé",
+  "errtag.ignoredsignal": "Signaux ignorés",
+  "errtag.badtiming": "Mauvais timing",
+  "errtag.impulsive": "Impulsif",
+  "errtag.wronganalysis": "Mauvaise analyse",
+
+  // Weekdays
+  "wd.monday": "lundi",
+  "wd.tuesday": "mardi",
+  "wd.wednesday": "mercredi",
+  "wd.thursday": "jeudi",
+  "wd.friday": "vendredi",
+  "wd.saturday": "samedi",
+  "wd.sunday": "dimanche",
+
+  // Trades page detail panel
+  "trades.tab.infos": "Trade",
+  "trades.tab.strategies": "Stratégie",
+  "trades.notePlaceholder": "Qu'est-ce qui s'est passé ? Pourquoi avoir pris ce trade ?",
+  "trades.tradesOfDay": "Trades du {day}",
+  "trades.voirPlus": "Voir plus ({n})",
+  "trades.voirMoins": "Voir moins",
+  "trades.deleting": "Suppression...",
+
+  // Add trade page
+  "addTrade.subtitle": "Importez un export CSV de votre courtier",
+  "addTrade.accountSection": "Sélectionne ou crée un compte",
+  "addTrade.newAccount": "Nouveau compte",
+  "addTrade.existingAccount": "Compte existant",
+  "addTrade.chooseAccount": "Choisis un compte",
+  "addTrade.accountPlaceholder": "ex. APEX 150K, FTMO Eval, Rithmic Live...",
+  "addTrade.brokerSection": "Courtier",
+  "addTrade.chooseBroker": "Choisis ton courtier",
+  "addTrade.csvSection": "Fichier CSV",
+  "addTrade.dragDrop": "Glisse ton fichier CSV ici",
+  "addTrade.orBrowse": "ou clique pour parcourir",
+  "addTrade.importBtn": "Importer",
+  "addTrade.importing": "Importation...",
+  "addTrade.instructions": "Instructions d'export",
+  "addTrade.account": "Compte",
+  "addTrade.importTrades": "Importer les trades",
+  "addTrade.processing": "Traitement…",
+  "addTrade.importError": "📂 Importer des trades",
+
+  "cal.title": "Calendrier",
+  "cal.noTrades": "Aucun trade ce mois-ci",
+  "cal.noTradesImported": "📥 Aucun trade importé",
+  "cal.noTradesImportedSub": "Importez vos trades pour voir les statistiques par jour",
+  "cal.monthlyPnL": "P&L mensuel",
+  "cal.monthlyTrades": "Trades du mois",
+  "cal.maxDrawdown": "Drawdown max",
+  "cal.profitDays": "Jours gagnants",
+  "cal.lossDays": "Jours perdants",
+  "cal.legendPositive": "Profits positifs",
+  "cal.legendNegative": "Pertes négatives",
+  "cal.legendEmpty": "Pas de trades ({n} trades au total)",
+
+  // Dashboard KPIs
+  "dash.kpi.totalPnL": "P&L Total",
+  "dash.kpi.winRate": "Taux de victoire",
+  "dash.kpi.profitFactor": "Facteur de profit",
+  "dash.kpi.totalTrades": "Trades Total",
+  "dash.kpi.avgWin": "Gain moyen",
+  "dash.kpi.avgLoss": "Perte moyenne",
 };
 
 const EN: Dict = {
@@ -395,6 +473,84 @@ const EN: Dict = {
 
   // Agent
   "agent.title": "AI Agent",
+
+  // Emotion tags
+  "tag.fomo": "FOMO",
+  "tag.revenge": "Revenge",
+  "tag.overconfident": "Overconfident",
+  "tag.hesitation": "Hesitation",
+  "tag.calm": "Calm & focus",
+  "tag.followed": "Plan followed",
+  "tag.boredom": "Bored trade",
+  "tag.earlyexit": "Early exit",
+  // Error tags
+  "errtag.poorentry": "Poor entry",
+  "errtag.poorexit": "Poor exit",
+  "errtag.nosltp": "No SL/TP",
+  "errtag.overleveraged": "Over-leveraged",
+  "errtag.ignoredsignal": "Ignored signals",
+  "errtag.badtiming": "Bad timing",
+  "errtag.impulsive": "Impulsive",
+  "errtag.wronganalysis": "Wrong analysis",
+
+  // Weekdays
+  "wd.monday": "Monday",
+  "wd.tuesday": "Tuesday",
+  "wd.wednesday": "Wednesday",
+  "wd.thursday": "Thursday",
+  "wd.friday": "Friday",
+  "wd.saturday": "Saturday",
+  "wd.sunday": "Sunday",
+
+  // Trades page detail panel
+  "trades.tab.infos": "Trade",
+  "trades.tab.strategies": "Strategy",
+  "trades.notePlaceholder": "What happened? Why did you take this trade?",
+  "trades.tradesOfDay": "{day} trades",
+  "trades.voirPlus": "Show more ({n})",
+  "trades.voirMoins": "Show less",
+  "trades.deleting": "Deleting...",
+
+  // Add trade page
+  "addTrade.subtitle": "Import a CSV export from your broker",
+  "addTrade.accountSection": "Pick or create an account",
+  "addTrade.newAccount": "New account",
+  "addTrade.existingAccount": "Existing account",
+  "addTrade.chooseAccount": "Choose an account",
+  "addTrade.accountPlaceholder": "e.g. APEX 150K, FTMO Eval, Rithmic Live...",
+  "addTrade.brokerSection": "Broker",
+  "addTrade.chooseBroker": "Choose your broker",
+  "addTrade.csvSection": "CSV File",
+  "addTrade.dragDrop": "Drop your CSV file here",
+  "addTrade.orBrowse": "or click to browse",
+  "addTrade.importBtn": "Import",
+  "addTrade.importing": "Importing...",
+  "addTrade.instructions": "Export instructions",
+  "addTrade.account": "Account",
+  "addTrade.importTrades": "Import trades",
+  "addTrade.processing": "Processing…",
+  "addTrade.importError": "📂 Import trades",
+
+  "cal.title": "Calendar",
+  "cal.noTrades": "No trades this month",
+  "cal.noTradesImported": "📥 No trades imported",
+  "cal.noTradesImportedSub": "Import your trades to see daily stats",
+  "cal.monthlyPnL": "Monthly P&L",
+  "cal.monthlyTrades": "Monthly trades",
+  "cal.maxDrawdown": "Max drawdown",
+  "cal.profitDays": "Winning days",
+  "cal.lossDays": "Losing days",
+  "cal.legendPositive": "Winning days",
+  "cal.legendNegative": "Losing days",
+  "cal.legendEmpty": "No trades ({n} trades total)",
+
+  // Dashboard KPIs
+  "dash.kpi.totalPnL": "Total P&L",
+  "dash.kpi.winRate": "Win rate",
+  "dash.kpi.profitFactor": "Profit factor",
+  "dash.kpi.totalTrades": "Total trades",
+  "dash.kpi.avgWin": "Average win",
+  "dash.kpi.avgLoss": "Average loss",
 };
 
 const DICTS: Record<Lang, Dict> = { fr: FR, en: EN };
