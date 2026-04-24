@@ -18,6 +18,8 @@ import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
 import TasksPage from "@/components/pages/TasksPage";
 import GoalsPage from "@/components/pages/GoalsPage";
+import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
+import HabitsPage from "@/components/pages/HabitsPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -59,6 +61,8 @@ import {
   GripVertical,
   ListTodo as LucideListTodo,
   Zap as LucideZap,
+  CalendarDays as LucideCalendarDays,
+  Flame as LucideFlame,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -6115,8 +6119,10 @@ export default function App() {
     {
       label: t("nav.productivity"),
       items: [
-        { id: "tasks", icon: LucideListTodo, label: t("nav.tasks") },
-        { id: "goals", icon: LucideZap,     label: t("nav.goals") },
+        { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
+        { id: "tasks",         icon: LucideListTodo,     label: t("nav.tasks") },
+        { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
+        { id: "habits",        icon: LucideFlame,        label: t("nav.habits") },
       ],
     },
   ];
@@ -6132,6 +6138,8 @@ export default function App() {
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
     tasks: <TasksPage />,
     goals: <GoalsPage />,
+    "daily-planner": <DailyPlannerPage />,
+    habits: <HabitsPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})

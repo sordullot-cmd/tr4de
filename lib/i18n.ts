@@ -58,6 +58,8 @@ const FR: Dict = {
   "nav.productivity": "Productivité",
   "nav.tasks": "Tâches",
   "nav.goals": "Objectifs",
+  "nav.dailyPlanner": "Daily Planner",
+  "nav.habits": "Habitudes",
 
   // Common
   "common.save": "Enregistrer",
@@ -317,6 +319,8 @@ const EN: Dict = {
   "nav.productivity": "Productivity",
   "nav.tasks": "Tasks",
   "nav.goals": "Goals",
+  "nav.dailyPlanner": "Daily Planner",
+  "nav.habits": "Habits",
 
   // Common
   "common.save": "Save",
