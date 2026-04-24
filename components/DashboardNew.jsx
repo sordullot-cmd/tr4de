@@ -16,10 +16,8 @@ import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
-import TasksPage from "@/components/pages/TasksPage";
 import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
-import HabitsPage from "@/components/pages/HabitsPage";
 import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import NotesPage from "@/components/pages/NotesPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
@@ -6126,9 +6124,7 @@ export default function App() {
       label: t("nav.productivity"),
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
-        { id: "tasks",         icon: LucideListTodo,     label: t("nav.tasks") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
-        { id: "habits",        icon: LucideFlame,        label: t("nav.habits") },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
         { id: "notes",         icon: LucideStickyNote,   label: t("nav.notes") },
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
@@ -6145,10 +6141,8 @@ export default function App() {
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
-    tasks: <TasksPage />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
-    habits: <HabitsPage />,
     focus: <FocusTimerPage />,
     notes: <NotesPage />,
     reading: <ReadingListPage />,
