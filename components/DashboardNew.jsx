@@ -20,6 +20,9 @@ import TasksPage from "@/components/pages/TasksPage";
 import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
 import HabitsPage from "@/components/pages/HabitsPage";
+import FocusTimerPage from "@/components/pages/FocusTimerPage";
+import NotesPage from "@/components/pages/NotesPage";
+import EnergySleepPage from "@/components/pages/EnergySleepPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -63,6 +66,9 @@ import {
   Zap as LucideZap,
   CalendarDays as LucideCalendarDays,
   Flame as LucideFlame,
+  Timer as LucideTimer,
+  StickyNote as LucideStickyNote,
+  HeartPulse as LucideHeartPulse,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -6123,6 +6129,9 @@ export default function App() {
         { id: "tasks",         icon: LucideListTodo,     label: t("nav.tasks") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "habits",        icon: LucideFlame,        label: t("nav.habits") },
+        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
+        { id: "notes",         icon: LucideStickyNote,   label: t("nav.notes") },
+        { id: "energy",        icon: LucideHeartPulse,   label: t("nav.energy") },
       ],
     },
   ];
@@ -6140,6 +6149,9 @@ export default function App() {
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     habits: <HabitsPage />,
+    focus: <FocusTimerPage />,
+    notes: <NotesPage />,
+    energy: <EnergySleepPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
