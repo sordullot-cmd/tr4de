@@ -221,11 +221,27 @@ function ComingSoonBadge() {
 function ProfileSection({ user }) {
   const supabase = createClient();
   const meta = user?.user_metadata || {};
-  const initialFirst = meta.first_name || (meta.full_name?.split(" ")[0]) || "";
-  const initialLast = meta.last_name || (meta.full_name?.split(" ").slice(1).join(" ")) || "";
+  const fullNameSrc = meta.full_name || meta.name || "";
+  const initialFirst = meta.first_name || meta.given_name || (fullNameSrc?.split(" ")[0]) || "";
+  const initialLast = meta.last_name || meta.family_name || (fullNameSrc?.split(" ").slice(1).join(" ")) || "";
 
   const [firstName, setFirstName] = useState(initialFirst);
   const [lastName, setLastName] = useState(initialLast);
+
+  // Auto-save Google-provided names into first_name/last_name on first load
+  // so they persist for future sessions and sync to other metadata consumers.
+  useEffect(() => {
+    if (!user) return;
+    const needsBackfill =
+      (!meta.first_name && (meta.given_name || fullNameSrc)) ||
+      (!meta.last_name && (meta.family_name || fullNameSrc));
+    if (!needsBackfill) return;
+    const full = [initialFirst, initialLast].filter(Boolean).join(" ") || fullNameSrc;
+    supabase.auth.updateUser({
+      data: { first_name: initialFirst, last_name: initialLast, full_name: full },
+    }).catch((e) => console.error("backfill names failed:", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   const [timezone, setTimezone] = useState(() => {
     if (typeof window !== "undefined") {
       try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return "Europe/Paris"; }

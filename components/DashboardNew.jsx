@@ -1076,6 +1076,7 @@ function JournalPage({ trades = [] }) {
   const { notes: dailyNotes, setNote: updateDailyNote } = useDailySessionNotes();
   
   const [expandedTrades, setExpandedTrades] = useState({});
+  const [expandedDays, setExpandedDays] = useState({});
   const [hoveredPoints, setHoveredPoints] = useState({});
   const [tooltipPositions, setTooltipPositions] = useState({});
   const [filterMode, setFilterMode] = useState("week"); // "week" or "custom"
@@ -1360,71 +1361,105 @@ function JournalPage({ trades = [] }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {dayTrades.map((trade, i) => {
-                            const entryTime = new Date(trade.entry_time || trade.date).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-                            const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : "—";
-                            const tradeId = getTradeId(trade);
-                            const isExpanded = expandedTrades[tradeId];
-                            const hasNote = tradeNotes[tradeId] && tradeNotes[tradeId].trim().length > 0;
-
+                          {(() => {
+                            const isDayExpanded = !!expandedDays[dateStr];
+                            const visibleTrades = isDayExpanded ? dayTrades : dayTrades.slice(0, 3);
+                            const hiddenCount = dayTrades.length - visibleTrades.length;
                             return (
-                              <React.Fragment key={i}>
-                                <tr style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?T.bg:"transparent"}}>
-                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{entryTime}</td>
-                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{exitTime}</td>
-                                  <td style={{padding:"8px 12px",fontSize:11,fontWeight:600,color:T.text}}>{trade.symbol}</td>
-                                  <td style={{padding:"8px 12px",fontSize:11,color:T.text}}><span style={{color:trade.side==="Long"?T.blue:T.red}}>{trade.side || "Long"}</span></td>
-                                  <td style={{padding:"8px 12px",textAlign:"right",fontSize:11,fontWeight:600,color:trade.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{fmt(trade.pnl,true)}</td>
-                                  <td style={{padding:"8px 12px",textAlign:"center"}}>
+                              <>
+                              {visibleTrades.map((trade, i) => {
+                                const entryTime = new Date(trade.entry_time || trade.date).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                                const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : "—";
+                                const rowKey = `${dateStr}_${i}`;
+                                const tradeId = getTradeId(trade);
+                                const isExpanded = !!expandedTrades[rowKey];
+                                const hasNote = tradeNotes[tradeId] && tradeNotes[tradeId].trim().length > 0;
+
+                                return (
+                                  <React.Fragment key={rowKey}>
+                                    <tr style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?T.bg:"transparent"}}>
+                                      <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{entryTime}</td>
+                                      <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{exitTime}</td>
+                                      <td style={{padding:"8px 12px",fontSize:11,color:T.text}}>{trade.symbol}</td>
+                                      <td style={{padding:"8px 12px",fontSize:11,color:T.text}}><span style={{color:trade.side==="Long"?T.blue:T.red}}>{trade.side || "Long"}</span></td>
+                                      <td style={{padding:"8px 12px",textAlign:"right",fontSize:11,color:trade.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{fmt(trade.pnl,true)}</td>
+                                      <td style={{padding:"8px 12px",textAlign:"center"}}>
+                                        <button
+                                          onClick={() => setExpandedTrades(prev => ({...prev, [rowKey]: !prev[rowKey]}))}
+                                          style={{
+                                            background:hasNote?T.accentBg:T.bg,
+                                            border:`1px solid ${hasNote?T.accentBd:T.border}`,
+                                            borderRadius:6,
+                                            padding:"4px 10px",
+                                            fontSize:10,
+                                            color:hasNote?T.accent:T.textMut,
+                                            cursor:"pointer",
+                                            textTransform:"uppercase"
+                                          }}
+                                        >
+                                          {isExpanded ? "✕" : "✎"}
+                                        </button>
+                                      </td>
+                                    </tr>
+                                    {isExpanded && (
+                                      <tr style={{borderBottom:`1px solid ${T.border}`,background:T.bg}}>
+                                        <td colSpan="6" style={{padding:"12px 12px"}}>
+                                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                                            <div style={{fontSize:11,color:T.textMut,textTransform:"uppercase"}}>Notes pour {trade.symbol}</div>
+                                            <textarea
+                                              placeholder="Ajoutez vos notes sur ce trade..."
+                                              value={tradeNotes[tradeId] || ""}
+                                              onChange={(e) => updateTradeNote(tradeId, e.target.value)}
+                                              style={{
+                                                width:"100%",
+                                                height:60,
+                                                border:`1px solid ${T.border}`,
+                                                borderRadius:8,
+                                                padding:12,
+                                                fontSize:12,
+                                                fontFamily:"var(--font-sans)",
+                                                color:T.text,
+                                                background:T.white,
+                                                resize:"none",
+                                                outline:"none",
+                                                boxSizing:"border-box"
+                                              }}
+                                            />
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                              {dayTrades.length > 3 && (
+                                <tr>
+                                  <td colSpan="6" style={{padding:0}}>
                                     <button
-                                      onClick={() => toggleExpanded(tradeId)}
+                                      onClick={() => setExpandedDays(prev => ({...prev, [dateStr]: !prev[dateStr]}))}
                                       style={{
-                                        background:hasNote?T.accentBg:T.bg,
-                                        border:`1px solid ${hasNote?T.accentBd:T.border}`,
-                                        borderRadius:6,
-                                        padding:"4px 10px",
-                                        fontSize:10,
-                                        fontWeight:600,
-                                        color:hasNote?T.accent:T.textMut,
+                                        width:"100%",
+                                        padding:"10px 12px",
+                                        background:"transparent",
+                                        border:"none",
+                                        borderTop:`1px solid ${T.border}`,
                                         cursor:"pointer",
-                                        textTransform:"uppercase"
+                                        fontSize:11,
+                                        color:T.textSub,
+                                        fontFamily:"var(--font-sans)",
+                                        transition:"background 0.15s",
                                       }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = T.bg}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                     >
-                                      {isExpanded ? "✕" : "✎"}
+                                      {isDayExpanded ? "Voir moins" : `Voir plus (${hiddenCount})`}
                                     </button>
                                   </td>
                                 </tr>
-                                {isExpanded && (
-                                  <tr style={{borderBottom:`1px solid ${T.border}`,background:T.bg}}>
-                                    <td colSpan="5" style={{padding:"12px 12px"}}>
-                                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                                        <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Notes pour {trade.symbol}</div>
-                                        <textarea
-                                          placeholder="Ajoutez vos notes sur ce trade..."
-                                          value={tradeNotes[tradeId] || ""}
-                                          onChange={(e) => updateTradeNote(tradeId, e.target.value)}
-                                          style={{
-                                            width:"100%",
-                                            height:60,
-                                            border:`1px solid ${T.border}`,
-                                            borderRadius:8,
-                                            padding:12,
-                                            fontSize:12,
-                                            fontFamily:"var(--font-sans)",
-                                            color:T.text,
-                                            background:T.white,
-                                            resize:"none",
-                                            outline:"none",
-                                            boxSizing:"border-box"
-                                          }}
-                                        />
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </React.Fragment>
+                              )}
+                              </>
                             );
-                          })}
+                          })()}
                         </tbody>
                       </table>
                     </div>
@@ -3342,7 +3377,6 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
       
       // Insérer les trades
       const tradesToInsert = importedTrades
-        .filter(t => Math.abs(t.pnl) >= 50) // Filtrer les trades avec |pnl| < 50$
         .map(t => ({
           user_id: userId,
           account_id: accountId,

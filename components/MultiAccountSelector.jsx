@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import ReactDOM from "react-dom";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 
 export default function MultiAccountSelector({
   accounts = [],
@@ -10,6 +11,8 @@ export default function MultiAccountSelector({
   T = {},
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // account object ou null
+  const [deleting, setDeleting] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -155,32 +158,52 @@ export default function MultiAccountSelector({
             const isSelected = selectedAccountIds.includes(account.id);
             return (
               <React.Fragment key={account.id}>
-                <label
+                <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
                     padding: "7px 10px",
                     borderRadius: 6,
-                    cursor: "pointer",
                     fontFamily: "inherit",
                     color: "#0D0D0D",
                     fontSize: 13,
                     fontWeight: 500,
+                    transition: "background .12s ease",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; const btn = e.currentTarget.querySelector('[data-del-btn]'); if (btn) btn.style.opacity = 1; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const btn = e.currentTarget.querySelector('[data-del-btn]'); if (btn) btn.style.opacity = 0; }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => handleToggleAccount(account.id)}
-                    style={{ width: 14, height: 14, accentColor: "#0D0D0D", cursor: "pointer", margin: 0, flexShrink: 0 }}
-                  />
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {account.name}
-                  </span>
-                </label>
+                  <label style={{display:"flex",alignItems:"center",gap:10,flex:1,cursor:"pointer",minWidth:0}}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleAccount(account.id)}
+                      style={{ width: 14, height: 14, accentColor: "#0D0D0D", cursor: "pointer", margin: 0, flexShrink: 0 }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {account.name}
+                    </span>
+                  </label>
+                  {onDeleteAccount && (
+                    <button
+                      data-del-btn
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete(account); }}
+                      title="Supprimer ce compte"
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 22, height: 22, border: "none", background: "transparent",
+                        cursor: "pointer", color: "#8E8E8E", borderRadius: 4, flexShrink: 0,
+                        opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "#FEF2F2"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "#8E8E8E"; e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <Trash2 size={12} strokeWidth={1.75}/>
+                    </button>
+                  )}
+                </div>
                 {idx < accounts.length - 1 && (
                   <div style={{ height: 1, background: "#F0F0F0", margin: "0 8px" }} />
                 )}
@@ -192,6 +215,46 @@ export default function MultiAccountSelector({
             <div style={{ padding: "12px", textAlign: "center", fontSize: 12, color: "#8E8E8E" }}>
               Aucun compte
             </div>
+          )}
+
+          {/* Modale de confirmation suppression compte */}
+          {confirmDelete && typeof document !== "undefined" && ReactDOM.createPortal(
+            <div onClick={()=>!deleting && setConfirmDelete(null)}
+              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}>
+              <div onClick={(e)=>e.stopPropagation()}
+                style={{background:"#FFFFFF",borderRadius:14,maxWidth:420,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.22)",border:"1px solid #E5E5E5",overflow:"hidden"}}>
+                <div style={{padding:"20px 24px 8px",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:"#FEF2F2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Trash2 size={16} strokeWidth={1.75} color="#EF4444"/>
+                  </div>
+                  <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
+                    Supprimer le compte « {confirmDelete.name} » ?
+                  </h3>
+                </div>
+                <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
+                  Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Tous les trades associés à ce compte seront aussi supprimés et ne pourront pas être récupérés.
+                </div>
+                <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
+                  <button onClick={()=>setConfirmDelete(null)} disabled={deleting}
+                    style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.5 : 1}}>
+                    Annuler
+                  </button>
+                  <button
+                    onClick={async ()=>{
+                      if (!onDeleteAccount) return;
+                      setDeleting(true);
+                      try { await onDeleteAccount(confirmDelete.id); }
+                      catch (e) { console.error("delete account failed:", e); }
+                      finally { setDeleting(false); setConfirmDelete(null); setIsOpen(false); }
+                    }}
+                    disabled={deleting}
+                    style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.7 : 1}}>
+                    {deleting ? "Suppression..." : "Supprimer"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
           )}
 
           {/* Footer : Creation de compte */}
