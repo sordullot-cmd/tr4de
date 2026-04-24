@@ -5,6 +5,7 @@ import ReactDOM from "react-dom";
 import { Pencil, Trash2, Plus, X, Target, TrendingUp, TrendingDown, Percent, Activity } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
+import { t, useLang } from "@/lib/i18n";
 import { useStrategies } from "@/lib/hooks/useUserData";
 import { useTrades } from "@/lib/hooks/useTradeData";
 
@@ -54,6 +55,7 @@ function Pill({ children, color="gray", small }) {
 }
 
 export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId = () => {} }) {
+  useLang();
   // ✅ Utiliser les hooks Supabase au lieu de localStorage
   const strategiesHook = useStrategies();
   const tradesHook = useTrades();
@@ -285,9 +287,9 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Stratégies</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("strat.title")}</h1>
         <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 14px",height:34,borderRadius:8,background:T.text,border:`1px solid ${T.text}`,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
-          <Plus size={14} strokeWidth={2}/> Créer une stratégie
+          <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
         </button>
         <div id="tr4de-page-header-slot" />
       </div>
@@ -364,13 +366,13 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
         return (
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Block icon={TrendingUp} label="Meilleure performance" item={best}
+            <Block icon={TrendingUp} label={t("strat.bestPerf")} item={best}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={best && best.pnl >= 0 ? T.green : T.red} />
-            <Block icon={TrendingDown} label="Moins performante" item={worst}
+            <Block icon={TrendingDown} label={t("strat.worstPerf")} item={worst}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={worst && worst.pnl >= 0 ? T.green : T.red} />
-            <Block icon={Percent} label="Meilleur win rate" item={bestWr}
+            <Block icon={Percent} label={t("strat.bestWr")} item={bestWr}
               valueFn={(x) => `${x.wr.toFixed(1)}%`} />
-            <Block icon={Activity} label="Plus active" item={mostActive}
+            <Block icon={Activity} label={t("strat.mostActive")} item={mostActive}
               valueFn={(x) => `${x.count} trades`} />
           </div>
         );
@@ -614,14 +616,14 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
                   {/* PnL */}
                   <div style={{paddingTop:14,paddingBottom:14}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:6}}>P&L Net</div>
+                    <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:6}}>{t("strat.pnlNet")}</div>
                     <div style={{fontSize:24,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.3}}>{fmt(totalPnL,true)}</div>
                   </div>
 
                   {/* W/L bar + Win Rate */}
                   <div style={{display:"flex",gap:16,alignItems:"center"}}>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:8}}>Wins / Losses</div>
+                      <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:8}}>{t("strat.winsLosses")}</div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         <div style={{fontSize:11,fontWeight:600,color:T.green,minWidth:18}}>{winCount}</div>
                         <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden",flex:1}}>
@@ -634,7 +636,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                     <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
                       <DonutChart winRate={parseInt(winRate)} size={56}/>
                       <div style={{display:"flex",flexDirection:"column"}}>
-                        <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>Win rate</div>
+                        <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("common.winRate")}</div>
                         <div style={{fontSize:15,fontWeight:600,color:T.text,letterSpacing:-0.2}}>{winRate}%</div>
                       </div>
                     </div>
@@ -644,7 +646,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 {/* ========== CENTER SECTION: AREA CHART ========== */}
                 <div style={{display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 20px",borderRight:`1px solid ${T.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>Performance</div>
+                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("strat.performance")}</div>
                     <div style={{fontSize:11,color:T.textSub,fontWeight:500}}>{strategyTradeCount} trades</div>
                   </div>
                   <div style={{width:"100%"}}>
@@ -655,7 +657,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 {/* ========== RIGHT SECTION: RULES ========== */}
                 <div style={{display:"flex",flexDirection:"column",gap:10,paddingLeft:4}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>Règles</div>
+                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("strat.rules")}</div>
                     <div style={{display:"flex",gap:4}}>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleEditStrategy(strategy); }}
@@ -723,10 +725,10 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           <div style={{width:48,height:48,borderRadius:12,background:T.accentBg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
             <Target size={22} strokeWidth={1.75} color={T.text}/>
           </div>
-          <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>Aucune stratégie</div>
-          <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>Créez votre première stratégie avec des règles pour suivre vos performances.</div>
+          <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>{t("strat.empty")}</div>
+          <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>{t("strat.emptySub")}</div>
           <button onClick={()=>setShowStrategyForm(true)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:"var(--font-sans)"}}>
-            <Plus size={14} strokeWidth={2}/> Créer une stratégie
+            <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
           </button>
         </div>
       )}
@@ -735,22 +737,22 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {showDeleteConfirm && ReactDOM.createPortal(
         <div onClick={cancelDelete} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:12,padding:32,maxWidth:400,width:"90%",boxShadow:"0 20px 25px -5px rgba(0,0,0,0.1)"}}>
-            <h2 style={{fontSize:18,fontWeight:700,color:T.text,textAlign:"left",marginBottom:12}}>Supprimer cette stratégie?</h2>
-            <p style={{fontSize:14,color:T.textSub,textAlign:"left",marginBottom:24,lineHeight:1.5}}>Cette action est irréversible. Toutes les données associées à cette stratégie seront supprimées.</p>
+            <h2 style={{fontSize:18,fontWeight:700,color:T.text,textAlign:"left",marginBottom:12}}>{t("strat.deleteTitle")}</h2>
+            <p style={{fontSize:14,color:T.textSub,textAlign:"left",marginBottom:24,lineHeight:1.5}}>{t("strat.deleteWarn")}</p>
             
             <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
-              <button 
+              <button
                 onClick={cancelDelete}
                 style={{padding:"10px 20px",borderRadius:8,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,transition:"all .2s"}}
               >
-                Annuler
+                {t("common.cancel")}
               </button>
-              <button 
+              <button
                 onClick={confirmDelete}
                 disabled={loading}
                 style={{padding:"10px 20px",borderRadius:8,border:"none",background:T.red,fontSize:13,fontWeight:600,cursor:loading?"not-allowed":"pointer",color:"#fff",transition:"all .2s",opacity:loading?0.6:1}}
               >
-                {loading ? "Suppression..." : "Supprimer"}
+                {loading ? (t("common.loading")) : t("common.delete")}
               </button>
             </div>
           </div>
@@ -768,7 +770,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:formData.color}}/>
                 <h2 style={{fontSize:16,fontWeight:600,color:T.text,margin:0,letterSpacing:-0.1}}>
-                  {editingStrategyId ? "Modifier la stratégie" : "Nouvelle stratégie"}
+                  {editingStrategyId ? t("strat.edit") : t("strat.new")}
                 </h2>
               </div>
               <button onClick={handleCancelEdit} style={{display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,background:"transparent",border:"none",cursor:"pointer",color:T.textMut,borderRadius:6}}
@@ -782,7 +784,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
               {/* Nom */}
               <div>
-                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>Nom</label>
+                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.name")}</label>
                 <input type="text" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} placeholder="ex. Scalp 5min FVG"
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:T.text,background:T.white}}
                   onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
@@ -790,7 +792,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
               {/* Description */}
               <div>
-                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>Description</label>
+                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.description")}</label>
                 <textarea value={formData.description} onChange={(e)=>setFormData({...formData,description:e.target.value})} placeholder="Décrivez votre stratégie en quelques mots..."
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",resize:"vertical",minHeight:64,fontFamily:"inherit",color:T.text,background:T.white,lineHeight:1.5}}
                   onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
@@ -798,7 +800,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
               {/* Couleur */}
               <div>
-                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:8,color:T.textSub}}>Couleur</label>
+                <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:8,color:T.textSub}}>{t("strat.color")}</label>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
                   {colors.map(color=>{
                     const selected = formData.color === color;

@@ -296,7 +296,7 @@ function Dashboard({ trades = [], setPage }) {
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
-          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Tableau de bord</h1>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("dash.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"60px 24px",textAlign:"center"}}>
@@ -571,7 +571,7 @@ function Dashboard({ trades = [], setPage }) {
     <div style={{display:"flex",flexDirection:"column",gap:12,fontFamily:"var(--font-sans)"}} className="anim-1">
       {/* PAGE TITLE */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:4}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>Tableau de bord</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>{t("dash.title")}</h1>
         <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
 
@@ -845,7 +845,7 @@ function Dashboard({ trades = [], setPage }) {
       {/* CALENDRIER P&L */}
       <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:12,overflow:"hidden",marginTop:8,marginBottom:8}}>
         <div style={{marginBottom:8}}>
-          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>Calendrier P&L</div>
+          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{t("dash.calendar")}</div>
           <div style={{fontSize:12,color:T.textSub,marginBottom:2}}>+{Object.values(dayPnLMap).filter(v=>v>0).reduce((s,v)=>s+v,0).toFixed(0)} $ ce mois</div>
         </div>
 
@@ -924,8 +924,8 @@ function Dashboard({ trades = [], setPage }) {
         {/* TR4DE SCORE CARD */}
         <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)"}}>
           <div style={{marginBottom:16}}>
-            <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>tr4de score</h3>
-            <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>Évaluation globale de ta performance</p>
+            <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>{t("dash.tr4deScore")}</h3>
+            <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>{t("dash.tr4deScoreSub")}</p>
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -941,7 +941,7 @@ function Dashboard({ trades = [], setPage }) {
                   </span>
                   <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
                 </div>
-                <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>Score global</span>
+                <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{t("dash.globalScore")}</span>
               </div>
 
               <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
@@ -961,7 +961,7 @@ function Dashboard({ trades = [], setPage }) {
 
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedDay !== null ? `Trades du ${["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"][selectedDay]}` : "Trades Récents"}</div>
+            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedDay !== null ? `Trades du ${["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"][selectedDay]}` : t("dash.recentTrades")}</div>
             <div style={{fontSize:12,color:T.textSub,marginBottom:8}}>
               {selectedDay !== null 
                 ? `${(pnlByDay[selectedDay] || []).length} trades`
@@ -969,7 +969,7 @@ function Dashboard({ trades = [], setPage }) {
               }
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 0.6fr",gap:8,fontSize:10,fontWeight:600,color:T.textMut,paddingBottom:8,borderBottom:`1px solid ${T.border}`}}>
-              <div>Asset</div>
+              <div>{t("dash.asset")}</div>
               <div style={{textAlign:"right"}}>P&L</div>
             </div>
           </div>
@@ -1005,8 +1005,8 @@ function Dashboard({ trades = [], setPage }) {
         {/* EMOTIONAL IMPACT */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
         <div style={{marginBottom:4}}>
-          <div style={{fontSize:14,fontWeight:700,color:T.text}}>Impact Émotionnel</div>
-          <div style={{fontSize:12,color:T.textSub,marginBottom:8}}>Effet des émotions sur le P&L</div>
+          <div style={{fontSize:14,fontWeight:700,color:T.text}}>{t("dash.emotionalImpact")}</div>
+          <div style={{fontSize:12,color:T.textSub,marginBottom:8}}>{t("dash.emotionalImpactSub")}</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
           {allEmotionTags.map(tag => {
@@ -1039,7 +1039,7 @@ function Dashboard({ trades = [], setPage }) {
       {/* DAY OF WEEK TABLE */}
       <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",height:340}}>
         <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:8}}>Performance par jour</div>
+          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:8}}>{t("dash.perfByDay")}</div>
           <div style={{fontSize:12,color:T.textSub}}>{selectedDay !== null ? `P&L ${dayLabelsFr[selectedDay]}` : "P&L cette semaine"}: <span style={{fontWeight:600,color:(() => {
             if (selectedDay !== null) {
               const dayTrades = pnlByDay[selectedDay] || [];
@@ -1076,7 +1076,7 @@ function Dashboard({ trades = [], setPage }) {
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:`none`,background:"transparent"}}>
-                {["Jour","Trades","% Total","Taux Victoire","Gain Moyen","Perte Moyenne","Espérance"].map(h=>(
+                {[t("dash.day"),t("common.trades"),"% "+t("common.total"),t("common.winRate"),t("dash.avgGain"),t("dash.avgLossHdr"),t("dash.expectancy")].map(h=>(
                   <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:600,color:T.textMut,borderBottom:`1px solid ${T.border}`}}>{h}</th>
                 ))}
               </tr>
@@ -1216,7 +1216,7 @@ function JournalPage({ trades = [] }) {
     <div style={{display:"flex",flexDirection:"column",gap:20}} className="anim-1">
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Journal de Trading</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("journal.title")}</h1>
         <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
 
@@ -1374,7 +1374,7 @@ function JournalPage({ trades = [] }) {
                 <div style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
                   {/* DAILY NOTES (sans contour ni label) */}
                   <textarea
-                    placeholder="Notes pour cette journée..."
+                    placeholder={t("journal.dailyNotes")}
                     value={dailyNotes[dateStr] || ""}
                     onChange={(e) => updateDailyNote(dateStr, e.target.value)}
                     style={{
@@ -1454,7 +1454,7 @@ function JournalPage({ trades = [] }) {
                                           <div style={{display:"flex",flexDirection:"column",gap:8}}>
                                             <div style={{fontSize:11,color:T.textMut,textTransform:"uppercase"}}>Notes pour {trade.symbol}</div>
                                             <textarea
-                                              placeholder="Ajoutez vos notes sur ce trade..."
+                                              placeholder={t("journal.tradeNote")}
                                               value={tradeNotes[tradeId] || ""}
                                               onChange={(e) => updateTradeNote(tradeId, e.target.value)}
                                               style={{
@@ -1518,8 +1518,8 @@ function JournalPage({ trades = [] }) {
         </div>
       ) : (
         <div style={{background:T.white,border:`2px dashed ${T.border}`,borderRadius:12,padding:"40px 24px",textAlign:"center"}}>
-          <div style={{fontSize:16,fontWeight:600,marginBottom:8,color:T.text}}>Aucun trade importé</div>
-          <p style={{color:T.textSub}}>Vos trades apparaîtront ici avec la possibilité d'ajouter des notes</p>
+          <div style={{fontSize:16,fontWeight:600,marginBottom:8,color:T.text}}>{t("journal.empty")}</div>
+          <p style={{color:T.textSub}}>{t("journal.emptySub")}</p>
         </div>
       )}
     </div>
@@ -1838,7 +1838,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Journal de Trading</h1>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("journal.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
         <div style={{background:T.white,border:`2px dashed ${T.accent}`,borderRadius:12,padding:"48px 24px",textAlign:"center"}}>
@@ -1902,9 +1902,9 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
       <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Trades</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
         <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
-          <button onClick={onImportClick} style={{padding:"7px 14px",height:34,borderRadius:8,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>+ Importer</button>
+          <button onClick={onImportClick} style={{padding:"7px 14px",height:34,borderRadius:8,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
         </div>
         <div id="tr4de-page-header-slot" />
       </div>
@@ -1940,23 +1940,23 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                           onClick={(e)=>e.stopPropagation()}
                         />
                       )}
-                      <span>Symbole</span>
+                      <span>{t("common.symbol")}</span>
                     </span>
                   </th>
                   {[
-                    {label:"Actif"},
-                    {label:"Sens"},
-                    {label:"Date entrée",sorted:true},
-                    {label:"Heure entrée"},
-                    {label:"Entrée"},
-                    {label:"Date sortie"},
-                    {label:"Heure sortie"},
-                    {label:"Sortie"},
-                    {label:"Contrats"},
-                    {label:"Volume"},
-                    {label:"P&L net"},
-                    {label:"P&L %"},
-                    {label:"Durée"},
+                    {label:t("trades.colAsset")},
+                    {label:t("trades.colSide")},
+                    {label:t("trades.colEntryDate"),sorted:true},
+                    {label:t("trades.colEntryTime")},
+                    {label:t("trades.colEntry")},
+                    {label:t("trades.colExitDate")},
+                    {label:t("trades.colExitTime")},
+                    {label:t("trades.colExit")},
+                    {label:t("trades.colLots")},
+                    {label:t("trades.colVolume")},
+                    {label:t("trades.colPnL")},
+                    {label:t("trades.colPnLPct")},
+                    {label:t("trades.colDuration")},
                   ].map(h=>(
                     <th key={h.label} style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg}}>
                       <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
@@ -2803,7 +2803,7 @@ function StrategiesPage({ strategies, setStrategies, onCreateClick }) {
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Stratégies</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("strat.title")}</h1>
         <button onClick={()=>setShowForm(true)} style={{marginLeft:"auto",padding:"7px 14px",height:34,borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>+ Créer une stratégie</button>
         <div id="tr4de-page-header-slot" />
       </div>
@@ -4314,7 +4314,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
   return (
     <div style={{display:"flex",flexDirection:"column",gap:24}} className="anim-1">
       <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Calendrier</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("cal.title")}</h1>
         <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
       {renderMonthDetail()}
@@ -5055,14 +5055,14 @@ function DisciplinePage({ trades = [] }) {
     <>
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Discipline</h1>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("disc.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
         {/* TOP SECTION - 4 COLUMNS */}
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:12}}>
           {/* DATE */}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",justifyContent:"space-between",height:"100%"}}>
-            <div style={{fontSize:12,color:T.textMut,fontWeight:600}}>Progression du jour</div>
+            <div style={{fontSize:12,color:T.textMut,fontWeight:600}}>{t("disc.todayProgress")}</div>
             <div style={{display:"flex",justifyContent:"flex-start",alignItems:"flex-end",gap:12}}>
               <div style={{display:"flex",gap:4,flex:1}}>
                 <div style={{fontSize:32,fontWeight:700,color:T.text}}>{currentMonth}</div>
@@ -5099,7 +5099,7 @@ function DisciplinePage({ trades = [] }) {
 
           {/* BIAS JOURNALIER */}
           <EditableTextList
-            title="Bias Journalier"
+            title={t("disc.biasDaily")}
             iconBg="#EFF6FF"
             accent="#3B82F6"
             icon={<LucideTrendingUp size={13} strokeWidth={1.75} color="#3B82F6"/>}
@@ -5112,7 +5112,7 @@ function DisciplinePage({ trades = [] }) {
 
           {/* REGLES A SUIVRE */}
           <EditableCheckList
-            title="Règles à suivre"
+            title={t("disc.rulesToFollow")}
             iconBg="#E6F7F1"
             accent={T.green}
             icon={<LucideCheck size={13} strokeWidth={2} color={T.green}/>}
@@ -5124,7 +5124,7 @@ function DisciplinePage({ trades = [] }) {
 
           {/* ERREURS A EVITER */}
           <EditableTextList
-            title="Erreurs à éviter"
+            title={t("disc.errorsToAvoid")}
             iconBg="#FEF2F2"
             accent={T.red}
             icon={<LucideX size={13} strokeWidth={2} color={T.red}/>}
@@ -5144,7 +5144,7 @@ function DisciplinePage({ trades = [] }) {
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12}}>
             <div style={{padding:16,borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:T.text}}>Checklist quotidienne</div>
+                <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("disc.checklist")}</div>
                 <div style={{fontSize:11,color:T.textMut}}>{currentDay} {currentMonth.toLowerCase()}.</div>
               </div>
               <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{dailyRules.filter(r=>r.status).length}/{dailyRules.length}</div>
@@ -5192,7 +5192,7 @@ function DisciplinePage({ trades = [] }) {
           {/* HEATMAP CALENDAR - DISCIPLINE TRACKER */}
           <div key={heatmapVersion} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:28,minWidth:0,overflow:"hidden"}}>
             <div style={{marginBottom:24}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.text}}>Suivi de progression</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("disc.progressTracker")}</div>
               <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{dailyRules.filter(r => r.status).length}/{dailyRules.length}</div>
               
               {(() => {
@@ -5501,12 +5501,12 @@ function DisciplinePage({ trades = [] }) {
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:1000}}>
               <thead>
                 <tr style={{background:T.bg,borderBottom:`1px solid ${T.border}`}}>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Règle</th>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Type</th>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Condition</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Série</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Performance moy.</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Taux de respect</th>
+                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colRule")}</th>
+                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colType")}</th>
+                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colCondition")}</th>
+                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colStreak")}</th>
+                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colAvgPerf")}</th>
+                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colFollowRate")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -5602,7 +5602,7 @@ function DisciplinePage({ trades = [] }) {
             {/* MANUAL RULES */}
             {customRules.length > 0 && (
               <div style={{marginBottom:24}}>
-                <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:12}}>Règles personnalisées</div>
+                <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:12}}>{t("disc.personalRules")}</div>
                 {allRules.filter(r => !["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map(rule => (
                   <div key={rule.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
                     <input 
