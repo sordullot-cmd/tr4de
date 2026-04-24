@@ -23,6 +23,10 @@ import HabitsPage from "@/components/pages/HabitsPage";
 import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import NotesPage from "@/components/pages/NotesPage";
 import EnergySleepPage from "@/components/pages/EnergySleepPage";
+import WeeklyReviewPage from "@/components/pages/WeeklyReviewPage";
+import ReadingListPage from "@/components/pages/ReadingListPage";
+import FinancialDashboardPage from "@/components/pages/FinancialDashboardPage";
+import VisionBoardPage from "@/components/pages/VisionBoardPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -69,6 +73,10 @@ import {
   Timer as LucideTimer,
   StickyNote as LucideStickyNote,
   HeartPulse as LucideHeartPulse,
+  BookOpen as LucideBookOpen,
+  ClipboardList as LucideClipboardList,
+  Wallet as LucideWallet,
+  Sparkles as LucideSparkles,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -6132,6 +6140,10 @@ export default function App() {
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
         { id: "notes",         icon: LucideStickyNote,   label: t("nav.notes") },
         { id: "energy",        icon: LucideHeartPulse,   label: t("nav.energy") },
+        { id: "weekly-review", icon: LucideClipboardList,label: t("nav.weeklyReview") },
+        { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
+        { id: "financial",     icon: LucideWallet,       label: t("nav.financial") },
+        { id: "vision",        icon: LucideSparkles,     label: t("nav.vision") },
       ],
     },
   ];
@@ -6152,6 +6164,10 @@ export default function App() {
     focus: <FocusTimerPage />,
     notes: <NotesPage />,
     energy: <EnergySleepPage />,
+    "weekly-review": <WeeklyReviewPage />,
+    reading: <ReadingListPage />,
+    financial: <FinancialDashboardPage />,
+    vision: <VisionBoardPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
