@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
@@ -126,41 +127,14 @@ const defaultHabits = () => {
 export default function DailyPlannerPage() {
   const [dateKey, setDateKey] = useState(() => todayKey());
 
-  // Planner (tâches, objectifs, énergie) par jour
-  const [plannerStore, setPlannerStore] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem(STORAGE_PLANNER) || "{}"); } catch { return {}; }
-  });
-  useEffect(() => { try { localStorage.setItem(STORAGE_PLANNER, JSON.stringify(plannerStore)); } catch {} }, [plannerStore]);
+  // Planner (tâches, objectifs, énergie) par jour — synchronisé Supabase
+  const [plannerStore, setPlannerStore] = useCloudState(STORAGE_PLANNER, "daily_planner", {});
   const day = plannerStore[dateKey] || { tasks: [], goals: [], energy: 7 };
   const updateDay = (patch) => setPlannerStore(prev => ({ ...prev, [dateKey]: { ...day, ...patch } }));
 
-  // Habits
-  // Migration one-shot : si l'utilisateur n'a pas encore été migré vers la liste
-  // par défaut "v2", on remplace ses habitudes par celle-ci et on oublie l'historique.
-  const HABITS_VERSION_KEY = "tr4de_habits_version";
-  const HABITS_CURRENT_VERSION = "v2-defaults-2026-04";
-  const [habits, setHabits] = useState(() => {
-    if (typeof window === "undefined") return defaultHabits();
-    try {
-      const v = localStorage.getItem(HABITS_VERSION_KEY);
-      if (v !== HABITS_CURRENT_VERSION) {
-        const next = defaultHabits();
-        localStorage.setItem(STORAGE_HABITS, JSON.stringify(next));
-        localStorage.setItem(STORAGE_HABITS_HISTORY, "{}");
-        localStorage.setItem(HABITS_VERSION_KEY, HABITS_CURRENT_VERSION);
-        return next;
-      }
-      const s = JSON.parse(localStorage.getItem(STORAGE_HABITS) || "null");
-      return Array.isArray(s) && s.length ? s : defaultHabits();
-    } catch { return defaultHabits(); }
-  });
-  const [habitHistory, setHabitHistory] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem(STORAGE_HABITS_HISTORY) || "{}"); } catch { return {}; }
-  });
-  useEffect(() => { try { localStorage.setItem(STORAGE_HABITS, JSON.stringify(habits)); } catch {} }, [habits]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_HABITS_HISTORY, JSON.stringify(habitHistory)); } catch {} }, [habitHistory]);
+  // Habits — synchronisées Supabase
+  const [habits, setHabits] = useCloudState(STORAGE_HABITS, "habits", defaultHabits());
+  const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, "habits_history", {});
 
   const toggleHabit = (habitId) => {
     setHabitHistory(prev => {
@@ -227,11 +201,7 @@ export default function DailyPlannerPage() {
   }, [dateKey]);
 
   // --- Notes quotidiennes ---
-  const [notesStore, setNotesStore] = useState(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem(STORAGE_DAILY_NOTES) || "{}"); } catch { return {}; }
-  });
-  useEffect(() => { try { localStorage.setItem(STORAGE_DAILY_NOTES, JSON.stringify(notesStore)); } catch {} }, [notesStore]);
+  const [notesStore, setNotesStore] = useCloudState(STORAGE_DAILY_NOTES, "daily_notes", {});
   const currentNote = notesStore[dateKey] || "";
   const setCurrentNote = (text) => setNotesStore(prev => {
     const next = { ...prev };
@@ -246,8 +216,9 @@ export default function DailyPlannerPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
+      {/* Header : gros titre */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Daily Planner</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>Daily Planner</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 
@@ -291,23 +262,21 @@ export default function DailyPlannerPage() {
         );
       })()}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, alignItems: "start" }}>
-        {/* LEFT : Habitudes du jour */}
-        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <Flame size={13} strokeWidth={1.75} color={T.amber} />
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Habitudes du jour</div>
-            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
-                {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
-              </span>
-              <button onClick={openCreateHabit} title="Ajouter une habitude"
-                style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
-                <Plus size={13} strokeWidth={2} />
-              </button>
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24, alignItems: "start" }}>
+        {/* LEFT : Habitudes du jour (sans carte, style timeline comme la page Objectifs) */}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Habitudes du jour</h2>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+              {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
             </span>
+            <button onClick={openCreateHabit} title="Ajouter une habitude"
+              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
+              <Plus size={13} strokeWidth={2} />
+            </button>
           </div>
 
           {/* Formulaire ajout/edit */}
@@ -336,36 +305,45 @@ export default function DailyPlannerPage() {
             </div>
           )}
 
-          {/* Liste des habitudes (compacte, icônes auto) */}
+          {/* Liste des habitudes (style timeline de la page Objectifs) */}
           {habits.length === 0 ? (
-            <div style={{ padding: "20px 10px", textAlign: "center", color: T.textMut, fontSize: 12 }}>Ajoute ta première habitude</div>
+            <div style={{ padding: "40px 16px", textAlign: "center", color: T.textMut, fontSize: 13 }}>Ajoute ta première habitude</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {habits.map(h => {
                 const done = !!(habitHistory[h.id] && habitHistory[h.id][dateKey]);
                 const Ico = autoIcon(h.name);
                 return (
                   <div key={h.id}
                     style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "6px 8px",
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "12px 16px",
                       borderRadius: 8,
                       transition: "background .12s ease",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 1; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 0; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#FAFAFA";
+                      const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 1;
+                      const ed = e.currentTarget.querySelector("[data-habit-edit]"); if (ed) ed.style.opacity = 1;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                      const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 0;
+                      const ed = e.currentTarget.querySelector("[data-habit-edit]"); if (ed) ed.style.opacity = 0;
+                    }}
                   >
-                    {/* Icône avatar (auto selon le nom) */}
+                    {/* Icon bubble (gris neutre, plus de vert) */}
                     <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: T.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
+                      width: 34, height: 34, borderRadius: "50%",
+                      background: T.bg,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, color: done ? T.textMut : T.text,
                     }}>
-                      <Ico size={15} strokeWidth={1.75} color={done ? T.textMut : T.text} />
+                      <Ico size={15} strokeWidth={2} />
                     </div>
 
-                    {/* Content */}
-                    <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openEditHabit(h)}>
+                    {/* Content (non cliquable) */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: 13, fontWeight: 600, color: done ? T.textMut : T.text,
                         textDecoration: done ? "line-through" : "none",
@@ -378,7 +356,6 @@ export default function DailyPlannerPage() {
                           display: "flex", alignItems: "center", gap: 6, marginTop: 2,
                           fontSize: 11, color: T.textMut, lineHeight: 1.2,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          textDecoration: done ? "line-through" : "none",
                         }}>
                           {h.time && (
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
@@ -398,6 +375,14 @@ export default function DailyPlannerPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Edit (hidden until hover) */}
+                    <button data-habit-edit onClick={() => openEditHabit(h)} title="Modifier"
+                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease", flexShrink: 0 }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                      <Pencil size={11} strokeWidth={1.75} />
+                    </button>
 
                     {/* Delete (hidden until hover) */}
                     <button data-habit-del onClick={() => removeHabit(h.id)} title="Supprimer"
@@ -426,47 +411,50 @@ export default function DailyPlannerPage() {
           )}
         </div>
 
-        {/* RIGHT : Tâches + Objectifs */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* RIGHT : Tâches + Notes (sans cartes, style timeline) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
           {/* Tâches */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <TargetIcon size={13} strokeWidth={1.75} color={T.amber} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Tâches du jour</div>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Tâches du jour</h2>
+              <div style={{ flex: 1, height: 1, background: T.border }} />
+              <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
                 {(day.tasks || []).filter(p => p.done).length}/{(day.tasks || []).length}
               </span>
             </div>
-            {(day.tasks || []).map(p => (
-              <Row key={p.id} done={p.done} text={p.text} onToggle={() => toggleTask(p.id)} onDelete={() => removeTask(p.id)} accent={T.amber} />
-            ))}
-            <AddInput value={newTask} onChange={setNewTask} onAdd={addTask} placeholder="Ajouter une tâche..." />
+            <div style={{ padding: "0 16px" }}>
+              {(day.tasks || []).map(p => (
+                <Row key={p.id} done={p.done} text={p.text} onToggle={() => toggleTask(p.id)} onDelete={() => removeTask(p.id)} accent={T.amber} />
+              ))}
+              <AddInput value={newTask} onChange={setNewTask} onAdd={addTask} placeholder="Ajouter une tâche..." />
+            </div>
           </div>
 
           {/* Notes du jour — reset chaque jour, archivées */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <StickyNote size={13} strokeWidth={1.75} color={T.blue} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Notes du jour</div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Notes du jour</h2>
+              <div style={{ flex: 1, height: 1, background: T.border }} />
               {pastNotes.length > 0 && (
-                <span style={{ marginLeft: "auto", fontSize: 10, color: T.textMut, fontWeight: 500 }}>
+                <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
                   {pastNotes.length} archivée{pastNotes.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
-            <textarea
-              value={currentNote}
-              onChange={(e) => setCurrentNote(e.target.value)}
-              placeholder="Pensées, idées, observations du jour..."
-              style={{
-                width: "100%", minHeight: 110, resize: "vertical",
-                padding: 12, border: `1px solid ${T.border}`, borderRadius: 10,
-                fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white,
-                lineHeight: 1.5, boxSizing: "border-box",
-              }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = T.text; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = T.border; }}
-            />
+            <div style={{ padding: "0 16px" }}>
+              <textarea
+                value={currentNote}
+                onChange={(e) => setCurrentNote(e.target.value)}
+                placeholder="Pensées, idées, observations du jour..."
+                style={{
+                  width: "100%", minHeight: 110, resize: "vertical",
+                  padding: 12, border: `1px solid ${T.border}`, borderRadius: 10,
+                  fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white,
+                  lineHeight: 1.5, boxSizing: "border-box",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = T.text; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = T.border; }}
+              />
 
             {/* Archives : liste compacte */}
             {pastNotes.length > 0 && (
@@ -546,6 +534,7 @@ export default function DailyPlannerPage() {
             )}
           </div>
 
+          </div>
         </div>
       </div>
 
@@ -673,6 +662,16 @@ function HabitsChart({ habits, history }) {
           })}
         </svg>
       )}
+    </div>
+  );
+}
+
+function DailyStatCell({ label, value, subLabel, color }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 10, color: T.textMut, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: color || T.text, letterSpacing: -0.3, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subLabel}</div>
     </div>
   );
 }

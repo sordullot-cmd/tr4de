@@ -6415,26 +6415,33 @@ export default function App() {
               overflowX: "hidden",
               position: "relative",
             }}>
-              {page !== "add-trade" && (
-                <HeaderSlotPortal>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {["dashboard","strategies","journal","trades","discipline","goals"].includes(page) && (
-                      <DateRangePicker
-                        value={globalDateRange}
-                        onChange={(r) => setGlobalDateRange(r)}
+              {(() => {
+                // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
+                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading"];
+                const isProductivity = PRODUCTIVITY_PAGES.includes(page);
+                if (page === "add-trade") return null;
+                if (isProductivity) return null; // la page gère son propre header
+                return (
+                  <HeaderSlotPortal>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {["dashboard","strategies","journal","trades","discipline"].includes(page) && (
+                        <DateRangePicker
+                          value={globalDateRange}
+                          onChange={(r) => setGlobalDateRange(r)}
+                        />
+                      )}
+                      <MultiAccountSelector
+                        accounts={visibleAccounts}
+                        selectedAccountIds={selectedAccountIds}
+                        onSelectionChange={setSelectedAccountIds}
+                        onDeleteAccount={handleDeleteAccount}
+                        onCreateAccount={() => setPage("add-trade")}
+                        T={T}
                       />
-                    )}
-                    <MultiAccountSelector
-                      accounts={visibleAccounts}
-                      selectedAccountIds={selectedAccountIds}
-                      onSelectionChange={setSelectedAccountIds}
-                      onDeleteAccount={handleDeleteAccount}
-                      onCreateAccount={() => setPage("add-trade")}
-                      T={T}
-                    />
-                  </div>
-                </HeaderSlotPortal>
-              )}
+                    </div>
+                  </HeaderSlotPortal>
+                );
+              })()}
               {pages[page] || pages.dashboard}
             </div>
           </div>

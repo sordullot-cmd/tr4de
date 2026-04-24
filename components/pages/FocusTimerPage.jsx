@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, SkipForward, Coffee, Focus } from "lucide-react";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -29,14 +30,9 @@ export default function FocusTimerPage() {
   const [remaining, setRemaining] = useState(MODES.work.duration);
   const [running, setRunning] = useState(false);
   const [taskLabel, setTaskLabel] = useState("");
-  const [sessions, setSessions] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch { return []; }
-  });
+  const [sessions, setSessions] = useCloudState(LOG_KEY, "focus_sessions", []);
   const intervalRef = useRef(null);
   const modeConf = MODES[mode];
-
-  useEffect(() => { try { localStorage.setItem(LOG_KEY, JSON.stringify(sessions)); } catch {} }, [sessions]);
 
   // Start/stop timer
   useEffect(() => {

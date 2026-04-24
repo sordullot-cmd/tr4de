@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, BookOpen, Check, Trash2, Pencil, X } from "lucide-react";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -30,10 +31,7 @@ function defaultBooks() {
 }
 
 export default function ReadingListPage() {
-  const [books, setBooks] = useState(() => {
-    if (typeof window === "undefined") return defaultBooks();
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") || defaultBooks(); } catch { return defaultBooks(); }
-  });
+  const [books, setBooks] = useCloudState(STORAGE_KEY, "reading_list", defaultBooks());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const emptyForm = { title: "", author: "", category: "trading", status: "toRead", totalPages: "", currentPage: "" };
@@ -42,7 +40,6 @@ export default function ReadingListPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [filter, setFilter] = useState("all"); // all | toRead | reading | done
 
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(books)); } catch {} }, [books]);
 
   const save = () => {
     if (!form.title.trim()) return;
