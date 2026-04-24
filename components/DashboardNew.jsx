@@ -13,6 +13,7 @@ import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmot
 import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
 import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
@@ -4777,20 +4778,8 @@ function DisciplinePage({ trades = [] }) {
   const [ruleCategory, setRuleCategory] = useState("texte");
   const [ruleTime, setRuleTime] = useState("09:00");
   const [ruleAmount, setRuleAmount] = useState("");
-  const [disciplineRules, setDisciplineRules] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("tr4de_discipline_rules_config") || "{}");
-    } catch {
-      return {};
-    }
-  });
-  const [activeDays, setActiveDays] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("tr4de_discipline_active_days") || "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [disciplineRules, setDisciplineRules] = useCloudState("tr4de_discipline_rules_config", "discipline_rules_config", {});
+  const [activeDays, setActiveDays] = useCloudState("tr4de_discipline_active_days", "discipline_active_days", {});
 
   // Listes éditables pour Bias / Règles à suivre / Erreurs à éviter
   const DEFAULT_BIAS = [
@@ -5018,8 +5007,7 @@ function DisciplinePage({ trades = [] }) {
   }, [checkedRuleIds, personalRules]);
 
   const saveDisciplineRules = () => {
-    localStorage.setItem("tr4de_discipline_rules_config", JSON.stringify(disciplineRules));
-    localStorage.setItem("tr4de_discipline_active_days", JSON.stringify(activeDays));
+    // useCloudState persists automatically (localStorage + Supabase debounced)
     setShowRulesModal(false);
   };
 
