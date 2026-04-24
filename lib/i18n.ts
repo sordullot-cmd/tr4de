@@ -62,11 +62,7 @@ const FR: Dict = {
   "nav.habits": "Habitudes",
   "nav.focus": "Focus Timer",
   "nav.notes": "Notes",
-  "nav.energy": "Énergie & Sommeil",
-  "nav.weeklyReview": "Weekly Review",
   "nav.reading": "Lectures",
-  "nav.financial": "Finances",
-  "nav.vision": "Vision Board",
 
   // Common
   "common.save": "Enregistrer",
@@ -330,11 +326,7 @@ const EN: Dict = {
   "nav.habits": "Habits",
   "nav.focus": "Focus Timer",
   "nav.notes": "Notes",
-  "nav.energy": "Energy & Sleep",
-  "nav.weeklyReview": "Weekly Review",
   "nav.reading": "Reading",
-  "nav.financial": "Finances",
-  "nav.vision": "Vision Board",
 
   // Common
   "common.save": "Save",
