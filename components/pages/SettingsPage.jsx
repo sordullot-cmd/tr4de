@@ -65,7 +65,7 @@ export default function SettingsPage({ user, onBack }) {
         <p style={{ fontSize: 13, color: T.textSub, margin: "4px 0 0" }}>Gérez votre compte et vos préférences</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 32, alignItems: "start" }}>
+      <div className="tr4de-settings-grid" style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 32, alignItems: "start" }}>
         {/* Left nav */}
         <SettingsNav active={active} setActive={setActive} />
 

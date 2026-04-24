@@ -81,7 +81,7 @@ export default function ReadingListPage() {
 
       {showForm && (
         <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+          <div className="tr4de-book-form" style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
             <Field label="Titre"><input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} style={inputStyle()} placeholder="ex. Trading in the Zone" /></Field>
             <Field label="Auteur"><input type="text" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} style={inputStyle()} placeholder="Mark Douglas" /></Field>
             <Field label="Catégorie">

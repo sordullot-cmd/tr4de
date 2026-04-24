@@ -332,3 +332,128 @@ body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* === Responsive breakpoints ===
+   Mobile-first overrides pour les grilles / layouts les plus courants.
+   Les composants utilisent des `gridTemplateColumns` inline, qui sont
+   overridées ici via `[style*=...]` pour éviter de toucher chaque fichier. */
+
+/* Desktop medium (<1200px) : condense un peu */
+@media (max-width: 1199px) {
+  .tr4de-root { --sidebar-width: 200px; }
+}
+
+/* Tablet (<1024px) */
+@media (max-width: 1023px) {
+  /* Sidebar passe en overlay sur mobile */
+  .tr4de-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 80;
+    transform: translateX(-100%);
+    transition: transform .22s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 30px rgba(0,0,0,0.15);
+  }
+  .tr4de-sidebar.is-open { transform: translateX(0); }
+  .tr4de-sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    z-index: 79; backdrop-filter: blur(2px);
+    animation: fadeIn 180ms ease both;
+  }
+  /* Montre le hamburger */
+  .tr4de-hamburger { display: inline-flex !important; }
+  /* Contenu principal : pleine largeur */
+  .tr4de-main { margin-left: 0 !important; padding-left: 16px !important; padding-right: 16px !important; }
+  .tr4de-topbar { padding-left: 12px !important; padding-right: 12px !important; }
+
+  /* Grilles 2 colonnes (1.2fr/1fr, 2fr/1fr, etc.) → 1 colonne */
+  [style*="grid-template-columns: 1.2fr 1fr"],
+  [style*="grid-template-columns: 1fr 1.2fr"],
+  [style*="grid-template-columns: 1fr 1.5fr"],
+  [style*="grid-template-columns: 1.5fr 1fr"],
+  [style*="grid-template-columns: 1fr 2fr"],
+  [style*="grid-template-columns: 2fr 1fr"],
+  [style*="grid-template-columns: 0.8fr 2.2fr"],
+  [style*="grid-template-columns: 1fr 0.6fr"],
+  [style*="grid-template-columns: 1.3fr 1fr"],
+  [style*="grid-template-columns: 1fr 1.3fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Grilles 3+ colonnes custom → 1 col */
+  [style*="grid-template-columns: 1.3fr 1.2fr 1.1fr"],
+  [style*="grid-template-columns: 2fr 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile (<768px) */
+@media (max-width: 767px) {
+  /* Header compressé */
+  .tr4de-topbar { height: auto !important; padding: 10px 12px !important; gap: 8px !important; flex-wrap: wrap !important; }
+  .tr4de-main { padding: 12px !important; }
+
+  /* Typo titres page */
+  h1[style*="font-size: 26"], h1[style*="fontSize: 26"] { font-size: 20px !important; }
+  h1[style*="font-size: 24"], h1[style*="fontSize: 24"] { font-size: 19px !important; }
+
+  /* Grilles KPI/stats génériques : 4 col → 2 col, 3 col → 1-2 col */
+  [style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [style*="grid-template-columns: repeat(3"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+
+  /* Tables natives : scroll horizontal */
+  .tr4de-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tr4de-table-wrap table { min-width: 640px; }
+
+  /* Modals / drawers fluides */
+  .tr4de-modal-card { width: calc(100vw - 24px) !important; max-width: 100% !important; }
+  .tr4de-drawer { width: 100% !important; }
+}
+
+/* Mobile small (<480px) */
+@media (max-width: 479px) {
+  [style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  [style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* Hide helper (mobile only) */
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .show-mobile { display: none !important; }
+  .tr4de-hamburger { display: none !important; }
+}
+
+/* Sur mobile : tables → scroll horizontal + padding réduit sur les cellules */
+@media (max-width: 767px) {
+  table { font-size: 12px !important; }
+  table th, table td { padding-left: 8px !important; padding-right: 8px !important; }
+
+  /* Flex rows qui utilisent un panneau latéral fixe : stack vertical */
+  [style*="calc(100% - 376px)"] { flex: 1 1 auto !important; max-width: 100% !important; }
+
+  /* KPI / cartes numériques : value font-size réduite */
+  [style*="font-size: 28"], [style*="fontSize: 28"] { font-size: 20px !important; }
+  [style*="font-size: 32"], [style*="fontSize: 32"] { font-size: 22px !important; }
+  [style*="font-size: 48"], [style*="fontSize: 48"] { font-size: 32px !important; }
+
+  /* Padding intérieur des cards trop grand en desktop */
+  [style*="padding: 24px"] { padding: 14px !important; }
+  [style*="padding: 20px 24px"] { padding: 14px 14px !important; }
+  [style*="padding: 18px 20px"] { padding: 12px 14px !important; }
+
+  /* Boutons pleine largeur sur mobile quand ils sont seuls dans un flex */
+  .tr4de-mobile-fullwidth { width: 100% !important; }
+
+  /* Goals page : drawer stack sous la timeline */
+  .tr4de-goals-layout { flex-direction: column !important; }
+
+  /* Reading list : form 7-col → 2-col */
+  .tr4de-book-form { grid-template-columns: 1fr 1fr !important; }
+
+  /* Settings : sidebar + contenu → stack */
+  .tr4de-settings-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+}

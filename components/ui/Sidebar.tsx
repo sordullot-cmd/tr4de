@@ -54,12 +54,17 @@ export interface SidebarProps {
 
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
+
+  /** Mobile overlay: quand true, la sidebar est visible en overlay (≤1024px) */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export default function Sidebar(props: SidebarProps) {
   const {
     sections, activeId, onSelect, user, onUserMenu, onProfile, onSettings, onDarkMode, onLogout,
     collapsed = false, onToggleCollapsed,
+    mobileOpen = false, onMobileClose,
   } = props;
 
   useLang(); // re-render sidebar on language change
@@ -75,7 +80,12 @@ export default function Sidebar(props: SidebarProps) {
   }, []);
 
   return (
+    <>
+    {mobileOpen && (
+      <div className="tr4de-sidebar-backdrop" onClick={onMobileClose} />
+    )}
     <aside
+      className={`tr4de-sidebar ${mobileOpen ? "is-open" : ""}`}
       style={{
         width: collapsed ? 56 : 220,
         flexShrink: 0,
@@ -85,7 +95,7 @@ export default function Sidebar(props: SidebarProps) {
         position: "sticky",
         top: 0,
         height: "100vh",
-        transition: "width 180ms cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: "width 180ms cubic-bezier(0.4, 0, 0.2, 1), transform .22s cubic-bezier(.2,.8,.2,1)",
         fontFamily: "var(--font-sans)",
       }}
     >
@@ -290,6 +300,7 @@ export default function Sidebar(props: SidebarProps) {
         )}
       </div>
     </aside>
+    </>
   );
 }
 

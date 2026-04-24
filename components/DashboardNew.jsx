@@ -65,6 +65,7 @@ import {
   Flame as LucideFlame,
   Timer as LucideTimer,
   BookOpen as LucideBookOpen,
+  Menu as LucideMenu,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -5724,6 +5725,7 @@ export default function App() {
     }
   });
   const [page, setPage] = useState("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [selectedStrategyId, setSelectedStrategyId] = useState(null);
   const [aiReportsUnread, setAiReportsUnread] = useState(0);
 
@@ -6351,9 +6353,11 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
-      <div style={{display:"flex",minHeight:"100vh",background:"#F5F5F5"}}>
+      <div className="tr4de-root" style={{display:"flex",minHeight:"100vh",background:"#F5F5F5"}}>
         {/* SIDEBAR (OpenAI-style) */}
         <Sidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
           brand="tr4de"
           workspace={(() => {
             if (selectedAccountIds.length === 1) {
@@ -6379,13 +6383,23 @@ export default function App() {
               setSelectedAccountIds([]);
             }
             setPage(id);
+            setMobileNavOpen(false);
           }}
         />
 
 
         {/* MAIN */}
-        <div style={{flex:1,minWidth:0,height:"100vh",display:"flex",flexDirection:"column",background:"transparent"}}>
-          <div style={{flexShrink:0,zIndex:10,background:"#F5F5F5",padding:"10px 28px",display:"flex",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+        <div className="tr4de-main" style={{flex:1,minWidth:0,height:"100vh",display:"flex",flexDirection:"column",background:"transparent"}}>
+          <div className="tr4de-topbar" style={{flexShrink:0,zIndex:10,background:"#F5F5F5",padding:"10px 28px",display:"flex",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+            <button
+              type="button"
+              className="tr4de-hamburger"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Ouvrir le menu"
+              style={{display:"none",width:36,height:36,borderRadius:8,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}
+            >
+              <LucideMenu size={18} strokeWidth={1.75} />
+            </button>
             <div style={{marginLeft:"auto"}}>
               <TopBarUserMenu
                 user={{ name: displayUser.name, initials: displayUser.initials }}

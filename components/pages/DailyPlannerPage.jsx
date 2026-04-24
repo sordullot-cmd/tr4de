@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { t, useLang } from "@/lib/i18n";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
@@ -125,6 +126,7 @@ const defaultHabits = () => {
 };
 
 export default function DailyPlannerPage() {
+  useLang();
   const [dateKey, setDateKey] = useState(() => todayKey());
 
   // Planner (tâches, objectifs, énergie) par jour — synchronisé Supabase
@@ -218,7 +220,7 @@ export default function DailyPlannerPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       {/* Header : gros titre */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>Daily Planner</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>{t("nav.dailyPlanner")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 

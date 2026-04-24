@@ -10,6 +10,7 @@ import {
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { useTrades } from "@/lib/hooks/useTradeData";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
@@ -126,6 +127,7 @@ function Donut({ pct, color, size = 56, stroke = 5 }) {
 
 /* ---------- Page ---------- */
 export default function GoalsPage() {
+  useLang();
   const tradesHook = useTrades();
   const trades = tradesHook?.trades || [];
 
@@ -278,7 +280,7 @@ export default function GoalsPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       {/* Header : pleine largeur au-dessus du drawer */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>Goal Timeline</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>{t("nav.goals")}</h1>
         <button onClick={openCreate}
           style={{ marginLeft: "auto", padding: "7px 14px", height: 34, borderRadius: 8, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Nouvel objectif
@@ -286,13 +288,13 @@ export default function GoalsPage() {
       </div>
 
       {/* À partir d'ici : le drawer occupe la colonne de droite */}
-      <div style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
+      <div className="tr4de-goals-layout" style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Stats strip (style timeline) */}
       <StatStrip kpis={kpis} goals={goals} compute={compute} />
 
       {/* Column headers */}
-      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 160px 160px 70px", gap: 16, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
         <div>Créé le</div>
         <div>Objectif</div>
         <div>Échéance</div>
@@ -336,14 +338,25 @@ export default function GoalsPage() {
       ) : (
         <>
           {(() => {
+            // Tri par priorité (urgent > haute > normale > basse), puis par deadline la plus proche
+            const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
+            const byPriority = (a, b) => {
+              const pa = priorityRank[a.level || "normal"] ?? 2;
+              const pb = priorityRank[b.level || "normal"] ?? 2;
+              if (pa !== pb) return pa - pb;
+              // Même priorité : deadline la plus proche d'abord (pas de deadline = dernier)
+              const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+              const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+              return da - db;
+            };
             const onGoing = filtered.filter(g => {
               const { pct, current, target } = compute(g);
               return g.autoType === "max_dd" ? current > target : pct < 100;
-            });
+            }).sort(byPriority);
             const done = filtered.filter(g => {
               const { pct, current, target } = compute(g);
               return g.autoType === "max_dd" ? current <= target : pct >= 100;
-            });
+            }).sort(byPriority);
             return (
               <>
                 {onGoing.length > 0 && (
@@ -371,6 +384,7 @@ export default function GoalsPage() {
     {/* Drawer inline : s'étire pleine hauteur, aligné avec le contenu */}
     {showForm && (
         <div
+          className="tr4de-drawer"
           style={{
             width: 360, flexShrink: 0,
             background: T.white,
@@ -416,19 +430,9 @@ export default function GoalsPage() {
                   style={stackInput()} />
               </StackField>
 
-              {/* Deadline (full width) */}
-              <StackField label="Deadline">
-                <label className="fancy-date" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", position: "relative", flex: 1 }}>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 400, color: form.deadline ? T.text : T.textMut, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {form.deadline
-                      ? new Date(form.deadline + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-                      : "Choisir une date…"}
-                  </span>
-                  <Calendar size={14} strokeWidth={1.75} color={T.textMut} style={{ flexShrink: 0 }} />
-                  <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                    style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", border: "none", background: "transparent", fontFamily: "inherit" }} />
-                </label>
-              </StackField>
+              {/* Deadline (full width) avec presets + calendrier custom */}
+              <DeadlineField value={form.deadline} onChange={(v) => setForm({ ...form, deadline: v })} />
+
 
               {/* Priorité (full width, sous la deadline) */}
               <StackField label="Priorité">
@@ -709,15 +713,15 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
         onMouseLeave={() => setHover(false)}
         onClick={onEdit}
         style={{
-          display: "grid", gridTemplateColumns: "110px 1fr 160px 160px 70px", gap: 16,
+          display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12,
           alignItems: "center", padding: "12px 16px",
-          background: hover ? (isAchieved ? T.text : "#FAFAFA") : "transparent",
+          background: hover ? "#FAFAFA" : "transparent",
           borderRadius: 8,
           cursor: "pointer",
           transition: "background .12s ease",
         }}
       >
-        <div style={{ fontSize: 12, color: hover && isAchieved ? "rgba(255,255,255,0.8)" : T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{createdLabel}</div>
+        <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{createdLabel}</div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           {/* Icon bubble */}
@@ -732,11 +736,11 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
           <div style={{ minWidth: 0 }}>
             <div style={{
               fontSize: 13, fontWeight: 600,
-              color: hover && isAchieved ? "#fff" : T.text,
+              color: T.text,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               textDecoration: doneSection ? "line-through" : "none",
             }}>{g.label}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, fontSize: 11, color: hover && isAchieved ? "rgba(255,255,255,0.6)" : T.textMut, overflow: "hidden", whiteSpace: "nowrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, fontSize: 11, color: T.textMut, overflow: "hidden", whiteSpace: "nowrap" }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{cat.label}</span>
               {(() => {
                 const lv = LEVELS.find(l => l.id === (g.level || "normal")) || LEVELS[1];
@@ -744,8 +748,8 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
                   <span style={{
                     fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4,
                     padding: "1px 6px", borderRadius: 999,
-                    color: hover && isAchieved ? "#fff" : lv.color,
-                    background: hover && isAchieved ? "rgba(255,255,255,0.18)" : lv.color + "18",
+                    color: lv.color,
+                    background: lv.color + "18",
                   }}>{lv.label}</span>
                 );
               })()}
@@ -754,31 +758,31 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: hover && isAchieved ? "rgba(255,255,255,0.9)" : T.text, fontWeight: 500 }}>
+        <div style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
           {dueLabel}
           {dl !== null && !isAchieved && (
-            <div style={{ fontSize: 10, color: hover && isAchieved ? "rgba(255,255,255,0.6)" : (dl < 0 ? T.red : dl <= 3 ? T.amber : T.textMut), fontWeight: 500, marginTop: 1 }}>
+            <div style={{ fontSize: 10, color: dl < 0 ? T.red : dl <= 3 ? T.amber : T.textMut, fontWeight: 500, marginTop: 1 }}>
               {dl < 0 ? `${Math.abs(dl)}j dépassée` : dl === 0 ? "aujourd'hui" : `${dl}j restants`}
             </div>
           )}
         </div>
 
-        <div style={{ fontSize: 12, color: hover && isAchieved ? "rgba(255,255,255,0.9)" : T.text }}>
+        <div style={{ fontSize: 12, color: T.text }}>
           <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtVal(current, unit)}</span>
-          <span style={{ color: hover && isAchieved ? "rgba(255,255,255,0.5)" : T.textMut, margin: "0 3px" }}>/</span>
+          <span style={{ color: T.textMut, margin: "0 3px" }}>/</span>
           <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtVal(target, unit)}</span>
-          <div style={{ height: 3, background: hover && isAchieved ? "rgba(255,255,255,0.2)" : T.accentBg, borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
+          <div style={{ height: 3, background: T.accentBg, borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${pct}%`, background: isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: hover && isAchieved ? "rgba(255,255,255,0.18)" : T.white, color: hover && isAchieved ? "#fff" : T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: T.white, color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Pencil size={11} strokeWidth={1.75} />
           </button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: hover && isAchieved ? "rgba(255,255,255,0.18)" : T.white, color: T.red, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: T.white, color: T.red, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Trash2 size={11} strokeWidth={1.75} />
           </button>
         </div>
@@ -807,7 +811,165 @@ function EmptyState({ onClick }) {
 
 /* ---------- Tiny helpers ---------- */
 // Dropdown stylé (popover) — remplace les <select> natifs
-function FancyDropdown({ value, options, onChange, renderValue, renderOption }) {
+// Champ Deadline : dropdown de presets à gauche + popover calendrier custom
+function DeadlineField({ value, onChange }) {
+  const today = new Date();
+  const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const plusMonths = (n) => { const d = new Date(today); d.setMonth(d.getMonth() + n); return d; };
+  const plusYears = (n) => { const d = new Date(today); d.setFullYear(d.getFullYear() + n); return d; };
+
+  const presets = [
+    { id: toISO(endOfMonth),     label: "Ce mois" },
+    { id: toISO(plusMonths(1)),  label: "Dans 1 mois" },
+    { id: toISO(plusMonths(2)),  label: "Dans 2 mois" },
+    { id: toISO(plusMonths(3)),  label: "Dans 3 mois" },
+    { id: toISO(plusMonths(6)),  label: "Dans 6 mois" },
+    { id: toISO(plusYears(1)),   label: "Dans 1 an" },
+  ];
+  const activePreset = presets.find(p => p.id === value);
+
+  const [calOpen, setCalOpen] = useState(false);
+  const calRef = React.useRef(null);
+  useEffect(() => {
+    if (!calOpen) return;
+    const onDoc = (e) => { if (calRef.current && !calRef.current.contains(e.target)) setCalOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [calOpen]);
+
+  // État du mois affiché dans le popover
+  const [viewDate, setViewDate] = useState(() => {
+    const d = value ? new Date(value + "T00:00:00") : new Date();
+    return isNaN(d.getTime()) ? new Date() : d;
+  });
+
+  return (
+    <StackField label="Deadline">
+      {/* Dropdown de presets (colé à gauche) */}
+      <div style={{ flex: "0 0 auto" }}>
+        <FancyDropdown
+          value={activePreset ? activePreset.id : "__custom"}
+          options={[...presets, { id: "__custom", label: value && !activePreset
+            ? new Date(value + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+            : "Personnalisée…" }]}
+          onChange={(v) => { if (v !== "__custom") onChange(v); }}
+          align="left"
+          renderValue={(opt) => (
+            <span style={{ fontSize: 14, fontWeight: 400, color: value ? T.text : T.textMut }}>
+              {value ? (activePreset ? activePreset.label : new Date(value + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })) : "Choisir…"}
+            </span>
+          )}
+          renderOption={(opt, active) => (
+            <>
+              <span style={{ flex: 1 }}>{opt.label}</span>
+              {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
+            </>
+          )}
+        />
+      </div>
+      {/* Bouton calendrier : poussé à droite */}
+      <div ref={calRef} style={{ position: "relative", flexShrink: 0, marginLeft: "auto" }}>
+        <button type="button" title="Choisir une date" onClick={() => setCalOpen(v => !v)}
+          style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${T.border}`, background: calOpen ? T.accentBg : T.white, color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <Calendar size={13} strokeWidth={1.75} />
+        </button>
+        {calOpen && (
+          <MiniCalendar
+            value={value}
+            viewDate={viewDate}
+            setViewDate={setViewDate}
+            onPick={(iso) => { onChange(iso); setCalOpen(false); }}
+          />
+        )}
+      </div>
+    </StackField>
+  );
+}
+
+// Popover calendrier 1 mois, à la DateRangePicker
+function MiniCalendar({ value, viewDate, setViewDate, onPick }) {
+  const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+  const WD = ["L", "M", "M", "J", "V", "S", "D"];
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const first = new Date(year, month, 1);
+  const dow = first.getDay(); // 0 = dim
+  const lead = dow === 0 ? 6 : dow - 1; // Lundi en 1ère colonne
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const selected = value ? new Date(value + "T00:00:00") : null;
+  const todayISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const goPrev = () => setViewDate(new Date(year, month - 1, 1));
+  const goNext = () => setViewDate(new Date(year, month + 1, 1));
+
+  return (
+    <div style={{
+      position: "absolute", top: "calc(100% + 6px)", right: 0,
+      width: 280, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+      boxShadow: "0 12px 32px rgba(0,0,0,0.10)", zIndex: 200, padding: 12,
+    }}>
+      {/* Header mois */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button type="button" onClick={goPrev}
+          style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <ChevronDown size={14} style={{ transform: "rotate(90deg)" }} />
+        </button>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{MONTHS[month]} {year}</div>
+        <button type="button" onClick={goNext}
+          style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <ChevronDown size={14} style={{ transform: "rotate(-90deg)" }} />
+        </button>
+      </div>
+
+      {/* Weekdays */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {WD.map((w, i) => (
+          <div key={i} style={{ fontSize: 10, color: T.textMut, textAlign: "center", padding: "4px 0", fontWeight: 500 }}>{w}</div>
+        ))}
+      </div>
+
+      {/* Jours */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const iso = toISO(d);
+          const isSel = selected && toISO(selected) === iso;
+          const isToday = iso === todayISO;
+          return (
+            <button key={i} type="button" onClick={() => onPick(iso)}
+              style={{
+                width: "100%", aspectRatio: "1 / 1",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: isSel ? 600 : 500,
+                color: isSel ? "#fff" : T.text,
+                background: isSel ? T.text : "transparent",
+                border: isToday && !isSel ? `1px solid ${T.border2 || T.border}` : "none",
+                borderRadius: 6, cursor: "pointer", fontFamily: "inherit",
+                transition: "background .1s ease",
+              }}
+              onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "transparent"; }}>
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FancyDropdown({ value, options, onChange, renderValue, renderOption, align = "right" }) {
   const [open, setOpen] = useState(false);
   const ref = React.useRef(null);
   useEffect(() => {
@@ -823,7 +985,7 @@ function FancyDropdown({ value, options, onChange, renderValue, renderOption }) 
         style={{
           width: "100%", padding: 0, border: "none", background: "transparent",
           cursor: "pointer", fontFamily: "inherit",
-          display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6,
+          display: "flex", alignItems: "center", justifyContent: align === "left" ? "flex-start" : "flex-end", gap: 6,
           color: T.text,
         }}>
         {renderValue ? renderValue(selected) : (
@@ -834,7 +996,8 @@ function FancyDropdown({ value, options, onChange, renderValue, renderOption }) 
       </button>
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 6px)", right: 0, minWidth: 200,
+          position: "absolute", top: "calc(100% + 6px)",
+          [align === "left" ? "left" : "right"]: 0, minWidth: 200,
           background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
           boxShadow: "0 12px 32px rgba(0,0,0,0.10)",
           padding: 4, zIndex: 100, maxHeight: 280, overflowY: "auto",

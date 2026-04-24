@@ -58,9 +58,9 @@ const FR: Dict = {
   "nav.productivity": "Productivité",
   "nav.tasks": "Tâches",
   "nav.goals": "Objectifs",
-  "nav.dailyPlanner": "Daily Planner",
+  "nav.dailyPlanner": "Planning du jour",
   "nav.habits": "Habitudes",
-  "nav.focus": "Focus Timer",
+  "nav.focus": "Focus",
   "nav.notes": "Notes",
   "nav.reading": "Lectures",
 
@@ -322,9 +322,9 @@ const EN: Dict = {
   "nav.productivity": "Productivity",
   "nav.tasks": "Tasks",
   "nav.goals": "Goals",
-  "nav.dailyPlanner": "Daily Planner",
+  "nav.dailyPlanner": "Daily planner",
   "nav.habits": "Habits",
-  "nav.focus": "Focus Timer",
+  "nav.focus": "Focus",
   "nav.notes": "Notes",
   "nav.reading": "Reading",
 
