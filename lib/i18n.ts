@@ -55,6 +55,9 @@ const FR: Dict = {
   "nav.addTrade": "Ajouter des trades",
   "nav.settings": "Paramètres",
   "nav.logout": "Déconnexion",
+  "nav.productivity": "Productivité",
+  "nav.tasks": "Tâches",
+  "nav.goals": "Objectifs",
 
   // Common
   "common.save": "Enregistrer",
@@ -311,6 +314,9 @@ const EN: Dict = {
   "nav.addTrade": "Add trades",
   "nav.settings": "Settings",
   "nav.logout": "Log out",
+  "nav.productivity": "Productivity",
+  "nav.tasks": "Tasks",
+  "nav.goals": "Goals",
 
   // Common
   "common.save": "Save",

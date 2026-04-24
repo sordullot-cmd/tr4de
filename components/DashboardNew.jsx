@@ -16,6 +16,8 @@ import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
+import TasksPage from "@/components/pages/TasksPage";
+import GoalsPage from "@/components/pages/GoalsPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -55,6 +57,8 @@ import {
   Pencil,
   Plus,
   GripVertical,
+  ListTodo as LucideListTodo,
+  Zap as LucideZap,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -1990,8 +1994,13 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
                     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                   };
                   return [...filteredTrades].sort((a,b)=>{
-                    const timeA = a.entryTime || a.entry_time || "00:00:00";
-                    const timeB = b.entryTime || b.entry_time || "00:00:00";
+                    // Tri decroissant par date + heure de sortie (trades les plus
+                    // recemment fermes en haut).
+                    const dateA = String(a.date || "").slice(0,10);
+                    const dateB = String(b.date || "").slice(0,10);
+                    if (dateA !== dateB) return dateB.localeCompare(dateA);
+                    const timeA = a.exitTime || a.exit_time || "00:00:00";
+                    const timeB = b.exitTime || b.exit_time || "00:00:00";
                     return String(timeB).localeCompare(String(timeA));
                   }).map((t,i)=>{
                   const ret = ((t.pnl/(t.entry*100))*100).toFixed(2);
@@ -4087,7 +4096,7 @@ function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25
     while (cells.length < 42) cells.push(null);
 
     return (
-      <div key={monthIdx} style={{background: expandedMonth === monthIdx ? "#FAFAFA" : T.white,padding:"16px 18px",cursor:"pointer",fontFamily:"var(--font-sans)",transition:"background .12s ease",height:"100%",boxSizing:"border-box"}} onClick={()=>{
+      <div key={monthIdx} style={{background: expandedMonth === monthIdx ? "var(--color-hover-bg, #FAFAFA)" : T.white,padding:"16px 18px",cursor:"pointer",fontFamily:"var(--font-sans)",transition:"background .12s ease",height:"100%",boxSizing:"border-box"}} onClick={()=>{
         if (expandedMonth === monthIdx) {
           setExpandedMonth(null);
         } else {
@@ -6103,6 +6112,13 @@ export default function App() {
         { id: "agent",      icon: Bot,                label: t("nav.agent"), badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
       ],
     },
+    {
+      label: t("nav.productivity"),
+      items: [
+        { id: "tasks", icon: LucideListTodo, label: t("nav.tasks") },
+        { id: "goals", icon: LucideZap,     label: t("nav.goals") },
+      ],
+    },
   ];
 
   const pages = {
@@ -6114,6 +6130,8 @@ export default function App() {
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
+    tasks: <TasksPage />,
+    goals: <GoalsPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
@@ -6390,7 +6408,7 @@ export default function App() {
               {page !== "add-trade" && (
                 <HeaderSlotPortal>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {["dashboard","strategies","journal","trades","discipline"].includes(page) && (
+                    {["dashboard","strategies","journal","trades","discipline","goals"].includes(page) && (
                       <DateRangePicker
                         value={globalDateRange}
                         onChange={(r) => setGlobalDateRange(r)}

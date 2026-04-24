@@ -605,7 +605,7 @@ export default function ApexChatNew({
             marginBottom: 18,
             boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
           }}>
-            <MessageCircle size={22} strokeWidth={1.75} color="#0D0D0D" />
+            <MessageCircle size={22} strokeWidth={1.75} style={{color: "var(--color-text, #0D0D0D)"}} />
           </div>
 
           <h1
@@ -616,7 +616,7 @@ export default function ApexChatNew({
               marginBottom: 18,
               letterSpacing: -0.3,
               textAlign: "center",
-              color: T.text,
+              color: "var(--color-text, #0D0D0D)",
             }}
           >
             En quoi puis-je vous aider ?
@@ -635,7 +635,7 @@ export default function ApexChatNew({
                 borderRadius: 999,
                 border: `1px solid ${T.border}`,
                 background: T.bg,
-                color: T.text,
+                color: "var(--color-text, #0D0D0D)",
                 fontSize: 12,
                 fontWeight: 500,
                 cursor: "pointer",

@@ -223,65 +223,73 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
   const maxLoss = filteredTrades.length > 0 ? Math.min(...filteredTrades.map(t=>t.pnl)) : 0;
 
   // Calcul des statistiques par jour, heure, et symbole
-  const bestDay = (() => {
-    const dayPnL = {};
-    filteredTrades.forEach(t => {
-      const day = t.date ? new Date(t.date).toLocaleDateString('en-US', {weekday:'long'}) : 'Unknown';
-      dayPnL[day] = (dayPnL[day] || 0) + t.pnl;
-    });
-    const best = Object.entries(dayPnL).reduce((a, b) => a[1] > b[1] ? a : b, ['N/A', 0]);
-    return { day: best[0], pnl: best[1] };
-  })();
+  // Helper pour extraire l'heure : priorité à entryTime/entry_time (format "HH:MM[:SS]"),
+  // fallback sur le timestamp de t.date si une heure y est encodée.
+  const getTradeHour = (t) => {
+    const timeStr = t.entryTime || t.entry_time;
+    if (timeStr && typeof timeStr === "string") {
+      const m = timeStr.match(/^(\d{1,2}):/);
+      if (m) return parseInt(m[1], 10);
+    }
+    if (t.date) {
+      const d = new Date(t.date);
+      if (!isNaN(d.getTime()) && (d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0)) {
+        return d.getHours();
+      }
+    }
+    return null;
+  };
+  const dayNameFr = (d) => {
+    const days = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+    return days[d.getDay()];
+  };
 
-  const worstDay = (() => {
-    const dayPnL = {};
-    filteredTrades.forEach(t => {
-      const day = t.date ? new Date(t.date).toLocaleDateString('en-US', {weekday:'long'}) : 'Unknown';
-      dayPnL[day] = (dayPnL[day] || 0) + t.pnl;
-    });
-    const worst = Object.entries(dayPnL).reduce((a, b) => a[1] < b[1] ? a : b, ['N/A', 0]);
-    return { day: worst[0], pnl: worst[1] };
-  })();
+  // Stats agrégées par jour / heure / symbole
+  const dayPnLAgg = {};
+  const hourPnLAgg = {};
+  const symbolPnLAgg = {};
+  filteredTrades.forEach(t => {
+    if (t.date) {
+      const d = new Date(t.date);
+      if (!isNaN(d.getTime())) {
+        const day = dayNameFr(d);
+        dayPnLAgg[day] = (dayPnLAgg[day] || 0) + (t.pnl || 0);
+      }
+    }
+    const h = getTradeHour(t);
+    if (h !== null) {
+      const hourStr = `${String(h).padStart(2, '0')}h–${String((h + 1) % 24).padStart(2, '0')}h`;
+      hourPnLAgg[hourStr] = (hourPnLAgg[hourStr] || 0) + (t.pnl || 0);
+    }
+    if (t.symbol) {
+      symbolPnLAgg[t.symbol] = (symbolPnLAgg[t.symbol] || 0) + (t.pnl || 0);
+    }
+  });
 
-  const bestHour = (() => {
-    const hourPnL = {};
-    filteredTrades.forEach(t => {
-      const hour = t.date ? new Date(t.date).getHours() : -1;
-      const hourStr = hour >= 0 ? `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00` : 'Unknown';
-      hourPnL[hourStr] = (hourPnL[hourStr] || 0) + t.pnl;
-    });
-    const best = Object.entries(hourPnL).reduce((a, b) => a[1] > b[1] ? a : b, ['N/A', 0]);
-    return { hour: best[0], pnl: best[1] };
-  })();
+  const pickBest = (agg) => {
+    const entries = Object.entries(agg);
+    if (entries.length === 0) return null;
+    return entries.reduce((a, b) => b[1] > a[1] ? b : a);
+  };
+  const pickWorst = (agg) => {
+    const entries = Object.entries(agg);
+    if (entries.length === 0) return null;
+    return entries.reduce((a, b) => b[1] < a[1] ? b : a);
+  };
 
-  const worstHour = (() => {
-    const hourPnL = {};
-    filteredTrades.forEach(t => {
-      const hour = t.date ? new Date(t.date).getHours() : -1;
-      const hourStr = hour >= 0 ? `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00` : 'Unknown';
-      hourPnL[hourStr] = (hourPnL[hourStr] || 0) + t.pnl;
-    });
-    const worst = Object.entries(hourPnL).reduce((a, b) => a[1] < b[1] ? a : b, ['N/A', 0]);
-    return { hour: worst[0], pnl: worst[1] };
-  })();
+  const bd = pickBest(dayPnLAgg);
+  const wd = pickWorst(dayPnLAgg);
+  const bh = pickBest(hourPnLAgg);
+  const wh = pickWorst(hourPnLAgg);
+  const bs = pickBest(symbolPnLAgg);
+  const ws = pickWorst(symbolPnLAgg);
 
-  const bestSymbol = (() => {
-    const symbolPnL = {};
-    filteredTrades.forEach(t => {
-      symbolPnL[t.symbol] = (symbolPnL[t.symbol] || 0) + t.pnl;
-    });
-    const best = Object.entries(symbolPnL).reduce((a, b) => a[1] > b[1] ? a : b, ['N/A', 0]);
-    return { symbol: best[0], pnl: best[1] };
-  })();
-
-  const worstSymbol = (() => {
-    const symbolPnL = {};
-    filteredTrades.forEach(t => {
-      symbolPnL[t.symbol] = (symbolPnL[t.symbol] || 0) + t.pnl;
-    });
-    const worst = Object.entries(symbolPnL).reduce((a, b) => a[1] < b[1] ? a : b, ['N/A', 0]);
-    return { symbol: worst[0], pnl: worst[1] };
-  })();
+  const bestDay   = { day:    bd ? bd[0] : "—", pnl: bd ? bd[1] : 0 };
+  const worstDay  = { day:    wd && wd !== bd ? wd[0] : "—", pnl: wd ? wd[1] : 0 };
+  const bestHour  = { hour:   bh ? bh[0] : "—", pnl: bh ? bh[1] : 0 };
+  const worstHour = { hour:   wh && wh !== bh ? wh[0] : "—", pnl: wh ? wh[1] : 0 };
+  const bestSymbol  = { symbol: bs ? bs[0] : "—", pnl: bs ? bs[1] : 0 };
+  const worstSymbol = { symbol: ws && ws !== bs ? ws[0] : "—", pnl: ws ? ws[1] : 0 };
 
   // Early return if still loading or no strategy selected
   if (loading || !selectedStrategy) {
@@ -577,13 +585,12 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         </div>
       </div>
 
-      {/* CARD 1 : 4 KPIs fusionnes (separateurs internes) */}
+      {/* CARD 1 : 4 KPIs separes */}
       {filteredTrades.length > 0 && (
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
 
             {/* 1. P&L Net */}
-            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
               <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
                 P&L Net <span style={{color:T.textMut}}>›</span>
               </div>
@@ -594,7 +601,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             </div>
 
             {/* 2. Taux de Victoire */}
-            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
               <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
                 Taux de victoire <span style={{color:T.textMut}}>›</span>
               </div>
@@ -605,7 +612,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             </div>
 
             {/* 3. Meilleur vs Pire (compact) */}
-            <div style={{padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
               <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
                 Meilleur vs pire <span style={{color:T.textMut}}>›</span>
               </div>
@@ -619,7 +626,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 4. Suivi Regles (ou stat de fallback) */}
             {hasRules ? (
-              <div style={{padding:"16px 20px"}}>
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                   <div style={{fontSize:12,color:T.textSub,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
                     Suivi des règles <span style={{color:T.textMut}}>›</span>
@@ -636,7 +643,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                 <div style={{fontSize:11,color:T.textMut}}>Avec règles / sans règles</div>
               </div>
             ) : (
-              <div style={{padding:"16px 20px"}}>
+              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
                 <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
                   Volume <span style={{color:T.textMut}}>›</span>
                 </div>
@@ -647,7 +654,6 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
               </div>
             )}
 
-          </div>
         </div>
       )}
 
