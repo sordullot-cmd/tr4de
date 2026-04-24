@@ -3176,33 +3176,54 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
     };
   };
 
+  const lastSavedRef = useRef({ broker: null, type: null, size: null });
+
   // Charger les infos du compte quand le nom change
   useEffect(() => {
     if (accountName && accounts.length > 0) {
       const selectedAccount = accounts.find(acc => acc.name === accountName);
       if (selectedAccount) {
-        // Remplir le broker
-        const brokerMap = {
-          "MetaTrader 5": "mt5",
-          "WealthCharts": "wealthcharts",
-          "Tradovate": "tradovate"
-        };
-        setSelectedBroker(brokerMap[selectedAccount.broker] || "tradovate");
-        
-        // Remplir le type et la taille
-        setAccountType(selectedAccount.account_type || "live");
-        if (selectedAccount.account_type === "eval" && selectedAccount.eval_account_size) {
-          setSelectedEvalAccount(selectedAccount.eval_account_size);
-        } else {
-          setSelectedEvalAccount("25k");
-        }
-        
+        const brokerMatch = brokers.find(b =>
+          b.name.toLowerCase() === String(selectedAccount.broker || "").toLowerCase() ||
+          b.id.toLowerCase() === String(selectedAccount.broker || "").toLowerCase()
+        );
+        const bId = brokerMatch?.id || "tradovate";
+        const aType = selectedAccount.account_type || "live";
+        const aSize = (aType === "eval" && selectedAccount.eval_account_size)
+          ? selectedAccount.eval_account_size
+          : "25k";
+
+        lastSavedRef.current = { broker: bId, type: aType, size: aSize };
+        setSelectedBroker(bId);
+        setAccountType(aType);
+        setSelectedEvalAccount(aSize);
         setIsEditingAccount(true);
       }
     } else {
       setIsEditingAccount(false);
     }
   }, [accountName, accounts]);
+
+  // Auto-sauvegarde : ne fire que si la valeur diffère de ce qui est en DB
+  useEffect(() => {
+    if (!isEditingAccount) return;
+    const saved = lastSavedRef.current;
+    if (
+      saved.broker === selectedBroker &&
+      saved.type === accountType &&
+      saved.size === selectedEvalAccount
+    ) return;
+    const t = setTimeout(() => {
+      lastSavedRef.current = {
+        broker: selectedBroker,
+        type: accountType,
+        size: selectedEvalAccount,
+      };
+      saveAccountChanges();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBroker, accountType, selectedEvalAccount, isEditingAccount]);
 
   // Sauvegarder les changements du compte
   const saveAccountChanges = async () => {
@@ -3228,14 +3249,9 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
         return;
       }
       
-      const brokerMap = {
-        "tradovate": "Tradovate",
-        "mt5": "MetaTrader 5",
-        "wealthcharts": "WealthCharts"
-      };
-      
+      const brokerObj = brokers.find(b => b.id === selectedBroker);
       const updateData = {
-        broker: brokerMap[selectedBroker] || "Tradovate",
+        broker: brokerObj?.name || "Tradovate",
         account_type: accountType,
         eval_account_size: accountType === "eval" ? selectedEvalAccount : null,
       };
@@ -3267,7 +3283,14 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
         if (setAccounts) {
           setAccounts(refreshedAccounts || []);
         }
-        
+
+        // Notifier les autres composants (sidebar, selecteurs) pour rafraichir le logo
+        try {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("tr4de:accounts-changed"));
+          }
+        } catch {}
+
         setSaveStatus("success");
         setTimeout(() => setSaveStatus(""), 2000);
       }
@@ -3324,13 +3347,9 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
         return;
       }
       
-      // Mapper les valeurs de broker à leurs formes correctes
-      const brokerMap = {
-        "tradovate": "Tradovate",
-        "mt5": "MetaTrader 5",
-        "wealthcharts": "WealthCharts"
-      };
-      const brokerFormatted = brokerMap[selectedBroker] || "Tradovate";
+      // Nom officiel du broker pour enregistrement DB
+      const brokerObj = brokers.find(b => b.id === selectedBroker);
+      const brokerFormatted = brokerObj?.name || "Tradovate";
       
       // Créer ou obtenir le compte
       let accountId;
@@ -3681,31 +3700,6 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
                   ]}
                   searchable={false}
                 />
-              </div>
-            )}
-            
-            {/* BOUTON SAUVEGARDER POUR ÉDITION */}
-            {isEditingAccount && (
-              <div style={{ marginTop: "16px", display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  onClick={saveAccountChanges}
-                  disabled={saveStatus === "saving"}
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    background: saveStatus === "success" ? T.green : saveStatus === "error" ? T.red : T.accent,
-                    color: T.white,
-                    border: "none",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    cursor: saveStatus === "saving" ? "default" : "pointer",
-                    opacity: saveStatus === "saving" ? 0.6 : 1,
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {saveStatus === "saving" ? "Sauvegarde..." : saveStatus === "success" ? "✓ Sauvegardé" : saveStatus === "error" ? "✗ Erreur" : "Mettre à jour"}
-                </button>
               </div>
             )}
           </div>

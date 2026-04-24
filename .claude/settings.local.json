@@ -6,7 +6,21 @@
       "Bash(npx vercel *)",
       "Bash(vercel --version)",
       "Bash(vercel whoami *)",
-      "Bash(vercel --prod --yes)"
+      "Bash(vercel --prod --yes)",
+      "Bash(npx next *)",
+      "Bash(npm install *)",
+      "Bash(npm ls *)",
+      "Bash(awk 'NR==5008,NR==5137' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(awk 'NR>=5040 && NR<=5170' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(awk 'NR==94,/^}/{print NR\": \"$0}' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(awk -F: '{print $2}')",
+      "Bash(awk 'NR>=660 && NR<=720' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(awk 'NR>=3217 && NR<=3560{if\\(/^  return \\\\\\(/\\) print NR\": \"$0}' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(awk 'NR>=2328 && NR<=2500{if\\(/^  return \\\\\\(/\\) print NR\": \"$0}' f:/tr4de/components/DashboardNew.jsx)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit --allow-empty -m ' *)"
     ]
   }
 }
