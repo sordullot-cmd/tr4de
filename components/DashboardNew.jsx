@@ -306,17 +306,48 @@ function Dashboard({ trades = [], setPage }) {
     );
   }
 
-  const totalPnL = trades.reduce((s,t)=>s+t.pnl,0);
-  const wins = trades.filter(t=>t.pnl>0);
-  const losses = trades.filter(t=>t.pnl<0);
+  // P&L par jour de la semaine (sur tous les trades, tous mois confondus).
+  // Utilise plus bas par la table "Performance par jour".
+  const pnlByDay = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
+  trades.forEach(t => {
+    try {
+      const d = new Date(t.date);
+      if (!isNaN(d.getTime())) {
+        const dayOfWeek = d.getDay();
+        if (pnlByDay[dayOfWeek]) pnlByDay[dayOfWeek].push(t);
+      }
+    } catch (e) {}
+  });
+
+  // Trades du mois affiche dans le calendrier — servent de base pour toutes
+  // les stats du dashboard.
+  const monthTrades = trades.filter(t => {
+    try {
+      const d = new Date(t.date);
+      if (isNaN(d.getTime())) return false;
+      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Si un jour de la semaine est selectionne dans "Performance par jour",
+  // toutes les stats de la page se restreignent a ce jour-la.
+  const filteredTrades = selectedDay !== null
+    ? (pnlByDay[selectedDay] || [])
+    : monthTrades;
+
+  const totalPnL = filteredTrades.reduce((s,t)=>s+t.pnl,0);
+  const wins = filteredTrades.filter(t=>t.pnl>0);
+  const losses = filteredTrades.filter(t=>t.pnl<0);
   const winCount = wins.length;
   const lossCount = losses.length;
-  const winRate = ((winCount/(winCount+lossCount))*100).toFixed(1);
+  const winRate = ((winCount/(winCount+lossCount||1))*100).toFixed(1);
   const profitFactor = (wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0)||1)).toFixed(2);
   const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
-  const maxWin = Math.max(...trades.map(t=>t.pnl));
-  const maxLoss = Math.min(...trades.map(t=>t.pnl));
+  const maxWin = filteredTrades.length ? Math.max(...filteredTrades.map(t=>t.pnl)) : 0;
+  const maxLoss = filteredTrades.length ? Math.min(...filteredTrades.map(t=>t.pnl)) : 0;
 
   // P&L by hour
   const pnlByHour = {};
@@ -331,18 +362,7 @@ function Dashboard({ trades = [], setPage }) {
     } catch (e) {}
   });
 
-  // P&L by day of week
-  const pnlByDay = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
   const dayLabels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  trades.forEach(t => {
-    try {
-      const d = new Date(t.date);
-      if (!isNaN(d.getTime())) {
-        const dayOfWeek = d.getDay();
-        if (pnlByDay[dayOfWeek]) pnlByDay[dayOfWeek].push(t);
-      }
-    } catch (e) {}
-  });
 
   // Calendar heatmap for selected month
   const year = selectedYear;
@@ -367,17 +387,6 @@ function Dashboard({ trades = [], setPage }) {
     } catch (e) {}
   });
 
-  // For Dashboard context, filteredTrades represents all trades
-  // (filtered by month for calendar context, but used for overall stats)
-  const filteredTrades = trades.filter(t => {
-    try {
-      const d = new Date(t.date);
-      if (isNaN(d.getTime())) return false;
-      return d.getMonth() === month && d.getFullYear() === year;
-    } catch (e) {
-      return false;
-    }
-  });
 
   // PENTAGON RADAR COMPONENT
   const PentagonRadar = ({ metrics, size = 280 }) => {
@@ -503,12 +512,14 @@ function Dashboard({ trades = [], setPage }) {
     const winLossRatio = winCount > 0 && lossCount > 0 ? winCount / lossCount : (winCount > 0 ? 100 : 0);
     const winLossScore = Math.min(100, (winLossRatio / 3) * 100);
     
-    const avgPnL = trades.length > 0 ? trades.reduce((s, t) => s + t.pnl, 0) / trades.length : 0;
-    const variance = trades.length > 0 
-      ? trades.reduce((s, t) => s + Math.pow(t.pnl - avgPnL, 2), 0) / trades.length 
+    const avgPnL = filteredTrades.length > 0 ? filteredTrades.reduce((s, t) => s + t.pnl, 0) / filteredTrades.length : 0;
+    const variance = filteredTrades.length > 0
+      ? filteredTrades.reduce((s, t) => s + Math.pow(t.pnl - avgPnL, 2), 0) / filteredTrades.length
       : 0;
     const stdDev = Math.sqrt(variance);
-    const consistencyScore = Math.max(0, 100 - (stdDev / Math.max(...trades.map(t => t.pnl), 1000) * 100));
+    const consistencyScore = filteredTrades.length > 0
+      ? Math.max(0, 100 - (stdDev / Math.max(...filteredTrades.map(t => t.pnl), 1000) * 100))
+      : 0;
     const ruleAdherenceScore = 75; // Default pour Dashboard basé sur comptes
 
     const overallScore = ((winPercent + profitFactorScore + winLossScore + consistencyScore + ruleAdherenceScore) / 5).toFixed(2);
@@ -524,7 +535,7 @@ function Dashboard({ trades = [], setPage }) {
   })();
 
   // P&L curve - grouped by day
-  const sortedTrades = [...trades].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const sortedTrades = [...filteredTrades].sort((a,b)=>new Date(a.date)-new Date(b.date));
   const dailyPnL = {};
   sortedTrades.forEach(t=>{
     try {
@@ -543,7 +554,7 @@ function Dashboard({ trades = [], setPage }) {
 
   // Symbol stats
   const symbolStats = {};
-  trades.forEach(t => {
+  filteredTrades.forEach(t => {
     if (!symbolStats[t.symbol]) symbolStats[t.symbol] = {pnl:0,trades:0,wins:0};
     symbolStats[t.symbol].pnl += t.pnl;
     symbolStats[t.symbol].trades++;
@@ -616,11 +627,27 @@ function Dashboard({ trades = [], setPage }) {
                 </defs>
                 {/* Axe Y labels supprimes du SVG (rendus en HTML overlay) */}
                 
-                {/* Grid lines horizontales tres fines */}
-                {Array.from({length:4},(_, i)=>{
-                  const y = 20 + (i * (200 / 3));
-                  return <line key={`grid-${i}`} x1="35" y1={y} x2="600" y2={y} stroke="#F0F0F0" strokeWidth="1"/>;
-                })}
+                {/* Grid lines horizontales alignees sur chaque tick Y */}
+                {(() => {
+                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                  const niceStep = (max) => {
+                    const rough = max / 3;
+                    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+                    const n = rough / mag;
+                    const nice = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+                    return nice * mag;
+                  };
+                  const step = niceStep(maxCum);
+                  const topMax = Math.ceil(maxCum / step) * step;
+                  const ticks = [];
+                  for (let v = 0; v <= topMax; v += step) ticks.push(v);
+                  return ticks.map((value, i) => {
+                    // topPct va de 91% (v=0) a 8% (v=topMax), en coord viewBox [0,240]
+                    const topPct = 91 - ((value / topMax) * 83);
+                    const y = (topPct / 100) * 240;
+                    return <line key={`grid-${i}`} x1="35" y1={y} x2="600" y2={y} stroke="#F0F0F0" strokeWidth="1"/>;
+                  });
+                })()}
 
                 {/* Chart area - smooth Catmull-Rom curve */}
                 <g>
@@ -655,7 +682,7 @@ function Dashboard({ trades = [], setPage }) {
                     return (
                       <g>
                         <path d={fillD} fill="url(#chartGradient)" stroke="none"/>
-                        <path d={pathD} stroke="#10A37F" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d={pathD} stroke="#10A37F" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -737,7 +764,10 @@ function Dashboard({ trades = [], setPage }) {
                 const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
                 const p = pnlCurve[hoveredChart];
                 const topPct = (130 - ((p.cum / range) * 90)) / 240 * 100;
-                const leftPct = hoveredChart / Math.max(pnlCurve.length - 1, 1) * 100;
+                // Les points de donnees vont de x=35 a x=600 dans un viewBox 600
+                // (le x=0..35 est reserve pour l'axe Y). Il faut donc remapper.
+                const svgX = 35 + (hoveredChart / Math.max(pnlCurve.length - 1, 1)) * 565;
+                const leftPct = (svgX / 600) * 100;
                 return (
                   <div style={{
                     position:"absolute",
@@ -808,123 +838,123 @@ function Dashboard({ trades = [], setPage }) {
 
       </div>  {/* fin MERGED CARD (KPIs + P&L Cumulatif) */}
 
-      {/* GRID: tr4de score + Rapport IA */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1.5fr",gap:8}}>
+      {/* GRID: Calendrier + Rapport IA */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1.5fr",gap:20,alignItems:"start"}}>
 
-      {/* TR4DE SCORE CARD */}
-      <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)"}}>
-        {/* Header: titre + sous-titre */}
-        <div style={{marginBottom:16}}>
-          <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>tr4de score</h3>
-          <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>Évaluation globale de ta performance</p>
+      {/* CALENDRIER P&L */}
+      <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:12,overflow:"hidden",marginTop:8,marginBottom:8}}>
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>Calendrier P&L</div>
+          <div style={{fontSize:12,color:T.textSub,marginBottom:2}}>+{Object.values(dayPnLMap).filter(v=>v>0).reduce((s,v)=>s+v,0).toFixed(0)} $ ce mois</div>
         </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          {/* PENTAGON CHART - CENTRE (NE PAS TOUCHER) */}
-          <div style={{display:"flex",justifyContent:"center",width:"100%",paddingTop:12,overflow:"visible"}}>
-            <PentagonRadar metrics={pentagonMetrics} size={280} />
-          </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <button style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:T.text}} onClick={()=>{
+            if (selectedMonth === 0) {
+              setSelectedMonth(11);
+              setSelectedYear(selectedYear - 1);
+            } else {
+              setSelectedMonth(selectedMonth - 1);
+            }
+          }}>‹</button>
+          <div style={{fontSize:12,fontWeight:600,color:T.text}}>{new Date(year,month).toLocaleString('en-US',{month:'long',year:'numeric'})}</div>
+          <button style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:T.text}} onClick={()=>{
+            if (selectedMonth === 11) {
+              setSelectedMonth(0);
+              setSelectedYear(selectedYear + 1);
+            } else {
+              setSelectedMonth(selectedMonth + 1);
+            }
+          }}>›</button>
+        </div>
 
-          {/* Score + progress (moderne, sans divider vertical) */}
-          <div>
-            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{display:"flex",alignItems:"baseline",gap:5}}>
-                <span style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2,lineHeight:1}}>
-                  {pentagonMetrics.overallScore}
-                </span>
-                <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
-              </div>
-              <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>Score global</span>
-            </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,aspectRatio:"1.8"}}>
+          {["L","M","M","J","V","S","D"].map((d, idx)=>(
+            <div key={idx} style={{fontSize:8,fontWeight:600,color:T.textMut,textAlign:"center",aspectRatio:"1",display:"flex",alignItems:"center",justifyContent:"center"}}>{d}</div>
+          ))}
+          {calendarDays.map((day,i)=>{
+            if (!day) return <div key={i} style={{aspectRatio:"1"}}/>;;
+            const pnl = dayPnLMap[day]||0;
+            const maxDayPnL = Math.max(...Object.values(dayPnLMap).map(Math.abs), 1);
+            const bgColor = pnl > 0 ? T.greenBg : pnl < 0 ? T.redBg : T.bg;
+            const textColor = pnl > 0 ? T.green : pnl < 0 ? T.red : T.text;
+            const opacity = Math.abs(pnl) / Math.abs(maxDayPnL);
+            const borderStyle = day === 31 ? `2px solid ${T.accent}` : `1px solid ${T.border}`;
 
-            <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
+            return (
               <div
+                key={i}
                 style={{
-                  width:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                  height:"100%",
-                  background:"#10A37F",
-                  transition:"width 0.6s ease",
-                  borderRadius:2,
+                  aspectRatio:"1",
+                  background:bgColor,
+                  opacity:Math.max(0.35,opacity),
+                  borderRadius:3,
+                  display:"flex",
+                  flexDirection:"column",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  fontSize:8,
+                  fontWeight:600,
+                  color:T.text,
+                  border:borderStyle,
+                  cursor:"pointer",
+                  transition:"all 0.2s"
                 }}
-              />
-            </div>
-          </div>
+                onMouseEnter={(e)=>{e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.1)"}}
+                onMouseLeave={(e)=>{e.currentTarget.style.boxShadow="none"}}
+              >
+                <div style={{fontSize:11,fontWeight:700}}>{day}</div>
+                {pnl !== 0 && <div style={{fontSize:10,color:textColor,fontWeight:600}}>{pnl>0?"+":""}{pnl.toFixed(0)}</div>}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* AI REPORT SUMMARY (droite) */}
-      <AIReportSummaryCard onOpenReports={setPage ? () => setPage("agent") : undefined} />
+      <div style={{marginTop:20,marginBottom:20}}>
+        <AIReportSummaryCard onOpenReports={setPage ? () => setPage("agent") : undefined} />
+      </div>
 
-      </div>  {/* Close tr4de + Rapport IA grid */}
+      </div>  {/* Close Calendrier + Rapport IA grid */}
 
-      {/* CALENDAR + RECENT TRADES + EMOTIONAL IMPACT */}
+      {/* TR4DE SCORE + RECENT TRADES + EMOTIONAL IMPACT */}
       <div style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 1.1fr",gap:8}}>
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:12,overflow:"hidden"}}>
-          <div style={{marginBottom:8}}>
-        <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>Calendrier P&L</div>
-            <div style={{fontSize:12,color:T.textSub,marginBottom:2}}>+{Object.values(dayPnLMap).filter(v=>v>0).reduce((s,v)=>s+v,0).toFixed(0)} $ ce mois</div>
+        {/* TR4DE SCORE CARD */}
+        <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)"}}>
+          <div style={{marginBottom:16}}>
+            <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>tr4de score</h3>
+            <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>Évaluation globale de ta performance</p>
           </div>
-          
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <button style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:T.text}} onClick={()=>{
-              if (selectedMonth === 0) {
-                setSelectedMonth(11);
-                setSelectedYear(selectedYear - 1);
-              } else {
-                setSelectedMonth(selectedMonth - 1);
-              }
-            }}>‹</button>
-            <div style={{fontSize:12,fontWeight:600,color:T.text}}>{new Date(year,month).toLocaleString('en-US',{month:'long',year:'numeric'})}</div>
-            <button style={{background:"none",border:"none",fontSize:16,cursor:"pointer",color:T.text}} onClick={()=>{
-              if (selectedMonth === 11) {
-                setSelectedMonth(0);
-                setSelectedYear(selectedYear + 1);
-              } else {
-                setSelectedMonth(selectedMonth + 1);
-              }
-            }}>›</button>
-          </div>
-          
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,aspectRatio:"1.8"}}>
-            {["L","M","M","J","V","S","D"].map((d, idx)=>(
-              <div key={idx} style={{fontSize:8,fontWeight:600,color:T.textMut,textAlign:"center",aspectRatio:"1",display:"flex",alignItems:"center",justifyContent:"center"}}>{d}</div>
-            ))}
-            {calendarDays.map((day,i)=>{
-              if (!day) return <div key={i} style={{aspectRatio:"1"}}/>;;
-              const pnl = dayPnLMap[day]||0;
-              const maxDayPnL = Math.max(...Object.values(dayPnLMap).map(Math.abs), 1);
-              const bgColor = pnl > 0 ? T.greenBg : pnl < 0 ? T.redBg : T.bg;
-              const textColor = pnl > 0 ? T.green : pnl < 0 ? T.red : T.text;
-              const opacity = Math.abs(pnl) / Math.abs(maxDayPnL);
-              const borderStyle = day === 31 ? `2px solid ${T.accent}` : `1px solid ${T.border}`;
-              
-              return (
-                <div 
-                  key={i} 
-                  style={{
-                    aspectRatio:"1",
-                    background:bgColor,
-                    opacity:Math.max(0.35,opacity),
-                    borderRadius:3,
-                    display:"flex",
-                    flexDirection:"column",
-                    alignItems:"center",
-                    justifyContent:"center",
-                    fontSize:8,
-                    fontWeight:600,
-                    color:T.text,
-                    border:borderStyle,
-                    cursor:"pointer",
-                    transition:"all 0.2s"
-                  }}
-                  onMouseEnter={(e)=>{e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.1)"}}
-                  onMouseLeave={(e)=>{e.currentTarget.style.boxShadow="none"}}
-                >
-                  <div style={{fontSize:11,fontWeight:700}}>{day}</div>
-                  {pnl !== 0 && <div style={{fontSize:10,color:textColor,fontWeight:600}}>{pnl>0?"+":""}{pnl.toFixed(0)}</div>}
+
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <div style={{display:"flex",justifyContent:"center",width:"100%",paddingTop:12,overflow:"visible"}}>
+              <PentagonRadar metrics={pentagonMetrics} size={280} />
+            </div>
+
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+                  <span style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2,lineHeight:1}}>
+                    {pentagonMetrics.overallScore}
+                  </span>
+                  <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
                 </div>
-              );
-            })}
+                <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>Score global</span>
+              </div>
+
+              <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
+                <div
+                  style={{
+                    width:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                    height:"100%",
+                    background:"#10A37F",
+                    transition:"width 0.6s ease",
+                    borderRadius:2,
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -942,13 +972,29 @@ function Dashboard({ trades = [], setPage }) {
               <div style={{textAlign:"right"}}>P&L</div>
             </div>
           </div>
-          <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",maxHeight:360}}>
             {(() => {
-              const dayFilteredTrades = selectedDay !== null ? (pnlByDay[selectedDay] || []) : filteredTrades;
-              return [...dayFilteredTrades].reverse().slice(0,6).map((t,i)=>(
-                <div key={i} style={{padding:8,background:T.bg,borderRadius:6,display:"grid",gridTemplateColumns:"1fr 0.6fr",gap:8,fontSize:11}}>
-                  <div><div style={{fontWeight:600,color:T.text}}>{t.symbol}</div><div style={{fontSize:9,color:(t.direction === 'Short' ? T.red : T.blue)}}>{t.direction || 'Long'}</div></div>
-                  <div style={{textAlign:"right",fontWeight:500,color:t.pnl>=0?T.green:T.red}}>{t.pnl>=0?"+":""}{getCurrencySymbol()}{t.pnl.toFixed(0)}</div>
+              // Tous les trades de la semaine (lundi 00:00 → dimanche 23:59)
+              const now = new Date();
+              const dow = now.getDay();
+              const weekStart = new Date(now);
+              weekStart.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
+              weekStart.setHours(0,0,0,0);
+              const weekEnd = new Date(weekStart);
+              weekEnd.setDate(weekStart.getDate() + 7);
+
+              const source = selectedDay !== null ? (pnlByDay[selectedDay] || []) : filteredTrades;
+              const weekTrades = selectedDay !== null
+                ? source
+                : source.filter(t => {
+                    const d = new Date(t.date);
+                    return !isNaN(d.getTime()) && d >= weekStart && d < weekEnd;
+                  });
+              const list = [...weekTrades].reverse();
+              return list.map((t,i)=>(
+                <div key={i} style={{padding:"10px 8px",display:"grid",gridTemplateColumns:"1fr 0.6fr",gap:8,fontSize:11,borderBottom:i<list.length-1?`1px solid ${T.border}`:"none"}}>
+                  <div><div style={{fontWeight:600,color:T.text}}>{t.symbol}</div><div style={{fontSize:9,color:T.textMut}}>{t.direction || 'Long'}</div></div>
+                  <div style={{textAlign:"right",fontWeight:500,color:t.pnl>0?T.green:t.pnl<0?T.red:T.textMut}}>{t.pnl>0?"+":""}{getCurrencySymbol()}{t.pnl.toFixed(0)}</div>
                 </div>
               ));
             })()}
@@ -1054,11 +1100,11 @@ function Dashboard({ trades = [], setPage }) {
                   return <tr key={day} onClick={()=>setSelectedDay(isSelected ? null : idx)} style={{borderBottom:isHidden?`none`:`1px solid ${T.border}`,cursor:"pointer",background:"transparent",display:isHidden?"none":"table-row",transition:"background 0.2s"}}>
                     <td style={{padding:"10px 14px",fontWeight:600,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayLabels[idx]}</td>
                     <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayTrades.length}</td>
-                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{((dayTrades.length/filteredTrades.length)*100).toFixed(1)}%</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:dayWinRate>=50?T.green:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayWinRate}%</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:T.green,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgWin,true)}</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgLoss,true)}</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:dayPnL>=0?T.green:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayPnL/Math.max(dayTrades.length,1),true)}</td>
+                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{((dayTrades.length/Math.max(monthTrades.length,1))*100).toFixed(1)}%</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:dayTrades.length===0?T.textMut:(dayWinRate>=50?T.green:T.red),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayWinRate}%</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:dayAvgWin===0?T.textMut:T.green,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgWin,true)}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:dayAvgLoss===0?T.textMut:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgLoss,true)}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:(()=>{const v=dayPnL/Math.max(dayTrades.length,1);return v>0?T.green:v<0?T.red:T.textMut;})(),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayPnL/Math.max(dayTrades.length,1),true)}</td>
                   </tr>;
                 });
               })()}
@@ -3405,6 +3451,8 @@ function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, acc
           entry: t.entry,
           exit: t.exit,
           pnl: t.pnl,
+          entry_time: t.entryTime || t.entry_time || null,
+          exit_time: t.exitTime || t.exit_time || null,
         }));
       
       if (tradesToInsert.length === 0) {
@@ -4858,11 +4906,11 @@ function DisciplinePage({ trades = [] }) {
   // Liste quotidienne uniquement (base + custom Supabase). Affichée dans la
   // section "Liste quotidienne".
   const dailyRules = [
-    { id: "premarket", label: "Pre Market Routine", uuid: null },
-    { id: "biais", label: "Biais Journalier", uuid: null },
-    { id: "news", label: "News et Key Levels", uuid: null },
-    { id: "followall", label: "Followed All Rules", uuid: null },
-    { id: "journal", label: "Journal d'après session", uuid: null },
+    { id: "premarket", label: "Routine pré-marché", uuid: null },
+    { id: "biais", label: "Biais journalier", uuid: null },
+    { id: "news", label: "News et niveaux clés", uuid: null },
+    { id: "followall", label: "Toutes les règles respectées", uuid: null },
+    { id: "journal", label: "Journal d'après-session", uuid: null },
     ...customRules.map(r => ({ id: r.rule_id, label: r.text, uuid: r.id })),
   ].map(r => ({ ...r, status: checkedRuleIds[r.id] || false }));
 
@@ -4949,7 +4997,7 @@ function DisciplinePage({ trades = [] }) {
         <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:12}}>
           {/* DATE */}
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",justifyContent:"space-between",height:"100%"}}>
-            <div style={{fontSize:12,color:T.textMut,fontWeight:600}}>Today's progress</div>
+            <div style={{fontSize:12,color:T.textMut,fontWeight:600}}>Progression du jour</div>
             <div style={{display:"flex",justifyContent:"flex-start",alignItems:"flex-end",gap:12}}>
               <div style={{display:"flex",gap:4,flex:1}}>
                 <div style={{fontSize:32,fontWeight:700,color:T.text}}>{currentMonth}</div>
@@ -4957,13 +5005,9 @@ function DisciplinePage({ trades = [] }) {
               </div>
               <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flex:1,justifyContent:"flex-end"}}>
                 <svg width="70" height="70" style={{transform:"rotate(-90deg)"}}>
-                  {/* Background circle */}
                   <circle cx="35" cy="35" r="30" fill="none" stroke={T.bg} strokeWidth="4"/>
-                  {/* Progress circle */}
                   <circle
-                    cx="35"
-                    cy="35"
-                    r="30"
+                    cx="35" cy="35" r="30"
                     fill="none"
                     stroke={T.green}
                     strokeWidth="4"
@@ -4972,20 +5016,18 @@ function DisciplinePage({ trades = [] }) {
                     strokeLinecap="round"
                     style={{transition:"stroke-dashoffset 0.3s"}}
                   />
-                  {/* Center text */}
-                  <text 
-                    x="35" 
-                    y="40" 
-                    textAnchor="middle" 
-                    fontSize="18" 
-                    fontWeight="700" 
+                  <text
+                    x="35" y="40"
+                    textAnchor="middle"
+                    fontSize="18"
+                    fontWeight="700"
                     fill={T.text}
                     style={{transform:"rotate(90deg)",transformOrigin:"35px 35px"}}
                   >
                     {Math.round(completeProgress)}%
                   </text>
                 </svg>
-                <div style={{fontSize:10,fontWeight:500,color:T.textMut}}>{completedCount} des {allRules.length} règles</div>
+                <div style={{fontSize:10,fontWeight:500,color:T.textMut}}>{completedCount} sur {allRules.length} règles</div>
               </div>
             </div>
           </div>
@@ -5037,7 +5079,7 @@ function DisciplinePage({ trades = [] }) {
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12}}>
             <div style={{padding:16,borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:T.text}}>Liste quotidienne</div>
+                <div style={{fontSize:13,fontWeight:600,color:T.text}}>Checklist quotidienne</div>
                 <div style={{fontSize:11,color:T.textMut}}>{currentDay} {currentMonth.toLowerCase()}.</div>
               </div>
               <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{dailyRules.filter(r=>r.status).length}/{dailyRules.length}</div>
@@ -5085,7 +5127,7 @@ function DisciplinePage({ trades = [] }) {
           {/* HEATMAP CALENDAR - DISCIPLINE TRACKER */}
           <div key={heatmapVersion} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:28,minWidth:0,overflow:"hidden"}}>
             <div style={{marginBottom:24}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.text}}>Progress Tracker</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.text}}>Suivi de progression</div>
               <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{dailyRules.filter(r => r.status).length}/{dailyRules.length}</div>
               
               {(() => {
@@ -5394,12 +5436,12 @@ function DisciplinePage({ trades = [] }) {
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:1000}}>
               <thead>
                 <tr style={{background:T.bg,borderBottom:`1px solid ${T.border}`}}>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Rule</th>
+                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Règle</th>
                   <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Type</th>
                   <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Condition</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Streak</th>
+                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Série</th>
                   <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Performance moy.</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Follow Rate</th>
+                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Taux de respect</th>
                 </tr>
               </thead>
               <tbody>
@@ -5425,7 +5467,7 @@ function DisciplinePage({ trades = [] }) {
                       </td>
                       <td style={{padding:"10px 12px",fontSize:11}}>
                         <span style={{background:data?.type==="Auto"?T.accentBg:T.bg,color:data?.type==="Auto"?T.accent:T.text,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600}}>
-                          {data?.type||"Manual"}
+                          {data?.type||"Manuel"}
                         </span>
                       </td>
                       <td style={{padding:"10px 12px",fontSize:12,color:T.textMut}}>{data?.condition||"—"}</td>
@@ -6282,7 +6324,7 @@ export default function App() {
               {page !== "add-trade" && (
                 <HeaderSlotPortal>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {["dashboard","strategies","journal","trades","calendar","discipline"].includes(page) && (
+                    {["dashboard","strategies","journal","trades","discipline"].includes(page) && (
                       <DateRangePicker
                         value={globalDateRange}
                         onChange={(r) => setGlobalDateRange(r)}
