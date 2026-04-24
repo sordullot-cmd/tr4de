@@ -1545,6 +1545,8 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
   const [filterEndDate, setFilterEndDate] = useState(() => getInitWeekRange().end);
   // Selection multiple via checkbox
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeletingTrades, setIsDeletingTrades] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [showBulkStrategyDropdown, setShowBulkStrategyDropdown] = useState(false);
   const [openStratMenuId, setOpenStratMenuId] = useState(null);
@@ -2525,6 +2527,61 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
 
       </div>
 
+      {/* CONFIRM DELETE MODAL */}
+      {confirmDeleteOpen && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div
+          onClick={() => !isDeletingTrades && setConfirmDeleteOpen(false)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}
+        >
+          <div
+            onClick={(e)=>e.stopPropagation()}
+            style={{background:"#FFFFFF",borderRadius:14,maxWidth:420,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.22)",border:"1px solid #E5E5E5",overflow:"hidden"}}
+          >
+            <div style={{padding:"20px 24px 8px",display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:10,background:"#FEF2F2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <LucideTrash2 size={16} strokeWidth={1.75} color="#EF4444"/>
+              </div>
+              <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
+                Supprimer {selectedIds.size} trade{selectedIds.size > 1 ? "s" : ""} ?
+              </h3>
+            </div>
+            <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
+              Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Les trades sélectionnés seront supprimés et ne pourront pas être récupérés.
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
+              <button
+                onClick={()=>setConfirmDeleteOpen(false)}
+                disabled={isDeletingTrades}
+                style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:isDeletingTrades?"not-allowed":"pointer",fontFamily:"inherit",opacity:isDeletingTrades?0.5:1}}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async ()=>{
+                  setIsDeletingTrades(true);
+                  try {
+                    const tradesToDelete = filteredTrades.filter(t => selectedIds.has(tradeKey(t)));
+                    for (const t of tradesToDelete) {
+                      if (onDeleteTrade) await onDeleteTrade(t);
+                    }
+                    setSelectedIds(new Set());
+                  } catch (e) { console.error("delete trades failed:", e); }
+                  finally {
+                    setIsDeletingTrades(false);
+                    setConfirmDeleteOpen(false);
+                  }
+                }}
+                disabled={isDeletingTrades}
+                style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:isDeletingTrades?"not-allowed":"pointer",fontFamily:"inherit",opacity:isDeletingTrades?0.7:1}}
+              >
+                {isDeletingTrades ? "Suppression..." : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* BOTTOM ACTION BAR (visible quand au moins 1 trade selectionne) */}
       {selectedIds.size > 0 && (
         <div style={{
@@ -2603,14 +2660,7 @@ function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade
           <span style={{width:1,height:18,background:"#E5E5E5"}} />
 
           <button
-            onClick={async () => {
-              if (!window.confirm(`Supprimer ${selectedIds.size} trade${selectedIds.size > 1 ? "s" : ""} ?`)) return;
-              const tradesToDelete = filteredTrades.filter(t => selectedIds.has(tradeKey(t)));
-              for (const t of tradesToDelete) {
-                if (onDeleteTrade) await onDeleteTrade(t);
-              }
-              setSelectedIds(new Set());
-            }}
+            onClick={() => setConfirmDeleteOpen(true)}
             style={{background:"transparent",border:"none",color:"#EF4444",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit",padding:"4px 8px",borderRadius:6}}
             onMouseEnter={(e)=>{e.currentTarget.style.background="#FEF2F2"}}
             onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
