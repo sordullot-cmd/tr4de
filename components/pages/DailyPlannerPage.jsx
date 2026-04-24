@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, Sun, TrendingUp, CloudSun, Moon, Plus, Check, Trash2,
-  Battery, Flame, ListTodo, Target as TargetIcon,
+  ChevronLeft, ChevronRight, Plus, Check, Trash2,
+  Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
+  StickyNote, ChevronDown,
+  // Icônes pour les habitudes
+  Dumbbell, BookOpen, Brain, Footprints, Bike, Waves, PenLine, BedDouble, AlarmClock,
+  Droplets, Coffee, Apple, Salad, ShoppingCart, GraduationCap, TrendingUp,
+  Music, Sparkles as Sparkle, Wallet, Code as CodeIcon, Users, ShowerHead,
+  Pill, Dog, Sprout, Wind, Sun, Star, Mic, Utensils,
 } from "lucide-react";
 
 const T = {
@@ -14,66 +20,140 @@ const T = {
   green: "#10A37F", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
 };
 
-// Stockage : daily planner (par jour), habits (partagées), tasks (partagées)
 const STORAGE_PLANNER = "tr4de_daily_planner";
 const STORAGE_HABITS = "tr4de_habits";
 const STORAGE_HABITS_HISTORY = "tr4de_habits_history";
-const STORAGE_TASKS = "tr4de_tasks";
-
-const BLOCKS = [
-  { id: "morning",  label: "Matin",             icon: Sun,        color: "#F59E0B", bg: "#FFF7ED" },
-  { id: "trading",  label: "Session de trading", icon: TrendingUp, color: "#10A37F", bg: "#ECFDF5" },
-  { id: "afternoon", label: "Après-midi",       icon: CloudSun,   color: "#3B82F6", bg: "#EFF6FF" },
-  { id: "evening",  label: "Soir",              icon: Moon,       color: "#6366F1", bg: "#EEF2FF" },
-];
-const TASK_PRIORITIES = [
-  { id: "low",    label: "Basse",  color: "#8E8E8E" },
-  { id: "normal", label: "Normale", color: "#3B82F6" },
-  { id: "high",   label: "Haute",  color: "#F59E0B" },
-  { id: "urgent", label: "Urgente", color: "#EF4444" },
-];
+const STORAGE_DAILY_NOTES = "tr4de_dp_notes"; // { [iso]: "note text" }
 
 const todayKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const fmtDateLong = (iso) => {
+const capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const fmtDateParts = (iso) => {
   const d = new Date(iso + "T00:00:00");
-  const s = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return {
+    weekday: capFirst(d.toLocaleDateString("fr-FR", { weekday: "long" })),
+    day: d.getDate(),
+    month: capFirst(d.toLocaleDateString("fr-FR", { month: "long" })),
+    year: d.getFullYear(),
+  };
 };
 
-const defaultHabits = () => ([
-  { id: 1, name: "sommeil 8h" },
-  { id: 2, name: "méditation" },
-  { id: 3, name: "sport" },
-]);
+// Auto-icône : devine une icône pertinente à partir du nom de l'habitude.
+const ICON_RULES = [
+  { re: /(médit|meditat|yoga|pleine conscience|respir|breath)/i, Icon: Brain },
+  { re: /(sport|run|jog|fitness|gym|muscu|entr|étirement|etirement|stretch)/i, Icon: Dumbbell },
+  { re: /(marche|walk|balade|promenade)/i, Icon: Footprints },
+  { re: /(vélo|velo|bike|cycle)/i, Icon: Bike },
+  { re: /(nat(a|er)|swim|pisc)/i, Icon: Waves },
+  { re: /(lect|livre|read|book)/i, Icon: BookOpen },
+  { re: /(journal|écri|ecri|write|blog)/i, Icon: PenLine },
+  { re: /(sommeil|dormi|sleep|coucher)/i, Icon: BedDouble },
+  { re: /(lever|réveil|reveil|wake)/i, Icon: AlarmClock },
+  { re: /(eau|boire|hydra|water)/i, Icon: Droplets },
+  { re: /(café|cafe|coffee|thé|the|tea)/i, Icon: Coffee },
+  { re: /(diet|régime|regime|nutri)/i, Icon: Utensils },
+  { re: /(sain|healthy|légume|legume|salade|manger|food|repas|brocoli|veget)/i, Icon: Salad },
+  { re: /(éloquence|eloquence|oratoire|prise de parole|speaking|discours)/i, Icon: Mic },
+  { re: /(salle|gym|muscu|musculation)/i, Icon: Dumbbell },
+  { re: /(fruit|pomme|apple|banane)/i, Icon: Apple },
+  { re: /(market|course|épicerie|epicerie|shopping|groceries)/i, Icon: ShoppingCart },
+  { re: /(étude|etude|study|cours|apprend|learn)/i, Icon: GraduationCap },
+  { re: /(trading|marché|marche|bourse|chart)/i, Icon: TrendingUp },
+  { re: /(musique|guitare|piano|music)/i, Icon: Music },
+  { re: /(argent|budget|money|finance)/i, Icon: Wallet },
+  { re: /(code|dev|program)/i, Icon: CodeIcon },
+  { re: /(famille|family|appel|call)/i, Icon: Users },
+  { re: /(douche|shower|bain|hygiène|hygiene)/i, Icon: ShowerHead },
+  { re: /(vitamin|suppl|complément|complement|médoc|medoc)/i, Icon: Pill },
+  { re: /(chien|dog)/i, Icon: Dog },
+  { re: /(jardin|plant)/i, Icon: Sprout },
+  { re: /(prière|priere|pray|gratitude|mindful)/i, Icon: Sparkle },
+  { re: /(soleil|sun|matin)/i, Icon: Sun },
+  { re: /(air|vent|wind)/i, Icon: Wind },
+];
+function autoIcon(name) {
+  if (!name) return Star;
+  for (const r of ICON_RULES) if (r.re.test(name)) return r.Icon;
+  return Star;
+}
+
+// Auto-description : si le nom match un thème connu, suggère une description.
+const DESC_RULES = [
+  { re: /(lect|livre|read|book)/i,                          desc: "Lire 20 minutes" },
+  { re: /(journal|écri|ecri|write|blog)/i,                  desc: "Noter pensées et ressentis du jour" },
+  { re: /(diet|régime|regime|nutri|sain|healthy|food|repas)/i, desc: "Manger équilibré et respecter les portions" },
+  { re: /(salle|gym|muscu|musculation)/i,                   desc: "Séance de musculation (45-60 min)" },
+  { re: /(sport|run|jog|fitness|entr)/i,                    desc: "Séance cardio / entraînement" },
+  { re: /(éloquence|eloquence|oratoire|prise de parole|speaking|discours)/i, desc: "S'entraîner à parler à voix haute 10 min" },
+  { re: /(sommeil|dormi|sleep|coucher)/i,                   desc: "Dormir au moins 7 à 8 heures" },
+  { re: /(médit|meditat|yoga|pleine conscience)/i,          desc: "Méditation 10 minutes" },
+  { re: /(marche|walk|balade|promenade)/i,                  desc: "Marcher 30 minutes en extérieur" },
+  { re: /(vélo|velo|bike|cycle)/i,                          desc: "Sortie vélo" },
+  { re: /(nat(a|er)|swim|pisc)/i,                           desc: "Séance de natation" },
+  { re: /(eau|boire|hydra|water)/i,                         desc: "Boire 2L d'eau dans la journée" },
+  { re: /(café|cafe|coffee)/i,                              desc: "Limiter la caféine" },
+  { re: /(étude|etude|study|cours|apprend|learn)/i,         desc: "Session d'étude 45 min" },
+  { re: /(trading|marché|marche|bourse|chart)/i,            desc: "Revue de marché & journal de trading" },
+  { re: /(musique|guitare|piano|music)/i,                   desc: "Pratique musicale" },
+  { re: /(nettoya|clean|rang|ménage|menage)/i,              desc: "Mise en ordre de l'espace" },
+  { re: /(argent|budget|money|finance)/i,                   desc: "Revue du budget" },
+  { re: /(code|dev|program)/i,                              desc: "Session de code dédiée" },
+  { re: /(famille|family|appel|call)/i,                     desc: "Appeler un proche" },
+  { re: /(étirement|etirement|stretch)/i,                   desc: "Étirements 10 minutes" },
+  { re: /(respir|breath)/i,                                 desc: "Exercices de respiration" },
+  { re: /(prière|priere|pray|gratitude)/i,                  desc: "Moment de gratitude" },
+];
+function autoDescription(name) {
+  if (!name) return "";
+  for (const r of DESC_RULES) if (r.re.test(name)) return r.desc;
+  return "";
+}
+
+const defaultHabits = () => {
+  const mk = (id, name) => ({ id, name, description: autoDescription(name) });
+  return [
+    mk(1, "Lecture"),
+    mk(2, "Journaling"),
+    mk(3, "Diet"),
+    mk(4, "Salle de sport"),
+    mk(5, "Éloquence"),
+    mk(6, "Sommeil"),
+  ];
+};
 
 export default function DailyPlannerPage() {
   const [dateKey, setDateKey] = useState(() => todayKey());
 
-  // --- Daily planner (blocks, goals, priorities, energy) ---
+  // Planner (tâches, objectifs, énergie) par jour
   const [plannerStore, setPlannerStore] = useState(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(localStorage.getItem(STORAGE_PLANNER) || "{}"); } catch { return {}; }
   });
   useEffect(() => { try { localStorage.setItem(STORAGE_PLANNER, JSON.stringify(plannerStore)); } catch {} }, [plannerStore]);
-  const day = plannerStore[dateKey] || { blocks: {}, goals: [], priorities: [], energy: 7 };
+  const day = plannerStore[dateKey] || { tasks: [], goals: [], energy: 7 };
   const updateDay = (patch) => setPlannerStore(prev => ({ ...prev, [dateKey]: { ...day, ...patch } }));
-  const setBlockText = (blockId, text) => updateDay({ blocks: { ...day.blocks, [blockId]: text } });
 
-  // --- Tasks (simple list, no date) ---
-  const [tasks, setTasks] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem(STORAGE_TASKS) || "[]"); } catch { return []; }
-  });
-  useEffect(() => { try { localStorage.setItem(STORAGE_TASKS, JSON.stringify(tasks)); } catch {} }, [tasks]);
-
-  // --- Habits ---
+  // Habits
+  // Migration one-shot : si l'utilisateur n'a pas encore été migré vers la liste
+  // par défaut "v2", on remplace ses habitudes par celle-ci et on oublie l'historique.
+  const HABITS_VERSION_KEY = "tr4de_habits_version";
+  const HABITS_CURRENT_VERSION = "v2-defaults-2026-04";
   const [habits, setHabits] = useState(() => {
     if (typeof window === "undefined") return defaultHabits();
-    try { const s = JSON.parse(localStorage.getItem(STORAGE_HABITS) || "null"); return Array.isArray(s) && s.length ? s : defaultHabits(); }
-    catch { return defaultHabits(); }
+    try {
+      const v = localStorage.getItem(HABITS_VERSION_KEY);
+      if (v !== HABITS_CURRENT_VERSION) {
+        const next = defaultHabits();
+        localStorage.setItem(STORAGE_HABITS, JSON.stringify(next));
+        localStorage.setItem(STORAGE_HABITS_HISTORY, "{}");
+        localStorage.setItem(HABITS_VERSION_KEY, HABITS_CURRENT_VERSION);
+        return next;
+      }
+      const s = JSON.parse(localStorage.getItem(STORAGE_HABITS) || "null");
+      return Array.isArray(s) && s.length ? s : defaultHabits();
+    } catch { return defaultHabits(); }
   });
   const [habitHistory, setHabitHistory] = useState(() => {
     if (typeof window === "undefined") return {};
@@ -89,64 +169,48 @@ export default function DailyPlannerPage() {
       return { ...prev, [habitId]: h };
     });
   };
-  const computeStreak = (habitId) => {
-    const hh = habitHistory[habitId] || {};
-    let streak = 0;
-    const cursor = new Date(dateKey + "T00:00:00");
-    while (true) {
-      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
-      if (hh[iso]) { streak++; cursor.setDate(cursor.getDate() - 1); } else break;
-    }
-    return streak;
+  const removeHabit = (id) => {
+    setHabits(prev => prev.filter(h => h.id !== id));
+    setHabitHistory(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
-  // --- Inline inputs ---
-  const [newGoal, setNewGoal] = useState("");
-  const [newPriority, setNewPriority] = useState("");
-  const [newTask, setNewTask] = useState("");
-  const [taskPriority, setTaskPriority] = useState("normal");
-  const [newHabitName, setNewHabitName] = useState("");
-  const [showHabitForm, setShowHabitForm] = useState(false);
-  const [taskFilter, setTaskFilter] = useState("open"); // all | open | done
+  // Habit form (add + edit)
+  const [habitFormOpen, setHabitFormOpen] = useState(false);
+  const [editingHabitId, setEditingHabitId] = useState(null);
+  const emptyHabit = { name: "", description: "", time: "", location: "" };
+  const [habitDraft, setHabitDraft] = useState(emptyHabit);
+  const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setHabitFormOpen(true); };
+  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "" }); setEditingHabitId(h.id); setHabitFormOpen(true); };
+  const saveHabit = () => {
+    const nm = habitDraft.name.trim();
+    if (!nm) return;
+    const desc = habitDraft.description.trim() || autoDescription(nm);
+    if (editingHabitId) {
+      setHabits(prev => prev.map(h => h.id === editingHabitId ? { ...h, name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim() } : h));
+    } else {
+      setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim() }]);
+    }
+    setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null);
+  };
+  const closeHabitForm = () => { setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); };
 
+  // Tasks & goals (sans limite)
+  const [newTask, setNewTask] = useState("");
+  const [newGoal, setNewGoal] = useState("");
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    updateDay({ tasks: [...(day.tasks || []), { id: Date.now(), text: newTask.trim(), done: false }] });
+    setNewTask("");
+  };
+  const toggleTask = (id) => updateDay({ tasks: (day.tasks || []).map(p => p.id === id ? { ...p, done: !p.done } : p) });
+  const removeTask = (id) => updateDay({ tasks: (day.tasks || []).filter(p => p.id !== id) });
   const addGoal = () => {
     if (!newGoal.trim()) return;
     updateDay({ goals: [...(day.goals || []), { id: Date.now(), text: newGoal.trim(), done: false }] });
     setNewGoal("");
   };
-  const toggleGoal = (id) => updateDay({ goals: day.goals.map(g => g.id === id ? { ...g, done: !g.done } : g) });
-  const removeGoal = (id) => updateDay({ goals: day.goals.filter(g => g.id !== id) });
-
-  const addPriority = () => {
-    if (!newPriority.trim()) return;
-    if ((day.priorities || []).length >= 3) return;
-    updateDay({ priorities: [...(day.priorities || []), { id: Date.now(), text: newPriority.trim(), done: false }] });
-    setNewPriority("");
-  };
-  const togglePriority = (id) => updateDay({ priorities: day.priorities.map(p => p.id === id ? { ...p, done: !p.done } : p) });
-  const removePriority = (id) => updateDay({ priorities: day.priorities.filter(p => p.id !== id) });
-
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    setTasks(prev => [
-      { id: Date.now() + Math.random(), text: newTask.trim(), priority: taskPriority, done: false, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
-    setNewTask(""); setTaskPriority("normal");
-  };
-  const toggleTask = (id) => setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const removeTask = (id) => setTasks(prev => prev.filter(t => t.id !== id));
-
-  const addHabit = () => {
-    const name = newHabitName.trim();
-    if (!name) return;
-    setHabits(prev => [...prev, { id: Date.now(), name }]);
-    setNewHabitName(""); setShowHabitForm(false);
-  };
-  const removeHabit = (id) => {
-    setHabits(prev => prev.filter(h => h.id !== id));
-    setHabitHistory(prev => { const n = { ...prev }; delete n[id]; return n; });
-  };
+  const toggleGoal = (id) => updateDay({ goals: (day.goals || []).map(g => g.id === id ? { ...g, done: !g.done } : g) });
+  const removeGoal = (id) => updateDay({ goals: (day.goals || []).filter(g => g.id !== id) });
 
   const shiftDay = (delta) => {
     const d = new Date(dateKey + "T00:00:00");
@@ -155,222 +219,460 @@ export default function DailyPlannerPage() {
   };
 
   const energyColor = day.energy >= 8 ? T.green : day.energy >= 5 ? T.amber : T.red;
-  const shownTasks = tasks.filter(t => taskFilter === "all" ? true : taskFilter === "open" ? !t.done : t.done);
-  const openCount = tasks.filter(t => !t.done).length;
-  const doneCount = tasks.filter(t => t.done).length;
+
+  // Migration : anciens planners avec "priorities" mappés sur "tasks"
+  useEffect(() => {
+    if (day.priorities && !day.tasks) updateDay({ tasks: day.priorities, priorities: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateKey]);
+
+  // --- Notes quotidiennes ---
+  const [notesStore, setNotesStore] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem(STORAGE_DAILY_NOTES) || "{}"); } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem(STORAGE_DAILY_NOTES, JSON.stringify(notesStore)); } catch {} }, [notesStore]);
+  const currentNote = notesStore[dateKey] || "";
+  const setCurrentNote = (text) => setNotesStore(prev => {
+    const next = { ...prev };
+    if (!text || !text.trim()) delete next[dateKey]; else next[dateKey] = text;
+    return next;
+  });
+  // Liste des notes passées (hors date courante), triées par date décroissante
+  const pastNotes = Object.entries(notesStore)
+    .filter(([iso]) => iso !== dateKey)
+    .sort((a, b) => b[0].localeCompare(a[0]));
+  const [expandedNoteDate, setExpandedNoteDate] = useState(null);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Ma journée</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Daily Planner</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 
-      {/* Date nav */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 16px" }}>
-        <button onClick={() => shiftDay(-1)} style={iconBtn()}><ChevronLeft size={16} /></button>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{fmtDateLong(dateKey)}</div>
-          {dateKey !== todayKey() && (
-            <button onClick={() => setDateKey(todayKey())}
-              style={{ marginTop: 4, fontSize: 11, color: T.blue, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-              Revenir à aujourd&apos;hui
-            </button>
+      {/* Date nav stylée */}
+      {(() => {
+        const parts = fmtDateParts(dateKey);
+        const isToday = dateKey === todayKey();
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 14, background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 18px" }}>
+            <button onClick={() => shiftDay(-1)} style={iconBtn()} aria-label="Jour précédent"><ChevronLeft size={16} /></button>
+
+            {/* Bloc date : day number big + weekday/month */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1, minWidth: 48 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5 }}>{parts.month.slice(0, 3)}.</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: T.text, letterSpacing: -0.8, marginTop: 2 }}>{String(parts.day).padStart(2, "0")}</div>
+              </div>
+              <div style={{ height: 30, width: 1, background: T.border }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{parts.weekday}</div>
+                  {isToday && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, color: T.green, background: T.green + "18",
+                      padding: "2px 7px", borderRadius: 999, letterSpacing: 0.4, textTransform: "uppercase",
+                    }}>Aujourd&apos;hui</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>{parts.month} {parts.year}</div>
+              </div>
+              {!isToday && (
+                <button onClick={() => setDateKey(todayKey())}
+                  style={{ marginLeft: "auto", fontSize: 11, color: T.blue, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
+                  Aujourd&apos;hui
+                </button>
+              )}
+            </div>
+
+            <button onClick={() => shiftDay(1)} style={iconBtn()} aria-label="Jour suivant"><ChevronRight size={16} /></button>
+          </div>
+        );
+      })()}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, alignItems: "start" }}>
+        {/* LEFT : Habitudes du jour */}
+        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Flame size={13} strokeWidth={1.75} color={T.amber} />
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Habitudes du jour</div>
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
+                {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
+              </span>
+              <button onClick={openCreateHabit} title="Ajouter une habitude"
+                style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
+                <Plus size={13} strokeWidth={2} />
+              </button>
+            </span>
+          </div>
+
+          {/* Formulaire ajout/edit */}
+          {habitFormOpen && (
+            <div style={{ background: T.bg, borderRadius: 10, padding: 12, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input type="text" value={habitDraft.name} onChange={(e) => setHabitDraft({ ...habitDraft, name: e.target.value })}
+                placeholder="Nom de l'habitude (l'emoji est choisi automatiquement)" autoFocus
+                style={{ padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+              <textarea value={habitDraft.description} onChange={(e) => setHabitDraft({ ...habitDraft, description: e.target.value })}
+                placeholder="Description (optionnel)"
+                rows={2}
+                style={{ padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, resize: "vertical", lineHeight: 1.4 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="time" value={habitDraft.time} onChange={(e) => setHabitDraft({ ...habitDraft, time: e.target.value })}
+                  style={{ flex: 1, padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                <input type="text" value={habitDraft.location} onChange={(e) => setHabitDraft({ ...habitDraft, location: e.target.value })}
+                  placeholder="Lieu (optionnel)"
+                  style={{ flex: 2, padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                <button onClick={saveHabit} style={{ padding: "0 14px", height: 36, background: T.text, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {editingHabitId ? "Enregistrer" : "Ajouter"}
+                </button>
+                <button onClick={closeHabitForm} style={{ width: 36, height: 36, background: T.white, color: T.textSub, border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Liste des habitudes (compacte, icônes auto) */}
+          {habits.length === 0 ? (
+            <div style={{ padding: "20px 10px", textAlign: "center", color: T.textMut, fontSize: 12 }}>Ajoute ta première habitude</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {habits.map(h => {
+                const done = !!(habitHistory[h.id] && habitHistory[h.id][dateKey]);
+                const Ico = autoIcon(h.name);
+                return (
+                  <div key={h.id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      transition: "background .12s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 1; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const del = e.currentTarget.querySelector("[data-habit-del]"); if (del) del.style.opacity = 0; }}
+                  >
+                    {/* Icône avatar (auto selon le nom) */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: T.bg, display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <Ico size={15} strokeWidth={1.75} color={done ? T.textMut : T.text} />
+                    </div>
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => openEditHabit(h)}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: done ? T.textMut : T.text,
+                        textDecoration: done ? "line-through" : "none",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2,
+                      }}>
+                        {h.name}
+                      </div>
+                      {(h.description || h.time || h.location) && (
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 6, marginTop: 2,
+                          fontSize: 11, color: T.textMut, lineHeight: 1.2,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          textDecoration: done ? "line-through" : "none",
+                        }}>
+                          {h.time && (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                              <Clock size={10} strokeWidth={1.75} /> {h.time}
+                            </span>
+                          )}
+                          {h.time && h.location && <span>·</span>}
+                          {h.location && (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                              <MapPin size={10} strokeWidth={1.75} /> {h.location}
+                            </span>
+                          )}
+                          {(h.time || h.location) && h.description && <span>·</span>}
+                          {h.description && (
+                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.description}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Delete (hidden until hover) */}
+                    <button data-habit-del onClick={() => removeHabit(h.id)} title="Supprimer"
+                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease", flexShrink: 0 }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                      <Trash2 size={11} strokeWidth={1.75} />
+                    </button>
+
+                    {/* Checkbox */}
+                    <button onClick={() => toggleHabit(h.id)}
+                      style={{
+                        width: 24, height: 24, borderRadius: 6,
+                        border: done ? "none" : `1.5px solid ${T.border}`,
+                        background: done ? T.green : T.white,
+                        cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, transition: "all .15s ease",
+                      }}>
+                      {done && <Check size={12} strokeWidth={2.5} color="#fff" />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
-        <button onClick={() => shiftDay(1)} style={iconBtn()}><ChevronRight size={16} /></button>
-      </div>
 
-      {/* Habitudes du jour : row minimaliste */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Habitudes du jour</div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            {showHabitForm ? (
-              <>
-                <input type="text" autoFocus value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addHabit(); if (e.key === "Escape") { setShowHabitForm(false); setNewHabitName(""); } }}
-                  placeholder="ex. lire 20 min"
-                  style={{ padding: "4px 10px", border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, width: 180 }} />
-                <button onClick={addHabit} style={{ padding: "0 10px", height: 28, background: T.text, color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>OK</button>
-              </>
-            ) : (
-              <button onClick={() => setShowHabitForm(true)}
-                style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <Plus size={12} strokeWidth={2} />
-              </button>
-            )}
+        {/* RIGHT : Tâches + Objectifs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Tâches */}
+          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <TargetIcon size={13} strokeWidth={1.75} color={T.amber} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Tâches du jour</div>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
+                {(day.tasks || []).filter(p => p.done).length}/{(day.tasks || []).length}
+              </span>
+            </div>
+            {(day.tasks || []).map(p => (
+              <Row key={p.id} done={p.done} text={p.text} onToggle={() => toggleTask(p.id)} onDelete={() => removeTask(p.id)} accent={T.amber} />
+            ))}
+            <AddInput value={newTask} onChange={setNewTask} onAdd={addTask} placeholder="Ajouter une tâche..." />
           </div>
-        </div>
-        {habits.length === 0 ? (
-          <div style={{ fontSize: 12, color: T.textMut, padding: "8px 0" }}>Aucune habitude pour le moment</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {habits.map(h => {
-              const done = !!(habitHistory[h.id] && habitHistory[h.id][dateKey]);
-              const streak = computeStreak(h.id);
-              return (
-                <div key={h.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: T.bg, borderRadius: 999, padding: "4px 6px 4px 4px" }}>
-                  <button onClick={() => toggleHabit(h.id)}
-                    title={done ? "Décocher" : "Marquer fait"}
-                    style={{
-                      width: 28, height: 28, borderRadius: "50%",
-                      background: done ? T.text : T.white,
-                      color: done ? "#fff" : T.text,
-                      border: done ? "none" : `1px solid ${T.border}`,
-                      cursor: "pointer",
-                      display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                      transition: "background .15s ease",
-                    }}>
-                    {done && <Check size={13} strokeWidth={2.5} />}
-                  </button>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{h.name}</span>
-                  {streak >= 2 && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 2, color: "#F59E0B", fontSize: 11, fontWeight: 700 }}>
-                      <Flame size={10} strokeWidth={2} />{streak}
-                    </span>
-                  )}
-                  <button onClick={() => removeHabit(h.id)} title="Supprimer"
-                    style={{ width: 18, height: 18, background: "transparent", border: "none", color: T.textMut, cursor: "pointer", borderRadius: 4, display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 4 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = T.red; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; }}
-                  >
-                    <Trash2 size={10} strokeWidth={1.75} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
-        {/* Left : time blocks */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {BLOCKS.map(b => {
-            const Icon = b.icon;
-            return (
-              <div key={b.id} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: b.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Icon size={16} strokeWidth={1.75} color={b.color} />
+          {/* Notes du jour — reset chaque jour, archivées */}
+          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <StickyNote size={13} strokeWidth={1.75} color={T.blue} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Notes du jour</div>
+              {pastNotes.length > 0 && (
+                <span style={{ marginLeft: "auto", fontSize: 10, color: T.textMut, fontWeight: 500 }}>
+                  {pastNotes.length} archivée{pastNotes.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <textarea
+              value={currentNote}
+              onChange={(e) => setCurrentNote(e.target.value)}
+              placeholder="Pensées, idées, observations du jour..."
+              style={{
+                width: "100%", minHeight: 110, resize: "vertical",
+                padding: 12, border: `1px solid ${T.border}`, borderRadius: 10,
+                fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white,
+                lineHeight: 1.5, boxSizing: "border-box",
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = T.text; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = T.border; }}
+            />
+
+            {/* Archives : liste compacte */}
+            {pastNotes.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                  Archives
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 4 }}>{b.label}</div>
-                  <textarea
-                    value={day.blocks[b.id] || ""}
-                    onChange={(e) => setBlockText(b.id, e.target.value)}
-                    placeholder="Qu'est-ce que tu fais sur ce créneau ?"
-                    style={{
-                      width: "100%", minHeight: 48, resize: "vertical",
-                      border: "none", outline: "none", background: "transparent",
-                      fontFamily: "inherit", fontSize: 13, color: T.text, lineHeight: 1.5, padding: 0,
-                    }}
-                  />
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+                  {pastNotes.map(([iso, text]) => {
+                    const parts = fmtDateParts(iso);
+                    const isExpanded = expandedNoteDate === iso;
+                    const preview = text.split("\n").find(l => l.trim()) || "";
+                    return (
+                      <div key={iso}>
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: 2 }}
+                          onMouseEnter={(e) => { const del = e.currentTarget.querySelector("[data-note-del]"); if (del) del.style.opacity = 1; }}
+                          onMouseLeave={(e) => { const del = e.currentTarget.querySelector("[data-note-del]"); if (del) del.style.opacity = 0; }}
+                        >
+                          <button
+                            onClick={() => setExpandedNoteDate(isExpanded ? null : iso)}
+                            style={{
+                              flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8,
+                              padding: "6px 8px", borderRadius: 6, border: "none",
+                              background: isExpanded ? T.bg : "transparent",
+                              cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                              transition: "background .12s ease",
+                            }}
+                            onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = T.bg; }}
+                            onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <ChevronDown size={11} strokeWidth={1.75} color={T.textMut} style={{ transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease", flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: T.text, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                              {String(parts.day).padStart(2, "0")}/{String(new Date(iso + "T00:00:00").getMonth() + 1).padStart(2, "0")}
+                            </span>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {preview}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setDateKey(iso)}
+                            title="Aller à cette date pour éditer"
+                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "transparent", color: T.blue, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = T.blue + "18"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <Pencil size={11} strokeWidth={1.75} />
+                          </button>
+                          <button
+                            data-note-del
+                            onClick={() => {
+                              setNotesStore(prev => { const n = { ...prev }; delete n[iso]; return n; });
+                              if (expandedNoteDate === iso) setExpandedNoteDate(null);
+                            }}
+                            title="Supprimer"
+                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <Trash2 size={11} strokeWidth={1.75} />
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div style={{
+                            marginLeft: 22, marginTop: 4, marginBottom: 6,
+                            padding: "8px 10px", background: T.bg, borderRadius: 6,
+                            fontSize: 12, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                          }}>
+                            {text}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* Graphique ligne : complétion habitudes (30 derniers jours) — pleine largeur, en bas */}
+      <HabitsChart habits={habits} history={habitHistory} />
+    </div>
+  );
+}
+
+function HabitsChart({ habits, history }) {
+  const total = habits.length;
+  const RANGE = 30; // 30 derniers jours
+  const days = [];
+  for (let i = RANGE - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const done = habits.reduce((acc, h) => acc + (history[h.id]?.[iso] ? 1 : 0), 0);
+    const pct = total > 0 ? (done / total) * 100 : 0;
+    days.push({ iso, day: d.getDate(), date: d, done, pct, isToday: i === 0 });
+  }
+  const avg = total > 0 ? Math.round(days.reduce((s, x) => s + x.pct, 0) / days.length) : 0;
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0; i--) { if (days[i].done > 0) streak++; else break; }
+
+  // Courbe SVG
+  const VB_W = 1000;   // viewBox width (adapte via preserveAspectRatio)
+  const VB_H = 180;    // viewBox height
+  const padL = 32, padR = 16, padT = 16, padB = 30;
+  const chartW = VB_W - padL - padR;
+  const chartH = VB_H - padT - padB;
+  // Points
+  const points = days.map((d, i) => {
+    const x = padL + (i / Math.max(days.length - 1, 1)) * chartW;
+    const y = padT + chartH - (d.pct / 100) * chartH;
+    return { x, y, ...d };
+  });
+  // Smooth Catmull-Rom path
+  let pathD = "";
+  if (points.length > 0) {
+    pathD = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] || points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] || p2;
+      const tension = 0.5;
+      const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
+      const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
+      const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
+      const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
+      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+  }
+  const areaD = points.length > 0
+    ? `${pathD} L ${points[points.length - 1].x} ${padT + chartH} L ${points[0].x} ${padT + chartH} Z`
+    : "";
+
+  // Gridlines horizontales : 0 / 50 / 100 %
+  const yTicks = [0, 50, 100];
+  // Labels X : un repère tous les 5 jours
+  const xTicks = points.filter((_, i) => i === 0 || i === points.length - 1 || i % 5 === 0);
+
+  return (
+    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <TrendingUp size={13} strokeWidth={1.75} color={T.green} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Complétion des habitudes</div>
+        <span style={{ fontSize: 11, color: T.textMut }}>· 30 derniers jours</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          {streak >= 2 && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#F59E0B", fontSize: 12, fontWeight: 700 }}>
+              <Flame size={12} strokeWidth={2} /> {streak} j
+            </span>
+          )}
+          <span style={{ fontSize: 12, color: avg >= 70 ? T.green : T.textSub, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            {avg}% moy.
+          </span>
+        </div>
+      </div>
+
+      {total === 0 ? (
+        <div style={{ padding: "40px 0", textAlign: "center", color: T.textMut, fontSize: 13 }}>
+          Ajoute des habitudes pour voir ton graphique
+        </div>
+      ) : (
+        <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none"
+          style={{ width: "100%", height: 180, display: "block", fontFamily: "var(--font-sans)" }}>
+          <defs>
+            <linearGradient id="habit-area" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor={T.green} stopOpacity="0.20" />
+              <stop offset="100%" stopColor={T.green} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid + Y ticks */}
+          {yTicks.map(t => {
+            const y = padT + chartH - (t / 100) * chartH;
+            return (
+              <g key={t}>
+                <line x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="#F0F0F0" strokeWidth="1" />
+                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#8E8E8E" fontWeight="500">{t}%</text>
+              </g>
             );
           })}
-        </div>
 
-        {/* Right : energy, priorities, goals, tasks */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Energy */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Battery size={14} strokeWidth={1.75} color={T.textSub} />
-              <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Énergie estimée</div>
-              <div style={{ marginLeft: "auto", fontSize: 16, fontWeight: 700, color: energyColor }}>{day.energy}/10</div>
-            </div>
-            <input type="range" min={1} max={10} step={1} value={day.energy}
-              onChange={(e) => updateDay({ energy: parseInt(e.target.value, 10) })}
-              style={{ width: "100%", accentColor: energyColor }} />
-          </div>
+          {/* Area + line */}
+          <path d={areaD} fill="url(#habit-area)" />
+          <path d={pathD} fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
 
-          {/* 3 priorités */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <TargetIcon size={13} strokeWidth={1.75} color={T.amber} />
-              <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
-                3 priorités du jour <span style={{ color: T.textMut, fontWeight: 500 }}>({(day.priorities || []).length}/3)</span>
-              </div>
-            </div>
-            {(day.priorities || []).map(p => (
-              <Row key={p.id} done={p.done} text={p.text} onToggle={() => togglePriority(p.id)} onDelete={() => removePriority(p.id)} accent={T.amber} />
-            ))}
-            {(day.priorities || []).length < 3 && (
-              <AddInput value={newPriority} onChange={setNewPriority} onAdd={addPriority} placeholder="Ajouter une priorité..." />
-            )}
-          </div>
+          {/* Dot today */}
+          {points.length > 0 && (() => {
+            const last = points[points.length - 1];
+            return <circle cx={last.x} cy={last.y} r="4" fill="#fff" stroke={T.green} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
+          })()}
 
-          {/* Goals du jour */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 8 }}>Objectifs du jour</div>
-            {(day.goals || []).map(g => (
-              <Row key={g.id} done={g.done} text={g.text} onToggle={() => toggleGoal(g.id)} onDelete={() => removeGoal(g.id)} accent={T.green} />
-            ))}
-            <AddInput value={newGoal} onChange={setNewGoal} onAdd={addGoal} placeholder="Ajouter un objectif..." />
-          </div>
-
-          {/* Tâches (long terme) */}
-          <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-              <ListTodo size={13} strokeWidth={1.75} color={T.blue} />
-              <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Tâches</div>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                {[{ id: "open", label: openCount }, { id: "done", label: doneCount }, { id: "all", label: tasks.length }].map(f => (
-                  <button key={f.id} onClick={() => setTaskFilter(f.id)}
-                    style={{
-                      padding: "2px 8px", borderRadius: 999,
-                      border: `1px solid ${taskFilter === f.id ? T.text : T.border}`,
-                      background: taskFilter === f.id ? T.text : T.white,
-                      color: taskFilter === f.id ? T.white : T.textSub,
-                      fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                    {f.id === "open" ? "Ouvertes" : f.id === "done" ? "Faites" : "Toutes"} · {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-              <input type="text" value={newTask} onChange={(e) => setNewTask(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
-                placeholder="Nouvelle tâche..."
-                style={{ flex: 1, padding: "6px 10px", border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-              <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)}
-                style={{ padding: "6px 8px", border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 11, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }}>
-                {TASK_PRIORITIES.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
-              </select>
-              <button onClick={addTask} style={{ padding: "0 10px", height: 28, background: T.text, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                <Plus size={12} strokeWidth={2.5} />
-              </button>
-            </div>
-            {shownTasks.length === 0 ? (
-              <div style={{ padding: "10px 0", fontSize: 12, color: T.textMut, textAlign: "center" }}>Rien pour l&apos;instant</div>
-            ) : shownTasks.slice(0, 8).map(task => {
-              const pr = TASK_PRIORITIES.find(p => p.id === task.priority) || TASK_PRIORITIES[1];
-              return (
-                <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
-                  <button onClick={() => toggleTask(task.id)}
-                    style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${task.done ? T.green : T.border}`, background: task.done ? T.green : T.white, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {task.done && <Check size={10} strokeWidth={2.5} color="#fff" />}
-                  </button>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: pr.color, flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: 12, color: task.done ? T.textMut : T.text, textDecoration: task.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.text}</div>
-                  <button onClick={() => removeTask(task.id)}
-                    style={{ width: 18, height: 18, background: "transparent", border: "none", color: T.textMut, cursor: "pointer", borderRadius: 3, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                    <Trash2 size={10} strokeWidth={1.75} />
-                  </button>
-                </div>
-              );
-            })}
-            {shownTasks.length > 8 && (
-              <div style={{ fontSize: 11, color: T.textMut, textAlign: "center", marginTop: 6 }}>+ {shownTasks.length - 8} autres</div>
-            )}
-          </div>
-        </div>
-      </div>
+          {/* X labels */}
+          {xTicks.map(p => {
+            const label = p.isToday ? "Ajd" : `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
+            return (
+              <text key={`x-${p.iso}`} x={p.x} y={VB_H - 10} textAnchor="middle" fontSize="10" fill={p.isToday ? "#0D0D0D" : "#8E8E8E"} fontWeight={p.isToday ? "600" : "500"}>
+                {label}
+              </text>
+            );
+          })}
+        </svg>
+      )}
     </div>
   );
 }

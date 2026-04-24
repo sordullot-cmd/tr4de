@@ -19,7 +19,6 @@ import StrategyDetailPage from "@/components/StrategyDetailPage";
 import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
 import FocusTimerPage from "@/components/pages/FocusTimerPage";
-import NotesPage from "@/components/pages/NotesPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
@@ -65,7 +64,6 @@ import {
   CalendarDays as LucideCalendarDays,
   Flame as LucideFlame,
   Timer as LucideTimer,
-  StickyNote as LucideStickyNote,
   BookOpen as LucideBookOpen,
 } from "lucide-react";
 
@@ -6126,7 +6124,6 @@ export default function App() {
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
-        { id: "notes",         icon: LucideStickyNote,   label: t("nav.notes") },
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
       ],
     },
@@ -6144,7 +6141,6 @@ export default function App() {
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
-    notes: <NotesPage />,
     reading: <ReadingListPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
