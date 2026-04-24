@@ -13,9 +13,9 @@ export default function LandingPage({ onLoginClick }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center font-bold text-blue-700">
-              tr
+              t
             </div>
-            <h1 className="text-2xl font-bold text-white">tr4de</h1>
+            <h1 className="text-2xl font-bold text-white">tao trade</h1>
           </div>
           <button
             onClick={onLoginClick}
@@ -121,7 +121,7 @@ export default function LandingPage({ onLoginClick }) {
       <footer className="border-t border-blue-700 bg-blue-700/50 backdrop-blur mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p className="text-center text-blue-100">
-            © 2026 tr4de. Trading platform pour traders professionnels.
+            © 2026 tao trade. Trading platform pour traders professionnels.
           </p>
         </div>
       </footer>

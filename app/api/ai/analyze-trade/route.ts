@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       await supabase.from("agent_notifications").insert({
         user_id: userId,
         trade_id: tradeId,
-        agent_name: "APEX AI",
+        agent_name: "tao AI",
         notification_type: alertType,
         title: "Analyse automatique du trade",
         message: response.text,

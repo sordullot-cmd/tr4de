@@ -93,7 +93,7 @@ export default function LoginPage() {
           >
             T
           </div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#0D0D0D" }}>tr4de</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#0D0D0D" }}>tao trade</div>
         </div>
 
         {/* Title */}

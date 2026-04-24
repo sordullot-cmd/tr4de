@@ -434,7 +434,7 @@ export async function getTrades({
  * - title: Titre de la notification (requis)
  * - message: Contenu du message (requis)
  * - tradeId: ID du trade associé (optionnel)
- * - agentName: Nom de l'agent (défaut: "APEX AI")
+ * - agentName: Nom de l'agent (défaut: "tao AI")
  * 
  * Fait:
  * Sauvegarde dans la table agent_notifications pour affichage
@@ -450,7 +450,7 @@ export async function saveNotification({
   title,
   message,
   tradeId,
-  agentName = "APEX AI",
+  agentName = "tao AI",
 }: {
   userId: string;
   type: "info" | "warning" | "stop" | "report";

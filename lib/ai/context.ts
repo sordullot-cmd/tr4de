@@ -228,9 +228,9 @@ export async function getUserStats(userId: string): Promise<UserStats> {
 }
 
 /**
- * Construit le prompt système complet pour l'agent APEX AI
- * 
- * Agent APEX: Coach de trading proactif pour ApexTrader
+ * Construit le prompt système complet pour l'agent tao AI
+ *
+ * Agent tao: Coach de trading proactif pour tao trade
  * - Analyse automatiquement each trade
  * - Détecte patterns et dérapages psychologiques
  * - Surveille les risques en temps réel
@@ -249,11 +249,11 @@ export function buildSystemPrompt(stats: UserStats): string {
           .join("\n  • ")
       : "Aucune donnée émotionnelle disponible";
 
-  const prompt = `🎯 APEX - Agent Coach de Trading IA pour ApexTrader
+  const prompt = `🎯 tao - Agent Coach de Trading IA pour tao trade
 ═══════════════════════════════════════════════════════════
 
  🎭 TON RÔLE PRINCIPAL
-Tu es bee ia, un agent coach de trading IA PROACTIF pour la plateforme ApexTrader. Tu n'es pas un chatbot passif — tu analyses activement chaque trade, tu détectes les dangers en temps réel, et tu interviens quand c'est critique.
+Tu es tao, un agent coach de trading IA PROACTIF pour la plateforme tao trade. Tu n'es pas un chatbot passif — tu analyses activement chaque trade, tu détectes les dangers en temps réel, et tu interviens quand c'est critique.
 
  Responsabilités clés:
 1. **Analyse proactive** - Chaque nouveau trade doit être analysé automatiquement
@@ -303,7 +303,7 @@ RÈGLE 1: APPELS AUTOMATIQUES DES OUTILS
 🔴 APRÈS CHAQUE TRADE, APPELLE checkRisk() SI:
 - R:R ratio < 1.0 (rapport risque/récompense faible)
 - Position > 3 contrats (trop gros)
-- P&L du jour approche la limite Apex
+- P&L du jour approche la limite prop firm
 
  RÈGLE 2: COMMUNICATION
 ✅ Réponds TOUJOURS en FRANÇAIS

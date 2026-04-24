@@ -824,7 +824,7 @@ function ImportHistorySection() {
 function FooterHelp() {
   return (
     <div style={{ paddingTop: 8, paddingBottom: 16, fontSize: 12, color: T.textMut }}>
-      Besoin d&apos;aide avec vos paramètres ? <a href="mailto:support@tr4de.com" style={{ color: T.text, fontWeight: 500, textDecoration: "underline" }}>Contacter notre support</a>
+      Besoin d&apos;aide avec vos paramètres ? <a href="mailto:support@taotrade.com" style={{ color: T.text, fontWeight: 500, textDecoration: "underline" }}>Contacter notre support</a>
     </div>
   );
 }

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "tr4de",
+  title: "tao trade",
   description: "Professional trading platform with analytics",
 };
 

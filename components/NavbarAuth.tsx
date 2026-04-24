@@ -33,7 +33,7 @@ export default function NavbarAuth() {
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
         <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-          Apex
+          tao trade
         </div>
 
         {/* User menu */}

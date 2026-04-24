@@ -706,11 +706,11 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
           </div>
         </div>
 
-        {/* CARD 3 : tr4de score */}
+        {/* CARD 3 : tao score */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
           <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
-              tr4de score <span style={{color:T.textMut,fontWeight:500}}>›</span>
+              tao score <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
             <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Performance globale de la stratégie</div>
           </div>

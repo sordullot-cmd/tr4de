@@ -5774,7 +5774,7 @@ export default function App() {
   // Construire l'objet affichage utilisateur à partir de l'utilisateur authentifié
   const displayUser = {
     name: user?.email?.split('@')[0] || "Trader",
-    email: user?.email || "trader@apextrader.com",
+    email: user?.email || "trader@taotrade.com",
     initials: (user?.email?.split('@')[0] || "TR").substring(0, 2).toUpperCase()
   };
 
@@ -6358,7 +6358,7 @@ export default function App() {
         <Sidebar
           mobileOpen={mobileNavOpen}
           onMobileClose={() => setMobileNavOpen(false)}
-          brand="tr4de"
+          brand="tao trade"
           workspace={(() => {
             if (selectedAccountIds.length === 1) {
               const acc = accounts.find(a => a.id === selectedAccountIds[0]);

@@ -1933,7 +1933,7 @@ export default function App() {
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:30,height:30,borderRadius:8,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff",fontWeight:700}}>A</div>
               <div>
-                <div style={{fontSize:13,fontWeight:700,letterSpacing:"0px"}}>tr4de</div>
+                <div style={{fontSize:13,fontWeight:700,letterSpacing:"0px"}}>tao trade</div>
               </div>
             </div>
           </div>

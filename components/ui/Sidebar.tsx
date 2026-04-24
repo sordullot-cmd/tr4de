@@ -111,11 +111,11 @@ export default function Sidebar(props: SidebarProps) {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 14, fontWeight: 700, color: "#FFFFFF", flexShrink: 0,
           }}>
-            F
+            t
           </div>
           {!collapsed && (
             <div style={{ flex: 1, overflow: "hidden", fontSize: 14, fontWeight: 600, color: "var(--color-text)", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-              futur nom de l'app
+              tao trade
             </div>
           )}
         </div>

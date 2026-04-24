@@ -238,7 +238,7 @@ export default function Agentia({ trades: initialTrades = [] }) {
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-slate-900 to-slate-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-          <p className="text-cyan-400 text-lg">Initialisation APEX...</p>
+          <p className="text-cyan-400 text-lg">Initialisation tao...</p>
         </div>
       </div>
     );
@@ -254,7 +254,7 @@ export default function Agentia({ trades: initialTrades = [] }) {
               <span className="text-white font-bold">⚡</span>
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              APEX TRADING AI
+              TAO TRADE AI
             </h1>
           </div>
           <button
@@ -378,7 +378,7 @@ export default function Agentia({ trades: initialTrades = [] }) {
       {/* Footer */}
       <footer className="border-t border-slate-700 bg-slate-900/50 mt-12 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center text-slate-400 text-sm">
-          <p>APEX Trading AI © 2026 | Coach IA Spécialisé en Trading</p>
+          <p>tao trade AI © 2026 | Coach IA Spécialisé en Trading</p>
         </div>
       </footer>
 
