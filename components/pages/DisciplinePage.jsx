@@ -19,6 +19,7 @@ import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getLocalDateString } from "@/lib/dateUtils";
 import { getCurrencySymbol } from "@/lib/userPrefs";
+import RiskCalculator from "@/components/RiskCalculator";
 
 function reorder(arr, from, to) {
   const next = [...arr];
@@ -1194,6 +1195,11 @@ export default function DisciplinePage({ trades = [] }) {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* RISK CALCULATOR — sizing pré-trade */}
+      <div style={{ marginTop: 16 }}>
+        <RiskCalculator />
       </div>
 
       {/* MODAL MODIFIER REGLES */}

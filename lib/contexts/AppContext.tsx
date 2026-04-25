@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, type Re
 import { useTrades } from "@/lib/hooks/useTradeData";
 import { useStrategies } from "@/lib/hooks/useUserData";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
+import { useTradingAccounts } from "@/lib/hooks/useTradingAccounts";
 import { isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 
 type AccountType = "live" | "eval";
@@ -25,6 +26,9 @@ export interface AppContextValue {
   addStrategy: (s: any) => Promise<void> | void;
   updateStrategy: (id: string, patch: any) => Promise<void> | void;
   deleteStrategy: (id: string) => Promise<void> | void;
+
+  /** Liste des comptes de trading de l'utilisateur. */
+  accounts: { id: string; name: string }[];
 
   // Account selection (UI state — persisted in localStorage)
   selectedAccountIds: string[];
@@ -71,6 +75,7 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
   const { user } = useAuth();
   const tradesApi = useTrades();
   const strategiesApi = useStrategies();
+  const { accounts: rawAccounts } = useTradingAccounts(user?.id);
 
   const [page, setPage] = useState<string>(initialPage);
   const [selectedAccountIds, _setSelectedAccountIds] = useState<string[]>(() =>
@@ -121,6 +126,7 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
     updateStrategy: strategiesApi.updateStrategy,
     deleteStrategy: strategiesApi.deleteStrategy,
 
+    accounts: (rawAccounts || []).map(a => ({ id: a.id, name: a.name })),
     selectedAccountIds,
     setSelectedAccountIds,
     accountType,

@@ -7,6 +7,8 @@ import { fmt } from "@/lib/ui/format";
 import { useApp } from "@/lib/contexts/AppContext";
 import { backtest, compareBacktests } from "@/lib/backtest/engine";
 import { Skeleton } from "@/components/ui/Skeleton";
+import HoursHeatmap from "@/components/HoursHeatmap";
+import EquityByAccount from "@/components/EquityByAccount";
 
 /**
  * BacktestPage — analyse "what-if" sur les trades historiques.
@@ -24,7 +26,7 @@ export default function BacktestPage() {
   // tradesByAccount = trades filtrés par les comptes sélectionnés.
   // Si rien de sélectionné, on retombe sur les trades bruts (l'utilisateur
   // veut peut-être analyser tout l'historique sans contrainte de compte).
-  const { trades: rawTrades, tradesByAccount, strategies, tradesLoading, selectedAccountIds } = useApp();
+  const { trades: rawTrades, tradesByAccount, strategies, tradesLoading, selectedAccountIds, accounts } = useApp();
   const trades = selectedAccountIds.length > 0 ? tradesByAccount : rawTrades;
 
   const [selected, setSelected] = useState/** @type {string[]} */([]);
@@ -218,6 +220,14 @@ export default function BacktestPage() {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* Heatmap par heure */}
+          <HoursHeatmap trades={result.trades} />
+
+          {/* Equity par compte (utilise les trades bruts, indépendant des filtres) */}
+          {accounts.length > 1 && (
+            <EquityByAccount trades={rawTrades} accounts={accounts} />
           )}
         </>
       )}
