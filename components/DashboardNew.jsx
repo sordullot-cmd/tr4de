@@ -686,9 +686,7 @@ export default function App() {
         { id: "dashboard",  icon: LayoutDashboard,    label: t("nav.dashboard") },
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
-        { id: "trade-chart", icon: LucideLineChart,   label: "Chart" },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
-        { id: "brokers",    icon: LucideUpload,       label: "Brokers" },
       ],
     },
     {
