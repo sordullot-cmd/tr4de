@@ -437,7 +437,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           {/* Total P&L (uniquement vue cumulative) à droite */}
           {chartView === "cumulative" && (
             <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
-              <div style={{fontSize:12,fontWeight:600,color:"#10A37F"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+              <div style={{fontSize:12,fontWeight:600,color:totalPnL>=0?"#10A37F":"#EF4444"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
             </div>
           )}
           {/* Titre + flèches de navigation à droite du titre, sans contour */}
@@ -477,6 +477,27 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             >
               <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:50,bottom:22,width:"calc(100% - 50px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
 
+                {/* Lignes de grille horizontales très claires alignées sur ticks Y */}
+                {(() => {
+                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                  const niceStep = (max) => {
+                    const rough = max / 3;
+                    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+                    const n = rough / mag;
+                    const nice = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+                    return nice * mag;
+                  };
+                  const step = niceStep(maxCum);
+                  const topMax = Math.ceil(maxCum / step) * step;
+                  const ticks = [];
+                  for (let v = 0; v <= topMax; v += step) ticks.push(v);
+                  return ticks.map((value, i) => {
+                    const topPct = 91 - ((value / topMax) * 83);
+                    const y = (topPct / 100) * 240;
+                    return <line key={`grid-${i}`} x1="0" y1={y} x2="600" y2={y} stroke="#F5F5F5" strokeWidth="1"/>;
+                  });
+                })()}
+
                 {/* Chart area - smooth Catmull-Rom curve, sans gradient (style stats stratégie) */}
                 <g>
                   {(() => {
@@ -495,10 +516,13 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
                     // Lignes droites entre points (moins lisse)
                     const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ");
+                    // Couleur selon le P&L cumulatif final
+                    const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
+                    const lineColor = lastCum >= 0 ? "#10A37F" : "#EF4444";
 
                     return (
                       <g>
-                        <path d={pathD} stroke="#10A37F" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+                        <path d={pathD} stroke={lineColor} strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -561,8 +585,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   const last = pnlCurve[pnlCurve.length - 1];
                   const lastTopPct = (220 - ((last.cum - minCum2) / span) * 204) / 240 * 100;
                   const precise = `${last.cum >= 0 ? "+" : "-"}$${Math.abs(last.cum).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+                  const lastColor = last.cum >= 0 ? "#10A37F" : "#EF4444";
                   const lastEl = (
-                    <div key="last-pnl" style={{position:"absolute",top:`calc(${lastTopPct}% * (100% - 22px) / 100%)`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:"#10A37F",whiteSpace:"nowrap",background:"#FFFFFF"}}>
+                    <div key="last-pnl" style={{position:"absolute",top:`calc(${lastTopPct}% * (100% - 22px) / 100%)`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:lastColor,whiteSpace:"nowrap",background:"#FFFFFF"}}>
                       {precise}
                     </div>
                   );
@@ -581,6 +606,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 const topPct = (220 - ((p.cum - minCum) / span) * 204) / 240 * 100;
                 const svgX = 10 + (idx / Math.max(pnlCurve.length - 1, 1)) * 590;
                 const leftPct = (svgX / 600) * 100;
+                const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
+                const dotColor = lastCum >= 0 ? "#10A37F" : "#EF4444";
+                const dotShadow = lastCum >= 0 ? "rgba(16, 163, 127, 0.2)" : "rgba(239, 68, 68, 0.2)";
                 return (
                   <div style={{
                     position:"absolute",
@@ -588,8 +616,8 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                     left:`calc(${leftPct}% * (100% - 50px) / 100%)`,
                     width:10, height:10, borderRadius:"50%",
                     background:"#FFFFFF",
-                    border:"2px solid #10A37F",
-                    boxShadow:"0 0 0 1px rgba(16, 163, 127, 0.2)",
+                    border:`2px solid ${dotColor}`,
+                    boxShadow:`0 0 0 1px ${dotShadow}`,
                     transform:"translate(-50%, -50%)",
                     pointerEvents:"none",
                   }} />
