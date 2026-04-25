@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, SkipForward, Coffee, Focus } from "lucide-react";
+import { Play, Pause, RotateCcw, SkipForward, Coffee, Focus, Flame, CheckCircle2 } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { Stat } from "@/components/ui/Stat";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -93,11 +94,32 @@ export default function FocusTimerPage() {
   });
   const weekMinutes = Math.round(weekSessions.reduce((s, x) => s + x.duration, 0) / 60);
 
+  // Streak : nombre de jours consécutifs (en remontant depuis aujourd'hui) avec ≥1 session
+  const streak = (() => {
+    const days = new Set(sessions.map(s => s.date));
+    let count = 0;
+    const cur = new Date();
+    for (;;) {
+      const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      if (days.has(iso)) { count++; cur.setDate(cur.getDate() - 1); }
+      else break;
+    }
+    return count;
+  })();
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Focus Timer</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Minuteur Focus</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
+      </div>
+
+      {/* Header stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+        <Stat icon={Focus}        label="Aujourd'hui"     value={`${todayMinutes}m`}  subtext={`${todaysSessions.length} session${todaysSessions.length > 1 ? "s" : ""}`} size="sm" />
+        <Stat icon={Coffee}       label="Cette semaine"   value={`${weekMinutes}m`}   subtext={`${weekSessions.length} session${weekSessions.length > 1 ? "s" : ""}`} size="sm" />
+        <Stat icon={CheckCircle2} label="Sessions totales" value={sessions.length}     size="sm" />
+        <Stat icon={Flame}        label="Streak"          value={`${streak}j`}        subtext={streak > 0 ? "jours consécutifs" : "aucun jour"} size="sm" positive={streak > 0} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 16 }}>
@@ -149,13 +171,8 @@ export default function FocusTimerPage() {
           </div>
         </div>
 
-        {/* Stats + log */}
+        {/* Log */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <StatCard icon={Focus} label="Aujourd'hui" value={`${todayMinutes}m`} sub={`${todaysSessions.length} session${todaysSessions.length > 1 ? "s" : ""}`} />
-            <StatCard icon={Coffee} label="Cette semaine" value={`${weekMinutes}m`} sub={`${weekSessions.length} session${weekSessions.length > 1 ? "s" : ""}`} />
-          </div>
-
           <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "12px 14px", borderBottom: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Historique</div>

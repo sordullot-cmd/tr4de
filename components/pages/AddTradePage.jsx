@@ -744,14 +744,19 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   const brokerInfo = getBrokerInstructions();
 
   return (
-    <div style={{ display: "flex", flexDirection: "row", gap: "16px", padding: "16px", background: "#fff", width: "100%", height: "100%", minHeight: "100%" }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, background: "#fff", width: "100%", minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1 }}>{t("addTrade.title") || "Importer des trades"}</h1>
+        <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "row", gap: 16 }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
-      <div style={{ display: "flex", flexDirection: "column", borderRadius: "12px", border: `1px solid ${T.border}`, padding: "0", background: "#fff", flex: "0.7" }}>
-          <div style={{ padding: "24px" }}>
+      <div style={{ display: "flex", flexDirection: "column", borderRadius: 12, padding: 0, background: "#fff", flex: "0.7" }}>
+          <div style={{ padding: 24 }}>
           
           {/* ACCOUNT SELECTOR */}
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.account")}
             </label>
             <QuickAccountSelector
@@ -760,11 +765,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               T={T}
             />
           </div>
-          <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>
-
           {/* BROKER */}
-          <div style={{ marginTop: "14px", marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
+          <div style={{ marginTop: "14px", marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.broker")}
             </label>
             <SearchableSelect
@@ -812,45 +815,56 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               small
             />
           </div>
-          <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 14px -24px" }}></div>
-
-          {/* ACCOUNT TYPE */}
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
+          {/* ACCOUNT TYPE — toggle live/eval */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.accountType")}
             </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {["live", "eval"].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setAccountType(type)}
-                  onMouseEnter={(e) => {
-                    if (accountType !== type) {
-                      e.currentTarget.style.background = "#F5F5F5";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (accountType !== type) {
-                      e.currentTarget.style.background = T.white;
-                    }
-                  }}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={accountType === "eval"}
+              onClick={() => setAccountType(accountType === "eval" ? "live" : "eval")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+                padding: 0,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              <span
+                style={{
+                  position: "relative",
+                  width: 36,
+                  height: 20,
+                  borderRadius: 999,
+                  background: accountType === "eval" ? T.text : "#D4D4D4",
+                  transition: "background 160ms ease",
+                  flexShrink: 0,
+                }}
+              >
+                <span
                   style={{
-                    padding: "8px 12px",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8,
-                    background: accountType === type ? "#F0F0F0" : T.white,
-                    color: T.text,
-                    fontSize: 13,
-                    fontWeight: accountType === type ? 600 : 500,
-                    cursor: "pointer",
-                    transition: "background 120ms ease, font-weight 0ms",
-                    fontFamily: "var(--font-sans)",
+                    position: "absolute",
+                    top: 2,
+                    left: accountType === "eval" ? 18 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                    transition: "left 160ms ease",
                   }}
-                >
-                  {type === "live" ? t("addTrade.live") : t("addTrade.eval")}
-                </button>
-              ))}
-            </div>
+                />
+              </span>
+              <span style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>
+                {accountType === "eval" ? t("addTrade.eval") : t("addTrade.live")}
+              </span>
+            </button>
             {accountType === "eval" && (
               <div style={{ marginTop: "12px" }}>
                 <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
@@ -870,73 +884,68 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               </div>
             )}
           </div>
-          <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>
-
-          {/* STRATEGY SELECTOR */}
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
-              {t("addTrade.strategy")}
-            </label>
-            <SearchableSelect
-              value={selectedImportStrategy}
-              onChange={(id) => {
-                if (id === "create_new") {
-                  setShowStrategyForm(true);
-                  setStrategyFormData(getDefaultStrategyFormData());
-                } else {
-                  setSelectedImportStrategy(id);
-                }
-              }}
-              options={[
-                { id: "", label: "Aucune stratégie" },
-                ...strategies.map((s) => ({
-                  id: s.id,
-                  label: s.name,
-                  iconNode: <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color || "#10A37F", display: "inline-block" }} />,
-                })),
-                { id: "create_new", label: "+ Créer une stratégie", isAction: true },
-              ]}
-              searchPlaceholder="Rechercher une stratégie..."
-              emptyLabel="Aucune stratégie"
-              placeholder="Sélectionner une stratégie"
-            />
-          </div>
-          <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>
-
+          <div style={{ borderTop: `1px solid ${T.border}`, margin: "24px 0" }} />
           {/* FILE */}
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "12px", color: T.textMut, textTransform: "uppercase" }}>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               Fichier
             </label>
-            <div style={{
-              padding: "20px",
-              border: `2px dashed ${T.border}`,
-              borderRadius: "8px",
-              textAlign: "center",
-              cursor: "pointer",
-              background: T.bg,
-            }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file && fileInputRef.current) { const dt = new DataTransfer(); dt.items.add(file); fileInputRef.current.files = dt.files; handleFileSelect({ target: { files: [file] } }); } }}>
+            <div
+              style={{
+                padding: "36px 20px",
+                border: `1px dashed ${fileName ? "#10A37F" : T.border}`,
+                borderRadius: 12,
+                textAlign: "center",
+                cursor: "pointer",
+                background: fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA",
+                transition: "border-color 160ms ease, background 160ms ease",
+              }}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#0D0D0D"; e.currentTarget.style.background = "#F5F5F5"; }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = fileName ? "#10A37F" : T.border; e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA"; }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.borderColor = fileName ? "#10A37F" : T.border;
+                e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA";
+                const file = e.dataTransfer.files?.[0];
+                if (file && fileInputRef.current) {
+                  const dt = new DataTransfer();
+                  dt.items.add(file);
+                  fileInputRef.current.files = dt.files;
+                  handleFileSelect({ target: { files: [file] } });
+                }
+              }}
+            >
               <input ref={fileInputRef} type="file" onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
-              <button aria-label="Importer un fichier CSV" onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", fontFamily: "var(--font-sans)" }}>
-                {!fileName ? (
-                  <LucideUpload size={22} strokeWidth={1.5} color={T.textMut} />
-                ) : (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#10A37F" }}>
-                    <LucideCheck size={16} strokeWidth={2} />
-                  </span>
-                )}
-                <div style={{ fontSize: 12, color: fileName ? "#0D0D0D" : T.textSub, fontWeight: 500 }}>
-                  {fileName || "Glissez votre fichier ici ou parcourir"}
+              <button
+                aria-label="Importer un fichier"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: "100%", fontFamily: "var(--font-sans)" }}
+              >
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 44, height: 44, borderRadius: "50%",
+                  background: fileName ? "rgba(16, 163, 127, 0.12)" : "#F0F0F0",
+                  color: fileName ? "#10A37F" : "#5C5C5C",
+                  transition: "background 160ms ease, color 160ms ease",
+                }}>
+                  {fileName
+                    ? <LucideCheck size={20} strokeWidth={2} />
+                    : <LucideUpload size={20} strokeWidth={1.75} />}
+                </span>
+                <div>
+                  <div style={{ fontSize: 13, color: "#0D0D0D", fontWeight: 600, marginBottom: 4 }}>
+                    {fileName || "Glissez votre fichier ici"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#8E8E8E", fontWeight: 400 }}>
+                    {fileName ? "Fichier prêt à être importé" : <>ou <span style={{ color: "#0D0D0D", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 2 }}>parcourir</span> · CSV, TXT, HTML</>}
+                  </div>
                 </div>
-                {!fileName && <div style={{ fontSize: 11, color: T.textMut }}>CSV, TXT, ou HTML</div>}
               </button>
             </div>
           </div>
-          {preview.length > 0 && <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>}
-
           {/* PREVIEW */}
           {preview.length > 0 && (
-            <div style={{ marginBottom: "14px" }}>
+            <div style={{ marginBottom: 24 }}>
               <label style={{ display: "block", fontSize: "10px", fontWeight: "700", color: T.textMut, marginBottom: "12px", textTransform: "uppercase" }}>
                 Aperçu ({preview.length} trades)
               </label>
@@ -968,8 +977,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               </div>
             </div>
           )}
-          {(preview.length > 0 || error) && <div style={{ borderBottom: `1px solid ${T.border}`, margin: "0 -24px 20px -24px" }}></div>}
-
           {error && <div style={{ padding: "12px", background: "#FEE2E2", border: `1px solid #FCA5A5`, borderRadius: "6px", fontSize: "12px", color: "#991B1B", marginBottom: "16px" }}>{error}</div>}
 
           <button
@@ -1082,6 +1089,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           </div>
 
         </div>
+      </div>
       </div>
   );
 }

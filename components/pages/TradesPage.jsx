@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
 import {
   X as LucideX,
   ChevronDown as LucideChevronDown,
@@ -10,6 +11,7 @@ import {
   ArrowDown as LucideArrowDown,
   SlidersHorizontal as LucideSlidersHorizontal,
   Target as LucideTarget,
+  FileText as LucideFileText,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
@@ -154,7 +156,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       }
       
       // ✅ CRITICAL: Always reload strategies list
-      const savedStrategies = localStorage.getItem("apex_strategies");
+      // Source de vérité : tr4de_strategies (clé actuelle). Fallback sur apex_strategies (legacy).
+      const savedStrategies = localStorage.getItem("tr4de_strategies") || localStorage.getItem("apex_strategies");
       if (savedStrategies) {
         const parsed = JSON.parse(savedStrategies);
         console.log("✅ Loaded", parsed.length, "strategies");
@@ -813,7 +816,18 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
               {/* STRATEGIES TAB */}
               {activeTab === "strategies" && (() => {
                 const tradeId = selectedTrade.date + selectedTrade.symbol + selectedTrade.entry;
-                const selectedIds = tradeStrategies[tradeId] || [];
+                // Toutes les clés sous lesquelles ce trade peut être indexé (l'import en crée 3) :
+                // UUID Supabase, composite, composite normalisé. On les met TOUTES à jour pour
+                // éviter qu'une stratégie reste fantôme via une clé non nettoyée.
+                const tradeKeys = [
+                  selectedTrade.id,
+                  tradeId,
+                  selectedTrade.date && selectedTrade.symbol && selectedTrade.entry != null
+                    ? `${selectedTrade.date}${selectedTrade.symbol}${parseFloat(selectedTrade.entry).toFixed(2)}`
+                    : null,
+                ].filter(Boolean).map(String);
+                // Source de vérité pour l'UI : union de toutes les stratégies trouvées sur n'importe quelle clé
+                const selectedIds = Array.from(new Set(tradeKeys.flatMap(k => tradeStrategies[k] || [])));
                 
                 // Calculate total rules checked across all selected strategies
                 const allSelectedStrats = loadedStrategies.filter(s => selectedIds.includes(s.id));
@@ -893,16 +907,17 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                   const isSelected = selectedIds.includes(strat.id);
                                   return (
                                     <button key={strat.id} onClick={()=>{
-                                      const current = tradeStrategies[tradeId] || [];
-                                      let updated;
-                                      if(isSelected){
-                                        updated = current.filter(id=>id!==strat.id);
-                                      }else{
-                                        updated = [...current, strat.id];
-                                      }
-                                      const newTradeStrategies = {...tradeStrategies,[tradeId]: updated};
+                                      // Mise à jour cohérente sur TOUTES les clés du trade
+                                      const newTradeStrategies = {...tradeStrategies};
+                                      tradeKeys.forEach(k => {
+                                        const current = newTradeStrategies[k] || [];
+                                        const updated = isSelected
+                                          ? current.filter(id => id !== strat.id)
+                                          : (current.includes(strat.id) ? current : [...current, strat.id]);
+                                        newTradeStrategies[k] = updated;
+                                      });
                                       setTradeStrategies(newTradeStrategies);
-                                      console.log(`✓ Strategy link updated for trade ${tradeId}:`, updated);
+                                      console.log(`✓ Strategy link updated across keys [${tradeKeys.join(", ")}]`);
                                       setShowStrategyDropdown(false);
                                     }} style={{width:"100%",padding:"8px 12px",borderBottom:`1px solid ${T.border}`,background:isSelected?T.accentBg:T.white,border:"none",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:6,transition:"all .2s"}}>
                                     <div style={{width:10,height:10,borderRadius:3,background:strat.color}}/>
@@ -966,8 +981,12 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                           <button
                                             onClick={(e)=>{
                                               e.stopPropagation();
-                                              const newIds = selectedIds.filter(id=>id!==strat.id);
-                                              const newTradeStrategies = {...tradeStrategies,[tradeId]: newIds};
+                                              // Retirer la stratégie de TOUTES les clés du trade
+                                              const newTradeStrategies = {...tradeStrategies};
+                                              tradeKeys.forEach(k => {
+                                                const current = newTradeStrategies[k] || [];
+                                                newTradeStrategies[k] = current.filter(id => id !== strat.id);
+                                              });
                                               setTradeStrategies(newTradeStrategies);
                                               localStorage.setItem("tr4de_trade_strategies", JSON.stringify(newTradeStrategies));
                                               setOpenStratMenuId(null);

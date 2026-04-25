@@ -9,7 +9,22 @@ import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/contexts/AppContext";
 
-export default function DashboardPage({ trades = [], setPage }) {
+export default function DashboardPage({ trades = [], allTrades = [], accounts = [], selectedAccountIds = [], strategies = [], setPage }) {
+  // Vue du graphique : "cumulative" | "byAccount" | "byStrategy"
+  const [chartView, setChartView] = React.useState("cumulative");
+  const [hoveredDayIdx, setHoveredDayIdx] = React.useState(null);
+  const VIEWS = ["cumulative", "byAccount", "byStrategy"];
+  const cycleView = (dir) => {
+    const idx = VIEWS.indexOf(chartView);
+    const next = (idx + dir + VIEWS.length) % VIEWS.length;
+    setChartView(VIEWS[next]);
+  };
+  // Mapping trades → stratégies (depuis localStorage)
+  const tradeStrategiesData = React.useMemo(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("tr4de_trade_strategies") || "{}"); }
+    catch { return {}; }
+  }, []);
   const [emotionTags, setEmotionTags] = React.useState({});
   const [errorTags, setErrorTags] = React.useState({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
@@ -349,7 +364,14 @@ export default function DashboardPage({ trades = [], setPage }) {
   
   const pnlCurve = [];
   let cum = 0;
-  Object.keys(dailyPnL).sort().forEach(date=>{
+  const sortedDates = Object.keys(dailyPnL).sort();
+  // Point de départ à 0, la veille du premier trade
+  if (sortedDates.length > 0) {
+    const first = new Date(sortedDates[0]);
+    first.setDate(first.getDate() - 1);
+    pnlCurve.push({ cum: 0, pnl: 0, date: first.toISOString().split('T')[0] });
+  }
+  sortedDates.forEach(date=>{
     cum += dailyPnL[date];
     pnlCurve.push({cum, pnl:dailyPnL[date], date});
   });
@@ -412,79 +434,71 @@ export default function DashboardPage({ trades = [], setPage }) {
 
         {/* ROW 2: P&L Cumulatif (a l'interieur de la meme carte) */}
         <div style={{padding:"16px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
-          <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#10A37F"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+          {/* Total P&L (uniquement vue cumulative) à droite */}
+          {chartView === "cumulative" && (
+            <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
+              <div style={{fontSize:12,fontWeight:600,color:"#10A37F"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+            </div>
+          )}
+          {/* Titre + flèches de navigation à droite du titre, sans contour */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D"}}>
+              {chartView === "cumulative" ? t("dash.cumulativePnL")
+                : chartView === "byAccount" ? "P&L par compte"
+                : "P&L par stratégie"}
+            </div>
+            <button
+              onClick={() => cycleView(-1)}
+              aria-label="Graphique précédent"
+              style={{width:22,height:22,borderRadius:5,border:"none",background:"transparent",color:T.textSub,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",fontSize:14}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+            >‹</button>
+            <button
+              onClick={() => cycleView(1)}
+              aria-label="Graphique suivant"
+              style={{width:22,height:22,borderRadius:5,border:"none",background:"transparent",color:T.textSub,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",fontSize:14}}
+              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
+              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+            >›</button>
           </div>
-          <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",marginBottom:2,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.cumulativePnL")} <span style={{color:"#8E8E8E",fontWeight:500}}>›</span></div>
-          <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>Évolution du capital — {new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}</div>
+          <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>
+            {chartView === "cumulative"
+              ? `Évolution du capital — ${new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}`
+              : chartView === "byAccount"
+              ? "Comparaison des comptes au fil du temps"
+              : "Comparaison des stratégies au fil du temps"}
+          </div>
 
-          {pnlCurve.length > 1 ? (
-            <div style={{position:"relative",width:"100%",height:280,paddingLeft:44,paddingBottom:22}}>
-              <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:44,right:8,bottom:22,width:"calc(100% - 52px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
-                <defs>
-                  <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{stopColor:"#10A37F",stopOpacity:0.18}}/>
-                    <stop offset="100%" style={{stopColor:"#10A37F",stopOpacity:0.01}}/>
-                  </linearGradient>
-                </defs>
-                {/* Axe Y labels supprimes du SVG (rendus en HTML overlay) */}
-                
-                {/* Grid lines horizontales alignees sur chaque tick Y */}
-                {(() => {
-                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                  const niceStep = (max) => {
-                    const rough = max / 3;
-                    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-                    const n = rough / mag;
-                    const nice = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
-                    return nice * mag;
-                  };
-                  const step = niceStep(maxCum);
-                  const topMax = Math.ceil(maxCum / step) * step;
-                  const ticks = [];
-                  for (let v = 0; v <= topMax; v += step) ticks.push(v);
-                  return ticks.map((value, i) => {
-                    // topPct va de 91% (v=0) a 8% (v=topMax), en coord viewBox [0,240]
-                    const topPct = 91 - ((value / topMax) * 83);
-                    const y = (topPct / 100) * 240;
-                    return <line key={`grid-${i}`} x1="35" y1={y} x2="600" y2={y} stroke="#F0F0F0" strokeWidth="1"/>;
-                  });
-                })()}
+          {chartView === "cumulative" && pnlCurve.length > 1 ? (
+            <div
+              style={{position:"relative",width:"100%",height:280,paddingLeft:0,paddingBottom:22}}
+              onMouseLeave={() => setHoveredChart(null)}
+            >
+              <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:50,bottom:22,width:"calc(100% - 50px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
 
-                {/* Chart area - smooth Catmull-Rom curve */}
+                {/* Chart area - smooth Catmull-Rom curve, sans gradient (style stats stratégie) */}
                 <g>
                   {(() => {
-                    const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+                    const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 0);
                     const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                    const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
+                    const span = (maxCum - minCum) || 1;
+                    const padL = 10;
+                    const topY = 16;
+                    const bottomY = 220;
+                    const plotH = bottomY - topY;
                     const points = pnlCurve.map((p, i) => {
-                      const x = 35 + (i / (pnlCurve.length - 1 || 1)) * 565;
-                      const y = 130 - ((p.cum / range) * 90);
+                      const x = padL + (i / (pnlCurve.length - 1 || 1)) * (600 - padL);
+                      const y = bottomY - ((p.cum - minCum) / span) * plotH;
                       return [x, y];
                     });
 
-                    // Catmull-Rom -> Cubic Bezier (courbe lisse)
-                    let pathD = `M ${points[0][0]} ${points[0][1]}`;
-                    for (let i = 0; i < points.length - 1; i++) {
-                      const p0 = points[i - 1] || points[i];
-                      const p1 = points[i];
-                      const p2 = points[i + 1];
-                      const p3 = points[i + 2] || p2;
-                      const tension = 0.5;
-                      const cp1x = p1[0] + (p2[0] - p0[0]) / 6 * tension;
-                      const cp1y = p1[1] + (p2[1] - p0[1]) / 6 * tension;
-                      const cp2x = p2[0] - (p3[0] - p1[0]) / 6 * tension;
-                      const cp2y = p2[1] - (p3[1] - p1[1]) / 6 * tension;
-                      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`;
-                    }
-
-                    // Fill path
-                    const fillD = pathD + ` L ${points[points.length - 1][0]} 200 L ${points[0][0]} 200 Z`;
+                    // Lignes droites entre points (moins lisse)
+                    const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ");
 
                     return (
                       <g>
-                        <path d={fillD} fill="url(#chartGradient)" stroke="none"/>
-                        <path d={pathD} stroke="#10A37F" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d={pathD} stroke="#10A37F" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -499,7 +513,7 @@ export default function DashboardPage({ trades = [], setPage }) {
                               setHoveredChart(i);
                               setTooltipPos({x: point[0], y: point[1]});
                             }}
-                            onMouseLeave={() => setHoveredChart(null)}
+                            // pas de reset sur mouseleave — on garde le dernier point hover
                           />
                         ))}
                       </g>
@@ -510,11 +524,10 @@ export default function DashboardPage({ trades = [], setPage }) {
                 {/* Axe X labels supprimes du SVG (rendus en HTML overlay) */}
               </svg>
 
-              {/* Y-axis labels (chiffres ronds) */}
-              <div style={{position:"absolute",top:0,left:0,width:40,height:"calc(100% - 22px)",pointerEvents:"none"}}>
+              {/* Y-axis labels en HTML overlay (à droite) — pas étirés par preserveAspectRatio */}
+              <div style={{position:"absolute",top:0,right:0,width:50,height:"calc(100% - 22px)",pointerEvents:"none"}}>
                 {(() => {
                   const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                  // Algo "nice number": trouver un step rond (100, 250, 500, 1000, 2500, 5000...)
                   const niceStep = (max) => {
                     const rough = max / 3;
                     const mag = Math.pow(10, Math.floor(Math.log10(rough)));
@@ -526,58 +539,56 @@ export default function DashboardPage({ trades = [], setPage }) {
                   const topMax = Math.ceil(maxCum / step) * step;
                   const ticks = [];
                   for (let v = 0; v <= topMax; v += step) ticks.push(v);
-                  return ticks.map((value, i) => {
-                    // Map 0 -> 91%, topMax -> 8% (inverted)
+                  const fmtVal = (v) => {
+                    const sign = v >= 0 ? "+" : "-";
+                    const abs = Math.abs(v);
+                    if (abs >= 10000) return `${sign}${Math.round(abs/10000)*10}k`;
+                    if (abs >= 1000)  return `${sign}${Math.round(abs/1000)}k`;
+                    return `${sign}${Math.round(abs)}`;
+                  };
+                  const tickEls = ticks.map((value, i) => {
                     const topPct = 91 - ((value / topMax) * 83);
                     return (
-                      <div key={`yh-${i}`} style={{position:"absolute",top:`${topPct}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500,textAlign:"right"}}>
-                        ${value.toLocaleString("en-US")}
+                      <div key={`yh-${i}`} style={{position:"absolute",top:`${topPct}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500}}>
+                        {fmtVal(value)}
                       </div>
                     );
                   });
+                  // P&L final au niveau du dernier point (couleur courbe)
+                  const minCum2 = Math.min(...pnlCurve.map(x=>x.cum), 0);
+                  const maxCum2 = Math.max(...pnlCurve.map(x=>x.cum), 0);
+                  const span = (maxCum2 - minCum2) || 1;
+                  const last = pnlCurve[pnlCurve.length - 1];
+                  const lastTopPct = (220 - ((last.cum - minCum2) / span) * 204) / 240 * 100;
+                  const precise = `${last.cum >= 0 ? "+" : "-"}$${Math.abs(last.cum).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+                  const lastEl = (
+                    <div key="last-pnl" style={{position:"absolute",top:`calc(${lastTopPct}% * (100% - 22px) / 100%)`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:"#10A37F",whiteSpace:"nowrap",background:"#FFFFFF"}}>
+                      {precise}
+                    </div>
+                  );
+                  return [...tickEls, lastEl];
                 })()}
               </div>
 
-              {/* Dot final persistant (style OpenAI) */}
-              {(() => {
-                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
+              {/* Dot au hover (n'apparaît que pendant le survol) */}
+              {hoveredChart !== null && (() => {
+                const idx = hoveredChart;
+                if (!pnlCurve[idx]) return null;
+                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 0);
                 const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
-                const last = pnlCurve[pnlCurve.length - 1];
-                const topPct = (130 - ((last.cum / range) * 90)) / 240 * 100;
-                return (
-                  <div style={{
-                    position:"absolute",
-                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
-                    right:8,
-                    width:8, height:8, borderRadius:"50%",
-                    background:"#FFFFFF",
-                    border:"2px solid #10A37F",
-                    transform:"translate(50%, -50%)",
-                    pointerEvents:"none",
-                  }} />
-                );
-              })()}
-
-              {/* Dot au hover - render en HTML pour eviter l'ecrasement */}
-              {hoveredChart !== null && pnlCurve[hoveredChart] && (() => {
-                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                const range = Math.max(Math.abs(maxCum), Math.abs(minCum));
-                const p = pnlCurve[hoveredChart];
-                const topPct = (130 - ((p.cum / range) * 90)) / 240 * 100;
-                // Les points de donnees vont de x=35 a x=600 dans un viewBox 600
-                // (le x=0..35 est reserve pour l'axe Y). Il faut donc remapper.
-                const svgX = 35 + (hoveredChart / Math.max(pnlCurve.length - 1, 1)) * 565;
+                const span = (maxCum - minCum) || 1;
+                const p = pnlCurve[idx];
+                const topPct = (220 - ((p.cum - minCum) / span) * 204) / 240 * 100;
+                const svgX = 10 + (idx / Math.max(pnlCurve.length - 1, 1)) * 590;
                 const leftPct = (svgX / 600) * 100;
                 return (
                   <div style={{
                     position:"absolute",
                     top:`calc(${topPct}% * (100% - 22px) / 100%)`,
-                    left:`calc(44px + ${leftPct}% * (100% - 52px) / 100%)`,
+                    left:`calc(${leftPct}% * (100% - 50px) / 100%)`,
                     width:10, height:10, borderRadius:"50%",
-                    background:"#10A37F",
-                    border:"2px solid #FFFFFF",
+                    background:"#FFFFFF",
+                    border:"2px solid #10A37F",
                     boxShadow:"0 0 0 1px rgba(16, 163, 127, 0.2)",
                     transform:"translate(-50%, -50%)",
                     pointerEvents:"none",
@@ -585,52 +596,396 @@ export default function DashboardPage({ trades = [], setPage }) {
                 );
               })()}
 
-              {/* X-axis labels en HTML - sous le graphique */}
-              <div style={{position:"absolute",bottom:2,left:44,right:8,height:18,pointerEvents:"none"}}>
+              {/* X-axis labels en HTML - chaque jour, premier collé à gauche, dernier collé à droite */}
+              <div style={{position:"absolute",bottom:2,left:0,right:50,height:18,pointerEvents:"none"}}>
                 {(() => {
-                  const step = Math.max(1, Math.floor(pnlCurve.length / 5));
                   return pnlCurve.map((p, i) => {
-                    if (i % step === 0 || i === pnlCurve.length - 1) {
-                      const dateStr = p.date || '';
-                      const date = new Date(dateStr);
-                      const label = isNaN(date.getTime()) ? '' : date.toLocaleDateString('fr-FR',{month:'short',day:'numeric'});
-                      const leftPct = (i / Math.max(pnlCurve.length - 1, 1)) * 100;
-                      return (
-                        <div key={`xh-${i}`} style={{position:"absolute",left:`${leftPct}%`,top:0,transform:"translateX(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500,whiteSpace:"nowrap"}}>
-                          {label}
-                        </div>
-                      );
-                    }
-                    return null;
+                    const dateStr = p.date || '';
+                    const date = new Date(dateStr);
+                    const label = isNaN(date.getTime()) ? '' : date.toLocaleDateString('fr-FR',{month:'short',day:'numeric'});
+                    const svgX = 10 + (i / Math.max(pnlCurve.length - 1, 1)) * 590;
+                    const leftPct = (svgX / 600) * 100;
+                    // Premier label aligné à gauche, dernier à droite, le reste centré
+                    const xfm = i === 0 ? "translateX(0%)"
+                              : i === pnlCurve.length - 1 ? "translateX(-100%)"
+                              : "translateX(-50%)";
+                    return (
+                      <div key={`xh-${i}`} style={{position:"absolute",left:`${leftPct}%`,top:0,transform:xfm,fontSize:10,color:"#8E8E8E",fontWeight:500,whiteSpace:"nowrap"}}>
+                        {label}
+                      </div>
+                    );
                   });
                 })()}
               </div>
               
-              {/* Tooltip */}
-              {hoveredChart !== null && pnlCurve[hoveredChart] && (
-                <div style={{
-                  position:"absolute",
-                  left:`${(tooltipPos.x / 600) * 100}%`,
-                  top:`${(tooltipPos.y / 240) * 100}%`,
-                  transform:"translate(-50%, -120%)",
-                  background:"#0D0D0D",
-                  color:"#FFF",
-                  padding:"8px 12px",
-                  borderRadius:"6px",
-                  fontSize:"12px",
-                  fontWeight:"600",
-                  whiteSpace:"nowrap",
-                  zIndex:100,
-                  pointerEvents:"none",
-                  boxShadow:"0 2px 8px rgba(0,0,0,0.15)"
-                }}>
-                  <div>{new Date(pnlCurve[hoveredChart].date).toLocaleDateString('fr-FR',{weekday:'short',month:'short',day:'numeric'})}</div>
-                  <div style={{fontSize:"13px",fontWeight:"700",color:pnlCurve[hoveredChart].pnl>=0?"#10A37F":"#EF4444"}}>
-                    {pnlCurve[hoveredChart].pnl>=0?"+":""}${Math.abs(pnlCurve[hoveredChart].pnl).toFixed(0)}
+              {/* Tooltip (n'apparaît que pendant le survol) */}
+              {hoveredChart !== null && (() => {
+                const idx = hoveredChart;
+                const p = pnlCurve[idx];
+                if (!p) return null;
+                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 0);
+                const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
+                const span = (maxCum - minCum) || 1;
+                const svgX = 10 + (idx / Math.max(pnlCurve.length - 1, 1)) * 590;
+                const svgY = 220 - ((p.cum - minCum) / span) * 204;
+                const leftPct = (svgX / 600) * 100;
+                const topPct = (svgY / 240) * 100;
+                return (
+                  <div style={{
+                    position:"absolute",
+                    left:`calc(${leftPct}% * (100% - 50px) / 100%)`,
+                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
+                    transform:"translate(-50%, -120%)",
+                    background:"#FFFFFF",
+                    color:"#0D0D0D",
+                    padding:"8px 12px",
+                    borderRadius:"6px",
+                    fontSize:"12px",
+                    fontWeight:"600",
+                    whiteSpace:"nowrap",
+                    zIndex:100,
+                    pointerEvents:"none",
+                    border:"1px solid #E5E5E5",
+                    boxShadow:"0 4px 12px rgba(0,0,0,0.08)"
+                  }}>
+                    <div style={{color:"#5C5C5C",fontWeight:500,fontSize:11,marginBottom:2}}>{new Date(p.date).toLocaleDateString('fr-FR',{weekday:'short',month:'short',day:'numeric'})}</div>
+                    <div style={{fontSize:"13px",fontWeight:"700",color:p.pnl>=0?"#10A37F":"#EF4444"}}>
+                      {p.pnl>=0?"+":""}${Math.abs(p.pnl).toFixed(0)}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
+          ) : chartView === "byStrategy" ? (
+            (() => {
+              const STRAT_COLORS = ["#10A37F","#3B82F6","#F97316","#A855F7","#EF4444","#0EA5E9","#EAB308","#EC4899"];
+              const getStrategyIdsForTrade = (tr) => {
+                let ids = tradeStrategiesData[tr.id] || [];
+                if (ids.length === 0 && tr.date && tr.symbol && tr.entry) {
+                  const ck = `${tr.date}${tr.symbol}${tr.entry}`;
+                  ids = tradeStrategiesData[ck] || [];
+                  if (ids.length === 0) {
+                    const norm = `${tr.date}${tr.symbol}${parseFloat(tr.entry).toFixed(2)}`;
+                    ids = tradeStrategiesData[norm] || [];
+                  }
+                }
+                return ids.map(String);
+              };
+
+              const seriesPerStrategy = (strategies || []).map((s, idx) => {
+                const sTrades = allTrades.filter(tr => getStrategyIdsForTrade(tr).includes(String(s.id)));
+                if (sTrades.length === 0) return null;
+                const sorted = [...sTrades].sort((a,b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+                const byDay = {};
+                sorted.forEach(tr => {
+                  const d = String(tr.date || "").split("T")[0];
+                  byDay[d] = (byDay[d] || 0) + (tr.pnl || 0);
+                });
+                const dates = Object.keys(byDay).sort();
+                let cum = 0;
+                const points = dates.map(d => { cum += byDay[d]; return { date: d, value: cum }; });
+                return { id: s.id, name: s.name, color: s.color || STRAT_COLORS[idx % STRAT_COLORS.length], points };
+              }).filter(Boolean);
+
+              if (seriesPerStrategy.length === 0) {
+                return (
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
+                    Pas de stratégies liées
+                  </div>
+                );
+              }
+
+              const allDatesSet = new Set();
+              seriesPerStrategy.forEach(s => s.points.forEach(p => allDatesSet.add(p.date)));
+              const allDates = Array.from(allDatesSet).sort();
+
+              const seriesFilled = seriesPerStrategy.map(s => {
+                const map = Object.fromEntries(s.points.map(p => [p.date, p.value]));
+                let lastVal = 0;
+                const filled = allDates.map(d => {
+                  if (map[d] !== undefined) lastVal = map[d];
+                  return { date: d, value: lastVal };
+                });
+                return { ...s, filled };
+              });
+
+              let yMin = 0, yMax = 0;
+              seriesFilled.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+              const yRange = (yMax - yMin) || 1;
+
+              const W = 600, H = 240;
+              const padL = 10, padR = 50, padT = 12, padB = 22;
+              const plotW = W - padL - padR;
+              const plotH = H - padT - padB;
+              const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
+              const yFor = (v) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+              const fmtVal = (v) => {
+                const sign = v >= 0 ? "+" : "-";
+                const abs = Math.abs(v);
+                if (abs >= 10000) return `${sign}${Math.round(abs/10000)*10}k`;
+                if (abs >= 1000)  return `${sign}${Math.round(abs/1000)}k`;
+                return `${sign}${Math.round(abs)}`;
+              };
+
+              const yTicks = [];
+              const N = 3;
+              for (let i = 0; i <= N; i++) {
+                const ratio = i / N;
+                yTicks.push({ y: padT + plotH * ratio, value: yMax - ratio * yRange });
+              }
+
+              return (
+                <div style={{position:"relative",width:"100%",height:280}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
+                    {yTicks.map((tk, i) => (
+                      <line key={`gr-${i}`} x1={padL} y1={tk.y} x2={W - padR} y2={tk.y} stroke="#F5F5F5" strokeWidth="1"/>
+                    ))}
+                    {seriesFilled.map(s => {
+                      const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                      return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+                    })}
+
+                    {/* Indicateur vertical au hover */}
+                    {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (
+                      <line x1={xFor(hoveredDayIdx)} y1={padT} x2={xFor(hoveredDayIdx)} y2={padT + plotH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2"/>
+                    )}
+
+                    {/* Capture rects pour le hover */}
+                    {allDates.map((d, i) => {
+                      const cellW = (allDates.length === 1 ? plotW : plotW / (allDates.length - 1));
+                      const x = xFor(i) - cellW / 2;
+                      return (
+                        <rect key={`hov-${i}`} x={Math.max(0, x)} y={padT} width={cellW} height={plotH + padB} fill="transparent" style={{cursor:"crosshair"}}
+                          onMouseEnter={() => setHoveredDayIdx(i)}
+                          onMouseLeave={() => setHoveredDayIdx(null)}
+                        />
+                      );
+                    })}
+                  </svg>
+
+                  {/* Y labels (échelle, gris) + P&L final par stratégie (couleur de la courbe) */}
+                  <div style={{position:"absolute",top:0,right:0,width:50,height:"100%",pointerEvents:"none"}}>
+                    {yTicks.map((tk, i) => (
+                      <div key={`yh-${i}`} style={{position:"absolute",top:`${(tk.y / H) * 100}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500}}>{fmtVal(tk.value)}</div>
+                    ))}
+                    {seriesFilled.map(s => {
+                      const last = s.filled[s.filled.length - 1].value;
+                      const topPct = (yFor(last) / H) * 100;
+                      const precise = `${last >= 0 ? "+" : "-"}$${Math.abs(last).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+                      return (
+                        <div key={`pnl-${s.id}`} style={{position:"absolute",top:`${topPct}%`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:s.color,whiteSpace:"nowrap",background:"#FFFFFF"}}>{precise}</div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Légende */}
+                  <div style={{position:"absolute",bottom:4,left:padL,display:"flex",gap:14,flexWrap:"wrap",fontFamily:"inherit"}}>
+                    {seriesFilled.map(s => (
+                      <div key={s.id} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:T.textSub}}>
+                        <span style={{width:8,height:8,borderRadius:"50%",background:s.color,flexShrink:0}}/>
+                        <span style={{fontWeight:500}}>{s.name}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tooltip blanc */}
+                  {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (() => {
+                    const date = allDates[hoveredDayIdx];
+                    const items = [...seriesFilled]
+                      .map(s => ({ strategy: s, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
+                      .sort((a, b) => b.value - a.value);
+                    const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                    const flip = leftPct > 60;
+                    const fmtD = (d) => { const [, m, dd] = d.split("-"); const months = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"]; return `${parseInt(dd)} ${months[parseInt(m)-1]}`; };
+                    return (
+                      <div style={{position:"absolute",left:`${leftPct}%`,top:16,transform: flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",background:"#FFFFFF",color:"#0D0D0D",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",border:"1px solid #E5E5E5",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
+                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C"}}>{fmtD(date)}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {items.map(it => (
+                            <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
+                              <span style={{fontWeight:600,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()
+          ) : chartView === "byAccount" ? (
+            (() => {
+              // Construire une série cumulative par compte
+              const ACCOUNT_COLORS = ["#10A37F", "#3B82F6", "#F97316", "#A855F7", "#EF4444", "#0EA5E9", "#EAB308", "#EC4899"];
+              const accountIds = (accounts && accounts.length > 0)
+                ? accounts.map(a => a.id)
+                : Array.from(new Set(allTrades.map(t => t.account_id).filter(Boolean)));
+
+              const seriesPerAccount = accountIds.map((aid, idx) => {
+                const acc = accounts.find(a => a.id === aid);
+                const accTrades = allTrades.filter(t => t.account_id === aid);
+                if (accTrades.length === 0) return null;
+                const sorted = [...accTrades].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+                const byDay = {};
+                sorted.forEach(tr => {
+                  const d = String(tr.date || "").split("T")[0];
+                  byDay[d] = (byDay[d] || 0) + (tr.pnl || 0);
+                });
+                const dates = Object.keys(byDay).sort();
+                let cum = 0;
+                const points = dates.map(d => { cum += byDay[d]; return { date: d, value: cum }; });
+                return { id: aid, name: acc?.name || "Compte", color: ACCOUNT_COLORS[idx % ACCOUNT_COLORS.length], points };
+              }).filter(Boolean);
+
+              if (seriesPerAccount.length === 0) {
+                return (
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
+                    Pas de données
+                  </div>
+                );
+              }
+
+              // X axis : toutes les dates
+              const allDatesSet = new Set();
+              seriesPerAccount.forEach(s => s.points.forEach(p => allDatesSet.add(p.date)));
+              const allDates = Array.from(allDatesSet).sort();
+
+              // Forward-fill chaque compte
+              const seriesFilled = seriesPerAccount.map(s => {
+                const map = Object.fromEntries(s.points.map(p => [p.date, p.value]));
+                let lastVal = 0;
+                const filled = allDates.map(d => {
+                  if (map[d] !== undefined) lastVal = map[d];
+                  return { date: d, value: lastVal };
+                });
+                return { ...s, filled };
+              });
+
+              let yMin = 0, yMax = 0;
+              seriesFilled.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+              const yRange = (yMax - yMin) || 1;
+
+              const W = 600, H = 240;
+              const padL = 10, padR = 50, padT = 12, padB = 22;
+              const plotW = W - padL - padR;
+              const plotH = H - padT - padB;
+              const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
+              const yFor = (v) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+              const fmtVal = (v) => {
+                const sign = v >= 0 ? "+" : "-";
+                const abs = Math.abs(v);
+                if (abs >= 10000) return `${sign}${Math.round(abs/10000)*10}k`;
+                if (abs >= 1000)  return `${sign}${Math.round(abs/1000)}k`;
+                return `${sign}${Math.round(abs)}`;
+              };
+
+              const yTicks = [];
+              const N = 3;
+              for (let i = 0; i <= N; i++) {
+                const ratio = i / N;
+                yTicks.push({ y: padT + plotH * ratio, value: yMax - ratio * yRange });
+              }
+
+              return (
+                <div style={{position:"relative",width:"100%",height:280}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
+                    {/* Lignes de grille */}
+                    {yTicks.map((tk, i) => (
+                      <line key={`gr-${i}`} x1={padL} y1={tk.y} x2={W - padR} y2={tk.y} stroke="#F5F5F5" strokeWidth="1"/>
+                    ))}
+                    {/* Courbes — non-sélectionnés en arrière-plan, sélectionnés au-dessus */}
+                    {seriesFilled.filter(s => !(selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id))).map(s => {
+                      const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                      return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="1" strokeOpacity="0.35" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+                    })}
+                    {seriesFilled.filter(s => selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id)).map(s => {
+                      const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                      return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+                    })}
+
+                    {/* Indicateur vertical au hover */}
+                    {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (
+                      <line x1={xFor(hoveredDayIdx)} y1={padT} x2={xFor(hoveredDayIdx)} y2={padT + plotH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2"/>
+                    )}
+
+                    {/* Capture rects pour le hover */}
+                    {allDates.map((d, i) => {
+                      const cellW = (allDates.length === 1 ? plotW : plotW / (allDates.length - 1));
+                      const x = xFor(i) - cellW / 2;
+                      return (
+                        <rect key={`hov-${i}`} x={Math.max(0, x)} y={padT} width={cellW} height={plotH + padB} fill="transparent" style={{cursor:"crosshair"}}
+                          onMouseEnter={() => setHoveredDayIdx(i)}
+                          onMouseLeave={() => setHoveredDayIdx(null)}
+                        />
+                      );
+                    })}
+                  </svg>
+
+                  {/* Y labels (échelle, gris) + P&L de chaque compte (couleur de la courbe) */}
+                  <div style={{position:"absolute",top:0,right:0,width:50,height:"100%",pointerEvents:"none"}}>
+                    {/* Échelle (ticks ronds) */}
+                    {yTicks.map((tk, i) => (
+                      <div key={`yh-${i}`} style={{position:"absolute",top:`${(tk.y / H) * 100}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500}}>{fmtVal(tk.value)}</div>
+                    ))}
+                    {/* P&L final par compte (au niveau du dernier point, valeur précise, aligné avec l'ordonnée) */}
+                    {seriesFilled.map(s => {
+                      const isSelected = selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id);
+                      const last = s.filled[s.filled.length - 1].value;
+                      const topPct = (yFor(last) / H) * 100;
+                      const precise = `${last >= 0 ? "+" : "-"}$${Math.abs(last).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+                      return (
+                        <div key={`pnl-${s.id}`} style={{position:"absolute",top:`${topPct}%`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:s.color,whiteSpace:"nowrap",background:"#FFFFFF",opacity:isSelected ? 1 : 0.4}}>{precise}</div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Légende compacte en bas (juste pastille + nom) */}
+                  <div style={{position:"absolute",bottom:4,left:padL,display:"flex",gap:14,flexWrap:"wrap",fontFamily:"inherit"}}>
+                    {seriesFilled.map(s => {
+                      const isSelected = selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id);
+                      return (
+                        <div key={s.id} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,color:T.textSub,opacity:isSelected ? 1 : 0.5}}>
+                          <span style={{width:8,height:8,borderRadius:"50%",background:s.color,flexShrink:0}}/>
+                          <span style={{fontWeight:isSelected ? 600 : 500}}>{s.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tooltip blanc */}
+                  {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (() => {
+                    const date = allDates[hoveredDayIdx];
+                    const items = [...seriesFilled]
+                      .map(s => ({ strategy: s, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
+                      .sort((a, b) => b.value - a.value);
+                    const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                    const flip = leftPct > 60;
+                    const fmtD = (d) => { const [, m, dd] = d.split("-"); const months = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"]; return `${parseInt(dd)} ${months[parseInt(m)-1]}`; };
+                    return (
+                      <div style={{position:"absolute",left:`${leftPct}%`,top:16,transform: flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",background:"#FFFFFF",color:"#0D0D0D",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",border:"1px solid #E5E5E5",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
+                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C"}}>{fmtD(date)}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {items.map(it => {
+                            const isSelected = selectedAccountIds.length === 0 || selectedAccountIds.includes(it.strategy.id);
+                            return (
+                              <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.55}}>
+                                <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
+                                <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
+                                <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()
           ) : (
             <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
               Pas de données

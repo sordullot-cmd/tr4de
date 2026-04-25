@@ -323,12 +323,13 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         const bestWr = stats.length ? stats.reduce((a, b) => b.wr > a.wr ? b : a) : null;
         const mostActive = stats.length ? stats.reduce((a, b) => b.count > a.count ? b : a) : null;
 
-        const Block = ({ icon: Icon, label, item, valueFn, valueColor }) => {
+        const Block = ({ icon: Icon, label, item, valueFn, valueColor, isLast }) => {
           return (
             <div
               style={{
-                flex: 1, padding: 16, background: T.white, border: `1px solid ${T.border}`,
-                borderRadius: 12, display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
+                flex: 1, padding: 16, background: T.white,
+                borderRight: isLast ? "none" : `1px solid ${T.border}`,
+                display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -338,18 +339,18 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 }}>
                   <Icon size={14} strokeWidth={1.75} color={T.text} />
                 </div>
-                <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>{label}</div>
+                <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
               </div>
               {item ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                     <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.strategy.color, flexShrink: 0 }} />
-                    <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {item.strategy.name}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 18, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2 }}>
+                    <div style={{ fontSize: 20, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2 }}>
                       {valueFn(item)}
                     </div>
                     <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
@@ -365,7 +366,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         };
 
         return (
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
             <Block icon={TrendingUp} label={t("strat.bestPerf")} item={best}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={best && best.pnl >= 0 ? T.green : T.red} />
             <Block icon={TrendingDown} label={t("strat.worstPerf")} item={worst}
@@ -373,7 +374,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             <Block icon={Percent} label={t("strat.bestWr")} item={bestWr}
               valueFn={(x) => `${x.wr.toFixed(1)}%`} />
             <Block icon={Activity} label={t("strat.mostActive")} item={mostActive}
-              valueFn={(x) => `${x.count} trades`} />
+              valueFn={(x) => `${x.count} trades`} isLast />
           </div>
         );
       })()}
@@ -431,7 +432,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               return (strategyTradeCountMap[b.id] || 0) - (strategyTradeCountMap[a.id] || 0);
             });
 
-            return sortedStrategies.map(strategy => {
+            return sortedStrategies.map((strategy, sIdx) => {
               // 🔍 DEBUG LOG
               console.log(`\n📊 Strategy: "${strategy.name}" (ID: ${strategy.id})`);
               console.log(`  Total trades available: ${trades.length}`);
@@ -525,59 +526,55 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             };
             
             // ✅ Fonction helper pour créer un Area Chart
-            const AreaChart = ({ trades, width = 200, height = 100 }) => {
+            const AreaChart = ({ trades, width = 280, height = 110 }) => {
               if (trades.length === 0) {
-                return <div style={{width, height, background: T.bg, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: T.textMut}}>Pas de données</div>;
+                return <div style={{width:"100%", height: 110, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: T.textMut}}>Pas de données</div>;
               }
-              
-              // Calculer les points cumulatifs
-              let cumulative = 0;
-              const points = trades.map(t => {
-                cumulative += typeof t.pnl === 'number' ? t.pnl : 0;
-                return cumulative;
+
+              // Cumulative P&L par trade (ordre chronologique)
+              const sorted = [...trades].sort((a, b) =>
+                new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
+              );
+              let cum = 0;
+              const data = sorted.map(tr => {
+                cum += typeof tr.pnl === "number" ? tr.pnl : 0;
+                return { date: tr.date, value: cum };
               });
-              
-              const minVal = Math.min(...points, 0);
-              const maxVal = Math.max(...points, 0);
-              const range = maxVal - minVal || 1;
-              const isPositive = maxVal >= 0;
-              
-              // Normaliser les points pour le graphique
-              const normalized = points.map(p => {
-                const normalized = (p - minVal) / range;
-                return normalized * height;
-              });
-              
-              // Créer le path
-              const startY = isPositive ? height : 0;
-              const endY = isPositive ? height : 0;
-              let pathData = `M 0 ${startY}`;
-              normalized.forEach((y, i) => {
-                const x = (i / (normalized.length - 1 || 1)) * width;
-                const plotY = isPositive ? height - y : y;
-                pathData += ` L ${x} ${plotY}`;
-              });
-              pathData += ` L ${width} ${endY} Z`;
-              
-              const gradColor = isPositive ? T.green : T.red;
-              
+
+              const values = data.map(d => d.value);
+              const minVal = Math.min(...values, 0);
+              const maxVal = Math.max(...values, 0);
+              const range = (maxVal - minVal) || 1;
+              const isPositive = values[values.length - 1] >= 0;
+              const lineColor = isPositive ? T.green : T.red;
+
+              // Layout — chart prend toute la place, pas d'ordonnée à droite
+              const W = 800;
+              const H = 220;
+              const padL = 0;
+              const padR = 0;
+              const padT = 6;
+              const padB = 16;
+              const plotW = W - padL - padR;
+              const plotH = H - padT - padB;
+
+              const xFor = (i) => padL + (data.length === 1 ? plotW / 2 : (i / (data.length - 1)) * plotW);
+              const yFor = (v) => padT + plotH - ((v - minVal) / range) * plotH;
+
+              const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(d.value).toFixed(1)}`).join(" ");
+
+              const fmtD = (d) => {
+                if (!d) return "";
+                const parts = String(d).split("T")[0].split("-");
+                if (parts.length !== 3) return d;
+                const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+                return `${parseInt(parts[2])} ${months[parseInt(parts[1]) - 1]}`;
+              };
+
               return (
-                <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{overflow: "visible"}}>
-                  <defs>
-                    <linearGradient id={`grad-${strategy.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor={gradColor} stopOpacity="0.3"/>
-                      <stop offset="100%" stopColor={gradColor} stopOpacity="0.05"/>
-                    </linearGradient>
-                  </defs>
-                  <path d={pathData} fill={`url(#grad-${strategy.id})`}/>
-                  <path 
-                    d={pathData.replace(' Z', '')} 
-                    fill="none" 
-                    stroke={gradColor} 
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:"block",overflow:"visible",aspectRatio:`${W} / ${H}`}}>
+                  {/* Courbe seule — pas de gradient, pas d'axe Y, pas de dates */}
+                  <path d={linePath} fill="none" stroke={lineColor} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               );
             };
@@ -587,12 +584,12 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 key={strategy.id}
                 style={{
                   display:"grid",
-                  gridTemplateColumns:"1.1fr 1.1fr 1fr",
+                  gridTemplateColumns:"30% 40% 30%",
                   gap:24,
                   padding:20,
                   background:T.white,
                   border:`1px solid ${T.border}`,
-                  borderRadius:12,
+                  borderRadius: 12,
                   transition:"border-color .15s ease, box-shadow .15s ease",
                   cursor:"pointer",
                   minHeight:200,
@@ -607,68 +604,51 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 }}
               >
                 {/* ========== LEFT SECTION: STATISTICS ========== */}
-                <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",paddingRight:20,borderRight:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",flexDirection:"column",gap:8,paddingRight:20,borderRight:`1px solid ${T.border}`}}>
                   {/* Strategy Name & Color Dot */}
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:strategy.color,flexShrink:0}}/>
-                    <div style={{fontSize:17,fontWeight:600,color:T.text,lineHeight:1.3,letterSpacing:-0.1}}>{strategy.name}</div>
+                    <div style={{fontSize:15,fontWeight:600,color:T.text,lineHeight:1.3,letterSpacing:-0.1}}>{strategy.name}</div>
                   </div>
 
                   {/* PnL */}
-                  <div style={{paddingTop:14,paddingBottom:14}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:6}}>{t("strat.pnlNet")}</div>
-                    <div style={{fontSize:24,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.3}}>{fmt(totalPnL,true)}</div>
-                  </div>
+                  <div style={{fontSize:20,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
 
-                  {/* W/L bar + Win Rate */}
-                  <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:11,color:T.textMut,fontWeight:500,marginBottom:8}}>{t("strat.winsLosses")}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{fontSize:11,fontWeight:600,color:T.green,minWidth:18}}>{winCount}</div>
-                        <div style={{display:"flex",height:4,borderRadius:2,background:T.border,overflow:"hidden",flex:1}}>
-                          <div style={{flex:winCount,background:T.green}}/>
-                          <div style={{flex:lossCount,background:T.red}}/>
-                        </div>
-                        <div style={{fontSize:11,fontWeight:600,color:T.red,minWidth:18,textAlign:"right"}}>{lossCount}</div>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                      <DonutChart winRate={parseInt(winRate)} size={56}/>
-                      <div style={{display:"flex",flexDirection:"column"}}>
-                        <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("common.winRate")}</div>
-                        <div style={{fontSize:15,fontWeight:600,color:T.text,letterSpacing:-0.2}}>{winRate}%</div>
-                      </div>
+                  <div style={{flex:1}} />
+
+                  {/* Win Rate (donut) */}
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <DonutChart winRate={parseInt(winRate)} size={48}/>
+                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                      <div style={{fontSize:12,color:T.textSub,fontWeight:500}}>{t("common.winRate")}</div>
+                      <div style={{fontSize:13,fontWeight:500,color:T.text}}>{winRate}% · {winCount}W / {lossCount}L</div>
                     </div>
                   </div>
                 </div>
 
                 {/* ========== CENTER SECTION: AREA CHART ========== */}
-                <div style={{display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 20px",borderRight:`1px solid ${T.border}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("strat.performance")}</div>
-                    <div style={{fontSize:11,color:T.textSub,fontWeight:500}}>{strategyTradeCount} trades</div>
-                  </div>
+                {/* paddingLeft 13 + paddingRight 12 + borderRight 1px = 13px visible de chaque côté */}
+                <div style={{display:"flex",flexDirection:"column",justifyContent:"center",padding:"0 12px 0 13px",borderRight:`1px solid ${T.border}`}}>
                   <div style={{width:"100%"}}>
                     <AreaChart trades={strategyTrades} width={280} height={110}/>
                   </div>
                 </div>
 
                 {/* ========== RIGHT SECTION: RULES ========== */}
-                <div style={{display:"flex",flexDirection:"column",gap:10,paddingLeft:4}}>
+                <div style={{display:"flex",flexDirection:"column",gap:10,paddingLeft:20}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("strat.rules")}</div>
-                    <div style={{display:"flex",gap:4}}>
+                    <div style={{fontSize:12,color:T.textSub,fontWeight:500}}>{t("strat.rules")}</div>
+                    <div style={{display:"flex",gap:2}}>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleEditStrategy(strategy); }}
                         title="Modifier"
                         style={{
-                          width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",
-                          borderRadius:6,border:`1px solid ${T.border}`,background:T.white,
-                          color:T.textSub,cursor:"pointer",transition:"background .15s ease",
+                          width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
+                          borderRadius:6,border:"none",background:"transparent",
+                          color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
                         }}
-                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.accentBg; }}
-                        onMouseLeave={(e)=>{ e.currentTarget.style.background = T.white; }}
+                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                        onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
                       >
                         <Pencil size={13} strokeWidth={1.75} />
                       </button>
@@ -676,12 +656,12 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                         onClick={(e) => { e.stopPropagation(); handleDeleteStrategy(strategy.id); }}
                         title="Supprimer"
                         style={{
-                          width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",
-                          borderRadius:6,border:`1px solid ${T.border}`,background:T.white,
-                          color:T.red,cursor:"pointer",transition:"background .15s ease",
+                          width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
+                          borderRadius:6,border:"none",background:"transparent",
+                          color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
                         }}
-                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.redBg; }}
-                        onMouseLeave={(e)=>{ e.currentTarget.style.background = T.white; }}
+                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.redBg; e.currentTarget.style.color = T.red; }}
+                        onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
                       >
                         <Trash2 size={13} strokeWidth={1.75} />
                       </button>
@@ -693,7 +673,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                       strategy.groups.map(group => (
                         <div key={group.id} style={{display:"flex",flexDirection:"column",gap:4}}>
                           {group.name && (
-                            <div style={{fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.4}}>
+                            <div style={{fontSize:11,fontWeight:500,color:T.textMut}}>
                               {group.name}
                             </div>
                           )}

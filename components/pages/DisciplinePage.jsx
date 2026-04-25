@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   GripVertical,
+  Sun, Compass, Newspaper, ListChecks, NotebookPen, ShieldCheck,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
@@ -770,8 +771,8 @@ export default function DisciplinePage({ trades = [] }) {
         {/* MIDDLE SECTION - 2 COLUMNS */}
         <div style={{display:"grid",gridTemplateColumns:"0.8fr 2.2fr",gap:12}}>
           {/* DAILY CHECKLIST */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12}}>
-            <div style={{padding:16,borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{background:T.white,borderRadius:12}}>
+            <div style={{padding:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("disc.checklist")}</div>
                 <div style={{fontSize:11,color:T.textMut}}>{currentDay} {currentMonth.toLowerCase()}.</div>
@@ -779,42 +780,43 @@ export default function DisciplinePage({ trades = [] }) {
               <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{dailyRules.filter(r=>r.status).length}/{dailyRules.length}</div>
             </div>
             <div style={{maxHeight:"none",overflowY:"visible",paddingTop:8}}>
-              {dailyRules.map(rule => (
-                <div
-                  key={rule.id}
-                  onClick={() => toggleRule(rule.id, allRules)}
-                  style={{
-                    padding:"12px 16px",
-                    display:"flex",
-                    alignItems:"center",
-                    gap:12,
-                    background:rule.status?T.bg:"transparent",
-                    cursor:"pointer",
-                    transition:"background 0.15s"
-                  }}
-                >
-                  <div style={{
-                    width:18,
-                    height:18,
-                    borderRadius:3,
-                    background:rule.status?T.green:"transparent",
-                    border:`2px solid ${rule.status?T.green:T.border2}`,
-                    display:"flex",
-                    alignItems:"center",
-                    justifyContent:"center",
-                    color:"white",
-                    fontSize:12,
-                    fontWeight:600,
-                    flexShrink:0,
-                    transition:"all 0.15s"
-                  }}>
-                    {rule.status ? "✓" : ""}
+              {dailyRules.map(rule => {
+                return (
+                  <div
+                    key={rule.id}
+                    onClick={() => toggleRule(rule.id, allRules)}
+                    style={{
+                      display:"flex",
+                      alignItems:"center",
+                      gap:12,
+                      padding:"12px 16px",
+                      borderRadius:8,
+                      cursor:"pointer",
+                      transition:"background .12s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#FAFAFA"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {/* Checkbox — petit, contour épais, à gauche */}
+                    <div style={{
+                      width:18, height:18, borderRadius:5,
+                      border: rule.status ? "none" : `2px solid ${T.border2}`,
+                      background: rule.status ? T.green : T.white,
+                      display:"inline-flex", alignItems:"center", justifyContent:"center",
+                      flexShrink:0, transition:"all .15s ease",
+                    }}>
+                      {rule.status && <LucideCheck size={11} strokeWidth={3} color="#fff"/>}
+                    </div>
+
+                    {/* Label */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:500,color:rule.status?T.textMut:T.text,textDecoration:rule.status?"line-through":"none"}}>
+                        {rule.label}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:500,color:rule.status?T.textMut:T.text,textDecoration:rule.status?"line-through":"none"}}>{rule.label}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

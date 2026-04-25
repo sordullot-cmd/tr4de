@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, BookOpen, Check, Trash2, Pencil, X } from "lucide-react";
+import { Plus, BookOpen, Check, Trash2, Pencil, X, BookMarked, FileText, Library } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { Stat } from "@/components/ui/Stat";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -67,16 +68,30 @@ export default function ReadingListPage() {
     reading: books.filter(b => b.status === "reading").length,
     done: books.filter(b => b.status === "done").length,
   };
+  // Pages lues = somme des currentPage pour les "reading" + totalPages pour les "done"
+  const pagesRead = books.reduce((sum, b) => {
+    if (b.status === "done") return sum + (b.totalPages || 0);
+    if (b.status === "reading") return sum + (b.currentPage || 0);
+    return sum;
+  }, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Reading List</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Liste de lecture</h1>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}
           style={{ marginLeft: "auto", padding: "7px 14px", height: 34, borderRadius: 8, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Ajouter un livre
         </button>
         <div id="tr4de-page-header-slot" />
+      </div>
+
+      {/* Header stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+        <Stat icon={BookMarked} label="En cours"   value={counts.reading} subtext={counts.reading > 1 ? "livres" : "livre"} size="sm" />
+        <Stat icon={Check}      label="Terminés"   value={counts.done}    subtext={counts.done > 1 ? "livres" : "livre"} size="sm" positive={counts.done > 0} />
+        <Stat icon={FileText}   label="Pages lues" value={pagesRead}      subtext="cumulées" size="sm" />
+        <Stat icon={Library}    label="À lire"     value={counts.toRead}  subtext={counts.toRead > 1 ? "à découvrir" : "à découvrir"} size="sm" />
       </div>
 
       {showForm && (

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import ReactDOM from "react-dom";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { t, useLang } from "@/lib/i18n";
 import {
@@ -220,7 +221,7 @@ export default function DailyPlannerPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       {/* Header : gros titre */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5, fontFamily: "var(--font-sans)" }}>{t("nav.dailyPlanner")}</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("nav.dailyPlanner")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 
@@ -235,13 +236,13 @@ export default function DailyPlannerPage() {
             {/* Bloc date : day number big + weekday/month */}
             <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1, minWidth: 48 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5 }}>{parts.month.slice(0, 3)}.</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: T.text, letterSpacing: -0.8, marginTop: 2 }}>{String(parts.day).padStart(2, "0")}</div>
+                <div style={{ fontSize: 11, fontWeight: 500, color: T.textMut }}>{parts.month.slice(0, 3)}.</div>
+                <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: -0.3, marginTop: 2 }}>{String(parts.day).padStart(2, "0")}</div>
               </div>
               <div style={{ height: 30, width: 1, background: T.border }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{parts.weekday}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{parts.weekday}</div>
                   {isToday && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, color: T.green, background: T.green + "18",
@@ -268,13 +269,13 @@ export default function DailyPlannerPage() {
         {/* LEFT : Habitudes du jour (sans carte, style timeline comme la page Objectifs) */}
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Habitudes du jour</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Habitudes du jour</h2>
             <div style={{ flex: 1, height: 1, background: T.border }} />
             <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
               {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
             </span>
             <button onClick={openCreateHabit} title="Ajouter une habitude"
-              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}
               onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
               <Plus size={13} strokeWidth={2} />
@@ -282,29 +283,113 @@ export default function DailyPlannerPage() {
           </div>
 
           {/* Formulaire ajout/edit */}
-          {habitFormOpen && (
-            <div style={{ background: T.bg, borderRadius: 10, padding: 12, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <input type="text" value={habitDraft.name} onChange={(e) => setHabitDraft({ ...habitDraft, name: e.target.value })}
-                placeholder="Nom de l'habitude (l'emoji est choisi automatiquement)" autoFocus
-                style={{ padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-              <textarea value={habitDraft.description} onChange={(e) => setHabitDraft({ ...habitDraft, description: e.target.value })}
-                placeholder="Description (optionnel)"
-                rows={2}
-                style={{ padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, resize: "vertical", lineHeight: 1.4 }} />
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="time" value={habitDraft.time} onChange={(e) => setHabitDraft({ ...habitDraft, time: e.target.value })}
-                  style={{ flex: 1, padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-                <input type="text" value={habitDraft.location} onChange={(e) => setHabitDraft({ ...habitDraft, location: e.target.value })}
-                  placeholder="Lieu (optionnel)"
-                  style={{ flex: 2, padding: "8px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-                <button onClick={saveHabit} style={{ padding: "0 14px", height: 36, background: T.text, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                  {editingHabitId ? "Enregistrer" : "Ajouter"}
-                </button>
-                <button onClick={closeHabitForm} style={{ width: 36, height: 36, background: T.white, color: T.textSub, border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                  <X size={14} />
-                </button>
+          {habitFormOpen && typeof document !== "undefined" && ReactDOM.createPortal(
+            <div
+              onClick={closeHabitForm}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.45)",
+                zIndex: 10000,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 16,
+                animation: "fadeIn 140ms ease both",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => { if (e.key === "Escape") closeHabitForm(); if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveHabit(); }}
+                style={{
+                  background: T.white,
+                  borderRadius: 14,
+                  padding: 0,
+                  width: "min(520px, 96vw)",
+                  maxHeight: "92vh",
+                  overflow: "auto",
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.18)",
+                  fontFamily: "var(--font-sans)",
+                  display: "flex", flexDirection: "column",
+                }}
+              >
+                {/* Header */}
+                <div style={{ padding: "20px 24px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
+                      {editingHabitId ? "Modifier l'habitude" : "Nouvelle habitude"}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>
+                      Une habitude, une heure, un lieu — précis = tenu.
+                    </div>
+                  </div>
+                  <button onClick={closeHabitForm} aria-label="Fermer"
+                    style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                    <X size={16} strokeWidth={1.75} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: "8px 24px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Nom */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "block", marginBottom: 6 }}>Nom de l'habitude</label>
+                    <input type="text" value={habitDraft.name} onChange={(e) => setHabitDraft({ ...habitDraft, name: e.target.value })}
+                      placeholder="ex. Méditer 10 min" autoFocus
+                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, transition: "border-color .15s ease" }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = T.text}
+                      onBlur={(e) => e.currentTarget.style.borderColor = T.border}
+                    />
+                  </div>
+
+                  {/* Heure + Lieu */}
+                  <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
+                        <Clock size={11} strokeWidth={1.75} /> Heure
+                      </label>
+                      <input type="time" value={habitDraft.time} onChange={(e) => setHabitDraft({ ...habitDraft, time: e.target.value })}
+                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
+                        <MapPin size={11} strokeWidth={1.75} /> Lieu <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel</span>
+                      </label>
+                      <input type="text" value={habitDraft.location} onChange={(e) => setHabitDraft({ ...habitDraft, location: e.target.value })}
+                        placeholder="ex. Bureau, salon…"
+                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "block", marginBottom: 6 }}>
+                      Description <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel</span>
+                    </label>
+                    <textarea value={habitDraft.description} onChange={(e) => setHabitDraft({ ...habitDraft, description: e.target.value })}
+                      placeholder="Pourquoi cette habitude ? Comment la déclencher ?"
+                      rows={3}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, resize: "vertical", lineHeight: 1.5 }} />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding: "12px 24px 20px", display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, color: T.textMut }}>
+                    <kbd style={{ fontSize: 10, padding: "1px 5px", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textSub, fontFamily: "var(--font-mono, ui-monospace), monospace" }}>Esc</kbd> pour fermer
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={closeHabitForm} style={{ padding: "0 16px", height: 36, background: T.white, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      Annuler
+                    </button>
+                    <button onClick={saveHabit} disabled={!habitDraft.name?.trim()}
+                      style={{ padding: "0 18px", height: 36, background: habitDraft.name?.trim() ? T.text : T.border2, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: habitDraft.name?.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: habitDraft.name?.trim() ? 1 : 0.7 }}>
+                      {editingHabitId ? "Enregistrer" : "Ajouter l'habitude"}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* Liste des habitudes (style timeline de la page Objectifs) */}
@@ -353,7 +438,8 @@ export default function DailyPlannerPage() {
                       }}>
                         {h.name}
                       </div>
-                      {(h.description || h.time || h.location) && (
+                      {/* Heure + lieu : ligne inline, descritpion : ligne séparée qui peut wrapper */}
+                      {(h.time || h.location) && (
                         <div style={{
                           display: "flex", alignItems: "center", gap: 6, marginTop: 2,
                           fontSize: 11, color: T.textMut, lineHeight: 1.2,
@@ -370,13 +456,27 @@ export default function DailyPlannerPage() {
                               <MapPin size={10} strokeWidth={1.75} /> {h.location}
                             </span>
                           )}
-                          {(h.time || h.location) && h.description && <span>·</span>}
-                          {h.description && (
-                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.description}</span>
-                          )}
+                        </div>
+                      )}
+                      {h.description && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: T.textMut, lineHeight: 1.4, whiteSpace: "normal", wordBreak: "break-word" }}>
+                          {h.description}
                         </div>
                       )}
                     </div>
+
+                    {/* Checkbox — collée au texte */}
+                    <button onClick={() => toggleHabit(h.id)}
+                      style={{
+                        width: 18, height: 18, borderRadius: 5,
+                        border: done ? "none" : `2px solid ${T.border2 || "#D4D4D4"}`,
+                        background: done ? T.green : T.white,
+                        cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, transition: "all .15s ease",
+                      }}>
+                      {done && <Check size={11} strokeWidth={3} color="#fff" />}
+                    </button>
 
                     {/* Edit (hidden until hover) */}
                     <button data-habit-edit onClick={() => openEditHabit(h)} title="Modifier"
@@ -393,19 +493,6 @@ export default function DailyPlannerPage() {
                       onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
                       <Trash2 size={11} strokeWidth={1.75} />
                     </button>
-
-                    {/* Checkbox */}
-                    <button onClick={() => toggleHabit(h.id)}
-                      style={{
-                        width: 24, height: 24, borderRadius: 6,
-                        border: done ? "none" : `1.5px solid ${T.border}`,
-                        background: done ? T.green : T.white,
-                        cursor: "pointer",
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, transition: "all .15s ease",
-                      }}>
-                      {done && <Check size={12} strokeWidth={2.5} color="#fff" />}
-                    </button>
                   </div>
                 );
               })}
@@ -418,7 +505,7 @@ export default function DailyPlannerPage() {
           {/* Tâches */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Tâches du jour</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Tâches du jour</h2>
               <div style={{ flex: 1, height: 1, background: T.border }} />
               <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
                 {(day.tasks || []).filter(p => p.done).length}/{(day.tasks || []).length}
@@ -435,7 +522,7 @@ export default function DailyPlannerPage() {
           {/* Notes du jour — reset chaque jour, archivées */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: -0.3, margin: 0 }}>Notes du jour</h2>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Notes du jour</h2>
               <div style={{ flex: 1, height: 1, background: T.border }} />
               {pastNotes.length > 0 && (
                 <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
@@ -461,7 +548,7 @@ export default function DailyPlannerPage() {
             {/* Archives : liste compacte */}
             {pastNotes.length > 0 && (
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: T.textSub, marginBottom: 8 }}>
                   Archives
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
@@ -562,42 +649,21 @@ function HabitsChart({ habits, history }) {
   let streak = 0;
   for (let i = days.length - 1; i >= 0; i--) { if (days[i].done > 0) streak++; else break; }
 
-  // Courbe SVG
-  const VB_W = 1000;   // viewBox width (adapte via preserveAspectRatio)
-  const VB_H = 180;    // viewBox height
-  const padL = 32, padR = 16, padT = 16, padB = 30;
+  // Courbe SVG — style harmonisé avec les charts du Dashboard (Y labels à droite, lignes droites)
+  const VB_W = 1000;
+  const VB_H = 180;
+  const padL = 8, padR = 36, padT = 14, padB = 24;
   const chartW = VB_W - padL - padR;
   const chartH = VB_H - padT - padB;
-  // Points
   const points = days.map((d, i) => {
     const x = padL + (i / Math.max(days.length - 1, 1)) * chartW;
     const y = padT + chartH - (d.pct / 100) * chartH;
     return { x, y, ...d };
   });
-  // Smooth Catmull-Rom path
-  let pathD = "";
-  if (points.length > 0) {
-    pathD = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i - 1] || points[i];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = points[i + 2] || p2;
-      const tension = 0.5;
-      const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
-      const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
-      const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
-      const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
-      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-    }
-  }
-  const areaD = points.length > 0
-    ? `${pathD} L ${points[points.length - 1].x} ${padT + chartH} L ${points[0].x} ${padT + chartH} Z`
-    : "";
+  // Lignes droites entre points (pas de Bezier)
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 
-  // Gridlines horizontales : 0 / 50 / 100 %
   const yTicks = [0, 50, 100];
-  // Labels X : un repère tous les 5 jours
   const xTicks = points.filter((_, i) => i === 0 || i === points.length - 1 || i % 5 === 0);
 
   return (
@@ -623,46 +689,49 @@ function HabitsChart({ habits, history }) {
           Ajoute des habitudes pour voir ton graphique
         </div>
       ) : (
-        <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none"
-          style={{ width: "100%", height: 180, display: "block", fontFamily: "var(--font-sans)" }}>
-          <defs>
-            <linearGradient id="habit-area" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor={T.green} stopOpacity="0.20" />
-              <stop offset="100%" stopColor={T.green} stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
+        <div style={{ position: "relative", width: "100%" }}>
+          <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none"
+            style={{ width: "100%", height: 180, display: "block", fontFamily: "var(--font-sans)" }}>
+            {/* Grid très clair */}
+            {yTicks.map(t => {
+              const y = padT + chartH - (t / 100) * chartH;
+              return <line key={t} x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="#F5F5F5" strokeWidth="1" />;
+            })}
 
-          {/* Grid + Y ticks */}
-          {yTicks.map(t => {
-            const y = padT + chartH - (t / 100) * chartH;
-            return (
-              <g key={t}>
-                <line x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="#F0F0F0" strokeWidth="1" />
-                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#8E8E8E" fontWeight="500">{t}%</text>
-              </g>
-            );
-          })}
+            {/* Courbe — pas de gradient, lignes droites */}
+            <path d={pathD} fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
 
-          {/* Area + line */}
-          <path d={areaD} fill="url(#habit-area)" />
-          <path d={pathD} fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {/* Dot final */}
+            {points.length > 0 && (() => {
+              const last = points[points.length - 1];
+              return <circle cx={last.x} cy={last.y} r="3" fill="#fff" stroke={T.green} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
+            })()}
 
-          {/* Dot today */}
-          {points.length > 0 && (() => {
-            const last = points[points.length - 1];
-            return <circle cx={last.x} cy={last.y} r="4" fill="#fff" stroke={T.green} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
-          })()}
+            {/* X labels collés aux bords */}
+            {xTicks.map(p => {
+              const label = p.isToday ? "Ajd" : `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
+              const isFirst = p === points[0];
+              const isLast = p === points[points.length - 1];
+              const anchor = isFirst ? "start" : isLast ? "end" : "middle";
+              return (
+                <text key={`x-${p.iso}`} x={p.x} y={VB_H - 8} textAnchor={anchor} fontSize="9" fill={p.isToday ? "#0D0D0D" : "#8E8E8E"} fontWeight={p.isToday ? 600 : 500}>
+                  {label}
+                </text>
+              );
+            })}
+          </svg>
 
-          {/* X labels */}
-          {xTicks.map(p => {
-            const label = p.isToday ? "Ajd" : `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
-            return (
-              <text key={`x-${p.iso}`} x={p.x} y={VB_H - 10} textAnchor="middle" fontSize="10" fill={p.isToday ? "#0D0D0D" : "#8E8E8E"} fontWeight={p.isToday ? "600" : "500"}>
-                {label}
-              </text>
-            );
-          })}
-        </svg>
+          {/* Y labels HTML overlay (à droite, non étirés par preserveAspectRatio) */}
+          <div style={{ position: "absolute", top: 0, right: 0, width: 36, height: "100%", pointerEvents: "none" }}>
+            {yTicks.map(t => {
+              const yPx = padT + chartH - (t / 100) * chartH;
+              const topPct = (yPx / VB_H) * 100;
+              return (
+                <div key={`yh-${t}`} style={{ position: "absolute", top: `${topPct}%`, right: 6, transform: "translateY(-50%)", fontSize: 10, color: "#8E8E8E", fontWeight: 500 }}>{t}%</div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

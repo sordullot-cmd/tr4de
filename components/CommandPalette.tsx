@@ -28,8 +28,8 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: "nav.agent",         group: "Navigation", label: "Agent IA",                   keywords: ["coach"], run: c => c.setPage("agent") },
   { id: "nav.daily-planner", group: "Navigation", label: "Planning du jour",           keywords: ["habitudes", "tâches"], run: c => c.setPage("daily-planner") },
   { id: "nav.goals",         group: "Navigation", label: "Objectifs",                  keywords: ["goals"], run: c => c.setPage("goals") },
-  { id: "nav.focus",         group: "Navigation", label: "Focus timer",                keywords: ["pomodoro"], run: c => c.setPage("focus") },
-  { id: "nav.reading",       group: "Navigation", label: "Lectures",                   keywords: ["livres"], run: c => c.setPage("reading") },
+  { id: "nav.focus",         group: "Navigation", label: "Minuteur Focus",             keywords: ["pomodoro", "focus", "timer"], run: c => c.setPage("focus") },
+  { id: "nav.reading",       group: "Navigation", label: "Liste de lecture",           keywords: ["livres", "lectures", "books"], run: c => c.setPage("reading") },
   { id: "nav.settings",      group: "Navigation", label: "Paramètres",                 keywords: ["preferences", "profile"], run: c => c.setPage("settings") },
 
   // Actions

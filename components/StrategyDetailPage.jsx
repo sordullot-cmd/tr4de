@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
+import { DollarSign, Percent, Activity, ShieldCheck, BarChart3 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -48,6 +49,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
   const [loading, setLoading] = useState(true);
   const [tradeStrategiesData, setTradeStrategiesData] = useState({});
   const [checkedRules, setCheckedRules] = useState({});
+  const [hoveredDayIdx, setHoveredDayIdx] = useState(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -585,36 +587,36 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         </div>
       </div>
 
-      {/* CARD 1 : 4 KPIs separes */}
+      {/* CARD 1 : 4 KPIs collés dans une seule card */}
       {filteredTrades.length > 0 && (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        <div style={{display:"flex",background:T.white,border:`1px solid ${T.border}`,borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden"}}>
 
             {/* 1. P&L Net */}
-            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
-                P&L Net <span style={{color:T.textMut}}>›</span>
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
+                <DollarSign size={13} strokeWidth={1.75} color={T.textMut}/> P&L Net
               </div>
-              <div style={{fontSize:22,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+              <div style={{fontSize:20,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {fmt(totalPnL,true)}
               </div>
               <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length} trades</div>
             </div>
 
             {/* 2. Taux de Victoire */}
-            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
-                Taux de victoire <span style={{color:T.textMut}}>›</span>
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
+                <Percent size={13} strokeWidth={1.75} color={T.textMut}/> Taux de victoire
               </div>
-              <div style={{fontSize:22,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+              <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {winRate}%
               </div>
               <div style={{fontSize:11,color:T.textMut}}>{winCount}W · {lossCount}L</div>
             </div>
 
             {/* 3. Meilleur vs Pire (compact) */}
-            <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
-                Meilleur vs pire <span style={{color:T.textMut}}>›</span>
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
+                <Activity size={13} strokeWidth={1.75} color={T.textMut}/> Meilleur vs pire
               </div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
                 <span style={{fontSize:18,fontWeight:600,color:T.green,letterSpacing:-0.2}}>{fmt(maxWin)}</span>
@@ -626,10 +628,10 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 4. Suivi Regles (ou stat de fallback) */}
             {hasRules ? (
-              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
+              <div style={{flex:1,padding:"16px 20px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontSize:12,color:T.textSub,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
-                    Suivi des règles <span style={{color:T.textMut}}>›</span>
+                  <div style={{fontSize:12,color:T.textSub,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
+                    <ShieldCheck size={13} strokeWidth={1.75} color={T.textMut}/> Suivi des règles
                   </div>
                   <span style={{fontSize:10,fontWeight:600,color:impactColor,padding:"2px 6px",borderRadius:999,background:impactColor+"15"}}>
                     {rulesImpact > 0 ? "+" : ""}{rulesImpact}%
@@ -643,11 +645,11 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                 <div style={{fontSize:11,color:T.textMut}}>Avec règles / sans règles</div>
               </div>
             ) : (
-              <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"16px 20px"}}>
-                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
-                  Volume <span style={{color:T.textMut}}>›</span>
+              <div style={{flex:1,padding:"16px 20px"}}>
+                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
+                  <BarChart3 size={13} strokeWidth={1.75} color={T.textMut}/> Volume
                 </div>
-                <div style={{fontSize:22,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                   {filteredTrades.length}
                 </div>
                 <div style={{fontSize:11,color:T.textMut}}>trades exécutés</div>
@@ -657,12 +659,247 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         </div>
       )}
 
+      {/* PERFORMANCE COMPARISON — toutes les stratégies + highlight de la courante */}
+      {strategies.length > 0 && trades.length > 0 && (() => {
+        const getStrategyIdsForTrade = (tr) => {
+          let ids = tradeStrategiesData[tr.id] || [];
+          if (ids.length === 0 && tr.date && tr.symbol && tr.entry) {
+            const ck = `${tr.date}${tr.symbol}${tr.entry}`;
+            ids = tradeStrategiesData[ck] || [];
+            if (ids.length === 0) {
+              const norm = `${tr.date}${tr.symbol}${parseFloat(tr.entry).toFixed(2)}`;
+              ids = tradeStrategiesData[norm] || [];
+            }
+          }
+          return ids.map(String);
+        };
+
+        // Pour chaque stratégie, calculer la série cumulative par date
+        const seriesPerStrategy = strategies.map(s => {
+          const sTrades = trades.filter(tr => getStrategyIdsForTrade(tr).includes(String(s.id)));
+          if (sTrades.length === 0) return null;
+          const sorted = [...sTrades].sort((a, b) =>
+            new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
+          );
+          // Group by day
+          const byDay = {};
+          sorted.forEach(tr => {
+            const d = String(tr.date).split("T")[0];
+            byDay[d] = (byDay[d] || 0) + (tr.pnl || 0);
+          });
+          const dates = Object.keys(byDay).sort();
+          let cum = 0;
+          const points = dates.map(d => {
+            cum += byDay[d];
+            return { date: d, value: cum };
+          });
+          return { strategy: s, points };
+        }).filter(Boolean);
+
+        if (seriesPerStrategy.length === 0) return null;
+
+        // Toutes les dates uniques pour l'axe X
+        const allDatesSet = new Set();
+        seriesPerStrategy.forEach(s => s.points.forEach(p => allDatesSet.add(p.date)));
+        const allDates = Array.from(allDatesSet).sort();
+
+        // Forward-fill chaque stratégie sur toutes les dates
+        const seriesFilled = seriesPerStrategy.map(s => {
+          const map = Object.fromEntries(s.points.map(p => [p.date, p.value]));
+          let lastVal = 0;
+          const filled = allDates.map(d => {
+            if (map[d] !== undefined) lastVal = map[d];
+            return { date: d, value: lastVal };
+          });
+          return { ...s, filled };
+        });
+
+        // Min / max global pour l'axe Y
+        let yMin = 0, yMax = 0;
+        seriesFilled.forEach(s => s.filled.forEach(p => {
+          if (p.value < yMin) yMin = p.value;
+          if (p.value > yMax) yMax = p.value;
+        }));
+        const yRange = (yMax - yMin) || 1;
+
+        // SVG layout — ratio raisonnable, on évite preserveAspectRatio="none" qui distord les courbes
+        const W = 800;
+        const H = 220;
+        const padL = 0;
+        const padR = 28; // espace pour les Y labels à droite
+        const padT = 10;
+        const padB = 18;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+
+        const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
+        const yFor = (v) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+        // Format date
+        const fmtD = (d) => {
+          const [, m, dd] = d.split("-");
+          const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+          return `${parseInt(dd)} ${months[parseInt(m) - 1]}`;
+        };
+        const fmtVal = (v) => {
+          const sign = v >= 0 ? "+" : "-";
+          const abs = Math.abs(v);
+          // Arrondi "rond" : nearest 10k pour ≥10k, nearest 1k pour ≥1k
+          if (abs >= 10000) return `${sign}${Math.round(abs / 10000) * 10}k`;
+          if (abs >= 1000)  return `${sign}${Math.round(abs / 1000)}k`;
+          return `${sign}${Math.round(abs)}`;
+        };
+
+        // Y-axis ticks (4 niveaux)
+        const yTicks = [];
+        const N = 3;
+        for (let i = 0; i <= N; i++) {
+          const ratio = i / N;
+          const v = yMax - ratio * yRange;
+          yTicks.push({ y: padT + plotH * ratio, value: v });
+        }
+
+        // X-axis labels — toutes les dates
+        const xLabels = allDates.map((d, i) => ({
+          i,
+          date: d,
+          anchor: i === 0 ? "start" : i === allDates.length - 1 ? "end" : "middle",
+        }));
+
+        return (
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"0 0 12px 12px",overflow:"hidden",marginTop:-24}}>
+            <div style={{padding:"16px 20px"}}>
+              <div style={{fontSize:13,fontWeight:600,color:T.text}}>Comparaison des performances</div>
+              <div style={{fontSize:11,color:T.textMut,marginTop:2}}>P&L cumulé jour par jour — toutes les stratégies, courante mise en avant</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"180px 1fr"}}>
+              {/* Légende — triée par P&L décroissant */}
+              <div style={{padding:"16px 16px 16px 20px",borderRight:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:8}}>
+                {[...seriesFilled]
+                  .sort((a, b) => b.filled[b.filled.length - 1].value - a.filled[a.filled.length - 1].value)
+                  .map(s => {
+                    const isSelected = String(s.strategy.id) === String(selectedStrategy?.id);
+                    const last = s.filled[s.filled.length - 1].value;
+                    return (
+                      <div key={s.strategy.id} style={{display:"flex",alignItems:"center",gap:8,opacity:isSelected ? 1 : 0.5}}>
+                        <span style={{width:8,height:8,borderRadius:"50%",background:s.strategy.color,flexShrink:0}}/>
+                        <span style={{fontSize:12,fontWeight:isSelected ? 600 : 500,color:T.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.strategy.name}</span>
+                        <span style={{fontSize:11,fontWeight:500,color:last >= 0 ? T.green : T.red}}>{fmtVal(last)}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Chart — padding constant 12px de chaque côté */}
+              <div style={{padding:12, position:"relative"}}>
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:"block",overflow:"visible",aspectRatio:`${W} / ${H}`}}>
+                  {/* Y labels (colonne à droite, alignés verticalement sur chaque tick) */}
+                  {yTicks.map((tk, i) => (
+                    <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="7" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
+                  ))}
+
+                  {/* Lines : non-selected first (so selected stays on top) */}
+                  {seriesFilled.filter(s => String(s.strategy.id) !== String(selectedStrategy?.id)).map(s => {
+                    const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                    return (
+                      <path key={s.strategy.id} d={path} fill="none" stroke={s.strategy.color} strokeWidth="1" strokeOpacity="0.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    );
+                  })}
+                  {/* Selected on top */}
+                  {seriesFilled.filter(s => String(s.strategy.id) === String(selectedStrategy?.id)).map(s => {
+                    const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                    return (
+                      <path key={s.strategy.id} d={path} fill="none" stroke={s.strategy.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    );
+                  })}
+
+                  {/* X-axis labels — premier collé à gauche, dernier collé à droite */}
+                  {xLabels.map((x, i) => (
+                    <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="7" textAnchor={x.anchor}>{fmtD(x.date)}</text>
+                  ))}
+
+                  {/* Vertical hover indicator */}
+                  {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (
+                    <line x1={xFor(hoveredDayIdx)} y1={padT} x2={xFor(hoveredDayIdx)} y2={padT + plotH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2"/>
+                  )}
+
+                  {/* Hover capture rects (transparent) */}
+                  {allDates.map((d, i) => {
+                    const cellW = (allDates.length === 1 ? plotW : plotW / (allDates.length - 1));
+                    const x = xFor(i) - cellW / 2;
+                    return (
+                      <rect
+                        key={`hov-${i}`}
+                        x={Math.max(0, x)}
+                        y={padT}
+                        width={cellW}
+                        height={plotH + padB}
+                        fill="transparent"
+                        style={{cursor:"crosshair"}}
+                        onMouseEnter={() => setHoveredDayIdx(i)}
+                        onMouseLeave={() => setHoveredDayIdx(null)}
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* Tooltip HTML overlay (n'est pas étiré par preserveAspectRatio) */}
+                {hoveredDayIdx !== null && allDates[hoveredDayIdx] && (() => {
+                  const date = allDates[hoveredDayIdx];
+                  // Trier les stratégies par P&L décroissant à cette date
+                  const items = [...seriesFilled]
+                    .map(s => ({ strategy: s.strategy, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
+                    .sort((a, b) => b.value - a.value);
+                  const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                  // Si on est à droite, basculer la tooltip à gauche du curseur
+                  const shouldFlip = leftPct > 60;
+                  return (
+                    <div
+                      style={{
+                        position:"absolute",
+                        left:`calc(12px + ${leftPct}% * (100% - 24px) / 100%)`,
+                        top:16,
+                        transform: shouldFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",
+                        background:"#0D0D0D",
+                        color:"#FFF",
+                        padding:"8px 10px",
+                        borderRadius:6,
+                        fontSize:11,
+                        fontFamily:"var(--font-sans)",
+                        boxShadow:"0 4px 12px rgba(0,0,0,0.18)",
+                        pointerEvents:"none",
+                        zIndex:10,
+                        whiteSpace:"nowrap",
+                      }}
+                    >
+                      <div style={{fontWeight:600,marginBottom:6,fontSize:11}}>{fmtD(date)}</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                        {items.map(it => {
+                          const isSelected = String(it.strategy.id) === String(selectedStrategy?.id);
+                          return (
+                            <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.85}}>
+                              <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
+                              <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* CARDS 2 + 3 : cote a cote avec gap */}
       {filteredTrades.length > 0 && (
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"stretch"}}>
         {/* CARD 2 : Condition probabilite */}
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{background:T.white,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"16px 20px"}}>
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
               Condition probabilité <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
