@@ -141,6 +141,8 @@ export default function Sidebar(props: SidebarProps) {
                   key={item.id}
                   onClick={() => onSelect(item.id)}
                   title={collapsed ? item.label : undefined}
+                  aria-label={item.label}
+                  aria-current={active ? "page" : undefined}
                   style={{
                     width: "100%", display: "flex", alignItems: "center",
                     gap: collapsed ? 0 : 10, justifyContent: collapsed ? "center" : "flex-start",
@@ -234,6 +236,7 @@ export default function Sidebar(props: SidebarProps) {
               <button
                 onClick={() => { setUserMenuOpen(false); onProfile(); }}
                 style={dropdownItemStyle()}
+                role="menuitem"
                 onMouseEnter={e => { e.currentTarget.style.background = "var(--color-hover-bg)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
@@ -245,6 +248,7 @@ export default function Sidebar(props: SidebarProps) {
               <button
                 onClick={() => { setUserMenuOpen(false); onSettings(); }}
                 style={dropdownItemStyle()}
+                role="menuitem"
                 onMouseEnter={e => { e.currentTarget.style.background = "var(--color-hover-bg)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
@@ -256,6 +260,7 @@ export default function Sidebar(props: SidebarProps) {
               <button
                 onClick={() => { setUserMenuOpen(false); onDarkMode(); }}
                 style={dropdownItemStyle()}
+                role="menuitem"
                 onMouseEnter={e => { e.currentTarget.style.background = "var(--color-hover-bg)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
               >
@@ -269,6 +274,7 @@ export default function Sidebar(props: SidebarProps) {
             {onLogout && (
               <button
                 onClick={() => { setUserMenuOpen(false); onLogout(); }}
+                role="menuitem"
                 style={{ ...dropdownItemStyle(), color: "#EF4444" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#FEF2F2"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}

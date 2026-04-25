@@ -14,6 +14,7 @@ import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
 import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
@@ -697,6 +698,16 @@ export default function App() {
       ],
     },
   ];
+
+  // Raccourcis clavier : Alt+1..9 pour naviguer entre les pages de la sidebar
+  const flatNavIds = SIDEBAR_SECTIONS.flatMap(s => s.items.map(i => i.id));
+  useKeyboardShortcuts(
+    flatNavIds.slice(0, 9).map((id, i) => ({
+      key: String(i + 1),
+      alt: true,
+      handler: (e) => { e.preventDefault(); setPage(id); setMobileNavOpen(false); },
+    }))
+  );
 
   const pages = {
     dashboard:  <DashboardPage trades={filteredTrades} setPage={setPage} />,
