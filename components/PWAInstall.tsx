@@ -12,7 +12,7 @@ import { Download, X } from "lucide-react";
  *   discret en bas-gauche (dismissible 7 jours via localStorage)
  */
 
-const DISMISS_KEY = "tr4de_pwa_install_dismissed_until";
+const DISMISS_KEY = "tr4de_pwa_install_dismissed";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -41,13 +41,25 @@ export default function PWAInstall() {
     if (typeof window === "undefined") return;
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
-      const dismissedUntil = Number(localStorage.getItem(DISMISS_KEY) || 0);
-      if (Date.now() < dismissedUntil) return;
+      // L'utilisateur peut explicitement masquer la bannière via la croix.
+      // Tant qu'il ne l'a pas fait, on la montre à chaque session.
+      const dismissed = localStorage.getItem(DISMISS_KEY) === "1";
+      if (dismissed) return;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setVisible(true);
     };
+    // Une fois installée, l'app dispatch ce signal pour que la card disparaisse
+    const onInstalled = () => {
+      localStorage.setItem(DISMISS_KEY, "1");
+      setVisible(false);
+      setDeferredPrompt(null);
+    };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   if (!visible || !deferredPrompt) return null;
@@ -56,17 +68,19 @@ export default function PWAInstall() {
     try {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === "dismissed") {
-        // 7 jours de pause
-        localStorage.setItem(DISMISS_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+      if (choice.outcome === "accepted") {
+        // Installation acceptée → on cache (l'événement appinstalled le confirmera aussi)
+        localStorage.setItem(DISMISS_KEY, "1");
+        setVisible(false);
+        setDeferredPrompt(null);
       }
+      // Si "dismissed" : on laisse la card visible, l'utilisateur pourra réessayer.
     } catch {}
-    setVisible(false);
-    setDeferredPrompt(null);
   };
 
+  // Dismission permanente — seul moyen de masquer la bannière.
   const onClose = () => {
-    localStorage.setItem(DISMISS_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    localStorage.setItem(DISMISS_KEY, "1");
     setVisible(false);
   };
 
@@ -115,17 +129,6 @@ export default function PWAInstall() {
               }}
             >
               <Download size={12} strokeWidth={2} /> Installer
-            </button>
-            <button
-              onClick={onClose}
-              style={{
-                padding: "6px 10px", borderRadius: 6,
-                border: "1px solid #E5E5E5", background: "#FFFFFF",
-                color: "#5C5C5C", fontSize: 12, fontWeight: 500, cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Plus tard
             </button>
           </div>
         </div>
