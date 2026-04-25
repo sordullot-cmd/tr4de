@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Download } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
+import { exportJournalPdf } from "@/lib/export/journalPdf";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 
 export default function JournalPage({ trades = [] }) {
   const { notes: tradeNotes, setNote: updateTradeNote } = useTradeNotes();
@@ -72,7 +75,32 @@ export default function JournalPage({ trades = [] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("journal.title")}</h1>
-        <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
+        <button
+          type="button"
+          aria-label="Exporter le journal en PDF"
+          disabled={trades.length === 0}
+          onClick={() => exportJournalPdf({
+            trades,
+            dailyNotes,
+            tradeNotes,
+            currencySymbol: getCurrencySymbol(),
+            title: t("journal.title"),
+          })}
+          style={{
+            marginLeft: "auto",
+            padding: "7px 14px", height: 34, borderRadius: 8,
+            background: trades.length === 0 ? T.bg : T.text,
+            border: `1px solid ${trades.length === 0 ? T.border : T.text}`,
+            color: trades.length === 0 ? T.textMut : "#fff",
+            fontSize: 13, fontWeight: 600,
+            cursor: trades.length === 0 ? "not-allowed" : "pointer",
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontFamily: "inherit",
+          }}
+        >
+          <Download size={14} strokeWidth={1.75} /> Exporter PDF
+        </button>
+        <div id="tr4de-page-header-slot" />
       </div>
 
       {sortedDates.length > 0 ? (
