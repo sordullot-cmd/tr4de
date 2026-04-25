@@ -35,7 +35,7 @@ function fireNotification(title: string, body: string): void {
   }
   if (Notification.permission !== "granted") return;
   try {
-    new Notification(title, { body, icon: "/favicon.ico" });
+    new Notification(title, { body, icon: "/web-app-manifest-192x192.png" });
   } catch {}
 }
 

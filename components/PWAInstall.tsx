@@ -89,11 +89,13 @@ export default function PWAInstall() {
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 8, background: "#0D0D0D",
-          color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 16, fontWeight: 700, flexShrink: 0,
-        }}>t</div>
+        <img
+          src="/favicon.svg"
+          alt="tao"
+          width={36}
+          height={36}
+          style={{ flexShrink: 0, borderRadius: 8 }}
+        />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#0D0D0D", marginBottom: 2 }}>
             Installer tao trade

@@ -64,7 +64,7 @@ export default function FocusTimerPage() {
     }
     try {
       if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        new Notification("tao trade — Timer", { body: mode === "work" ? "Session terminée, fais une pause !" : "Pause terminée, retour au focus." });
+        new Notification("tao trade — Timer", { body: mode === "work" ? "Session terminée, fais une pause !" : "Pause terminée, retour au focus.", icon: "/web-app-manifest-192x192.png" });
       }
     } catch {}
   };

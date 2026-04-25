@@ -106,13 +106,13 @@ export default function Sidebar(props: SidebarProps) {
           justifyContent: collapsed ? "center" : "flex-start",
           padding: collapsed ? "6px 0" : "6px 8px",
         }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: "50%", background: "#0D0D0D",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 14, fontWeight: 700, color: "#FFFFFF", flexShrink: 0,
-          }}>
-            t
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="tao"
+            width={32}
+            height={32}
+            style={{ flexShrink: 0, display: "block" }}
+          />
           {!collapsed && (
             <div style={{ flex: 1, overflow: "hidden", fontSize: 14, fontWeight: 600, color: "var(--color-text)", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
               tao trade

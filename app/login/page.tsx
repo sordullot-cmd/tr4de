@@ -84,15 +84,7 @@ export default function LoginPage() {
       <div style={{ width: "100%", maxWidth: 360 }}>
         {/* Logo + brand */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-          <div
-            style={{
-              width: 36, height: 36, borderRadius: 8, background: "#0D0D0D",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#FFFFFF", fontSize: 16, fontWeight: 700,
-            }}
-          >
-            T
-          </div>
+          <img src="/favicon.svg" alt="tao" width={36} height={36} style={{ display: "block" }} />
           <div style={{ fontSize: 18, fontWeight: 600, color: "#0D0D0D" }}>tao trade</div>
         </div>
 

@@ -20,6 +20,16 @@ export const metadata: Metadata = {
   description: "Professional trading platform with analytics",
   manifest: "/manifest.webmanifest",
   applicationName: "tao trade",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     title: "tao trade",
