@@ -48,7 +48,6 @@ import { getCurrencySymbol, getUserTimezone } from "@/lib/userPrefs";
 import { t, useLang } from "@/lib/i18n";
 import {
   LayoutDashboard,
-  LineChart as LucideLineChart,
   Calendar as LucideCalendar,
   ListChecks,
   NotebookPen,
@@ -693,7 +692,6 @@ export default function App() {
       label: t("nav.analyse"),
       items: [
         { id: "journal",    icon: NotebookPen,        label: t("nav.journal"), badge: filteredTrades.filter(tr => {try { const d = new Date(tr.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
-        { id: "backtest",   icon: LucideLineChart,    label: "Backtest" },
         { id: "discipline", icon: ShieldCheck,        label: t("nav.discipline") },
         { id: "agent",      icon: Bot,                label: t("nav.agent"), badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
       ],
