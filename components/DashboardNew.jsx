@@ -15,6 +15,7 @@ import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
+import { useApp } from "@/lib/contexts/AppContext";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
@@ -292,7 +293,7 @@ export default function App() {
       return "25k";
     }
   });
-  const [page, setPage] = useState("dashboard");
+  const { page, setPage } = useApp();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [selectedStrategyId, setSelectedStrategyId] = useState(null);
   const [aiReportsUnread, setAiReportsUnread] = useState(0);

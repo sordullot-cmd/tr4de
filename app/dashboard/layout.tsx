@@ -1,7 +1,7 @@
 "use client";
 
 import { ProtectedRoute } from "@/lib/auth/ProtectedRoute";
-import { useAuth } from "@/lib/auth/supabaseAuthProvider";
+import { AppProvider } from "@/lib/contexts/AppContext";
 
 export default function DashboardLayout({
   children,
@@ -10,9 +10,11 @@ export default function DashboardLayout({
 }) {
   return (
     <ProtectedRoute>
-      <main className="flex-1">
-        {children}
-      </main>
+      <AppProvider>
+        <main className="flex-1">
+          {children}
+        </main>
+      </AppProvider>
     </ProtectedRoute>
   );
 }
