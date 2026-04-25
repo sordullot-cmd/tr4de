@@ -1,8 +1,10 @@
-// @ts-nocheck — TODO: migrate to fully typed; complex CSV parsing logic with diverse broker formats
 /**
  * CSV Parsers for different broker formats
  * Converts broker-specific CSV exports to standardized trade format
  */
+import type { ParsedTrade, ContractType, BrokerHint, TradeStats, Direction } from "@/lib/types/trade";
+
+type Dict<T> = Record<string, T>;
 
 /**
  * Detect contract type (micro, mini, standard) from symbol and product type
@@ -11,31 +13,31 @@
  * MINI contracts:  NQ, ES, YM, NK (standard size, tick=1)
  * STANDARD:        Other forex/commodity contracts
  */
-export const detectContractType = (symbol, productType = null) => {
+export const detectContractType = (symbol: string | null | undefined, productType: string | null = null): ContractType => {
   if (!symbol) return 'standard';
-  
+
   // If Tradovate Product column is provided, use it first
   if (productType) {
     const product = productType.toUpperCase();
     if (product.includes('MICRO')) return 'micro';
     if (product.includes('MINI')) return 'mini';
   }
-  
+
   const sym = symbol.toUpperCase();
   
   // Remove month/year suffix (M6, U6, Z6, H6) for pattern matching
   const base = sym.replace(/[HMUZ]\d{1,2}$/, '').toUpperCase();
   
   // Micro contracts: 1/10th of mini, $2 per point
-  if (['MNQ', 'MES', 'MYM', 'M2K', 'MME', 'MNGU'].includes(base)) {
+  if ((['MNQ', 'MES', 'MYM', 'M2K', 'MME', 'MNGU'] as const).includes(base as never)) {
     return 'micro';
   }
-  
+
   // Mini contracts: Standard size, $20-50 per point
-  if (['NQ', 'ES', 'YM', 'NK', 'NE', 'GE', 'GC', 'CL'].includes(base)) {
+  if ((['NQ', 'ES', 'YM', 'NK', 'NE', 'GE', 'GC', 'CL'] as const).includes(base as never)) {
     return 'mini';
   }
-  
+
   return 'standard';
 };
 
@@ -48,7 +50,7 @@ export const detectContractType = (symbol, productType = null) => {
  * Mini (standard):     NQ=$20/pt, ES=$50/pt, YM=$5/pt, NK=$2/pt
  * Commodities:         GC=$100/pt, CL=$1000/pt, NG=$10000/pt
  */
-export const getContractMultiplier = (symbol, productType = null) => {
+export const getContractMultiplier = (symbol: string | null | undefined, productType: string | null = null): number => {
   if (!symbol) return 1;
   const base = symbol.toUpperCase().replace(/[HMUZ]\d{1,2}$/, '');
   
@@ -64,10 +66,10 @@ export const getContractMultiplier = (symbol, productType = null) => {
       'MYM': 0.5,    // Micro Dow
       'M2K': 0.2,    // Micro Russell
     };
-    if (microMap[base]) return microMap[base];
+    if (microMap[base as keyof typeof microMap]) return microMap[base as keyof typeof microMap];
   }
-  
-  const multipliers = {
+
+  const multipliers: Record<string, number> = {
     // Micro contracts - explicitly labeled
     'MNQ': 2,      // Micro NASDAQ-100 ($2/pt)
     'MES': 5,      // Micro S&P 500 ($5/pt)
@@ -99,11 +101,19 @@ export const getContractMultiplier = (symbol, productType = null) => {
   return multipliers[base] || 1;
 };
 
+/* ──────────────────────────────────────────────────────────────────
+ * NOTE: les helpers internes ci-dessous (parseCSVLine, parseDate, etc.)
+ * et les parsers broker-specific manipulent des données CSV brutes
+ * fortement variables. Le typage interne est volontairement permissif
+ * (any) tandis que la surface publique est strictement typée.
+ * ────────────────────────────────────────────────────────────────── */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Parse a CSV line, handling quoted fields and embedded commas
  */
-const parseCSVLine = (line) => {
-  const result = [];
+const parseCSVLine = (line: string): string[] => {
+  const result: string[] = [];
   let current = '';
   let insideQuotes = false;
 
@@ -125,7 +135,7 @@ const parseCSVLine = (line) => {
 /**
  * Extract HH:MM from a timestamp string
  */
-const extractTime = (dateString) => {
+const extractTime = (dateString: string | null | undefined): string => {
   if (!dateString) return '';
   const match = dateString.match(/(\d{2}):(\d{2}):?(\d{2})?/);
   return match ? `${match[1]}:${match[2]}` : '';
@@ -137,7 +147,7 @@ const extractTime = (dateString) => {
  */
 // Détermine si une date donnée est en heure d'été US (CDT) ou d'hiver (CST).
 // Règle US : 2e dimanche de mars → 1er dimanche de novembre.
-const isUSDST = (year, month /* 1-12 */, day) => {
+const isUSDST = (year: number, month: number /* 1-12 */, day: number): boolean => {
   const dstStart = new Date(year, 2, 1); // 1er mars
   while (dstStart.getDay() !== 0) dstStart.setDate(dstStart.getDate() + 1);
   dstStart.setDate(dstStart.getDate() + 7); // 2e dimanche
@@ -150,7 +160,7 @@ const isUSDST = (year, month /* 1-12 */, day) => {
 // Extrait "HH:MM:SS" depuis "MM/DD/YYYY HH:MM:SS" (Tradovate Fill Time, en CST/CDT
 // Chicago) et le convertit dans le fuseau horaire de l'utilisateur (lu depuis
 // localStorage), avec gestion automatique de l'heure d'été US.
-const extractTimeHHMMSS = (fillTimeStr) => {
+const extractTimeHHMMSS = (fillTimeStr: string | null | undefined): string => {
   if (!fillTimeStr) return '';
   const m = String(fillTimeStr).match(
     /(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
@@ -194,7 +204,7 @@ const extractTimeHHMMSS = (fillTimeStr) => {
 // Backward-compat
 const extractTimeHHMM = extractTimeHHMMSS;
 
-const extractDateISO = (dateString) => {
+const extractDateISO = (dateString: string | null | undefined): string => {
   if (!dateString) return new Date().toISOString().split('T')[0];
   
   try {
@@ -234,14 +244,14 @@ const extractDateISO = (dateString) => {
  * 3. POSITION TRACKING: Chaque BUY += qty, chaque SELL -= qty
  * 4. DÉCLENCHEUR: Quand Position_Actuelle == 0 → 1 Trade Complet
  */
-export const parseTradovateCSV = (csvText) => {
+export const parseTradovateCSV = (csvText: string): ParsedTrade[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
 
   // Find critical columns
-  const getColumnIndex = (colNames) => {
+  const getColumnIndex = (colNames: string[]): number => {
     for (const name of colNames) {
       const idx = headers.findIndex(h => h === name);
       if (idx !== -1) return idx;
@@ -302,12 +312,12 @@ export const parseTradovateCSV = (csvText) => {
   rawOrders.sort((a, b) => a.timestamp - b.timestamp);
 
   // STEP 3 & 4: POSITION TRACKING + DÉCLENCHEUR
-  const trades = [];
+  const trades: ParsedTrade[] = [];
   let currentPosition = 0;
   let currentCycle = [];
-  let entryPrice = null;
-  let entryTime = null;
-  let tradeDirection = null;
+  let entryPrice: number | null = null;
+  let entryTime: string | null = null;
+  let tradeDirection: number | null = null;
 
   for (const order of rawOrders) {
     const direction = order.bs === 'BUY' ? 1 : -1;
@@ -352,7 +362,7 @@ export const parseTradovateCSV = (csvText) => {
         }
       }
 
-      const tradeEntry = entryQty > 0 ? entrySum / entryQty : entryPrice;
+      const tradeEntry = entryQty > 0 ? entrySum / entryQty : (entryPrice ?? 0);
       const tradeExit = exitQty > 0 ? exitSum / exitQty : 0;
 
       const exitTime = currentCycle[currentCycle.length - 1]?.fillTime;
@@ -361,7 +371,7 @@ export const parseTradovateCSV = (csvText) => {
         symbol: currentCycle[0].contract || 'UNKNOWN',
         entry: tradeEntry,
         exit: tradeExit,
-        quantity: Math.abs(currentPosition === 0 ? entryQty : 0) || Math.abs(tradeDirection) * currentCycle[0].quantity,
+        quantity: Math.abs(currentPosition === 0 ? entryQty : 0) || Math.abs(tradeDirection ?? 0) * currentCycle[0].quantity,
         direction: tradeDirection === 1 ? 'Long' : 'Short',
         pnl: Math.round(totalCashFlow * 100) / 100,
         volume: totalNotional,
@@ -421,15 +431,15 @@ export const parseTradovateCSV = (csvText) => {
  * Parse MetaTrader 5 HTML export format
  * MetaTrader 5 exports a complete HTML table with trade data
  */
-export const parseMT5HTML = (htmlText) => {
+export const parseMT5HTML = (htmlText: string): ParsedTrade[] => {
   try {
-    const trades = [];
+    const trades: ParsedTrade[] = [];
     
     // Extract table rows from HTML
     const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gs;
     let match;
     let isHeader = true;
-    let columnMap = {};
+    let columnMap: Dict<number> = {};
     let rowCount = 0;
     
     while ((match = rowRegex.exec(htmlText)) !== null) {
@@ -515,9 +525,9 @@ export const parseMT5HTML = (htmlText) => {
 /**
  * Build column index map from header row
  */
-const buildColumnMap = (headerCells) => {
-  const map = {};
-  headerCells.forEach((cell, idx) => {
+const buildColumnMap = (headerCells: string[]): Dict<number> => {
+  const map: Dict<number> = {};
+  headerCells.forEach((cell: string, idx: number) => {
     const lower = cell.toLowerCase();
     if (lower.includes('open') && lower.includes('date')) map.openDate = idx;
     if (lower.includes('open') && lower.includes('price')) map.openPrice = idx;
@@ -533,7 +543,7 @@ const buildColumnMap = (headerCells) => {
 /**
  * Format date string to YYYY-MM-DD
  */
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return new Date().toISOString().split('T')[0];
   
   dateStr = dateStr.trim();
@@ -548,7 +558,7 @@ const formatDate = (dateStr) => {
     let d;
     
     // Helper to convert 2-digit year to 4-digit
-    const toFullYear = (y) => {
+    const toFullYear = (y: number): number => {
       if (y < 100) {
         // Assume 00-30 = 2000-2030, 31-99 = 1931-1999
         return y <= 30 ? 2000 + y : 1900 + y;
@@ -623,12 +633,12 @@ const formatDate = (dateStr) => {
  * Parse MetaTrader 5 export format
  * Expected columns: Ticket, Open Date, Open Time, Type, Symbol, Volume, Open Price, Close Price, Close Date, Close Time, Commission, Comment, Profit
  */
-export const parseMT5CSV = (csvText) => {
+export const parseMT5CSV = (csvText: string): ParsedTrade[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-  const trades = [];
+  const trades: ParsedTrade[] = [];
 
   // Find column indices with flexible matching
   let ticketIdx = headers.findIndex(h => h.includes('ticket'));
@@ -700,12 +710,12 @@ export const parseMT5CSV = (csvText) => {
  * Parse generic CSV format
  * Expected columns: Date, Symbol, Direction (Long/Short/Buy/Sell), Entry, Exit, PnL
  */
-export const parseGenericCSV = (csvText) => {
+export const parseGenericCSV = (csvText: string): ParsedTrade[] => {
   const lines = csvText.trim().split('\n').filter(line => line.trim() !== '');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-  const trades = [];
+  const trades: ParsedTrade[] = [];
 
   // Find column indices - more flexible matching
   let dateIdx = headers.findIndex(h => h.includes('date'));
@@ -768,12 +778,12 @@ export const parseGenericCSV = (csvText) => {
  * Handles exports with B/S, Contract, avgPrice, PnL headers
  * Auto-detects column positions by header matching
  */
-export const parseBrokerExportCSV = (csvText) => {
+export const parseBrokerExportCSV = (csvText: string): ParsedTrade[] => {
   const lines = csvText.trim().split('\n').filter(line => line.trim() !== '');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-  const trades = [];
+  const trades: ParsedTrade[] = [];
 
   // Find column indices with flexible matching
   let dateIdx = headers.findIndex(h => h.includes('date') && !h.includes('exit') && !h.includes('entry'));
@@ -858,14 +868,14 @@ export const parseBrokerExportCSV = (csvText) => {
  * exec_qty: positive for BUY, negative for SELL
  * profit: Total profit/loss for the completed trade
  */
-export const parseWealthChartsCSV = (csvText) => {
+export const parseWealthChartsCSV = (csvText: string): ParsedTrade[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
 
   const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
   
   // Map columns - NEW FORMAT
-  const getColumnIndex = (colNames) => {
+  const getColumnIndex = (colNames: string[]): number => {
     for (const name of colNames) {
       const idx = headers.findIndex(h => h === name);
       if (idx !== -1) return idx;
@@ -928,8 +938,8 @@ export const parseWealthChartsCSV = (csvText) => {
   console.log(`WealthCharts CSV: Parsed ${orders.length} orders`);
 
   // Group orders by symbol and created_on (each group = 1 trade)
-  const tradesBySymbolAndTime = {};
-  orders.forEach(order => {
+  const tradesBySymbolAndTime: Record<string, any[]> = {};
+  orders.forEach((order: any) => {
     const key = `${order.symbol}_${order.createdOn}`;
     if (!tradesBySymbolAndTime[key]) {
       tradesBySymbolAndTime[key] = [];
@@ -940,14 +950,14 @@ export const parseWealthChartsCSV = (csvText) => {
   console.log(`Found ${Object.keys(tradesBySymbolAndTime).length} trades`);
 
   // Helper functions
-  const formatPrice = (price) => {
+  const formatPrice = (price: number): string => {
     return price.toLocaleString('fr-FR', { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     }).replace(',', '.');
   };
 
-  const extractDate = (dateString) => {
+  const extractDate = (dateString: string): string => {
     try {
       const dateObj = new Date(dateString);
       const day = String(dateObj.getDate()).padStart(2, '0');
@@ -960,7 +970,7 @@ export const parseWealthChartsCSV = (csvText) => {
   };
 
   // Build trades
-  const trades = [];
+  const trades: ParsedTrade[] = [];
 
   Object.entries(tradesBySymbolAndTime).forEach(([key, tradeOrders]) => {
     // Sort by movType to have consistent order
@@ -1017,7 +1027,7 @@ export const parseWealthChartsCSV = (csvText) => {
 
     const firstDate = new Date(tradeOrders[0].movTime);
     const lastDate = new Date(exitOrder.movTime);
-    const holdMinutes = Math.max(0, Math.round((lastDate - firstDate) / 60000));
+    const holdMinutes = Math.max(0, Math.round((lastDate.getTime() - firstDate.getTime()) / 60000));
 
     const symbol = tradeOrders[0].symbol;
 
@@ -1056,7 +1066,7 @@ export const parseWealthChartsCSV = (csvText) => {
 /**
  * Auto-detect CSV/HTML format and parse
  */
-export const parseCSV = (csvText, brokerHint = null) => {
+export const parseCSV = (csvText: string, brokerHint: BrokerHint = null): ParsedTrade[] => {
   const firstChars = csvText.trim().substring(0, 500).toLowerCase();
   
   // Check if it's HTML
@@ -1132,7 +1142,7 @@ export const parseCSV = (csvText, brokerHint = null) => {
 /**
  * Calculate trade statistics from trades array
  */
-export const calculateStats = (trades) => {
+export const calculateStats = (trades: ParsedTrade[]): TradeStats => {
   if (!trades || trades.length === 0) {
     return {
       totalTrades: 0,
