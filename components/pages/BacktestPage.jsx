@@ -21,7 +21,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
  */
 
 export default function BacktestPage() {
-  const { trades, strategies, tradesLoading } = useApp();
+  // tradesByAccount = trades filtrés par les comptes sélectionnés.
+  // Si rien de sélectionné, on retombe sur les trades bruts (l'utilisateur
+  // veut peut-être analyser tout l'historique sans contrainte de compte).
+  const { trades: rawTrades, tradesByAccount, strategies, tradesLoading, selectedAccountIds } = useApp();
+  const trades = selectedAccountIds.length > 0 ? tradesByAccount : rawTrades;
 
   const [selected, setSelected] = useState/** @type {string[]} */([]);
   const [from, setFrom] = useState("");

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTrades } from "@/lib/hooks/useTradeData";
 import { useStrategies } from "@/lib/hooks/useUserData";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
+import { isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 
 type AccountType = "live" | "eval";
 
@@ -14,6 +15,8 @@ export interface AppContextValue {
 
   // Trades + strategies (already cloud-backed)
   trades: any[];
+  /** Trades filtrés par les comptes sélectionnés (sans filtre de date — celui-ci est par-page). */
+  tradesByAccount: any[];
   tradesLoading: boolean;
   addTrade: (trade: any) => Promise<void> | void;
   updateTrade: (id: string, patch: any) => Promise<void> | void;
@@ -84,6 +87,15 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
     _setSelectedAccountIds(ids);
     writeLS("selectedAccountIds", ids);
   };
+
+  // Trades filtrés par sélection de compte (placeholder filtré). Pas de
+  // filtre de date ici — c'est par-page dans App.
+  const rawTrades = tradesApi.trades || [];
+  const tradesByAccount = useMemo(() => {
+    const realSelected = selectedAccountIds.filter(id => !isPlaceholderAccount(id));
+    if (realSelected.length === 0) return [];
+    return rawTrades.filter((t: { account_id?: string }) => realSelected.includes(t.account_id || ""));
+  }, [rawTrades, selectedAccountIds]);
   const setAccountType = (t: AccountType) => {
     _setAccountType(t);
     writeLS("accountType", t);
@@ -98,6 +110,7 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
     userEmail: user?.email ?? null,
 
     trades: tradesApi.trades || [],
+    tradesByAccount,
     tradesLoading: !!(tradesApi as { loading?: boolean }).loading,
     addTrade: tradesApi.addTrade,
     updateTrade: tradesApi.updateTrade,
