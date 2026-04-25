@@ -1,18 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export function useTradingAccounts(userId) {
-  const [accounts, setAccounts] = useState([]);
-  const [selectedAccountId, setSelectedAccountId] = useState(null);
+export interface TradingAccount {
+  id: string;
+  user_id: string;
+  name: string;
+  broker?: string | null;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const isUuid = (s: unknown): s is string =>
+  typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+export function useTradingAccounts(userId: string | null | undefined) {
+  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
-  // Récupérer les comptes
   const fetchAccounts = useCallback(async () => {
-    // Vérifier que c'est un UUID valide avant de faire la requête
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!userId || typeof userId !== 'string' || !uuidRegex.test(userId)) {
+    if (!isUuid(userId)) {
       console.log("Skipping fetch - userId is invalid:", userId);
       setAccounts([]);
       setSelectedAccountId(null);
@@ -28,34 +38,30 @@ export function useTradingAccounts(userId) {
         .order("created_at", { ascending: false });
 
       if (err) throw err;
-      setAccounts(data || []);
+      const list = (data || []) as TradingAccount[];
+      setAccounts(list);
 
-      // Sélectionner le premier compte par défaut
-      if (data && data.length > 0 && !selectedAccountId) {
-        setSelectedAccountId(data[0].id);
+      if (list.length > 0 && !selectedAccountId) {
+        setSelectedAccountId(list[0].id);
       }
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(errMsg(err));
       console.error("Error fetching accounts:", err);
     } finally {
       setLoading(false);
     }
   }, [userId, selectedAccountId]);
 
-  // Récupérer les comptes au montage
   useEffect(() => {
     if (userId) {
       fetchAccounts();
     }
   }, [userId, fetchAccounts]);
 
-  // Créer un compte
   const createAccount = useCallback(
-    async (name, broker) => {
-      // Vérifier que c'est un UUID valide
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!userId || !uuidRegex.test(userId) || !name.trim()) {
+    async (name: string, broker?: string): Promise<TradingAccount | null> => {
+      if (!isUuid(userId) || !name.trim()) {
         setError("Le nom du compte et un utilisateur valide sont requis");
         return null;
       }
@@ -76,9 +82,9 @@ export function useTradingAccounts(userId) {
         if (err) throw err;
 
         await fetchAccounts();
-        return data;
+        return data as TradingAccount;
       } catch (err) {
-        setError(err.message);
+        setError(errMsg(err));
         console.error("Error creating account:", err);
         return null;
       }
@@ -86,9 +92,8 @@ export function useTradingAccounts(userId) {
     [userId, fetchAccounts]
   );
 
-  // Supprimer un compte
   const deleteAccount = useCallback(
-    async (accountId) => {
+    async (accountId: string): Promise<void> => {
       try {
         const { error: err } = await supabase
           .from("trading_accounts")
@@ -103,16 +108,15 @@ export function useTradingAccounts(userId) {
 
         await fetchAccounts();
       } catch (err) {
-        setError(err.message);
+        setError(errMsg(err));
         console.error("Error deleting account:", err);
       }
     },
     [selectedAccountId, fetchAccounts]
   );
 
-  // Mettre à jour un compte
   const updateAccount = useCallback(
-    async (accountId, name, broker) => {
+    async (accountId: string, name: string, broker?: string): Promise<void> => {
       try {
         const { error: err } = await supabase
           .from("trading_accounts")
@@ -123,7 +127,7 @@ export function useTradingAccounts(userId) {
 
         await fetchAccounts();
       } catch (err) {
-        setError(err.message);
+        setError(errMsg(err));
         console.error("Error updating account:", err);
       }
     },
