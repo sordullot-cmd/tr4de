@@ -122,7 +122,7 @@ export default function Sidebar(props: SidebarProps) {
       </div>
 
       {/* NAV */}
-      <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
+      <nav aria-label="Navigation principale" style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
         {sections.map((sec, i) => (
           <div key={i} style={{ marginBottom: 12 }}>
             {!collapsed && sec.label && (

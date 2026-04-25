@@ -917,7 +917,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               background: T.bg,
             }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file && fileInputRef.current) { const dt = new DataTransfer(); dt.items.add(file); fileInputRef.current.files = dt.files; handleFileSelect({ target: { files: [file] } }); } }}>
               <input ref={fileInputRef} type="file" onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
-              <button onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", fontFamily: "var(--font-sans)" }}>
+              <button aria-label="Importer un fichier CSV" onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%", fontFamily: "var(--font-sans)" }}>
                 {!fileName ? (
                   <LucideUpload size={22} strokeWidth={1.5} color={T.textMut} />
                 ) : (
@@ -997,7 +997,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:12,padding:40,maxWidth:600,width:"90%",maxHeight:"90vh",overflowY:"auto"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
                   <h2 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Créer une stratégie</h2>
-                  <button onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{background:"transparent",border:"none",fontSize:24,cursor:"pointer",color:T.textMut}}>✕</button>
+                  <button aria-label="Fermer" onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{background:"transparent",border:"none",fontSize:24,cursor:"pointer",color:T.textMut}}>✕</button>
                 </div>
 
                 <div style={{marginBottom:16}}>
@@ -1014,7 +1014,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                   <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8,color:T.textMut}}>Couleur</label>
                   <div style={{display:"flex",gap:8}}>
                     {colors.map(color=>(
-                      <button key={color} onClick={()=>setStrategyFormData({...strategyFormData,color})} style={{width:32,height:32,borderRadius:8,background:color,border:strategyFormData.color===color?`3px solid ${T.text}`:"2px solid #ddd",cursor:"pointer"}}/>
+                      <button key={color} aria-label={`Couleur ${color}`} aria-pressed={strategyFormData.color===color} onClick={()=>setStrategyFormData({...strategyFormData,color})} style={{width:32,height:32,borderRadius:8,background:color,border:strategyFormData.color===color?`3px solid ${T.text}`:"2px solid #ddd",cursor:"pointer"}}/>
                     ))}
                   </div>
                 </div>
@@ -1025,7 +1025,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                     <div key={group.id} style={{marginBottom:16,padding:12,border:`1px solid ${T.border}`,borderRadius:8,background:T.bg}}>
                       <div style={{display:"flex",gap:8,marginBottom:12}}>
                         <input type="text" placeholder="Nom du groupe" value={group.name} onChange={(e)=>updateGroup(group.id,"name",e.target.value)} style={{flex:1,padding:"8px 10px",border:`1px solid ${T.border}`,borderRadius:6,fontSize:12,outline:"none"}}/>
-                        {strategyFormData.groups.length > 1 && <button onClick={()=>removeGroup(group.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:16,color:T.red}}>✕</button>}
+                        {strategyFormData.groups.length > 1 && <button aria-label="Supprimer le groupe" onClick={()=>removeGroup(group.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:16,color:T.red}}>✕</button>}
                       </div>
 
                       <div style={{display:"flex",flexDirection:"column",gap:6,paddingLeft:20}}>
@@ -1033,7 +1033,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                           <div key={rule.id} style={{display:"flex",alignItems:"center",gap:6}}>
                             <span style={{fontSize:10,color:T.textMut}}>•</span>
                             <input type="text" placeholder="ex., FVG 5m" value={rule.text} onChange={(e)=>updateRule(group.id,rule.id,e.target.value)} style={{flex:1,padding:"6px 10px",borderRadius:4,border:`1px solid ${T.border}`,fontSize:11,outline:"none"}}/>
-                            {group.rules.length > 1 && <button onClick={()=>removeRule(group.id,rule.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,color:T.red}}>✕</button>}
+                            {group.rules.length > 1 && <button aria-label="Supprimer la règle" onClick={()=>removeRule(group.id,rule.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,color:T.red}}>✕</button>}
                           </div>
                         ))}
                         <button onClick={()=>addRule(group.id)} style={{marginTop:4,fontSize:11,color:T.accent,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>+ Ajouter une règle</button>
