@@ -18,6 +18,7 @@ import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getLocalDateString } from "@/lib/dateUtils";
+import { getCurrencySymbol } from "@/lib/userPrefs";
 
 function reorder(arr, from, to) {
   const next = [...arr];

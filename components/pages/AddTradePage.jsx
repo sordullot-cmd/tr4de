@@ -11,6 +11,7 @@ import { t } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { parseCSV } from "@/lib/csvParsers";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import QuickAccountSelector from "@/components/QuickAccountSelector";
 import RiskCalculator from "@/components/RiskCalculator";
 
 export default function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, accountType, setAccountType, selectedEvalAccount, setSelectedEvalAccount, accounts = [], selectedAccountIds = [], addTrade, addStrategy, strategies = [], user }) {
