@@ -30,6 +30,7 @@ import DashboardPage from "@/components/pages/DashboardPage";
 import DisciplinePage from "@/components/pages/DisciplinePage";
 import TradesPage from "@/components/pages/TradesPage";
 import AddTradePage from "@/components/pages/AddTradePage";
+import BacktestPage from "@/components/pages/BacktestPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -690,6 +691,7 @@ export default function App() {
       label: t("nav.analyse"),
       items: [
         { id: "journal",    icon: NotebookPen,        label: t("nav.journal"), badge: filteredTrades.filter(tr => {try { const d = new Date(tr.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
+        { id: "backtest",   icon: LucideLineChart,    label: "Backtest" },
         { id: "discipline", icon: ShieldCheck,        label: t("nav.discipline") },
         { id: "agent",      icon: Bot,                label: t("nav.agent"), badge: aiReportsUnread > 0 ? aiReportsUnread : 0 },
       ],
@@ -724,6 +726,7 @@ export default function App() {
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
+    backtest: <BacktestPage />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
