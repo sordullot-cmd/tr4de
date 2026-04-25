@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Bot, ArrowRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const T = {
   bg: "#FFFFFF",
@@ -101,7 +102,15 @@ export default function AIReportSummaryCard({ onOpenReports }: AIReportSummaryCa
 
       {/* Liste sans contours */}
       {loading ? (
-        <div style={{ fontSize: 12, color: T.textMuted, padding: "8px 0" }}>Chargement...</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0" }} aria-busy="true" aria-live="polite">
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Skeleton width="40%" height={12} />
+              <Skeleton width="100%" height={14} />
+              <Skeleton width="80%" height={14} />
+            </div>
+          ))}
+        </div>
       ) : reports.length === 0 ? (
         <div style={{ fontSize: 13, color: T.textMuted, padding: "8px 0" }}>
           Aucun rapport pour l&apos;instant. L&apos;IA en génère automatiquement à la fin de chaque jour.

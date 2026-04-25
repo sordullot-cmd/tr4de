@@ -14,6 +14,7 @@ export interface AppContextValue {
 
   // Trades + strategies (already cloud-backed)
   trades: any[];
+  tradesLoading: boolean;
   addTrade: (trade: any) => Promise<void> | void;
   updateTrade: (id: string, patch: any) => Promise<void> | void;
   deleteTrade: (id: string) => Promise<void> | void;
@@ -97,6 +98,7 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
     userEmail: user?.email ?? null,
 
     trades: tradesApi.trades || [],
+    tradesLoading: !!(tradesApi as { loading?: boolean }).loading,
     addTrade: tradesApi.addTrade,
     updateTrade: tradesApi.updateTrade,
     deleteTrade: tradesApi.deleteTrade,

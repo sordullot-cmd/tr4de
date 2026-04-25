@@ -6,6 +6,8 @@ import { t } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
+import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
+import { useApp } from "@/lib/contexts/AppContext";
 
 export default function DashboardPage({ trades = [], setPage }) {
   const [emotionTags, setEmotionTags] = React.useState({});
@@ -64,6 +66,33 @@ export default function DashboardPage({ trades = [], setPage }) {
     }
   }, []);
 
+  // Pendant que les trades arrivent depuis Supabase, afficher un skeleton
+  // plutôt que l'état vide (évite le flash "Aucun trade" puis re-render).
+  const { tradesLoading } = useApp();
+  if (tradesLoading && (!trades || trades.length === 0)) {
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1" aria-busy="true" aria-live="polite">
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("dash.title")}</h1>
+          <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+        </div>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:24}}>
+          <Skeleton width={140} height={14} />
+          <div style={{height:14}} />
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:12}}>
+            {[0,1,2,3].map(i => (
+              <div key={i} style={{padding:14,border:`1px solid ${T.border}`,borderRadius:8,display:"flex",flexDirection:"column",gap:8}}>
+                <Skeleton width={60} height={11} />
+                <Skeleton width={90} height={22} />
+              </div>
+            ))}
+          </div>
+          <div style={{height:24}} />
+          <SkeletonRows rows={6} height={32} />
+        </div>
+      </div>
+    );
+  }
   if (!trades || trades.length === 0) {
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
