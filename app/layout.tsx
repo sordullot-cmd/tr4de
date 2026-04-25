@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/supabaseAuthProvider";
+import PWAInstall from "@/components/PWAInstall";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,12 +18,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "tao trade",
   description: "Professional trading platform with analytics",
+  manifest: "/manifest.webmanifest",
+  applicationName: "tao trade",
+  appleWebApp: {
+    capable: true,
+    title: "tao trade",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  themeColor: "#0D0D0D",
 };
 
 export default function RootLayout({
@@ -44,6 +53,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
+        <PWAInstall />
       </body>
     </html>
   );
