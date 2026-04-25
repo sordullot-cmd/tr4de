@@ -15,6 +15,7 @@ import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
+import { useTradeAlerts } from "@/lib/hooks/useTradeAlerts";
 import { useApp } from "@/lib/contexts/AppContext";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
@@ -32,6 +33,7 @@ import AddTradePage from "@/components/pages/AddTradePage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
+import AlertToast from "@/components/AlertToast";
 import AgentPanel from "@/components/AgentPanel";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import SettingsPage from "@/components/pages/SettingsPage";
@@ -318,6 +320,8 @@ export default function App() {
   }, [page]);
   // ✅ Utiliser les hooks pour Trades et Stratégies (auto-stockés dans Supabase)
   const { trades, addTrade, updateTrade, deleteTrade } = useTrades();
+  // Surveillance des seuils P&L (alertes navigateur + événement interne)
+  useTradeAlerts(trades || []);
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
   const { notes: agentTradeNotes } = useTradeNotes();
   const { notes: agentDailyNotes } = useDailySessionNotes();
@@ -932,6 +936,7 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
+      <AlertToast />
       <div className="tr4de-root" style={{display:"flex",minHeight:"100vh",background:"#F5F5F5"}}>
         {/* SIDEBAR (OpenAI-style) */}
         <Sidebar
