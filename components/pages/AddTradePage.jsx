@@ -12,7 +12,6 @@ import { createClient } from "@/lib/supabase/client";
 import { parseCSV } from "@/lib/csvParsers";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
-import RiskCalculator from "@/components/RiskCalculator";
 
 export default function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, accountType, setAccountType, selectedEvalAccount, setSelectedEvalAccount, accounts = [], selectedAccountIds = [], addTrade, addStrategy, strategies = [], user }) {
   const [accountName, setAccountName] = useState("");
@@ -1082,9 +1081,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             </ol>
           </div>
 
-          <div style={{ marginTop: 20 }}>
-            <RiskCalculator />
-          </div>
         </div>
       </div>
   );
