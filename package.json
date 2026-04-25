@@ -9,6 +9,7 @@
     "start": "next start",
     "server": "node server.js",
     "lint": "eslint",
+    "lint:strict": "eslint --rule 'react/jsx-no-undef: error' --rule 'no-undef: error' --max-warnings 0 components/ lib/ app/",
     "test": "vitest run",
     "test:watch": "vitest"
   },
