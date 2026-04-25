@@ -13,6 +13,7 @@ import {
   Globe as IconGlobe,
   Tag as IconTag,
   FileText as IconFile,
+  Bell as IconBell,
   ExternalLink,
   Sparkles,
   Trash2,
@@ -21,6 +22,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { getLang, setLang as setLangPref, t, useLang } from "@/lib/i18n";
+import { useCloudState } from "@/lib/hooks/useCloudState";
+import { DEFAULT_ALERT_SETTINGS } from "@/lib/hooks/useTradeAlerts";
 
 const T = {
   white: "#FFFFFF",
@@ -49,6 +52,7 @@ const SECTIONS = [
     items: [
       { id: "accounts",     label: "Comptes",            Icon: IconBriefcase },
       { id: "globals",      label: "Paramètres globaux", Icon: IconGlobe },
+      { id: "alerts",       label: "Alertes",            Icon: IconBell },
       { id: "import",       label: "Historique d'import", Icon: IconFile },
     ],
   },
@@ -76,6 +80,7 @@ export default function SettingsPage({ user, onBack }) {
           {active === "subscription" && <SubscriptionSection user={user} />}
           {active === "accounts"     && <AccountsSection />}
           {active === "globals"      && <GlobalsSection />}
+          {active === "alerts"       && <AlertsSection />}
           {active === "import"       && <ImportHistorySection />}
 
           <FooterHelp />
@@ -711,37 +716,6 @@ function SectionLabel({ children, mt }) {
   );
 }
 
-function ToggleRow({ title, description, checked, onChange }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "14px 14px", background: "#FAFAFA", borderRadius: 10,
-      marginBottom: 10,
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{title}</div>
-        <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>{description}</div>
-      </div>
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        style={{
-          width: 36, height: 20, borderRadius: 999, border: "none",
-          background: checked ? "#0D0D0D" : "#D4D4D4", position: "relative",
-          cursor: "pointer", transition: "background 120ms ease", padding: 0,
-          flexShrink: 0,
-        }}
-      >
-        <span style={{
-          position: "absolute", top: 2, left: checked ? 18 : 2, width: 16, height: 16,
-          borderRadius: "50%", background: "#FFFFFF", transition: "left 120ms ease",
-        }} />
-      </button>
-    </div>
-  );
-}
-
 /* =================== IMPORT HISTORY =================== */
 function ImportHistorySection() {
   const [history, setHistory] = useState([]);
@@ -829,11 +803,12 @@ function FooterHelp() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, hint, children }) {
   return (
     <div>
       <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: T.text, marginBottom: 6 }}>{label}</label>
       {children}
+      {hint && <div style={{ fontSize: 11, color: T.textMut, marginTop: 6, lineHeight: 1.45 }}>{hint}</div>}
     </div>
   );
 }
@@ -861,5 +836,165 @@ function selectStyle() {
     backgroundRepeat: "no-repeat",
     backgroundPosition: "right 12px center",
     paddingRight: 36,
+  };
+}
+
+/* ── Alerts section ────────────────────────────────────────────────── */
+function AlertsSection() {
+  const [settings, setSettings] = useCloudState(
+    "tr4de_alert_settings",
+    "alert_settings",
+    DEFAULT_ALERT_SETTINGS
+  );
+  const [permission, setPermission] = useState(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+  const [testing, setTesting] = useState(false);
+
+  const requestPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    try {
+      const p = await Notification.requestPermission();
+      setPermission(p);
+    } catch {}
+  };
+
+  const fireTest = () => {
+    setTesting(true);
+    window.dispatchEvent(new CustomEvent("tr4de:alert", {
+      detail: { title: "Alerte test", body: "Si tu vois ce toast, c'est que tout marche.", severity: "info" },
+    }));
+    if (permission === "granted") {
+      try { new Notification("tao trade — Test", { body: "Alerte test depuis les Paramètres." }); } catch {}
+    }
+    setTimeout(() => setTesting(false), 1200);
+  };
+
+  const update = (patch) => setSettings(prev => ({ ...prev, ...patch }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <CardHeader title="Alertes" subtitle="Reçois une notification quand certains seuils P&L sont atteints." />
+
+      {/* Permission */}
+      <div style={{
+        background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12,
+        padding: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Notifications navigateur</div>
+          <div style={{ fontSize: 12, color: T.textSub, marginTop: 2 }}>
+            Statut : {permission === "granted" ? "✅ activées" : permission === "denied" ? "❌ refusées (à activer dans les paramètres du navigateur)" : "⚠️ pas encore demandées"}
+          </div>
+        </div>
+        {permission !== "granted" && permission !== "denied" && (
+          <button onClick={requestPermission} style={primaryBtn()}>Activer</button>
+        )}
+        <button onClick={fireTest} disabled={testing} style={secondaryBtn(testing)}>
+          {testing ? "Envoyé !" : "Tester"}
+        </button>
+      </div>
+
+      {/* Master switch */}
+      <Field label="Surveillance active" hint="Désactive temporairement toutes les alertes sans perdre tes seuils.">
+        <AlertSwitch
+          checked={settings.enabled}
+          onChange={v => update({ enabled: v })}
+          label={settings.enabled ? "Activée" : "Désactivée"}
+        />
+      </Field>
+
+      {/* Thresholds */}
+      <Field label="Take profit journalier" hint="Notification quand le P&L du jour dépasse ce seuil. 0 pour désactiver.">
+        <NumberInput
+          value={settings.dailyTakeProfit}
+          onChange={v => update({ dailyTakeProfit: v })}
+          suffix="$"
+          placeholder="500"
+        />
+      </Field>
+
+      <Field label="Perte journalière maximale" hint="Notification 'STOP' quand la perte du jour atteint ce montant (en valeur absolue). 0 pour désactiver.">
+        <NumberInput
+          value={settings.dailyMaxLoss}
+          onChange={v => update({ dailyMaxLoss: v })}
+          suffix="$"
+          placeholder="300"
+        />
+      </Field>
+
+      <Field label="Série perdante" hint="Alerte après N pertes consécutives. 0 pour désactiver.">
+        <NumberInput
+          value={settings.losingStreak}
+          onChange={v => update({ losingStreak: v })}
+          suffix="trades"
+          placeholder="3"
+        />
+      </Field>
+    </div>
+  );
+}
+
+function AlertSwitch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      role="switch"
+      aria-checked={checked}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        background: "transparent", border: "none", cursor: "pointer",
+        padding: 0, fontFamily: "inherit",
+      }}
+    >
+      <span style={{
+        width: 36, height: 20, borderRadius: 999,
+        background: checked ? T.green : T.border,
+        position: "relative", transition: "background 150ms",
+        flexShrink: 0,
+      }}>
+        <span style={{
+          position: "absolute", top: 2, left: checked ? 18 : 2,
+          width: 16, height: 16, borderRadius: "50%",
+          background: "#FFFFFF",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+          transition: "left 150ms",
+        }} />
+      </span>
+      <span style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>{label}</span>
+    </button>
+  );
+}
+
+function NumberInput({ value, onChange, suffix, placeholder }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <input
+        type="number"
+        value={value ?? ""}
+        onChange={e => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+        placeholder={placeholder}
+        min={0}
+        style={{ ...inputStyle(), maxWidth: 160 }}
+      />
+      {suffix && <span style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>{suffix}</span>}
+    </div>
+  );
+}
+
+function primaryBtn() {
+  return {
+    padding: "8px 14px", borderRadius: 8, border: "none",
+    background: T.text, color: "#fff",
+    fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+  };
+}
+function secondaryBtn(disabled) {
+  return {
+    padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
+    background: T.white, color: T.text,
+    fontSize: 12, fontWeight: 600, cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.7 : 1, fontFamily: "inherit",
   };
 }
