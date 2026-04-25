@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
       const pnl = Number(t?.pnl) || 0;
       const dateStr = t?.entry_time || t?.date || t?.created_at || null;
       const d = dateStr ? new Date(dateStr) : null;
+      const valid = d && !Number.isNaN(d.getTime());
       return {
         id: String(t?.id || ""),
         symbol: String(t?.symbol || ""),
@@ -91,8 +92,8 @@ export async function POST(request: NextRequest) {
         pnl,
         quantity: Number(t?.quantity) || 1,
         risk_reward_ratio: Number(t?.risk_reward_ratio) || 0,
-        entry_time: d ? d.toISOString() : null,
-        _date: d,
+        entry_time: valid ? d!.toISOString() : null,
+        _date: valid ? d : null,
       };
     };
 
