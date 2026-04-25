@@ -34,6 +34,7 @@ import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
 import AlertToast from "@/components/AlertToast";
+import CommandPalette from "@/components/CommandPalette";
 import AgentPanel from "@/components/AgentPanel";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import SettingsPage from "@/components/pages/SettingsPage";
@@ -937,6 +938,7 @@ export default function App() {
     <>
       <style>{css}</style>
       <AlertToast />
+      <CommandPalette />
       <div className="tr4de-root" style={{display:"flex",minHeight:"100vh",background:"#F5F5F5"}}>
         {/* SIDEBAR (OpenAI-style) */}
         <Sidebar
