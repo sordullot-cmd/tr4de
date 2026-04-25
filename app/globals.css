@@ -456,4 +456,16 @@ body {
 
   /* Settings : sidebar + contenu → stack */
   .tr4de-settings-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+
+  /* Calendar : 3 mois par ligne → 1 mois par ligne sur mobile */
+  .tr4de-cal-year-grid { grid-template-columns: 1fr !important; }
+
+  /* TradesPage : table + détail latéral → stack vertical sur mobile */
+  .tr4de-trades-layout { flex-direction: column !important; }
+  .tr4de-trades-main { flex: 1 1 100% !important; max-height: none !important; }
+}
+
+/* Tablet (>=480 et <768) : 2 mois par ligne */
+@media (min-width: 480px) and (max-width: 767px) {
+  .tr4de-cal-year-grid { grid-template-columns: 1fr 1fr !important; }
 }

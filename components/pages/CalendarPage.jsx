@@ -300,7 +300,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
         </div>
       )}
 
-      <div style={{
+      <div className="tr4de-cal-year-grid" style={{
         background: T.white,
         border: `1px solid ${T.border}`,
         borderRadius: 12,

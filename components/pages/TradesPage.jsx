@@ -403,10 +403,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       </div>
 
       {/* LAYOUT WITH TABLE + SIDE PANEL WITH TABS */}
-      <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+      <div className="tr4de-trades-layout" style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
         {/* LEFT - TRADES TABLE */}
-        <div style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
+        <div className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
 
           <div style={{overflowX:"auto",overflowY:"auto",flex:1}}>
