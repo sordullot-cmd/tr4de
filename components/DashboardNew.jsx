@@ -29,8 +29,10 @@ import JournalPage from "@/components/pages/JournalPage";
 import DashboardPage from "@/components/pages/DashboardPage";
 import DisciplinePage from "@/components/pages/DisciplinePage";
 import TradesPage from "@/components/pages/TradesPage";
+import TradeChartPage from "@/components/pages/TradeChartPage";
 import AddTradePage from "@/components/pages/AddTradePage";
 import BacktestPage from "@/components/pages/BacktestPage";
+import BrokersPage from "@/components/pages/BrokersPage";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -685,6 +687,7 @@ export default function App() {
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
+        { id: "brokers",    icon: LucideUpload,       label: "Brokers" },
       ],
     },
     {
@@ -727,6 +730,7 @@ export default function App() {
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
     backtest: <BacktestPage />,
+    brokers: <BrokersPage />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
