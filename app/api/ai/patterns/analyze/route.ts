@@ -34,16 +34,17 @@ export async function POST(request: NextRequest) {
     const normalize = (t: any) => {
       const dateStr = t?.entry_time || t?.date || t?.created_at || null;
       const d = dateStr ? new Date(dateStr) : null;
+      const valid = d && !Number.isNaN(d.getTime());
       return {
         id: String(t?.id || ""),
         symbol: String(t?.symbol || ""),
         direction: String(t?.direction || ""),
-        entry_time: d ? d.toISOString() : "",
+        entry_time: valid ? d!.toISOString() : "",
         pnl: Number(t?.pnl) || 0,
         setup_name: t?.setup_name || t?.setup || null,
         quantity: Number(t?.quantity) || 1,
         risk_reward_ratio: Number(t?.risk_reward_ratio) || null,
-        _date: d,
+        _date: valid ? d : null,
       };
     };
 

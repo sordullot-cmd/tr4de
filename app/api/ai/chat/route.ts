@@ -5,6 +5,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildSystemPrompt, getUserStats } from "@/lib/ai/context";
 
 export async function POST(request: NextRequest) {
+  // Vérification clé OpenAI : si manquante, on retourne un message clair plutôt que "Server error 500"
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "OpenAI API key not configured on server. Set OPENAI_API_KEY in Vercel environment variables." },
+      { status: 503 }
+    );
+  }
+
   try {
     const {
       messages,
@@ -239,6 +247,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("API Error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const msg = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
