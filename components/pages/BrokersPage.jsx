@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { Upload, Link as LinkIcon, ExternalLink, Check, AlertTriangle } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { listBrokers } from "@/lib/brokers/registry";
+import { mergeUnique } from "@/lib/utils/tradeDedup";
 
 /**
  * BrokersPage — page de gestion des intégrations broker.
@@ -38,14 +39,19 @@ export default function BrokersPage() {
       if (!trades || trades.length === 0) {
         throw new Error("Aucun trade trouvé dans ce fichier.");
       }
-      // Persiste comme le fait AddTradePage (localStorage + event)
       const existing = JSON.parse(localStorage.getItem("tr4de_trades") || "[]");
-      const merged = [...existing, ...trades];
+      const { merged, report } = mergeUnique(existing, trades);
       localStorage.setItem("tr4de_trades", JSON.stringify(merged));
-      window.dispatchEvent(new CustomEvent("tr4de:trades-imported", { detail: { count: trades.length } }));
+      window.dispatchEvent(new CustomEvent("tr4de:trades-imported", { detail: { count: report.added.length } }));
+      const skipped = report.skipped.length;
       setFeedback(prev => ({
         ...prev,
-        [broker.meta.id]: { ok: true, msg: `${trades.length} trades importés` },
+        [broker.meta.id]: {
+          ok: true,
+          msg: skipped > 0
+            ? `${report.added.length} nouveaux trades importés (${skipped} doublons ignorés)`
+            : `${report.added.length} trades importés`,
+        },
       }));
     } catch (err) {
       setFeedback(prev => ({
