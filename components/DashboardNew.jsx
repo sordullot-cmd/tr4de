@@ -874,19 +874,9 @@ export default function App() {
             <button
               type="button"
               className="tr4de-hamburger"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                  setMobileNavOpen(true);
-                } else {
-                  setSidebarCollapsed(c => {
-                    const next = !c;
-                    try { localStorage.setItem("sidebarCollapsed", next ? "1" : "0"); } catch {}
-                    return next;
-                  });
-                }
-              }}
-              aria-label="Basculer le menu"
-              style={{display:"inline-flex",width:36,height:36,borderRadius:8,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Ouvrir le menu"
+              style={{display:"none",width:40,height:40,borderRadius:10,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}
             >
               <LucideMenu size={18} strokeWidth={1.75} />
             </button>

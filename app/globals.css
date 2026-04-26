@@ -368,8 +368,14 @@ body {
     z-index: 79; backdrop-filter: blur(2px);
     animation: fadeIn 180ms ease both;
   }
-  /* Montre le hamburger */
-  .tr4de-hamburger { display: inline-flex !important; }
+  /* Hamburger flottant : toujours accessible même quand on scrolle */
+  .tr4de-hamburger {
+    display: inline-flex !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 90 !important;
+  }
   /* Contenu principal : pleine largeur */
   .tr4de-main { margin-left: 0 !important; padding-left: 16px !important; padding-right: 16px !important; }
   .tr4de-topbar { padding-left: 12px !important; padding-right: 12px !important; }
@@ -455,10 +461,12 @@ body {
 @media (max-width: 767px) {
   .hide-mobile { display: none !important; }
 }
+@media (min-width: 1024px) {
+  /* Sur desktop, le bouton de collapse interne du Sidebar prend le relais */
+  .tr4de-hamburger { display: none !important; }
+}
 @media (min-width: 768px) {
   .show-mobile { display: none !important; }
-  /* Le hamburger reste visible sur desktop pour permettre de collapse la sidebar */
-  .tr4de-hamburger { display: inline-flex !important; }
 }
 
 /* Sur mobile : tables → scroll horizontal + padding réduit sur les cellules */
