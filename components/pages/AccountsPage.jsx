@@ -188,7 +188,8 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                       <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                           <span style={{
-                            fontSize: 15, fontWeight: 700, color: T.text,
+                            fontSize: 14, fontWeight: 600, color: T.text,
+                            letterSpacing: -0.1,
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}>
                             {acc.name || "Compte"}

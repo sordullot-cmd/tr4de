@@ -450,11 +450,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               ];
               return opts.map((opt, i) => {
                 const active = chartView === opt.id;
-                const prev = opts[i - 1];
-                const showSep = i > 0 && chartView !== opt.id && chartView !== prev?.id;
                 return (
                   <React.Fragment key={opt.id}>
-                    {showSep && (
+                    {i > 0 && (
                       <span aria-hidden="true" style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
                     )}
                     <button

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import LoadingScreen from "@/components/ui/LoadingScreen";
-import { DollarSign, Percent, Activity, ShieldCheck, BarChart3 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -594,9 +593,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 1. P&L Net */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
-                <DollarSign size={13} strokeWidth={1.75} color={T.textMut}/> P&L Net
-              </div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>P&L Net</div>
               <div style={{fontSize:20,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {fmt(totalPnL,true)}
               </div>
@@ -605,9 +602,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 2. Taux de Victoire */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
-                <Percent size={13} strokeWidth={1.75} color={T.textMut}/> Taux de victoire
-              </div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Taux de victoire</div>
               <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {winRate}%
               </div>
@@ -616,9 +611,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 3. Meilleur vs Pire (compact) */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
-                <Activity size={13} strokeWidth={1.75} color={T.textMut}/> Meilleur vs pire
-              </div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Meilleur vs pire</div>
               <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
                 <span style={{fontSize:18,fontWeight:600,color:T.green,letterSpacing:-0.2}}>{fmt(maxWin)}</span>
                 <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>/</span>
@@ -631,9 +624,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             {hasRules ? (
               <div style={{flex:1,padding:"16px 20px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontSize:12,color:T.textSub,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
-                    <ShieldCheck size={13} strokeWidth={1.75} color={T.textMut}/> Suivi des règles
-                  </div>
+                  <div style={{fontSize:12,color:T.textSub,fontWeight:500}}>Suivi des règles</div>
                   <span style={{fontSize:10,fontWeight:600,color:impactColor,padding:"2px 6px",borderRadius:999,background:impactColor+"15"}}>
                     {rulesImpact > 0 ? "+" : ""}{rulesImpact}%
                   </span>
@@ -647,9 +638,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
               </div>
             ) : (
               <div style={{flex:1,padding:"16px 20px"}}>
-                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:6}}>
-                  <BarChart3 size={13} strokeWidth={1.75} color={T.textMut}/> Volume
-                </div>
+                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Volume</div>
                 <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                   {filteredTrades.length}
                 </div>
