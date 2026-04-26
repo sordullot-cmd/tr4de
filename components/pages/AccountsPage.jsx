@@ -11,7 +11,7 @@ const fmtNoCents = (n) => {
   const prefix = v < 0 ? "-" : "";
   return `${prefix}${sym}${Math.abs(v).toLocaleString("en-US")}`;
 };
-import { Plus } from "lucide-react";
+import { Wallet, Plus } from "lucide-react";
 import { isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 
 const BROKER_LOGOS = {
@@ -95,24 +95,27 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
+    <div style={{ padding: "24px 32px", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>
-          Mes comptes
-        </h1>
-        <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: T.text, display: "flex", alignItems: "center", gap: 10 }}>
+            <Wallet size={22} /> Mes comptes
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: T.textSub }}>
+            Vue d'ensemble de tous vos comptes de trading
+          </p>
+        </div>
         <button
           onClick={() => setPage?.("add-trade")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "7px 12px", borderRadius: 6,
-            border: `1px solid ${T.text}`, background: T.text, color: "#FFFFFF",
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "inherit",
+            padding: "8px 14px", borderRadius: 8,
+            border: `1px solid ${T.border2}`, background: T.text, color: T.white,
+            fontSize: 13, fontWeight: 600, cursor: "pointer",
           }}
         >
-          <Plus size={13} strokeWidth={1.75} /> Nouveau compte
+          <Plus size={14} /> Nouveau compte
         </button>
       </div>
 
@@ -224,8 +227,9 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                 })()}
 
                 {(() => {
+                  const type = acc.account_type || "live";
                   const capital = parseEvalSize(acc.eval_account_size);
-                  const hasBalance = capital !== null;
+                  const hasBalance = (type === "eval" || type === "funded") && capital !== null;
                   const balance = hasBalance ? capital + s.pnl : null;
                   return (
                     <div style={{

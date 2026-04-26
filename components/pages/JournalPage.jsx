@@ -144,91 +144,93 @@ export default function JournalPage({ trades = [] }) {
 
             return (
               <div key={dateStr} className="tr4de-journal-row" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 12, width: 220, flexShrink: 0, position: "relative" }}>
-                  {/* Header : date + P&L du jour */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4, lineHeight: 1.3 }}>{dateLabel}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: dayPnL >= 0 ? T.green : T.red, letterSpacing: -0.2, lineHeight: 1, whiteSpace: "nowrap" }}>
-                      {dayPnL >= 0 ? "+" : ""}{fmt(dayPnL)}
-                    </div>
-                  </div>
-
-                  {/* Sparkline */}
-                  <div style={{ position: "relative", width: "100%", height: 70, marginLeft: -14, marginRight: -14, paddingLeft: 0, paddingRight: 0, width: "calc(100% + 28px)", overflow: "visible" }}>
-                    {sparklineData.length > 0 ? (
-                      <svg
-                        width="100%"
-                        height="100%"
-                        viewBox={`0 0 ${sparklineWidth} ${sparklineHeight}`}
-                        preserveAspectRatio="none"
-                        style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}
-                        onMouseMove={(e) => {
-                          const svg = e.currentTarget;
-                          const rect = svg.getBoundingClientRect();
-                          const x = ((e.clientX - rect.left) / rect.width) * sparklineWidth;
-                          const pointIndex = Math.round((x / sparklineWidth) * (sparklineData.length - 1));
-                          if (pointIndex >= 0 && pointIndex < sparklineData.length) {
-                            const pointX = (pointIndex / (sparklineData.length - 1 || 1)) * sparklineWidth;
-                            const pixelX = (pointX / sparklineWidth) * rect.width;
-                            const val = sparklineData[pointIndex];
-                            const rangeLocal = Math.max(Math.abs(Math.max(...sparklineData, 0)), Math.abs(Math.min(...sparklineData, 0))) || 1;
-                            const zeroYLocal = lastVal >= 0 ? sparklineHeight / 2 : 0;
-                            const svgY = zeroYLocal - (val / rangeLocal) * (sparklineHeight / 2);
-                            const pixelY = (svgY / sparklineHeight) * rect.height;
-                            setHoveredPoints({ ...hoveredPoints, [dateStr]: pointIndex });
-                            setTooltipPositions({ ...tooltipPositions, [dateStr]: { x: pixelX, y: pixelY } });
-                          }
-                        }}
-                        onMouseLeave={() => { setHoveredPoints({ ...hoveredPoints, [dateStr]: null }); }}
-                      >
-                        <defs>
-                          <linearGradient id={`grad-${dateStr}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.35" : "0.05"} />
-                            <stop offset="100%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.05" : "0.35"} />
-                          </linearGradient>
-                        </defs>
-                        <line x1="0" y1={sparklineHeight / 2} x2={sparklineWidth} y2={sparklineHeight / 2} stroke={T.border} strokeWidth="0.5" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
-                        <path
-                          d={`M ${points.split(' ')[0]} L ${points} L ${sparklineWidth},${zeroY} L 0,${zeroY} Z`}
-                          fill={`url(#grad-${dateStr})`}
-                        />
-                        <polyline points={points} fill="none" stroke={sparklineColor} strokeWidth="1.75" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: T.textMut }}>—</div>
-                    )}
-
-                    {hoveredPoints[dateStr] !== null && hoveredPoints[dateStr] !== undefined && sparklineData[hoveredPoints[dateStr]] !== undefined && (
-                      <div style={{
-                        position: "absolute",
-                        left: `${tooltipPositions[dateStr]?.x}px`,
-                        top: `${tooltipPositions[dateStr]?.y - 32}px`,
-                        background: "#0D0D0D",
-                        color: "#FFFFFF",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        pointerEvents: "none",
-                        transform: "translateX(-50%)",
-                        fontFamily: "var(--font-sans)",
-                        zIndex: 9999,
-                      }}>
-                        {sparklineData[hoveredPoints[dateStr]] >= 0 ? "+" : ""}{sparklineData[hoveredPoints[dateStr]].toFixed(2)}
+                <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 0, width: 220, aspectRatio: "1 / 1", flexShrink: 0, position: "relative" }}>
+                  <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", justifyContent: "flex-start", marginBottom: "20px", overflow: "hidden", marginLeft: "-16px", marginRight: "-16px", position: "relative" }}>
+                    <div style={{ position: "absolute", bottom: "-50px", left: "0", right: "0", height: "1px", background: T.border }}></div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: T.text, textAlign: "left", padding: "0 16px", marginBottom: 4 }}>{dateLabel}</div>
+                    {sparklineData.length > 0 && (
+                      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "visible" }}>
+                        <svg
+                          width="100%"
+                          height="100%"
+                          viewBox={`0 0 ${sparklineWidth} ${sparklineHeight}`}
+                          preserveAspectRatio="none"
+                          style={{ width: "100%", height: "100%", display: "block", overflow: "hidden" }}
+                          onMouseMove={(e) => {
+                            const svg = e.currentTarget;
+                            const rect = svg.getBoundingClientRect();
+                            const x = ((e.clientX - rect.left) / rect.width) * sparklineWidth;
+                            const pointIndex = Math.round((x / sparklineWidth) * (sparklineData.length - 1));
+                            if (pointIndex >= 0 && pointIndex < sparklineData.length) {
+                              const pointX = (pointIndex / (sparklineData.length - 1 || 1)) * sparklineWidth;
+                              const pixelX = (pointX / sparklineWidth) * rect.width;
+                              const val = sparklineData[pointIndex];
+                              const rangeLocal = Math.max(Math.abs(Math.max(...sparklineData, 0)), Math.abs(Math.min(...sparklineData, 0))) || 1;
+                              const zeroYLocal = lastVal >= 0 ? sparklineHeight / 2 : 0;
+                              const svgY = zeroYLocal - (val / rangeLocal) * (sparklineHeight / 2);
+                              const pixelY = (svgY / sparklineHeight) * rect.height;
+                              setHoveredPoints({ ...hoveredPoints, [dateStr]: pointIndex });
+                              setTooltipPositions({ ...tooltipPositions, [dateStr]: { x: pixelX, y: pixelY } });
+                            }
+                          }}
+                          onMouseLeave={() => { setHoveredPoints({ ...hoveredPoints, [dateStr]: null }); }}
+                        >
+                          <defs>
+                            <linearGradient id={`grad-${dateStr}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.5" : "0.05"} />
+                              <stop offset="100%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.05" : "0.5"} />
+                            </linearGradient>
+                          </defs>
+                          <path
+                            d={`M ${points.split(' ')[0]} L ${points} L ${sparklineWidth},${zeroY} L 0,${zeroY} Z`}
+                            fill={`url(#grad-${dateStr})`}
+                          />
+                          <polyline points={points} fill="none" stroke={sparklineColor} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        </svg>
                       </div>
                     )}
                   </div>
 
-                  {/* Footer : KPIs sur une ligne */}
-                  <div style={{ display: "flex", alignItems: "stretch", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${T.border}`, gap: 8 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.3 }}>Trades</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, lineHeight: 1 }}>{dayVolume}</div>
+                  {hoveredPoints[dateStr] !== null && hoveredPoints[dateStr] !== undefined && sparklineData[hoveredPoints[dateStr]] !== undefined && (
+                    <div style={{
+                      position: "absolute",
+                      left: `${tooltipPositions[dateStr]?.x}px`,
+                      top: `${tooltipPositions[dateStr]?.y - 40}px`,
+                      background: "#000000",
+                      color: sparklineData[hoveredPoints[dateStr]] >= 0 ? T.green : T.red,
+                      padding: "6px 12px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 400,
+                      whiteSpace: "nowrap",
+                      pointerEvents: "none",
+                      transform: "translateX(-50%)",
+                      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+                      letterSpacing: "0.3px",
+                      zIndex: 9999,
+                    }}>
+                      {sparklineData[hoveredPoints[dateStr]] >= 0 ? "+" : ""}{sparklineData[hoveredPoints[dateStr]].toFixed(2)}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, textAlign: "right" }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.3 }}>Win rate</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: dayWinRate >= 50 ? T.green : T.text, lineHeight: 1 }}>{dayWinRate}%</div>
+                  )}
+
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", transform: "translateY(-50px)" }}>
+                    <div className="tr4de-journal-kpis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>Trades</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{dayVolume}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>Total</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{trades.length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>Taux victoire</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: T.green }}>{dayWinRate}%</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>PnL du jour</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: dayPnL >= 0 ? T.green : T.red }}>{dayPnL >= 0 ? "+" : ""}{fmt(dayPnL)}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
