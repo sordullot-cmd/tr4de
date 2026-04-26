@@ -145,7 +145,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           Aucun compte de trading. Ajoutez-en un depuis la page “Ajouter des trades”.
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", borderTop: `1px solid ${T.border}` }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {[...visibleAccounts].sort((a, b) => {
             const sa = stats.get(a.id) || { trades: 0, pnl: 0 };
             const sb = stats.get(b.id) || { trades: 0, pnl: 0 };
@@ -175,7 +175,6 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                 style={{
                   cursor: "pointer",
                   padding: "12px 4px",
-                  borderBottom: `1px solid ${T.border}`,
                   display: "flex",
                   alignItems: "center",
                   gap: 18,
