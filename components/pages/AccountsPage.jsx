@@ -197,20 +197,26 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                             {acc.name || "Compte"}
                           </div>
                           <div style={{
-                            display: "inline-flex", alignItems: "center", gap: 8,
-                            fontSize: 12, color: T.textSub, fontWeight: 400,
+                            display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+                            fontSize: 11, color: T.textSub, fontWeight: 500,
                           }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", gap: 5,
+                              padding: "2px 8px", borderRadius: 999,
+                              border: `1px solid ${T.border}`, background: T.white,
+                            }}>
                               <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                               {typeLabel}
                             </span>
                             {acc.broker && (
-                              <>
-                                <span style={{ color: T.border2 }}>·</span>
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {acc.broker}
-                                </span>
-                              </>
+                              <span style={{
+                                display: "inline-flex", alignItems: "center",
+                                padding: "2px 8px", borderRadius: 999,
+                                border: `1px solid ${T.border}`, background: T.white,
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160,
+                              }}>
+                                {acc.broker}
+                              </span>
                             )}
                           </div>
                         </div>

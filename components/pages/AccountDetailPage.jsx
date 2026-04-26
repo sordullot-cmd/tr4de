@@ -541,10 +541,11 @@ function StatsTable({ stats }) {
                 borderRight: lastCol ? "none" : `1px solid ${T.border}`,
                 borderBottom: lastRow ? "none" : `1px solid ${T.border}`,
                 minWidth: 0,
+                textAlign: "center",
               }}
             >
               <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: c.color || T.text, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: c.color || T.text, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
             </div>
           );
         })}
