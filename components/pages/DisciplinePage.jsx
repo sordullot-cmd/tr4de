@@ -1128,7 +1128,7 @@ export default function DisciplinePage({ trades = [] }) {
 
         {/* RULES TABLE */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{overflowX:"auto"}}>
+          <div className="tr4de-table-wrap" style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:1000}}>
               <thead>
                 <tr style={{background:T.bg,borderBottom:`1px solid ${T.border}`}}>

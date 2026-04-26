@@ -154,7 +154,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const colors = ["#9B7D94","#997B5D","#A5956B","#6B9B6F","#4A9D6F","#6B9D68","#5F8BA0","#5F7FB4","#6B8BB4","#8B7BA4","#A07B94","#7F7F7F"];
+  const colors = ["#EF4444","#F97316","#F59E0B","#EAB308","#84CC16","#22C55E","#10B981","#06B6D4","#3B82F6","#6366F1","#A855F7","#EC4899"];
 
   const getDefaultFormData = () => ({name:"",description:"",color:"#16A34A",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
 
@@ -610,6 +610,13 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                     <div style={{width:8,height:8,borderRadius:"50%",background:strategy.color,flexShrink:0}}/>
                     <div style={{fontSize:15,fontWeight:600,color:T.text,lineHeight:1.3,letterSpacing:-0.1}}>{strategy.name}</div>
                   </div>
+
+                  {/* Description */}
+                  {strategy.description && (
+                    <div style={{fontSize:12,color:T.textSub,lineHeight:1.45,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
+                      {strategy.description}
+                    </div>
+                  )}
 
                   {/* PnL */}
                   <div style={{fontSize:20,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>

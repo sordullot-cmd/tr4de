@@ -199,7 +199,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
           </div>
         </div>
 
-        <div style={{ overflowX: "auto", fontFamily: "var(--font-sans)" }}>
+        <div className="tr4de-table-wrap" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", fontFamily: "var(--font-sans)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900, tableLayout: "fixed" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${T.border}` }}>
