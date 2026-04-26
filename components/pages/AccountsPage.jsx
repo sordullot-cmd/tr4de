@@ -188,7 +188,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                   return (
                     <>
                       {/* Top row: name + meta · broker logo */}
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
                         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
                           <div style={{
                             fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.15,
