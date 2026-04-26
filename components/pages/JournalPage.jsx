@@ -214,7 +214,7 @@ export default function JournalPage({ trades = [] }) {
                   )}
 
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", transform: "translateY(-50px)" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div className="tr4de-journal-kpis" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <div>
                         <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>Trades</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{dayVolume}</div>

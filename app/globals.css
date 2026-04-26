@@ -407,6 +407,10 @@ body {
   [style*="grid-template-columns: 1fr 1fr 1fr 1fr"] {
     grid-template-columns: 1fr !important;
   }
+
+  /* Exceptions : grilles qui doivent rester en 2 colonnes même sur tablette/mobile.
+     Le collapse `1fr 1fr → 1fr` au-dessus est trop large pour ces cas. */
+  .tr4de-journal-kpis { grid-template-columns: 1fr 1fr !important; }
 }
 
 /* Mobile (<768px) */
