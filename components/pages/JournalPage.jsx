@@ -277,8 +277,15 @@ export default function JournalPage({ trades = [] }) {
                             return (
                               <>
                                 {visibleTrades.map((trade, i) => {
-                                  const entryTime = new Date(trade.entry_time || trade.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                                  const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "—";
+                                  const fmtTime = (v) => {
+                                    if (!v) return "—";
+                                    if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
+                                    const d = new Date(v);
+                                    if (isNaN(d.getTime())) return "—";
+                                    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                                  };
+                                  const entryTime = fmtTime(trade.entryTime || trade.entry_time);
+                                  const exitTime = fmtTime(trade.exitTime || trade.exit_time);
                                   const rowKey = `${dateStr}_${i}`;
                                   const tradeId = getTradeId(trade);
                                   const isExpanded = !!expandedTrades[rowKey];
