@@ -497,9 +497,15 @@ body {
   /* Toolbars de page : header avec h1 + boutons → wrap propre */
   .anim-1 > div:first-child { flex-wrap: wrap !important; gap: 8px !important; }
 
-  /* Journal de trading : carte sparkline + tableau côte-à-côte → empilé */
+  /* Journal de trading : carte sparkline (carré) + tableau côte-à-côte → empilé.
+     La carte garde son ratio 1:1, fluide jusqu'à 280px de côté. */
   .tr4de-journal-row { flex-direction: column !important; gap: 12px !important; }
-  .tr4de-journal-row > div:first-child { width: 100% !important; height: auto !important; min-height: 220px; }
+  .tr4de-journal-row > div:first-child {
+    width: min(100%, 280px) !important;
+    aspect-ratio: 1 / 1 !important;
+    height: auto !important;
+    align-self: center !important;
+  }
 
   /* Goals page : grid 5-cols → empilé en 2 lignes (titre+actions / meta) */
   .tr4de-goals-headers { display: none !important; }

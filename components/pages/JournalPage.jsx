@@ -144,7 +144,7 @@ export default function JournalPage({ trades = [] }) {
 
             return (
               <div key={dateStr} className="tr4de-journal-row" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 0, width: 200, height: 240, position: "relative" }}>
+                <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 0, width: 220, aspectRatio: "1 / 1", flexShrink: 0, position: "relative" }}>
                   <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", justifyContent: "flex-start", marginBottom: "20px", overflow: "hidden", marginLeft: "-16px", marginRight: "-16px", position: "relative" }}>
                     <div style={{ position: "absolute", bottom: "-50px", left: "0", right: "0", height: "1px", background: T.border }}></div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: T.text, textAlign: "left", padding: "0 16px", marginBottom: 4 }}>{dateLabel}</div>
