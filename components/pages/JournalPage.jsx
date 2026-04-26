@@ -143,7 +143,7 @@ export default function JournalPage({ trades = [] }) {
             const sparklineColor = lastVal >= 0 ? T.green : T.red;
 
             return (
-              <div key={dateStr} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+              <div key={dateStr} className="tr4de-journal-row" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
                 <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 0, width: 200, height: 240, position: "relative" }}>
                   <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", justifyContent: "flex-start", marginBottom: "20px", overflow: "hidden", marginLeft: "-16px", marginRight: "-16px", position: "relative" }}>
                     <div style={{ position: "absolute", bottom: "-50px", left: "0", right: "0", height: "1px", background: T.border }}></div>
@@ -257,7 +257,7 @@ export default function JournalPage({ trades = [] }) {
                   />
 
                   <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-                    <div style={{ overflowX: "auto" }}>
+                    <div className="tr4de-table-wrap" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
                           <tr>

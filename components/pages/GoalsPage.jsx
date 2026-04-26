@@ -302,7 +302,7 @@ export default function GoalsPage() {
       <div style={{ height: 1, background: T.border, margin: "0 16px" }} />
 
       {/* Column headers */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
+      <div className="tr4de-goals-headers" style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
         <div>Créé le</div>
         <div>Objectif</div>
         <div>Échéance</div>
@@ -766,6 +766,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
   return (
     <>
       <div
+        className="tr4de-goals-row"
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         onClick={() => setOpen(v => !v)}
