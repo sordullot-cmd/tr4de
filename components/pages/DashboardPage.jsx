@@ -1128,16 +1128,27 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{t("dash.globalScore")}</span>
               </div>
 
-              <div style={{width:"100%",height:4,background:"#F0F0F0",borderRadius:2,overflow:"hidden"}}>
+              <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
                 <div
                   style={{
                     width:`${parseFloat(pentagonMetrics.overallScore)}%`,
                     height:"100%",
-                    background:"#16A34A",
+                    background:"#5F7FB4",
                     transition:"width 0.6s ease",
-                    borderRadius:2,
+                    borderRadius:3,
                   }}
                 />
+                {[20,40,60,80].map(v => (
+                  <div key={v} style={{position:"absolute",left:`${v}%`,top:0,bottom:0,width:1,background:"rgba(255,255,255,0.65)",transform:"translateX(-0.5px)",pointerEvents:"none"}} />
+                ))}
+              </div>
+              <div style={{position:"relative",height:12,marginTop:4}}>
+                {[0,20,40,60,80,100].map(v => {
+                  const tx = v === 0 ? "translateX(0)" : v === 100 ? "translateX(-100%)" : "translateX(-50%)";
+                  return (
+                    <span key={v} style={{position:"absolute",left:`${v}%`,transform:tx,fontSize:9,color:"#8E8E8E",fontWeight:500,fontVariantNumeric:"tabular-nums"}}>{v}</span>
+                  );
+                })}
               </div>
             </div>
           </div>
