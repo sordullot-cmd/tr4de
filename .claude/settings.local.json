@@ -38,10 +38,7 @@
       "Bash(grep -E \"app[\\\\\\\\\\\\\\\\/]planner\")",
       "Bash(npm uninstall *)",
       "Bash(npx skills *)",
-      "Bash(git revert *)",
-      "Bash(git stash *)",
-      "Bash(git checkout *)",
-      "Bash(git restore *)"
+      "Bash(git revert *)"
     ]
   }
 }
