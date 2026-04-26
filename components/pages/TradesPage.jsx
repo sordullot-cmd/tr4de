@@ -13,6 +13,7 @@ import {
   GripVertical as LucideGripVertical,
   Target as LucideTarget,
   FileText as LucideFileText,
+  Image as LucideImage,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
@@ -789,13 +790,25 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   {/* INFO ROW - HEURE D'OUVERTURE */}
                   <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entryTime || "—"}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
+                      const v = selectedTrade.entryTime || selectedTrade.entry_time;
+                      if (!v) return "—";
+                      if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
+                      const d = new Date(v);
+                      return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                    })()}</div>
                   </div>
 
                   {/* INFO ROW - HEURE DE FERMETURE */}
                   <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exitTime || "—"}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
+                      const v = selectedTrade.exitTime || selectedTrade.exit_time;
+                      if (!v) return "—";
+                      if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
+                      const d = new Date(v);
+                      return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                    })()}</div>
                   </div>
 
                   {/* INFO ROW - P&L */}
@@ -956,7 +969,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               if (f) await handleFile(f);
                             }}
                             style={{
-                              display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
                               padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
                               cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
                               color:T.textSub,fontSize:12,fontWeight:500,
@@ -964,7 +977,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             }}
                             onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background=T.bg}}>
-                            {screenshotBusy ? "Upload en cours…" : "Colle (Ctrl+V), glisse une image ou clique pour ajouter"}
+                            <LucideImage size={22} strokeWidth={1.5} color={T.textMut} />
+                            <span>{screenshotBusy ? "Upload en cours…" : "Glisser une image"}</span>
                             <input type="file" accept="image/*" disabled={screenshotBusy}
                               onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; await handleFile(f); e.target.value = ""; }}
                               style={{display:"none"}} />
