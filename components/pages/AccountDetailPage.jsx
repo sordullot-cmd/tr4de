@@ -4,7 +4,7 @@ import React from "react";
 import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
-import { ArrowLeft, ArrowRight, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pencil, TrendingUp as LucideTrendingUp } from "lucide-react";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -376,49 +376,116 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         {stats.sorted.length === 0 ? (
           <div style={{ padding: 24, textAlign: "center", color: T.textSub, fontSize: 13 }}>Aucun trade sur ce compte.</div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: "#FAFAFA" }}>
-                <Th>Date</Th>
-                <Th>Symbole</Th>
-                <Th>Sens</Th>
-                <Th align="right">Entrée</Th>
-                <Th align="right">Sortie</Th>
-                <Th align="right">P&L</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...stats.sorted].slice(-10).reverse().map((t, i) => {
-                const p = Number(t.pnl) || 0;
-                return (
-                  <tr key={t.id || i} style={{ borderTop: `1px solid ${T.border}` }}>
-                    <Td>{formatDate(t.date)}</Td>
-                    <Td><span style={{ fontWeight: 600 }}>{t.symbol || "—"}</span></Td>
-                    <Td>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4,
-                        padding: "2px 6px", borderRadius: 4,
-                        background: t.direction === "short" ? T.redBg : T.greenBg,
-                        color: t.direction === "short" ? T.red : T.green,
-                      }}>
-                        {t.direction || "long"}
-                      </span>
-                    </Td>
-                    <Td align="right">{t.entry != null ? Number(t.entry).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "—"}</Td>
-                    <Td align="right">{t.exit != null ? Number(t.exit).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "—"}</Td>
-                    <Td align="right">
-                      <span style={{ color: p > 0 ? T.green : p < 0 ? T.red : T.text, fontWeight: 600 }}>
-                        {fmt(p, true)}
-                      </span>
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <RecentTradesTable trades={[...stats.sorted].slice(-10).reverse()} />
         )}
       </div>
+
     </div>
+  );
+}
+
+function RecentTradesTable({ trades }) {
+  const fmtTime = (v) => {
+    if (!v) return "—";
+    if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  };
+  const [hoveredId, setHoveredId] = React.useState(null);
+
+  return (
+    <div style={{ overflowX: "auto", overflowY: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "var(--font-sans)" }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+            <Th2>Symbole</Th2>
+            <Th2>Date</Th2>
+            <Th2>Entrée</Th2>
+            <Th2>Sortie</Th2>
+            <Th2>Sens</Th2>
+            <Th2 align="right">Prix entrée</Th2>
+            <Th2 align="right">Prix sortie</Th2>
+            <Th2 align="right">P&amp;L</Th2>
+          </tr>
+        </thead>
+        <tbody>
+          {trades.map((t, i) => {
+            const p = Number(t.pnl) || 0;
+            const id = t.id || i;
+            const isHovered = hoveredId === id;
+            return (
+              <tr
+                key={id}
+                onMouseEnter={() => setHoveredId(id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  borderBottom: `1px solid ${T.border}`,
+                  background: isHovered ? "#FAFAFA" : "#FFFFFF",
+                  transition: "background .12s ease",
+                }}
+              >
+                <Td2>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 18, verticalAlign: "middle" }}>
+                    <span style={{ width: 22, height: 22, borderRadius: 6, background: T.bg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
+                    </span>
+                    <span style={{ fontWeight: 600, color: T.text }}>{t.symbol || "—"}</span>
+                  </span>
+                </Td2>
+                <Td2 muted>{formatDate(t.date)}</Td2>
+                <Td2 muted>{fmtTime(t.entry_time || t.entryTime)}</Td2>
+                <Td2 muted>{fmtTime(t.exit_time || t.exitTime)}</Td2>
+                <Td2>
+                  <span style={{ color: t.direction === "short" ? T.red : T.green, fontWeight: 500 }}>
+                    {t.direction === "short" ? "Short" : "Long"}
+                  </span>
+                </Td2>
+                <Td2 align="right" tabular>{t.entry != null ? Number(t.entry).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "—"}</Td2>
+                <Td2 align="right" tabular>{t.exit != null ? Number(t.exit).toLocaleString("en-US", { maximumFractionDigits: 4 }) : "—"}</Td2>
+                <Td2 align="right" tabular>
+                  <span style={{ color: p > 0 ? T.green : p < 0 ? T.red : T.text, fontWeight: 600 }}>
+                    {fmt(p, true)}
+                  </span>
+                </Td2>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Th2({ children, align = "left" }) {
+  return (
+    <th style={{
+      padding: "12px 14px",
+      textAlign: align,
+      fontSize: 11,
+      fontWeight: 500,
+      color: T.textMut,
+      whiteSpace: "nowrap",
+      background: T.bg,
+      height: 42,
+    }}>
+      {children}
+    </th>
+  );
+}
+
+function Td2({ children, align = "left", muted, tabular }) {
+  return (
+    <td style={{
+      padding: "12px 14px",
+      textAlign: align,
+      color: muted ? T.textSub : T.text,
+      fontFamily: "var(--font-sans)",
+      fontVariantNumeric: tabular ? "tabular-nums" : undefined,
+      whiteSpace: "nowrap",
+    }}>
+      {children}
+    </td>
   );
 }
 
@@ -641,26 +708,6 @@ function EquityCurve({ curve }) {
         <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="7" textAnchor={x.anchor}>{fmtD(x.date)}</text>
       ))}
     </svg>
-  );
-}
-
-function Th({ children, align = "left" }) {
-  return (
-    <th style={{
-      padding: "8px 12px", textAlign: align,
-      fontSize: 10, fontWeight: 700, color: T.textMut,
-      textTransform: "uppercase", letterSpacing: 0.4,
-    }}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, align = "left" }) {
-  return (
-    <td style={{ padding: "8px 12px", textAlign: align, color: T.text, fontSize: 12 }}>
-      {children}
-    </td>
   );
 }
 
