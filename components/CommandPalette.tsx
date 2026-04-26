@@ -30,6 +30,7 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: "nav.goals",         group: "Navigation", label: "Objectifs",                  keywords: ["goals"], run: c => c.setPage("goals") },
   { id: "nav.focus",         group: "Navigation", label: "Minuteur Focus",             keywords: ["pomodoro", "focus", "timer"], run: c => c.setPage("focus") },
   { id: "nav.reading",       group: "Navigation", label: "Liste de lecture",           keywords: ["livres", "lectures", "books"], run: c => c.setPage("reading") },
+  { id: "nav.notes",         group: "Navigation", label: "Notes",                      keywords: ["notes", "idées", "ideas"], run: c => c.setPage("notes") },
   { id: "nav.settings",      group: "Navigation", label: "Paramètres",                 keywords: ["preferences", "profile"], run: c => c.setPage("settings") },
 
   // Actions

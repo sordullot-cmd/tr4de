@@ -173,7 +173,7 @@ export default function BrokersPage() {
                 <div style={{
                   display: "flex", alignItems: "center", gap: 6,
                   padding: "8px 10px", borderRadius: 6,
-                  background: fb.ok ? "#E6F7F1" : "#FEF2F2",
+                  background: fb.ok ? "#F0FDF4" : "#FEF2F2",
                   color: fb.ok ? T.green : T.red,
                   fontSize: 12, fontWeight: 500,
                 }}>

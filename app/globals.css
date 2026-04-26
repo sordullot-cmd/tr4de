@@ -25,7 +25,7 @@
   --color-btn-primary-hover: #262626;
 
   /* Status */
-  --color-success: #10A37F;
+  --color-success: #16A34A;
   --color-warning: #F97316;
   --color-danger: #EF4444;
   --color-info: #A855F7;
@@ -138,7 +138,7 @@
 /* Icônes des blocs Bias/Règles/Erreurs : fonds clairs -> fonds foncés
    (i = case-insensitive pour #eff6ff / #EFF6FF, avec et sans espace) */
 :root[data-theme="dark"] [style*="#EFF6FF" i],
-:root[data-theme="dark"] [style*="#E6F7F1" i],
+:root[data-theme="dark"] [style*="#F0FDF4" i],
 :root[data-theme="dark"] [style*="#FEF2F2" i],
 :root[data-theme="dark"] [style*="#FFF4E6" i] {
   background: #242424 !important;
@@ -190,7 +190,7 @@
 }
 
 /* Calendrier dashboard : fonds teintés vert/rouge des jours avec trades */
-:root[data-theme="dark"] [style*="#E6F7F1" i] {
+:root[data-theme="dark"] [style*="#F0FDF4" i] {
   background: #1A3A2D !important;
 }
 :root[data-theme="dark"] [style*="#FEF2F2" i] {

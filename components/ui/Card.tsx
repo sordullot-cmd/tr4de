@@ -13,7 +13,7 @@ export function Card({ padded = true, hoverable = false, accent = "default", sty
   const accentBorders: Record<string, string> = {
     default: "transparent",
     primary: "#0D0D0D",
-    success: "#10A37F",
+    success: "#16A34A",
     warning: "#F97316",
     danger: "#EF4444",
     info: "#A855F7",

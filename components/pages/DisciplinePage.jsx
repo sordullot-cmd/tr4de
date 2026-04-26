@@ -370,7 +370,7 @@ function EditableCheckList({ title, iconBg, icon, items, checkedRuleIds, onToggl
                 onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
                 onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
                 <input type="checkbox" checked={checked} onChange={()=>onToggleCheck(r.id)}
-                  style={{width:14,height:14,accentColor:"#10A37F",cursor:"pointer",margin:0,flexShrink:0}}/>
+                  style={{width:14,height:14,accentColor:"#16A34A",cursor:"pointer",margin:0,flexShrink:0}}/>
                 <span style={{fontSize:12, color: checked ? "#8E8E8E" : "#0D0D0D", fontWeight:400, lineHeight:1.5, textDecoration: checked ? "line-through" : "none"}}>
                   {r.label}
                 </span>
@@ -743,7 +743,7 @@ export default function DisciplinePage({ trades = [] }) {
           {/* REGLES A SUIVRE */}
           <EditableCheckList
             title={t("disc.rulesToFollow")}
-            iconBg="#E6F7F1"
+            iconBg="#F0FDF4"
             accent={T.green}
             icon={<LucideCheck size={13} strokeWidth={2} color={T.green}/>}
             items={personalRules}
@@ -900,7 +900,7 @@ export default function DisciplinePage({ trades = [] }) {
                   if (percentage <= 40) return '#86EFAC'; // Vert pâle (21-40%)
                   if (percentage <= 60) return '#4ADE80'; // Vert moyen (41-60%)
                   if (percentage <= 80) return '#22C55E'; // Vert clair (61-80%)
-                  return '#10A37F';                       // Vert vif (81-100%)
+                  return '#16A34A';                       // Vert vif (81-100%)
                 };
                 
                 // Function to get daily completion data: prioritize Supabase (disciplineData), fallback to localStorage
@@ -1108,7 +1108,7 @@ export default function DisciplinePage({ trades = [] }) {
                 '#86EFAC',
                 '#4ADE80',
                 '#22C55E',
-                '#10A37F'
+                '#16A34A'
               ].map((color, i) => (
                 <div
                   key={i}

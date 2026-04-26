@@ -405,14 +405,14 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"1px solid #E5E5E5"}}>
           {/* NET P&L */}
           <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +12.4%</div>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#16A34A"}}>↑ +12.4%</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.totalPnL")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
           </div>
 
           {/* TRADE WIN */}
           <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#10A37F"}}>↑ +3.2%</div>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#16A34A"}}>↑ +3.2%</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.winRate")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
           </div>
@@ -437,7 +437,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           {/* Total P&L (uniquement vue cumulative) à droite */}
           {chartView === "cumulative" && (
             <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
-              <div style={{fontSize:12,fontWeight:600,color:totalPnL>=0?"#10A37F":"#EF4444"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+              <div style={{fontSize:12,fontWeight:600,color:totalPnL>=0?"#16A34A":"#EF4444"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
             </div>
           )}
           {/* Titre + flèches de navigation à droite du titre, sans contour */}
@@ -518,7 +518,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                     const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ");
                     // Couleur selon le P&L cumulatif final
                     const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
-                    const lineColor = lastCum >= 0 ? "#10A37F" : "#EF4444";
+                    const lineColor = lastCum >= 0 ? "#16A34A" : "#EF4444";
 
                     return (
                       <g>
@@ -585,7 +585,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   const last = pnlCurve[pnlCurve.length - 1];
                   const lastTopPct = (220 - ((last.cum - minCum2) / span) * 204) / 240 * 100;
                   const precise = `${last.cum >= 0 ? "+" : "-"}$${Math.abs(last.cum).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
-                  const lastColor = last.cum >= 0 ? "#10A37F" : "#EF4444";
+                  const lastColor = last.cum >= 0 ? "#16A34A" : "#EF4444";
                   const lastEl = (
                     <div key="last-pnl" style={{position:"absolute",top:`calc(${lastTopPct}% * (100% - 22px) / 100%)`,right:6,transform:"translateY(-50%)",fontSize:11,fontWeight:600,color:lastColor,whiteSpace:"nowrap",background:"#FFFFFF"}}>
                       {precise}
@@ -607,7 +607,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 const svgX = 10 + (idx / Math.max(pnlCurve.length - 1, 1)) * 590;
                 const leftPct = (svgX / 600) * 100;
                 const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
-                const dotColor = lastCum >= 0 ? "#10A37F" : "#EF4444";
+                const dotColor = lastCum >= 0 ? "#16A34A" : "#EF4444";
                 const dotShadow = lastCum >= 0 ? "rgba(16, 163, 127, 0.2)" : "rgba(239, 68, 68, 0.2)";
                 return (
                   <div style={{
@@ -677,7 +677,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                     boxShadow:"0 4px 12px rgba(0,0,0,0.08)"
                   }}>
                     <div style={{color:"#5C5C5C",fontWeight:500,fontSize:11,marginBottom:2}}>{new Date(p.date).toLocaleDateString('fr-FR',{weekday:'short',month:'short',day:'numeric'})}</div>
-                    <div style={{fontSize:"13px",fontWeight:"700",color:p.pnl>=0?"#10A37F":"#EF4444"}}>
+                    <div style={{fontSize:"13px",fontWeight:"700",color:p.pnl>=0?"#16A34A":"#EF4444"}}>
                       {p.pnl>=0?"+":""}${Math.abs(p.pnl).toFixed(0)}
                     </div>
                   </div>
@@ -686,7 +686,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             </div>
           ) : chartView === "byStrategy" ? (
             (() => {
-              const STRAT_COLORS = ["#10A37F","#3B82F6","#F97316","#A855F7","#EF4444","#0EA5E9","#EAB308","#EC4899"];
+              const STRAT_COLORS = ["#16A34A","#3B82F6","#F97316","#A855F7","#EF4444","#0EA5E9","#EAB308","#EC4899"];
               const getStrategyIdsForTrade = (tr) => {
                 let ids = tradeStrategiesData[tr.id] || [];
                 if (ids.length === 0 && tr.date && tr.symbol && tr.entry) {
@@ -834,7 +834,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                             <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6}}>
                               <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                               <span style={{fontWeight:600,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
                             </div>
                           ))}
                         </div>
@@ -847,7 +847,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           ) : chartView === "byAccount" ? (
             (() => {
               // Construire une série cumulative par compte
-              const ACCOUNT_COLORS = ["#10A37F", "#3B82F6", "#F97316", "#A855F7", "#EF4444", "#0EA5E9", "#EAB308", "#EC4899"];
+              const ACCOUNT_COLORS = ["#16A34A", "#3B82F6", "#F97316", "#A855F7", "#EF4444", "#0EA5E9", "#EAB308", "#EC4899"];
               const accountIds = (accounts && accounts.length > 0)
                 ? accounts.map(a => a.id)
                 : Array.from(new Set(allTrades.map(t => t.account_id).filter(Boolean)));
@@ -1003,7 +1003,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                               <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.55}}>
                                 <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                                 <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                                <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                                <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
                               </div>
                             );
                           })}
@@ -1133,7 +1133,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   style={{
                     width:`${parseFloat(pentagonMetrics.overallScore)}%`,
                     height:"100%",
-                    background:"#10A37F",
+                    background:"#16A34A",
                     transition:"width 0.6s ease",
                     borderRadius:2,
                   }}

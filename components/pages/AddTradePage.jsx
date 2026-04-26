@@ -893,7 +893,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             <div
               style={{
                 padding: "36px 20px",
-                border: `1px dashed ${fileName ? "#10A37F" : T.border}`,
+                border: `1px dashed ${fileName ? "#16A34A" : T.border}`,
                 borderRadius: 12,
                 textAlign: "center",
                 cursor: "pointer",
@@ -901,10 +901,10 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 transition: "border-color 160ms ease, background 160ms ease",
               }}
               onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#0D0D0D"; e.currentTarget.style.background = "#F5F5F5"; }}
-              onDragLeave={(e) => { e.currentTarget.style.borderColor = fileName ? "#10A37F" : T.border; e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA"; }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = fileName ? "#16A34A" : T.border; e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA"; }}
               onDrop={(e) => {
                 e.preventDefault();
-                e.currentTarget.style.borderColor = fileName ? "#10A37F" : T.border;
+                e.currentTarget.style.borderColor = fileName ? "#16A34A" : T.border;
                 e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA";
                 const file = e.dataTransfer.files?.[0];
                 if (file && fileInputRef.current) {
@@ -925,7 +925,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   width: 44, height: 44, borderRadius: "50%",
                   background: fileName ? "rgba(16, 163, 127, 0.12)" : "#F0F0F0",
-                  color: fileName ? "#10A37F" : "#5C5C5C",
+                  color: fileName ? "#16A34A" : "#5C5C5C",
                   transition: "background 160ms ease, color 160ms ease",
                 }}>
                   {fileName

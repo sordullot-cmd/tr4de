@@ -1179,7 +1179,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
                     onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
                   >
-                    <span style={{width:8,height:8,borderRadius:"50%",background:s.color||"#10A37F"}}/>
+                    <span style={{width:8,height:8,borderRadius:"50%",background:s.color||"#16A34A"}}/>
                     {s.name}
                   </button>
                 )) : (

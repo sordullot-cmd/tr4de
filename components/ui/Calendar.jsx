@@ -51,9 +51,9 @@ export default function Calendar() {
 
   const getHeatmapColor = (value) => {
     if (value === undefined || value === null) return "#F7F8FA";
-    if (value >= 500) return "#10B981";
+    if (value >= 500) return "#16A34A";
     if (value >= 300) return "#6EE7B7";
-    if (value >= 100) return "#A7F3D0";
+    if (value >= 100) return "#86EFAC";
     if (value >= 0) return "#D1FAE5";
     if (value >= -300) return "#FED7AA";
     if (value >= -500) return "#FDBA74";
@@ -403,7 +403,7 @@ export default function Calendar() {
             <span style={{ fontSize: "11px", color: "#A0A1B0" }}>-500 à 0</span>
             <div className="legend-item" style={{ backgroundColor: "#D1FAE5" }}></div>
             <span style={{ fontSize: "11px", color: "#A0A1B0" }}>0 à 100</span>
-            <div className="legend-item" style={{ backgroundColor: "#10B981" }}></div>
+            <div className="legend-item" style={{ backgroundColor: "#16A34A" }}></div>
             <span style={{ fontSize: "11px", color: "#A0A1B0" }}>{"> 500"}</span>
           </div>
         </div>

@@ -24,6 +24,7 @@ import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
 import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
+import NotesPage from "@/components/pages/NotesPage";
 import CalendarPage from "@/components/pages/CalendarPage";
 import JournalPage from "@/components/pages/JournalPage";
 import DashboardPage from "@/components/pages/DashboardPage";
@@ -92,9 +93,9 @@ const T = {
   text:    "#0D0D0D",
   textSub: "#5C5C5C",
   textMut: "#8E8E8E",
-  green:   "#10A37F",
-  greenBg: "#E6F7F1",
-  greenBd: "#A7E6CF",
+  green:   "#16A34A",
+  greenBg: "#F0FDF4",
+  greenBd: "#86EFAC",
   red:     "#EF4444",
   redBg:   "#FEF2F2",
   redBd:   "#FECACA",
@@ -192,7 +193,7 @@ function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
                 style={{
                   position: "relative",
                   width: 28, height: 16, borderRadius: 999,
-                  background: isDark ? "#10A37F" : "#D4D4D4",
+                  background: isDark ? "#16A34A" : "#D4D4D4",
                   transition: "background 150ms ease",
                   flexShrink: 0,
                 }}
@@ -703,6 +704,7 @@ export default function App() {
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
+        { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
       ],
     },
   ];
@@ -733,6 +735,7 @@ export default function App() {
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
     reading: <ReadingListPage />,
+    notes: <NotesPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})

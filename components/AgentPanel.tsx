@@ -29,7 +29,7 @@ const T = {
   textMut: "#8E8E8E",
   accent: "#0D0D0D",      // primaire = noir
   accentSoft: "#F0F0F0",
-  green: "#10A37F",
+  green: "#16A34A",
   red: "#EF4444",
   warn: "#F97316",
   info: "#A855F7",
@@ -545,7 +545,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
               display: "flex", alignItems: "center", gap: 8,
               background: status.kind === "error" ? "#FEF2F2" : status.kind === "no_trades" ? "#FFF8E6" : "#F0FAF6",
               color: status.kind === "error" ? "#991B1B" : status.kind === "no_trades" ? "#854D0E" : "#166534",
-              border: `1px solid ${status.kind === "error" ? "#FECACA" : status.kind === "no_trades" ? "#FCD79B" : "#A7E6CF"}`,
+              border: `1px solid ${status.kind === "error" ? "#FECACA" : status.kind === "no_trades" ? "#FCD79B" : "#86EFAC"}`,
             }}
           >
             <span style={{ display: "inline-flex", alignItems: "center" }}>
@@ -584,7 +584,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
               const isPositive = p.avg_pnl_impact != null && p.avg_pnl_impact > 0;
               const isNegative = p.avg_pnl_impact != null && p.avg_pnl_impact < 0;
               const iconColor = isNegative ? T.red : isPositive ? T.green : T.textSub;
-              const iconBg = isNegative ? "#FEF2F2" : isPositive ? "#E6F7F1" : "#F5F5F5";
+              const iconBg = isNegative ? "#FEF2F2" : isPositive ? "#F0FDF4" : "#F5F5F5";
               return (
                 <div
                   key={p.id}

@@ -10,11 +10,11 @@ interface EmotionDistributionProps {
 export function EmotionDistribution({ topEmotions }: EmotionDistributionProps) {
   const COLORS = [
     "#3B82F6",
-    "#10A37F",
+    "#16A34A",
     "#A855F7",
     "#F97316",
     "#EF4444",
-    "#10A37F",
+    "#16A34A",
     "#06B6D4",
     "#EC4899",
     "#A855F7",

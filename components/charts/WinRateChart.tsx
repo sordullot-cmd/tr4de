@@ -92,9 +92,9 @@ export function WinRateChart({ trades }: WinRateChartProps) {
           <Line
             type="monotone"
             dataKey="winRate"
-            stroke="#10A37F"
+            stroke="#16A34A"
             strokeWidth={3}
-            dot={{ fill: "#10A37F", r: 4 }}
+            dot={{ fill: "#16A34A", r: 4 }}
             activeDot={{ r: 6 }}
             name="Win Rate %"
           />

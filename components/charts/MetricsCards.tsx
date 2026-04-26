@@ -29,7 +29,7 @@ export function MetricsCards({
       label: "Win Rate",
       value: winRate,
       format: "percent",
-      color: "#10A37F",
+      color: "#16A34A",
       icon: "🎯",
     },
     {
@@ -43,14 +43,14 @@ export function MetricsCards({
       label: "Total P&L",
       value: totalPnL,
       format: "currency",
-      color: totalPnL > 0 ? "#10A37F" : "#EF4444",
+      color: totalPnL > 0 ? "#16A34A" : "#EF4444",
       icon: "💰",
     },
     {
       label: "Monthly P&L",
       value: monthlyPnL,
       format: "currency",
-      color: monthlyPnL > 0 ? "#10A37F" : "#EF4444",
+      color: monthlyPnL > 0 ? "#16A34A" : "#EF4444",
       icon: "📅",
     },
     {

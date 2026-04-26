@@ -39,9 +39,9 @@ export const tokens = {
     btnSecondaryHoverBg: "#F5F5F5",
 
     // Status / accents
-    success: "#10A37F",       // vert OpenAI signature
-    successBg: "#E6F7F1",
-    successBorder: "#A7E6CF",
+    success: "#16A34A",       // vert OpenAI signature
+    successBg: "#F0FDF4",
+    successBorder: "#86EFAC",
     warning: "#F97316",
     warningBg: "#FFF4E6",
     warningBorder: "#FCD9B6",
@@ -53,7 +53,7 @@ export const tokens = {
     infoBorder: "#DABFFC",
 
     // Charts
-    chartGreen: "#10A37F",
+    chartGreen: "#16A34A",
     chartPurple: "#A855F7",
     chartOrange: "#F97316",
     chartRed: "#EF4444",

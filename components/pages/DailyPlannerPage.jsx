@@ -20,13 +20,12 @@ const T = {
   text: "#0D0D0D", textSub: "#5C5C5C", textMut: "#8E8E8E",
   bg: "#F5F5F5",
   accent: "#0D0D0D", accentBg: "#F0F0F0",
-  green: "#10A37F", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
+  green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
 };
 
 const STORAGE_PLANNER = "tr4de_daily_planner";
 const STORAGE_HABITS = "tr4de_habits";
 const STORAGE_HABITS_HISTORY = "tr4de_habits_history";
-const STORAGE_DAILY_NOTES = "tr4de_dp_notes"; // { [iso]: "note text" }
 
 const todayKey = () => {
   const d = new Date();
@@ -171,16 +170,8 @@ export default function DailyPlannerPage() {
   };
   const closeHabitForm = () => { setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); };
 
-  // Tasks & goals (sans limite)
-  const [newTask, setNewTask] = useState("");
+  // Goals (sans limite)
   const [newGoal, setNewGoal] = useState("");
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    updateDay({ tasks: [...(day.tasks || []), { id: Date.now(), text: newTask.trim(), done: false }] });
-    setNewTask("");
-  };
-  const toggleTask = (id) => updateDay({ tasks: (day.tasks || []).map(p => p.id === id ? { ...p, done: !p.done } : p) });
-  const removeTask = (id) => updateDay({ tasks: (day.tasks || []).filter(p => p.id !== id) });
   const addGoal = () => {
     if (!newGoal.trim()) return;
     updateDay({ goals: [...(day.goals || []), { id: Date.now(), text: newGoal.trim(), done: false }] });
@@ -197,25 +188,20 @@ export default function DailyPlannerPage() {
 
   const energyColor = day.energy >= 8 ? T.green : day.energy >= 5 ? T.amber : T.red;
 
-  // Migration : anciens planners avec "priorities" mappés sur "tasks"
-  useEffect(() => {
-    if (day.priorities && !day.tasks) updateDay({ tasks: day.priorities, priorities: undefined });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateKey]);
-
-  // --- Notes quotidiennes ---
-  const [notesStore, setNotesStore] = useCloudState(STORAGE_DAILY_NOTES, "daily_notes", {});
-  const currentNote = notesStore[dateKey] || "";
-  const setCurrentNote = (text) => setNotesStore(prev => {
-    const next = { ...prev };
-    if (!text || !text.trim()) delete next[dateKey]; else next[dateKey] = text;
-    return next;
-  });
-  // Liste des notes passées (hors date courante), triées par date décroissante
-  const pastNotes = Object.entries(notesStore)
-    .filter(([iso]) => iso !== dateKey)
-    .sort((a, b) => b[0].localeCompare(a[0]));
-  const [expandedNoteDate, setExpandedNoteDate] = useState(null);
+  // --- Tâches du jour ---
+  const tasks = day.tasks || [];
+  const [newTaskId, setNewTaskId] = useState(null);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
+  const addTask = () => {
+    const id = Date.now();
+    updateDay({ tasks: [...tasks, { id, text: "", done: false, note: "" }] });
+    setNewTaskId(id);
+  };
+  const toggleTask = (id) => updateDay({ tasks: tasks.map(p => p.id === id ? { ...p, done: !p.done } : p) });
+  const updateTaskText = (id, text) => updateDay({ tasks: tasks.map(p => p.id === id ? { ...p, text } : p) });
+  const updateTaskNote = (id, note) => updateDay({ tasks: tasks.map(p => p.id === id ? { ...p, note } : p) });
+  const removeTask = (id) => updateDay({ tasks: tasks.filter(p => p.id !== id) });
+  const taskDoneCount = tasks.filter(p => p.done).length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
@@ -500,129 +486,84 @@ export default function DailyPlannerPage() {
           )}
         </div>
 
-        {/* RIGHT : Tâches + Notes (sans cartes, style timeline) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          {/* Tâches */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Tâches du jour</h2>
-              <div style={{ flex: 1, height: 1, background: T.border }} />
-              <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                {(day.tasks || []).filter(p => p.done).length}/{(day.tasks || []).length}
-              </span>
-            </div>
-            <div style={{ padding: "0 16px" }}>
-              {(day.tasks || []).map(p => (
-                <Row key={p.id} done={p.done} text={p.text} onToggle={() => toggleTask(p.id)} onDelete={() => removeTask(p.id)} accent={T.amber} />
-              ))}
-              <AddInput value={newTask} onChange={setNewTask} onAdd={addTask} placeholder="Ajouter une tâche..." />
-            </div>
+        {/* RIGHT : Tâches du jour */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px" }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Tâches du jour</h2>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+              {taskDoneCount}/{tasks.length}
+            </span>
           </div>
 
-          {/* Notes du jour — reset chaque jour, archivées */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Notes du jour</h2>
-              <div style={{ flex: 1, height: 1, background: T.border }} />
-              {pastNotes.length > 0 && (
-                <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
-                  {pastNotes.length} archivée{pastNotes.length > 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-            <div style={{ padding: "0 16px" }}>
-              <textarea
-                value={currentNote}
-                onChange={(e) => setCurrentNote(e.target.value)}
-                placeholder="Pensées, idées, observations du jour..."
-                style={{
-                  width: "100%", minHeight: 110, resize: "vertical",
-                  padding: 12, border: `1px solid ${T.border}`, borderRadius: 10,
-                  fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white,
-                  lineHeight: 1.5, boxSizing: "border-box",
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = T.text; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = T.border; }}
-              />
-
-            {/* Archives : liste compacte */}
-            {pastNotes.length > 0 && (
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: T.textSub, marginBottom: 8 }}>
-                  Archives
+          <div style={{ padding: "0 16px 0 28px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {tasks.map(p => {
+              const expanded = expandedTaskId === p.id;
+              const hasNote = !!(p.note && p.note.trim());
+              return (
+                <div key={p.id} style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    onMouseEnter={(e) => e.currentTarget.querySelectorAll("[data-task-action]").forEach(b => b.style.opacity = 1)}
+                    onMouseLeave={(e) => e.currentTarget.querySelectorAll("[data-task-action]").forEach(b => { if (!(b.dataset.persist === "1")) b.style.opacity = 0; })}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", borderRadius: 6 }}>
+                    <button onClick={() => toggleTask(p.id)} aria-label={p.done ? "Décocher" : "Cocher"}
+                      style={{ width: 14, height: 14, borderRadius: 4, border: p.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`, background: p.done ? T.green : T.white, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0, transition: "all .15s ease" }}>
+                      {p.done && <Check size={9} strokeWidth={3} color="#fff" />}
+                    </button>
+                    <input type="text" value={p.text}
+                      autoFocus={p.id === newTaskId}
+                      placeholder="Sans titre"
+                      onChange={(e) => updateTaskText(p.id, e.target.value)}
+                      onBlur={() => { if (p.id === newTaskId) setNewTaskId(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); addTask(); } }}
+                      style={{ flex: 1, minWidth: 0, padding: "2px 4px", border: "none", outline: "none", background: "transparent", fontSize: 13, color: p.done ? T.textMut : T.text, textDecoration: p.done ? "line-through" : "none", fontFamily: "inherit" }} />
+                    <button data-task-action data-persist={hasNote || expanded ? "1" : "0"}
+                      onClick={() => setExpandedTaskId(expanded ? null : p.id)}
+                      title={hasNote ? "Voir / éditer la note" : "Ajouter une note"}
+                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: expanded ? T.accentBg : "transparent", color: hasNote ? T.text : T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: hasNote || expanded ? 1 : 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = hasNote ? T.text : T.textMut; e.currentTarget.style.background = expanded ? T.accentBg : "transparent"; }}>
+                      <StickyNote size={11} strokeWidth={1.75} />
+                    </button>
+                    <button data-task-action data-persist="0" onClick={() => removeTask(p.id)} title="Supprimer"
+                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                      <Trash2 size={11} strokeWidth={1.75} />
+                    </button>
+                  </div>
+                  {expanded && (
+                    <textarea
+                      value={p.note || ""}
+                      onChange={(e) => updateTaskNote(p.id, e.target.value)}
+                      placeholder="Description, note, sous-étapes…"
+                      rows={3}
+                      style={{
+                        margin: "2px 6px 6px 28px",
+                        padding: "8px 10px",
+                        background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6,
+                        fontSize: 12, color: T.text, outline: "none",
+                        fontFamily: "inherit", resize: "vertical", lineHeight: 1.5,
+                      }}
+                    />
+                  )}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
-                  {pastNotes.map(([iso, text]) => {
-                    const parts = fmtDateParts(iso);
-                    const isExpanded = expandedNoteDate === iso;
-                    const preview = text.split("\n").find(l => l.trim()) || "";
-                    return (
-                      <div key={iso}>
-                        <div
-                          style={{ display: "flex", alignItems: "center", gap: 2 }}
-                          onMouseEnter={(e) => { const del = e.currentTarget.querySelector("[data-note-del]"); if (del) del.style.opacity = 1; }}
-                          onMouseLeave={(e) => { const del = e.currentTarget.querySelector("[data-note-del]"); if (del) del.style.opacity = 0; }}
-                        >
-                          <button
-                            onClick={() => setExpandedNoteDate(isExpanded ? null : iso)}
-                            style={{
-                              flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8,
-                              padding: "6px 8px", borderRadius: 6, border: "none",
-                              background: isExpanded ? T.bg : "transparent",
-                              cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                              transition: "background .12s ease",
-                            }}
-                            onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = T.bg; }}
-                            onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <ChevronDown size={11} strokeWidth={1.75} color={T.textMut} style={{ transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease", flexShrink: 0 }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: T.text, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                              {String(parts.day).padStart(2, "0")}/{String(new Date(iso + "T00:00:00").getMonth() + 1).padStart(2, "0")}
-                            </span>
-                            <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: T.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {preview}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => setDateKey(iso)}
-                            title="Aller à cette date pour éditer"
-                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "transparent", color: T.blue, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = T.blue + "18"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <Pencil size={11} strokeWidth={1.75} />
-                          </button>
-                          <button
-                            data-note-del
-                            onClick={() => {
-                              setNotesStore(prev => { const n = { ...prev }; delete n[iso]; return n; });
-                              if (expandedNoteDate === iso) setExpandedNoteDate(null);
-                            }}
-                            title="Supprimer"
-                            style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <Trash2 size={11} strokeWidth={1.75} />
-                          </button>
-                        </div>
-                        {isExpanded && (
-                          <div style={{
-                            marginLeft: 22, marginTop: 4, marginBottom: 6,
-                            padding: "8px 10px", background: T.bg, borderRadius: 6,
-                            fontSize: 12, color: T.text, lineHeight: 1.5, whiteSpace: "pre-wrap",
-                          }}>
-                            {text}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
+              );
+            })}
+            <button type="button" onClick={addTask}
+              style={{
+                alignSelf: "flex-start",
+                display: "inline-flex", alignItems: "center", gap: 4,
+                marginTop: 4, padding: "5px 6px",
+                border: "none", background: "transparent",
+                color: T.textMut, fontSize: 12, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit",
+                borderRadius: 6, transition: "color .12s ease, background .12s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+              <Plus size={12} strokeWidth={2} /> Ajouter une tâche
+            </button>
           </div>
         </div>
       </div>
@@ -707,19 +648,29 @@ function HabitsChart({ habits, history }) {
               return <circle cx={last.x} cy={last.y} r="3" fill="#fff" stroke={T.green} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
             })()}
 
-            {/* X labels collés aux bords */}
+          </svg>
+
+          {/* X labels HTML overlay — non étirés par preserveAspectRatio="none" */}
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: padB, pointerEvents: "none" }}>
             {xTicks.map(p => {
               const label = p.isToday ? "Ajd" : `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
               const isFirst = p === points[0];
               const isLast = p === points[points.length - 1];
-              const anchor = isFirst ? "start" : isLast ? "end" : "middle";
+              const leftPct = (p.x / VB_W) * 100;
+              const transform = isFirst ? "translateX(0)" : isLast ? "translateX(-100%)" : "translateX(-50%)";
               return (
-                <text key={`x-${p.iso}`} x={p.x} y={VB_H - 8} textAnchor={anchor} fontSize="9" fill={p.isToday ? "#0D0D0D" : "#8E8E8E"} fontWeight={p.isToday ? 600 : 500}>
+                <div key={`xh-${p.iso}`} style={{
+                  position: "absolute", left: `${leftPct}%`, bottom: 4,
+                  transform, fontSize: 10,
+                  color: p.isToday ? "#0D0D0D" : "#8E8E8E",
+                  fontWeight: p.isToday ? 600 : 500,
+                  whiteSpace: "nowrap",
+                }}>
                   {label}
-                </text>
+                </div>
               );
             })}
-          </svg>
+          </div>
 
           {/* Y labels HTML overlay (à droite, non étirés par preserveAspectRatio) */}
           <div style={{ position: "absolute", top: 0, right: 0, width: 36, height: "100%", pointerEvents: "none" }}>
@@ -764,6 +715,7 @@ function Row({ done, text, onToggle, onDelete, accent }) {
     </div>
   );
 }
+
 function AddInput({ value, onChange, onAdd, placeholder }) {
   return (
     <div style={{ display: "flex", gap: 6, marginTop: 6 }}>

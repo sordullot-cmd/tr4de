@@ -19,9 +19,9 @@ const T = {
   text:    "#0D0D0D",
   textSub: "#5C5C5C",
   textMut: "#8E8E8E",
-  green:   "#10A37F",
-  greenBg: "#E6F7F1",
-  greenBd: "#A7E6CF",
+  green:   "#16A34A",
+  greenBg: "#F0FDF4",
+  greenBd: "#86EFAC",
   red:     "#EF4444",
   redBg:   "#FEF2F2",
   redBd:   "#FECACA",
@@ -77,7 +77,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
   const [showStrategyForm, setShowStrategyForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [strategyToDelete, setStrategyToDelete] = useState(null);
-  const [formData, setFormData] = useState({name:"",description:"",color:"#10A37F",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
+  const [formData, setFormData] = useState({name:"",description:"",color:"#16A34A",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
   const [editingStrategyId, setEditingStrategyId] = useState(null);
   
   // ✅ Rendre tradeStrategiesData réactif
@@ -156,7 +156,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
   const colors = ["#9B7D94","#997B5D","#A5956B","#6B9B6F","#4A9D6F","#6B9D68","#5F8BA0","#5F7FB4","#6B8BB4","#8B7BA4","#A07B94","#7F7F7F"];
 
-  const getDefaultFormData = () => ({name:"",description:"",color:"#10A37F",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
+  const getDefaultFormData = () => ({name:"",description:"",color:"#16A34A",groups:[{id:Date.now(),name:"",rules:[{id:Date.now()+1,text:""}]}]});
 
   // ✅ Synchroniser les stratégies avec localStorage pour que DashboardNew les voit
   React.useEffect(() => {

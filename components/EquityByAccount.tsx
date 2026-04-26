@@ -30,7 +30,7 @@ interface EquityByAccountProps {
   accounts: AccountInfo[];
 }
 
-const PALETTE = ["#10A37F", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#EC4899", "#84CC16"];
+const PALETTE = ["#16A34A", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#EC4899", "#84CC16"];
 
 interface Series {
   accountId: string;

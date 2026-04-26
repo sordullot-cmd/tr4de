@@ -34,7 +34,7 @@ const T = {
   text: "#0D0D0D",
   textSub: "#5C5C5C",
   textMut: "#8E8E8E",
-  green: "#10A37F",
+  green: "#16A34A",
   red: "#EF4444",
 };
 
@@ -761,7 +761,7 @@ function ImportHistorySection() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{h.name}</span>
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 999, background: "#E6F7F1", border: "1px solid #A7E6CF", color: "#0F8B6C", fontSize: 10, fontWeight: 500 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 999, background: "#F0FDF4", border: "1px solid #86EFAC", color: "#0F8B6C", fontSize: 10, fontWeight: 500 }}>
                   Succès
                 </span>
               </div>

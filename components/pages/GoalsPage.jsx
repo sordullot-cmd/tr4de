@@ -17,7 +17,7 @@ const T = {
   white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
   text: "#0D0D0D", textSub: "#5C5C5C", textMut: "#8E8E8E",
   accent: "#0D0D0D", accentBg: "#F0F0F0",
-  green: "#10A37F", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
+  green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
 };
 
 const STORAGE_KEY = "tr4de_goals_v2";
@@ -49,7 +49,7 @@ const UNITS = [
   { id: "times",   label: "Fois",      suffix: "×" },
 ];
 const CATEGORIES = [
-  { id: "trading",   label: "Trading",       color: "#10A37F", icon: TrendingUp },
+  { id: "trading",   label: "Trading",       color: "#16A34A", icon: TrendingUp },
   { id: "personal",  label: "Personnel",     color: "#EF4444", icon: Heart },
   { id: "sport",     label: "Sport",         color: "#F59E0B", icon: Dumbbell },
   { id: "reading",   label: "Lecture",       color: "#8B5CF6", icon: BookOpen },
@@ -204,6 +204,9 @@ export default function GoalsPage() {
   const remove = (id) => setGoals(prev => prev.filter(g => g.id !== id));
 
   const adjustManual = (gid, delta) => setGoals(prev => prev.map(g => g.id === gid ? { ...g, manual: Math.max(0, (parseFloat(g.manual) || 0) + delta) } : g));
+
+  const setSubtasksFor = (gid, nextSubtasks) =>
+    setGoals(prev => prev.map(g => g.id === gid ? { ...g, subtasks: nextSubtasks } : g));
 
   // Compute current/target/pct pour un goal
   // L'horizon détermine la fenêtre temporelle pour les métriques trading.
@@ -369,6 +372,7 @@ export default function GoalsPage() {
                     compute={compute} unitOf={unitOf} fmtVal={fmtVal}
                     onEdit={openEdit} onDelete={remove}
                     onAdjustManual={adjustManual}
+                    onSubtasksChange={setSubtasksFor}
                   />
                 )}
                 {done.length > 0 && (
@@ -396,6 +400,7 @@ export default function GoalsPage() {
                         compute={compute} unitOf={unitOf} fmtVal={fmtVal}
                         onEdit={openEdit} onDelete={remove}
                         onAdjustManual={adjustManual}
+                        onSubtasksChange={setSubtasksFor}
                         doneSection
                       />
                     )}
@@ -585,6 +590,18 @@ export default function GoalsPage() {
                 </StackField>
               )}
 
+              {/* Sous-objectifs — visibles uniquement après création */}
+              {editingId && (() => {
+                const g = goals.find(gg => gg.id === editingId);
+                if (!g) return null;
+                return (
+                  <SubtasksField
+                    subtasks={g.subtasks || []}
+                    onChange={(next) => setSubtasksFor(g.id, next)}
+                  />
+                );
+              })()}
+
               {/* Progression actuelle — visible uniquement pour les objectifs manuels */}
               {form.autoType === "manual" && editingId && (() => {
                 const g = goals.find(gg => gg.id === editingId);
@@ -701,7 +718,7 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, expanded, onToggleExpand, onAdjustManual, subtaskInput, onSubtaskInputChange, onAddSub, onToggleSub, onRemoveSub, doneSection }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
@@ -711,6 +728,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
           onEdit={() => onEdit(g)}
           onDelete={() => onDelete(g.id)}
           onAdjustManual={(d) => onAdjustManual(g.id, d)}
+          onSubtasksChange={(next) => onSubtasksChange(g.id, next)}
           doneSection={doneSection}
         />
       ))}
@@ -718,7 +736,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, doneSection }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -742,17 +760,19 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
     : "—";
 
   const [hover, setHover] = useState(false);
+  const [open, setOpen] = useState(false);
+  const subtasks = g.subtasks || [];
 
   return (
     <>
       <div
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onClick={onEdit}
+        onClick={() => setOpen(v => !v)}
         style={{
           display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12,
           alignItems: "center", padding: "12px 16px",
-          background: hover ? "#FAFAFA" : "transparent",
+          background: hover || open ? "#FAFAFA" : "transparent",
           borderRadius: 8,
           cursor: "pointer",
           transition: "background .12s ease",
@@ -790,6 +810,28 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
                   }}>{lv.label}</span>
                 );
               })()}
+              {(g.subtasks || []).length > 0 && (() => {
+                const countAll = (arr) => arr.reduce((acc, s) => {
+                  acc.total += 1;
+                  if (s.done) acc.done += 1;
+                  const child = countAll(s.subtasks || []);
+                  acc.total += child.total;
+                  acc.done += child.done;
+                  return acc;
+                }, { total: 0, done: 0 });
+                const { total, done } = countAll(g.subtasks);
+                return (
+                  <span style={{
+                    fontSize: 10, fontWeight: 600,
+                    padding: "2px 8px", borderRadius: 999,
+                    color: T.textSub, background: T.accentBg,
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                  }}>
+                    <Check size={9} strokeWidth={2.5} />
+                    {done}/{total}
+                  </span>
+                );
+              })()}
               {atRisk && <span style={{ color: T.amber, marginLeft: 2, fontWeight: 600 }}>· à risque</span>}
             </div>
           </div>
@@ -813,7 +855,18 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
+        <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", alignItems: "center" }}>
+          <ChevronRight size={12} strokeWidth={2}
+            color={T.textMut}
+            style={{
+              transform: open ? "rotate(90deg)" : "none",
+              transition: "transform .15s ease",
+              flexShrink: 0,
+              marginRight: 2,
+              opacity: subtasks.length > 0 || hover ? 1 : 0,
+            }}
+          />
+          <div style={{ display: "flex", gap: 2, opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
@@ -826,9 +879,37 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
             <Trash2 size={11} strokeWidth={1.75} />
           </button>
+          </div>
         </div>
       </div>
 
+      {open && (
+        <div style={{
+          margin: "0 16px 8px",
+          padding: "12px 14px 12px",
+          background: "#FAFAFA",
+          borderRadius: 8,
+          borderTop: `1px solid ${T.border}`,
+          marginTop: -2,
+        }}>
+          <RoadmapStrip subtasks={subtasks} deadline={g.deadline} />
+          {subtasks.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
+              {sortByDeadline(subtasks).map((s) => (
+                <SubtaskNode
+                  key={s.id}
+                  node={s}
+                  onChange={(next) => onSubtasksChange(subtasks.map(x => x.id === s.id ? next : x))}
+                  onRemove={() => onSubtasksChange(subtasks.filter(x => x.id !== s.id))}
+                />
+              ))}
+            </div>
+          )}
+          <SubtaskAdder
+            onAdd={(label) => onSubtasksChange([...subtasks, { id: Date.now(), label, done: false, subtasks: [] }])}
+          />
+        </div>
+      )}
     </>
   );
 }
@@ -1061,6 +1142,323 @@ function FancyDropdown({ value, options, onChange, renderValue, renderOption, al
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function sortByDeadline(arr) {
+  return [...(arr || [])].sort((a, b) => {
+    const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+    const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+    if (da !== db) return da - db;
+    return (a.id || 0) - (b.id || 0);
+  });
+}
+
+function countSubtasks(arr) {
+  return (arr || []).reduce((acc, s) => {
+    acc.total += 1;
+    if (s.done) acc.done += 1;
+    const child = countSubtasks(s.subtasks || []);
+    acc.total += child.total;
+    acc.done += child.done;
+    return acc;
+  }, { total: 0, done: 0 });
+}
+
+function DateChip({ value, onChange, placeholder = "Date" }) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef(null);
+  const [viewDate, setViewDate] = useState(() => {
+    const d = value ? new Date(value + "T00:00:00") : new Date();
+    return isNaN(d.getTime()) ? new Date() : d;
+  });
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const label = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+    : placeholder;
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 8px", borderRadius: 999,
+          border: `1px dashed ${value ? "transparent" : T.border}`,
+          background: value ? T.accentBg : "transparent",
+          color: value ? T.text : T.textMut,
+          fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+        }}>
+        <Calendar size={10} strokeWidth={1.75} />
+        {label}
+        {value && (
+          <span onClick={(e) => { e.stopPropagation(); onChange(""); }}
+            style={{ marginLeft: 2, color: T.textMut, fontSize: 11, lineHeight: 1 }}>×</span>
+        )}
+      </button>
+      {open && (
+        <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200 }}>
+          <MiniCalendar
+            value={value}
+            viewDate={viewDate}
+            setViewDate={setViewDate}
+            onPick={(iso) => { onChange(iso); setOpen(false); }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NoteChip({ value, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const hasNote = !!(value || "").trim();
+  if (!editing && !hasNote) {
+    return (
+      <button type="button" onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 8px", borderRadius: 999,
+          border: `1px dashed ${T.border}`, background: "transparent",
+          color: T.textMut, fontSize: 11, fontWeight: 500,
+          cursor: "pointer", fontFamily: "inherit",
+        }}>
+        <BookOpen size={10} strokeWidth={1.75} /> Ajouter une note
+      </button>
+    );
+  }
+  return (
+    <textarea
+      autoFocus={editing}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+      onClick={(e) => e.stopPropagation()}
+      placeholder="Note…"
+      rows={2}
+      style={{
+        flex: 1, minWidth: 200,
+        padding: "6px 10px",
+        background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6,
+        fontSize: 12, color: T.text, outline: "none",
+        fontFamily: "inherit", resize: "vertical",
+        lineHeight: 1.4,
+      }}
+    />
+  );
+}
+
+function RoadmapStrip({ subtasks, deadline }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const end = deadline ? new Date(deadline + "T23:59:59") : null;
+  if (!end || isNaN(end.getTime()) || end <= today) return null;
+
+  const items = (subtasks || [])
+    .filter(s => s.deadline)
+    .map(s => {
+      const d = new Date(s.deadline + "T12:00:00");
+      return isNaN(d.getTime()) ? null : { ...s, _date: d };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._date - b._date);
+
+  const totalMs = end.getTime() - today.getTime();
+
+  return (
+    <div style={{ marginBottom: 12, padding: "10px 12px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 10, color: T.textMut, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
+        <span>Aujourd&apos;hui</span>
+        <span>{end.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
+      </div>
+      <div style={{ position: "relative", height: 22 }}>
+        <div style={{ position: "absolute", top: 10, left: 0, right: 0, height: 2, background: T.accentBg, borderRadius: 1 }} />
+        <div style={{ position: "absolute", top: 7, left: 0, width: 8, height: 8, borderRadius: "50%", background: T.text }} />
+        <div style={{ position: "absolute", top: 7, right: 0, width: 8, height: 8, borderRadius: "50%", background: T.text }} />
+        {items.map(it => {
+          const pct = Math.max(0, Math.min(100, ((it._date.getTime() - today.getTime()) / totalMs) * 100));
+          return (
+            <div key={it.id} title={`${it.label} — ${it._date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}`}
+              style={{
+                position: "absolute", top: 5, left: `${pct}%`,
+                transform: "translateX(-50%)",
+                width: 12, height: 12, borderRadius: "50%",
+                background: it.done ? T.green : T.blue,
+                border: `2px solid ${T.white}`,
+                boxShadow: "0 0 0 1px rgba(0,0,0,0.06)",
+              }} />
+          );
+        })}
+      </div>
+      {items.length === 0 && (
+        <div style={{ fontSize: 11, color: T.textMut, textAlign: "center", marginTop: 4 }}>
+          Ajoute des dates à tes sous-objectifs pour les voir sur la frise
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubtaskAdder({ onAdd, label = "Ajouter" }) {
+  return (
+    <button type="button"
+      onClick={(e) => { e.stopPropagation(); onAdd(""); }}
+      style={{
+        alignSelf: "flex-start",
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "4px 8px", marginTop: 4, marginLeft: 42,
+        border: "none", background: "transparent",
+        color: T.textMut, fontSize: 11, fontWeight: 500,
+        cursor: "pointer", fontFamily: "inherit",
+        borderRadius: 6, transition: "color .12s ease, background .12s ease",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+      <Plus size={11} strokeWidth={2} /> {label}
+    </button>
+  );
+}
+
+function SubtaskNode({ node, onChange, onRemove, depth = 0 }) {
+  const [open, setOpen] = useState(false);
+  const children = node.subtasks || [];
+  const { total, done } = countSubtasks(children);
+
+  const updateChild = (sid, next) => {
+    if (next === null) {
+      onChange({ ...node, subtasks: children.filter(c => c.id !== sid) });
+    } else {
+      onChange({ ...node, subtasks: children.map(c => c.id === sid ? next : c) });
+    }
+  };
+  const addChild = (label) => {
+    const arr = [...children, { id: Date.now(), label, done: false, subtasks: [] }];
+    onChange({ ...node, subtasks: arr });
+    setOpen(true);
+  };
+
+  const hasChildren = children.length > 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0" }}>
+        <button type="button" onClick={() => setOpen(v => !v)} aria-label={open ? "Replier" : "Déplier"}
+          title={hasChildren ? (open ? "Replier" : "Déplier") : "Ajouter un sous-objectif"}
+          style={{
+            width: 18, height: 18, flexShrink: 0, borderRadius: 4,
+            border: "none", background: "transparent",
+            color: T.textSub,
+            cursor: "pointer",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0,
+            opacity: hasChildren ? 1 : 0.55,
+          }}>
+          <ChevronRight size={12} strokeWidth={2}
+            style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s ease" }} />
+        </button>
+        <button type="button" onClick={() => onChange({ ...node, done: !node.done })}
+          style={{
+            width: 18, height: 18, flexShrink: 0, borderRadius: 4,
+            border: `1.5px solid ${node.done ? T.green : T.border}`,
+            background: node.done ? T.green : T.white,
+            color: "#fff", cursor: "pointer",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0,
+          }}>
+          {node.done && <Check size={11} strokeWidth={3} />}
+        </button>
+        <input
+          type="text"
+          value={node.label}
+          autoFocus={!node.label}
+          placeholder="Sans titre"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ ...node, label: e.target.value })}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            fontSize: 13, fontWeight: 400,
+            color: node.done ? T.textMut : T.text,
+            textDecoration: node.done ? "line-through" : "none",
+            fontFamily: "inherit", padding: 0, minWidth: 0,
+          }}
+        />
+        {total > 0 && (
+          <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+            {done}/{total}
+          </span>
+        )}
+        <button type="button" onClick={onRemove}
+          title="Supprimer"
+          style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+          <Trash2 size={11} strokeWidth={1.75} />
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 42, paddingBottom: 4, flexWrap: "wrap" }}>
+        <DateChip
+          value={node.deadline || ""}
+          onChange={(iso) => onChange({ ...node, deadline: iso })}
+          placeholder="Date"
+        />
+        <NoteChip
+          value={node.note || ""}
+          onChange={(v) => onChange({ ...node, note: v })}
+        />
+      </div>
+
+      {open && (
+        <div style={{ marginLeft: 22, paddingLeft: 10, borderLeft: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 2, paddingTop: 2, paddingBottom: 4 }}>
+          {sortByDeadline(children).map((child) => (
+            <SubtaskNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              onChange={(next) => updateChild(child.id, next)}
+              onRemove={() => updateChild(child.id, null)}
+            />
+          ))}
+          <SubtaskAdder onAdd={addChild} placeholder="Ajouter un sous-objectif…" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubtasksField({ subtasks, onChange }) {
+  const { total, done } = countSubtasks(subtasks);
+  const updateById = (sid, next) => {
+    if (next === null) onChange(subtasks.filter(s => s.id !== sid));
+    else onChange(subtasks.map(s => s.id === sid ? next : s));
+  };
+  const add = (label) => onChange([...subtasks, { id: Date.now(), label, done: false, subtasks: [] }]);
+  return (
+    <div style={{ padding: "14px 0", borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Sous-objectifs</div>
+        {total > 0 && (
+          <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{done}/{total}</div>
+        )}
+      </div>
+
+      {subtasks.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
+          {sortByDeadline(subtasks).map((s) => (
+            <SubtaskNode
+              key={s.id}
+              node={s}
+              onChange={(next) => updateById(s.id, next)}
+              onRemove={() => updateById(s.id, null)}
+            />
+          ))}
+        </div>
+      )}
+
+      <SubtaskAdder onAdd={add} />
     </div>
   );
 }

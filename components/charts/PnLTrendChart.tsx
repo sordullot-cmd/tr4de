@@ -98,7 +98,7 @@ export function PnLTrendChart({ trades }: PnLTrendChartProps) {
                     y={y}
                     width={width}
                     height={height}
-                    fill={payload.pnl > 0 ? "#10A37F" : "#EF4444"}
+                    fill={payload.pnl > 0 ? "#16A34A" : "#EF4444"}
                     rx={4}
                   />
                 );

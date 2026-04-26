@@ -10,7 +10,7 @@ const T = {
   textSub: "#5C5C5C",
   textMuted: "#8E8E8E",
   border: "#E5E5E5",
-  green: "#10A37F",
+  green: "#16A34A",
   red: "#EF4444",
 };
 

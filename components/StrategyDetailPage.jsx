@@ -14,9 +14,9 @@ const T = {
   text:    "#0D0D0D",
   textSub: "#5C5C5C",
   textMut: "#8E8E8E",
-  green:   "#10A37F",
-  greenBg: "#E6F7F1",
-  greenBd: "#A7E6CF",
+  green:   "#16A34A",
+  greenBg: "#F0FDF4",
+  greenBd: "#86EFAC",
   red:     "#EF4444",
   redBg:   "#FEF2F2",
   redBd:   "#FECACA",
@@ -880,7 +880,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                             <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.85}}>
                               <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                               <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#10A37F" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
                             </div>
                           );
                         })}
