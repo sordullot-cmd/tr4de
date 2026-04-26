@@ -440,27 +440,38 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               <div style={{fontSize:12,fontWeight:600,color:totalPnL>=0?"#16A34A":"#EF4444"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
             </div>
           )}
-          {/* Titre + flèches de navigation à droite du titre, sans contour */}
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-            <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D"}}>
-              {chartView === "cumulative" ? t("dash.cumulativePnL")
-                : chartView === "byAccount" ? "P&L par compte"
-                : "P&L par stratégie"}
-            </div>
-            <button
-              onClick={() => cycleView(-1)}
-              aria-label="Graphique précédent"
-              style={{width:22,height:22,borderRadius:5,border:"none",background:"transparent",color:T.textSub,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",fontSize:14}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
-            >‹</button>
-            <button
-              onClick={() => cycleView(1)}
-              aria-label="Graphique suivant"
-              style={{width:22,height:22,borderRadius:5,border:"none",background:"transparent",color:T.textSub,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",fontSize:14}}
-              onMouseEnter={(e)=>{e.currentTarget.style.background="#F5F5F5"}}
-              onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
-            >›</button>
+          {/* Onglets de sélection du graphique — style minimal (pill sur l'actif uniquement) */}
+          <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:6,flexWrap:"wrap"}}>
+            {[
+              { id: "cumulative", label: t("dash.cumulativePnL") },
+              { id: "byAccount",  label: "P&L par compte" },
+              { id: "byStrategy", label: "P&L par stratégie" },
+            ].map((opt) => {
+              const active = chartView === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setChartView(opt.id)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 999,
+                    border: "none",
+                    background: active ? "#F5F5F5" : "transparent",
+                    color: active ? T.text : T.textSub,
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 500,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    transition: "background 140ms ease, color 140ms ease",
+                  }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = T.text; }}
+                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = T.textSub; }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
           <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>
             {chartView === "cumulative"

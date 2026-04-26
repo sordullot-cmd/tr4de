@@ -210,7 +210,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                         <img
                           src={getBrokerLogo(acc.broker)}
                           alt={acc.broker || ""}
-                          style={{ height: 28, maxWidth: 90, objectFit: "contain", flexShrink: 0 }}
+                          style={{ height: 20, maxWidth: 64, objectFit: "contain", flexShrink: 0 }}
                         />
                       )}
                     </div>
