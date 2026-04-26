@@ -51,7 +51,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     { id: "overleveraged", label: t("errtag.overleveraged"), color: "#D4A574" },
     { id: "ignoredsignal", label: t("errtag.ignoredsignal"), color: "#8B6BB6" },
     { id: "badtiming", label: t("errtag.badtiming"), color: "#C94F4F" },
-    { id: "impulsive", label: t("errtag.impulsive"), color: "#D4A574" },
+    { id: "slttoosmall", label: t("errtag.slttoosmall"), color: "#D4A574" },
     { id: "wronganalysis", label: t("errtag.wronganalysis"), color: "#8B6BB6" }
   ];
 

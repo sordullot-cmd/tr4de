@@ -244,7 +244,7 @@ const FR: Dict = {
   "errtag.overleveraged": "Sur-leveragé",
   "errtag.ignoredsignal": "Signaux ignorés",
   "errtag.badtiming": "Mauvais timing",
-  "errtag.impulsive": "Impulsif",
+  "errtag.slttoosmall": "SL trop petite",
   "errtag.wronganalysis": "Mauvaise analyse",
 
   // Weekdays
@@ -510,7 +510,7 @@ const EN: Dict = {
   "errtag.overleveraged": "Over-leveraged",
   "errtag.ignoredsignal": "Ignored signals",
   "errtag.badtiming": "Bad timing",
-  "errtag.impulsive": "Impulsive",
+  "errtag.slttoosmall": "SL too tight",
   "errtag.wronganalysis": "Wrong analysis",
 
   // Weekdays

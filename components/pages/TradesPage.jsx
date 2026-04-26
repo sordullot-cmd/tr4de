@@ -123,7 +123,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     { id: "overleveraged", label: "Sur-leveragé", color: "#D4A574" },
     { id: "ignoredsignal", label: "Signaux ignorés", color: "#8B6BB6" },
     { id: "badtiming", label: "Mauvais timing", color: "#C94F4F" },
-    { id: "impulsive", label: "Impulsif", color: "#D4A574" },
+    { id: "slttoosmall", label: "SL trop petite", color: "#D4A574" },
     { id: "wronganalysis", label: "Mauvaise analyse", color: "#8B6BB6" }
   ];
 
@@ -330,6 +330,32 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       localStorage.setItem("tr4de_checked_rules", JSON.stringify(checkedRules));
     }
   }, [checkedRules]);
+
+  // Paste depuis le presse-papier → upload sur le trade sélectionné (si pas déjà de screenshot)
+  React.useEffect(() => {
+    if (!selectedTrade || screenshotUrls[selectedTrade.id]) return;
+    const onPaste = async (e) => {
+      const ae = document.activeElement;
+      const isEditable = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable);
+      if (isEditable && ae.tagName !== "LABEL") return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.kind === "file" && it.type?.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) {
+            e.preventDefault();
+            setScreenshotBusy(true);
+            try { await uploadScreenshot(selectedTrade.id, f); }
+            finally { setScreenshotBusy(false); }
+            return;
+          }
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [selectedTrade, screenshotUrls, uploadScreenshot]);
 
   // Auto-close selected trade panel if trade was deleted
   React.useEffect(() => {
@@ -704,7 +730,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
         {/* RIGHT - DETAIL PANEL WITH TABS */}
         {selectedTrade && (
-          <div style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>
+          <div style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
             <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -880,6 +906,23 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   {(() => {
                     const tradeId = selectedTrade.id;
                     const url = screenshotUrls[tradeId];
+                    const handleFile = async (file) => {
+                      if (!file || !file.type?.startsWith("image/")) return;
+                      setScreenshotBusy(true);
+                      try { await uploadScreenshot(tradeId, file); }
+                      finally { setScreenshotBusy(false); }
+                    };
+                    const extractImageFromClipboard = (e) => {
+                      const items = e.clipboardData?.items;
+                      if (!items) return null;
+                      for (const it of items) {
+                        if (it.kind === "file" && it.type?.startsWith("image/")) {
+                          const f = it.getAsFile();
+                          if (f) return f;
+                        }
+                      }
+                      return null;
+                    };
                     return (
                       <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -897,17 +940,33 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             <img src={url} alt="Trade screenshot" style={{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:T.bg}} />
                           </a>
                         ) : (
-                          <label style={{
-                            display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-                            padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
-                            cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
-                            color:T.textSub,fontSize:12,fontWeight:500,
-                          }}
+                          <label
+                            tabIndex={0}
+                            onPaste={async (e) => {
+                              const f = extractImageFromClipboard(e);
+                              if (f) { e.preventDefault(); await handleFile(f); }
+                            }}
+                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.background = "#F0F0F0"; e.currentTarget.style.borderColor = T.text; }}
+                            onDragLeave={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.borderColor = T.border; }}
+                            onDrop={async (e) => {
+                              e.preventDefault();
+                              e.currentTarget.style.background = T.bg;
+                              e.currentTarget.style.borderColor = T.border;
+                              const f = e.dataTransfer.files?.[0];
+                              if (f) await handleFile(f);
+                            }}
+                            style={{
+                              display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                              padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
+                              cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
+                              color:T.textSub,fontSize:12,fontWeight:500,
+                              outline: "none",
+                            }}
                             onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background=T.bg}}>
-                            {screenshotBusy ? "Upload en cours…" : "Glisse une image ou clique pour ajouter"}
+                            {screenshotBusy ? "Upload en cours…" : "Colle (Ctrl+V), glisse une image ou clique pour ajouter"}
                             <input type="file" accept="image/*" disabled={screenshotBusy}
-                              onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setScreenshotBusy(true); try { await uploadScreenshot(tradeId, f); } finally { setScreenshotBusy(false); e.target.value = ""; } }}
+                              onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; await handleFile(f); e.target.value = ""; }}
                               style={{display:"none"}} />
                           </label>
                         )}
