@@ -103,7 +103,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [activeTab, setActiveTab] = useState("infos");
 
   // Helper pour identifier un trade de maniere unique
-  const tradeKey = (t) => `${t.date}_${t.symbol}_${t.entry}_${t.entryTime || ''}`;
+  const tradeKey = (t) => t?.id != null ? `id:${t.id}` : `${t.date}_${t.symbol}_${t.entry}_${t.exit ?? ''}_${t.direction ?? ''}_${t.entryTime || ''}_${t.exitTime || ''}_${t.pnl ?? ''}`;
 
   const allEmotionTags = [
     { id: "fomo", label: "FOMO", color: "#C94F4F" },
@@ -616,7 +616,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                         transition:"background .12s ease",
                       }}
                       onClick={()=>{
-                        const isSelectedDetail = selectedTrade && selectedTrade.date === t.date && selectedTrade.symbol === t.symbol && selectedTrade.entry === t.entry;
+                        const isSelectedDetail = selectedTrade && tradeKey(selectedTrade) === tKey;
                         if(isSelectedDetail) {
                           setSelectedTrade(null);
                         } else {

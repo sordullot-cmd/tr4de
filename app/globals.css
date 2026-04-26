@@ -342,8 +342,10 @@ body {
 }
 
 /* === Sidebar nav : scrollbar masquée === */
-.tr4de-sidebar nav { scrollbar-width: none; -ms-overflow-style: none; }
-.tr4de-sidebar nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.tr4de-sidebar nav { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+.tr4de-sidebar nav::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; background: transparent !important; }
+.tr4de-sidebar nav::-webkit-scrollbar-thumb { display: none !important; background: transparent !important; }
+.tr4de-sidebar nav::-webkit-scrollbar-track { display: none !important; background: transparent !important; }
 
 /* === Responsive breakpoints ===
    Mobile-first overrides pour les grilles / layouts les plus courants.
