@@ -575,6 +575,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               <div
                 key={strategy.id}
                 style={{
+                  position:"relative",
                   display:"grid",
                   gridTemplateColumns:"30% 40% 30%",
                   gap:24,
@@ -633,38 +634,40 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   </div>
                 </div>
 
+                {/* ========== ACTIONS (top-right, absolu) ========== */}
+                <div style={{position:"absolute",top:12,right:12,display:"flex",gap:2,zIndex:2}}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditStrategy(strategy); }}
+                    title="Modifier"
+                    style={{
+                      width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",
+                      borderRadius:6,border:"none",background:"transparent",
+                      color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
+                    }}
+                    onMouseEnter={(e)=>{ e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+                  >
+                    <Pencil size={14} strokeWidth={1.75} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteStrategy(strategy.id); }}
+                    title="Supprimer"
+                    style={{
+                      width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",
+                      borderRadius:6,border:"none",background:"transparent",
+                      color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
+                    }}
+                    onMouseEnter={(e)=>{ e.currentTarget.style.background = T.redBg; e.currentTarget.style.color = T.red; }}
+                    onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+                  >
+                    <Trash2 size={14} strokeWidth={1.75} />
+                  </button>
+                </div>
+
                 {/* ========== RIGHT SECTION: RULES ========== */}
                 <div style={{display:"flex",flexDirection:"column",gap:10,paddingLeft:20}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{display:"flex",alignItems:"center"}}>
                     <div style={{fontSize:12,color:T.textSub,fontWeight:500}}>{t("strat.rules")}</div>
-                    <div style={{display:"flex",gap:2}}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEditStrategy(strategy); }}
-                        title="Modifier"
-                        style={{
-                          width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
-                          borderRadius:6,border:"none",background:"transparent",
-                          color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
-                        }}
-                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
-                        onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
-                      >
-                        <Pencil size={13} strokeWidth={1.75} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteStrategy(strategy.id); }}
-                        title="Supprimer"
-                        style={{
-                          width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
-                          borderRadius:6,border:"none",background:"transparent",
-                          color:T.textMut,cursor:"pointer",transition:"background .15s ease, color .15s ease",
-                        }}
-                        onMouseEnter={(e)=>{ e.currentTarget.style.background = T.redBg; e.currentTarget.style.color = T.red; }}
-                        onMouseLeave={(e)=>{ e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
-                      >
-                        <Trash2 size={13} strokeWidth={1.75} />
-                      </button>
-                    </div>
                   </div>
 
                   <div style={{display:"flex",flexDirection:"column",gap:10,flex:1,overflowY:"auto",maxHeight:170,paddingRight:4}} className="scroll-thin">
