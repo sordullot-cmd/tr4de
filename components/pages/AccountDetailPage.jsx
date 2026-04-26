@@ -217,11 +217,6 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
   }
 
   const type = account.account_type || "live";
-  const palette = type === "eval"
-    ? { bg: T.amberBg, fg: T.amber, bd: T.amber }
-    : type === "funded"
-      ? { bg: "#EFF6FF", fg: "#2563EB", bd: "#93C5FD" }
-      : { bg: T.greenBg, fg: T.green, bd: T.greenBd };
   const typeLabel = type === "eval"
     ? `Eval${account.eval_account_size ? ` ${account.eval_account_size}` : ""}`
     : type === "funded"
@@ -236,37 +231,40 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       {/* Header */}
       <div>
-        <button
-          onClick={() => setPage?.("accounts")}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 10px", borderRadius: 8,
-            border: `1px solid ${T.border}`, background: "#FFFFFF",
-            color: T.textSub, fontSize: 12, fontWeight: 500,
-            cursor: "pointer", marginBottom: 14,
-            fontFamily: "inherit",
-          }}
-        >
-          <ArrowLeft size={13} /> Comptes
-        </button>
-
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <button
+              type="button"
+              onClick={() => setPage?.("accounts")}
+              aria-label="Retour aux comptes"
+              title="Retour"
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 26, height: 26, borderRadius: 6,
+                border: `1px solid ${T.border}`, background: "#FFFFFF",
+                color: T.textSub, cursor: "pointer", flexShrink: 0,
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; e.currentTarget.style.color = T.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; e.currentTarget.style.color = T.textSub; }}
+            >
+              <ArrowLeft size={14} strokeWidth={1.75} />
+            </button>
             <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#0D0D0D", letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-sans)" }}>
               {account.name || "Compte"}
             </h1>
+            {getBrokerLogo(account.broker) && (
+              <img src={getBrokerLogo(account.broker)} alt={account.broker || ""} style={{ height: 20, maxWidth: 64, objectFit: "contain" }} />
+            )}
             <span style={{
               fontSize: 11, fontWeight: 600,
               padding: "3px 8px", borderRadius: 999,
-              background: palette.bg, color: palette.fg, border: `1px solid ${palette.bd}`,
+              background: T.bg, color: T.textSub, border: `1px solid ${T.border}`,
             }}>
               {typeLabel}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {getBrokerLogo(account.broker) && (
-              <img src={getBrokerLogo(account.broker)} alt={account.broker || ""} style={{ height: 30, maxWidth: 110, objectFit: "contain" }} />
-            )}
             <button
               type="button"
               onClick={() => {
