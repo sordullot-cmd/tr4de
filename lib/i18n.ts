@@ -243,7 +243,8 @@ const FR: Dict = {
   "errtag.nosltp": "Pas de SL/TP",
   "errtag.overleveraged": "Sur-leveragé",
   "errtag.ignoredsignal": "Signaux ignorés",
-  "errtag.slttoosmall": "SL trop petit",
+  "errtag.badtiming": "Mauvais timing",
+  "errtag.slttoosmall": "SL trop petite",
   "errtag.wronganalysis": "Mauvaise analyse",
 
   // Weekdays
@@ -508,6 +509,7 @@ const EN: Dict = {
   "errtag.nosltp": "No SL/TP",
   "errtag.overleveraged": "Over-leveraged",
   "errtag.ignoredsignal": "Ignored signals",
+  "errtag.badtiming": "Bad timing",
   "errtag.slttoosmall": "SL too tight",
   "errtag.wronganalysis": "Wrong analysis",
 
