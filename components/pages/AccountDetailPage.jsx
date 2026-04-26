@@ -54,8 +54,12 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
   const accountTrades = (trades || []).filter(t => t.account_id === accountId);
 
   const stats = React.useMemo(() => {
-    let pnl = 0, wins = 0, losses = 0, grossWin = 0, grossLoss = 0;
+    let pnl = 0, wins = 0, losses = 0, scratch = 0, grossWin = 0, grossLoss = 0;
     let bestTrade = null, worstTrade = null;
+    let longCount = 0, shortCount = 0;
+    let totalFees = 0, totalVolume = 0, openPositions = 0, totalExecutions = 0;
+    let holdWinSum = 0, holdWinCount = 0, holdLossSum = 0, holdLossCount = 0;
+    let maxWinStreak = 0, maxLossStreak = 0, curStreak = 0, curStreakSign = 0;
     const dayMap = new Map();
     const sorted = [...accountTrades].sort((a, b) => {
       const da = new Date(a.date || a.entry_time || 0).getTime();
@@ -64,6 +68,14 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
     });
     let cum = 0, peak = 0, maxDD = 0;
     const curve = [];
+    const pnlValues = [];
+    const durationSec = (entry, exit) => {
+      if (!entry || !exit) return null;
+      const e = new Date(entry).getTime();
+      const x = new Date(exit).getTime();
+      if (isNaN(e) || isNaN(x)) return null;
+      return Math.max(0, (x - e) / 1000);
+    };
     for (const t of sorted) {
       const p = Number(t.pnl) || 0;
       pnl += p;
@@ -72,8 +84,41 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       const dd = peak - cum;
       if (dd > maxDD) maxDD = dd;
       curve.push({ date: t.date, cum });
-      if (p > 0) { wins += 1; grossWin += p; if (!bestTrade || p > bestTrade.pnl) bestTrade = { ...t, pnl: p }; }
-      else if (p < 0) { losses += 1; grossLoss += Math.abs(p); if (!worstTrade || p < worstTrade.pnl) worstTrade = { ...t, pnl: p }; }
+      pnlValues.push(p);
+
+      // Direction
+      const dir = String(t.direction || "long").toLowerCase();
+      if (dir === "short") shortCount += 1; else longCount += 1;
+
+      // Volume / Fees / Executions
+      const qty = Number(t.qty ?? t.quantity ?? t.size ?? t.contracts) || 0;
+      totalVolume += qty;
+      totalFees += Number(t.fees ?? t.commission) || 0;
+      totalExecutions += Number(t.executions ?? 0) || 1;
+
+      // Open positions = pas d'exit
+      if (!t.exit && !t.exit_time) openPositions += 1;
+
+      // Hold duration
+      const hold = durationSec(t.entry_time || t.entryTime || t.date, t.exit_time || t.exitTime);
+
+      if (p > 0) {
+        wins += 1; grossWin += p;
+        if (hold !== null) { holdWinSum += hold; holdWinCount += 1; }
+        if (!bestTrade || p > bestTrade.pnl) bestTrade = { ...t, pnl: p };
+        if (curStreakSign === 1) curStreak += 1; else { curStreakSign = 1; curStreak = 1; }
+        if (curStreak > maxWinStreak) maxWinStreak = curStreak;
+      } else if (p < 0) {
+        losses += 1; grossLoss += Math.abs(p);
+        if (hold !== null) { holdLossSum += hold; holdLossCount += 1; }
+        if (!worstTrade || p < worstTrade.pnl) worstTrade = { ...t, pnl: p };
+        if (curStreakSign === -1) curStreak += 1; else { curStreakSign = -1; curStreak = 1; }
+        if (curStreak > maxLossStreak) maxLossStreak = curStreak;
+      } else {
+        scratch += 1;
+        curStreakSign = 0; curStreak = 0;
+      }
+
       const dKey = String(t.date || "").slice(0, 10);
       dayMap.set(dKey, (dayMap.get(dKey) || 0) + p);
     }
@@ -82,16 +127,78 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
     const avgLoss = losses ? grossLoss / losses : 0;
     const profitFactor = grossLoss ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0);
     const expectancy = sorted.length ? pnl / sorted.length : 0;
+    const avgTradePnL = expectancy;
+
+    // Std dev des P&L
+    let pnlStdDev = 0;
+    if (pnlValues.length > 1) {
+      const mean = pnl / pnlValues.length;
+      const variance = pnlValues.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (pnlValues.length - 1);
+      pnlStdDev = Math.sqrt(variance);
+    }
+
+    // Days stats
+    let winDays = 0, loseDays = 0, winDaySum = 0, loseDaySum = 0;
     let bestDay = null, worstDay = null;
     for (const [k, v] of dayMap) {
       if (bestDay === null || v > bestDay.pnl) bestDay = { date: k, pnl: v };
       if (worstDay === null || v < worstDay.pnl) worstDay = { date: k, pnl: v };
+      if (v > 0) { winDays += 1; winDaySum += v; }
+      else if (v < 0) { loseDays += 1; loseDaySum += v; }
     }
+    const tradingDays = dayMap.size;
+    const avgDailyPnL = tradingDays ? pnl / tradingDays : 0;
+    const avgWinDayPnL = winDays ? winDaySum / winDays : 0;
+    const avgLoseDayPnL = loseDays ? loseDaySum / loseDays : 0;
+    const avgDailyVolume = tradingDays ? sorted.length / tradingDays : 0;
+    const avgTradeVolume = sorted.length ? totalVolume / sorted.length : 0;
+
+    // Hold avg (en minutes)
+    const avgHoldWinMin = holdWinCount ? holdWinSum / holdWinCount / 60 : 0;
+    const avgHoldLossMin = holdLossCount ? holdLossSum / holdLossCount / 60 : 0;
+
+    // SQN = sqrt(N) * mean(P&L) / std(P&L)
+    const sqn = pnlStdDev > 0 ? Math.sqrt(pnlValues.length) * (expectancy / pnlStdDev) : 0;
+
+    // Expectancy ratio = avg win / avg loss * win rate / loss rate
+    const lossRate = sorted.length ? losses / sorted.length : 0;
+    const winR = sorted.length ? wins / sorted.length : 0;
+    const expectancyRatio = (avgLoss > 0 && lossRate > 0) ? (winR * avgWin) / (lossRate * avgLoss) : 0;
+
+    // Kelly % = winRate - (lossRate / (avgWin/avgLoss))
+    const kellyPct = avgLoss > 0 ? (winR - lossRate * (avgLoss / avgWin || 0)) * 100 : 0;
+
+    // K-Ratio (approximation simple : pente / écart-type des résidus de l'equity)
+    let kRatio = 0;
+    if (curve.length > 2) {
+      const n = curve.length;
+      const xs = curve.map((_, i) => i);
+      const ys = curve.map(c => c.cum);
+      const sumX = xs.reduce((a, b) => a + b, 0);
+      const sumY = ys.reduce((a, b) => a + b, 0);
+      const meanX = sumX / n, meanY = sumY / n;
+      let num = 0, den = 0;
+      for (let i = 0; i < n; i++) { num += (xs[i] - meanX) * (ys[i] - meanY); den += (xs[i] - meanX) ** 2; }
+      const slope = den > 0 ? num / den : 0;
+      const intercept = meanY - slope * meanX;
+      let resVar = 0;
+      for (let i = 0; i < n; i++) { resVar += (ys[i] - (slope * xs[i] + intercept)) ** 2; }
+      const stdRes = n > 2 ? Math.sqrt(resVar / (n - 2)) : 0;
+      kRatio = stdRes > 0 ? slope / stdRes : 0;
+    }
+
     return {
-      total: sorted.length, pnl, wins, losses, winRate,
+      total: sorted.length, pnl, wins, losses, scratch, winRate,
       avgWin, avgLoss, profitFactor, expectancy, maxDD,
       bestTrade, worstTrade, bestDay, worstDay,
       curve, sorted,
+      longCount, shortCount, totalFees, totalVolume, openPositions, totalExecutions,
+      avgHoldWinMin, avgHoldLossMin,
+      maxWinStreak, maxLossStreak,
+      tradingDays, winDays, loseDays,
+      avgDailyPnL, avgWinDayPnL, avgLoseDayPnL,
+      avgDailyVolume, avgTradeVolume, avgTradePnL,
+      pnlStdDev, sqn, expectancyRatio, kellyPct, kRatio,
     };
   }, [accountTrades]);
 
@@ -258,6 +365,9 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         </div>
       </div>
 
+      {/* Tableau de stats détaillées */}
+      <StatsTable stats={stats} />
+
       {/* Best/Worst */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
         <HighlightCard label="Meilleur trade" value={stats.bestTrade ? fmt(stats.bestTrade.pnl, true) : "—"} sub={stats.bestTrade ? `${stats.bestTrade.symbol || ""} · ${formatDate(stats.bestTrade.date)}` : ""} tone="green" />
@@ -350,6 +460,94 @@ function KpiCell({ label, value, sub, valueColor, last }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
         <span style={{ fontSize: 20, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2 }}>{value}</span>
         {sub && <span style={{ fontSize: 11, color: T.textSub }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+function StatsTable({ stats }) {
+  const fmtMoney = (v) => fmtNoCents(v);
+  const fmtMoneyCents = (v) => fmt(v);
+  const fmtNum = (v, dec = 2) => Number(v).toFixed(dec);
+  const fmtMin = (m) => {
+    if (!m) return "—";
+    if (m < 1) return `${Math.round(m * 60)}s`;
+    const mm = Math.round(m);
+    if (mm < 60) return `${mm} min`;
+    const h = Math.floor(mm / 60);
+    const r = mm % 60;
+    return r === 0 ? `${h} h` : `${h} h ${r} min`;
+  };
+  const sign = (v) => (v >= 0 ? "+" : "");
+
+  const cells = [
+    // Row 1
+    { label: "Total trades", value: String(stats.total) },
+    { label: "Gagnants", value: String(stats.wins) },
+    { label: "Perdants", value: String(stats.losses) },
+    { label: "Neutres", value: String(stats.scratch) },
+    { label: "Durée moy. (gagnants)", value: fmtMin(stats.avgHoldWinMin) },
+    { label: "Durée moy. (perdants)", value: fmtMin(stats.avgHoldLossMin) },
+    // Row 2
+    { label: "Série gagnante max", value: String(stats.maxWinStreak) },
+    { label: "Série perdante max", value: String(stats.maxLossStreak) },
+    { label: "Plus gros gain", value: stats.bestTrade ? fmtMoneyCents(stats.bestTrade.pnl) : "—", color: T.green },
+    { label: "Plus grosse perte", value: stats.worstTrade ? fmtMoneyCents(stats.worstTrade.pnl) : "—", color: T.red },
+    { label: "Total exécutions", value: String(stats.totalExecutions) },
+    { label: "Volume moy. / trade", value: stats.avgTradeVolume ? fmtNum(stats.avgTradeVolume, 1) : "—" },
+    // Row 3
+    { label: "P&L total", value: fmtMoneyCents(stats.pnl), color: stats.pnl >= 0 ? T.green : T.red },
+    { label: "Trades longs", value: String(stats.longCount) },
+    { label: "Trades shorts", value: String(stats.shortCount) },
+    { label: "Taux de victoire", value: stats.total > 0 ? `${stats.winRate.toFixed(1)}%` : "—" },
+    { label: "Frais totaux", value: fmtMoneyCents(stats.totalFees) },
+    { label: "Positions ouvertes", value: String(stats.openPositions) },
+    // Row 4
+    { label: "P&L moy. / trade", value: stats.total > 0 ? fmtMoneyCents(stats.avgTradePnL) : "—", color: stats.avgTradePnL >= 0 ? T.green : T.red },
+    { label: "Gagnant moyen", value: stats.wins ? fmtMoneyCents(stats.avgWin) : "—", color: T.green },
+    { label: "Perdant moyen", value: stats.losses ? `-${fmt(stats.avgLoss)}` : "—", color: T.red },
+    { label: "Profit factor", value: stats.profitFactor === Infinity ? "∞" : (stats.total > 0 ? fmtNum(stats.profitFactor) : "—") },
+    { label: "K-Ratio", value: stats.curve.length > 2 ? fmtNum(stats.kRatio) : "—" },
+    { label: "Kelly %", value: stats.total > 0 ? `${stats.kellyPct.toFixed(1)}%` : "—" },
+    // Row 5
+    { label: "Total jours tradés", value: String(stats.tradingDays) },
+    { label: "Jours gagnants", value: String(stats.winDays) },
+    { label: "Jours perdants", value: String(stats.loseDays) },
+    { label: "Drawdown max", value: stats.maxDD > 0 ? `-${fmtMoney(stats.maxDD)}` : "—", color: stats.maxDD > 0 ? T.red : T.text },
+    { label: "Volume quotidien moy.", value: stats.tradingDays ? fmtNum(stats.avgDailyVolume, 1) : "—" },
+    { label: "SQN", value: stats.pnlStdDev > 0 ? fmtNum(stats.sqn) : "—" },
+    // Row 6
+    { label: "P&L quotidien moy.", value: stats.tradingDays ? fmtMoneyCents(stats.avgDailyPnL) : "—", color: stats.avgDailyPnL >= 0 ? T.green : T.red },
+    { label: "P&L moy. jour gagnant", value: stats.winDays ? fmtMoneyCents(stats.avgWinDayPnL) : "—", color: T.green },
+    { label: "P&L moy. jour perdant", value: stats.loseDays ? fmtMoneyCents(stats.avgLoseDayPnL) : "—", color: T.red },
+    { label: "Écart-type P&L", value: stats.pnlStdDev > 0 ? fmtMoneyCents(stats.pnlStdDev) : "—" },
+    { label: "Espérance", value: stats.total > 0 ? fmtMoneyCents(stats.expectancy) : "—", color: stats.expectancy >= 0 ? T.green : T.red },
+    { label: "Ratio d'espérance", value: stats.expectancyRatio > 0 ? fmtNum(stats.expectancyRatio) : "—" },
+  ];
+
+  return (
+    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
+        {cells.map((c, i) => {
+          const col = i % 6;
+          const row = Math.floor(i / 6);
+          const lastRow = row === 5;
+          const lastCol = col === 5;
+          return (
+            <div
+              key={i}
+              style={{
+                padding: "14px 16px",
+                borderRight: lastCol ? "none" : `1px solid ${T.border}`,
+                borderBottom: lastRow ? "none" : `1px solid ${T.border}`,
+                minWidth: 0,
+              }}
+            >
+              <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: c.color || T.text, fontVariantNumeric: "tabular-nums" }}>{c.value}</div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
