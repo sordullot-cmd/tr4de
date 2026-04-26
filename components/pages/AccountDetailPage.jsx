@@ -4,7 +4,7 @@ import React from "react";
 import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
-import { ArrowLeft, ArrowRight, Pencil, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -272,34 +272,19 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
               onClick={() => {
                 setSelectedAccountIds?.([account.id]);
                 try { localStorage.setItem("selectedAccountIds", JSON.stringify([account.id])); } catch {}
-                setPage?.("dashboard");
-              }}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "8px 12px", borderRadius: 8,
-                border: `1px solid ${T.border}`, background: "#FAFAFA",
-                color: T.text, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              <Eye size={13} /> Ouvrir le dashboard
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAccountIds?.([account.id]);
-                try { localStorage.setItem("selectedAccountIds", JSON.stringify([account.id])); } catch {}
                 setPage?.("add-trade");
               }}
+              title="Éditer / Importer"
+              aria-label="Éditer / Importer"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "8px 12px", borderRadius: 8,
-                border: `1px solid ${T.border2}`, background: T.text, color: "#FFFFFF",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 26, height: 26, borderRadius: 6,
+                border: `1px solid ${T.border}`, background: "#FFFFFF",
+                color: T.textMut, cursor: "pointer",
                 fontFamily: "inherit",
               }}
             >
-              <Pencil size={13} /> Éditer / Importer
+              <Pencil size={12} strokeWidth={1.75} />
             </button>
           </div>
         </div>
