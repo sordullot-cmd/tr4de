@@ -123,7 +123,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     { id: "overleveraged", label: "Sur-leveragé", color: "#D4A574" },
     { id: "ignoredsignal", label: "Signaux ignorés", color: "#8B6BB6" },
     { id: "badtiming", label: "Mauvais timing", color: "#C94F4F" },
-    { id: "slttoosmall", label: "SL trop petite", color: "#D4A574" },
+    { id: "slttoosmall", label: "SL trop court", color: "#D4A574" },
     { id: "wronganalysis", label: "Mauvaise analyse", color: "#8B6BB6" }
   ];
 
@@ -780,40 +780,32 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
               {/* INFOS TAB (NOTES) */}
               {activeTab === "infos" && (
                 <>
-                  {/* INFO ROW - DIRECTION */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Direction</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
-                  </div>
-
-                  {/* INFO ROW - HEURE D'OUVERTURE */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entryTime || "—"}</div>
-                  </div>
-
-                  {/* INFO ROW - HEURE DE FERMETURE */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exitTime || "—"}</div>
-                  </div>
-
-                  {/* INFO ROW - P&L */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
-                  </div>
-
-                  {/* INFO ROW - P&L % */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L %</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
-                  </div>
-
-                  {/* INFO ROW - R-multiple */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R-multiple</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
+                  {/* INFO ROWS group : pas de séparateurs internes, juste un bord en bas */}
+                  <div style={{padding:"6px 16px 10px",borderBottom:`1px solid ${T.border}`,fontFamily:"var(--font-sans)"}}>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Direction</div>
+                      <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
+                    </div>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
+                      <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entryTime || "—"}</div>
+                    </div>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
+                      <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exitTime || "—"}</div>
+                    </div>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
+                      <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
+                    </div>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L %</div>
+                      <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
+                    </div>
+                    <div style={{padding:"7px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R-multiple</div>
+                      <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
+                    </div>
                   </div>
 
                   {/* EMOTION TAGS */}
