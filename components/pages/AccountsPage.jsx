@@ -160,7 +160,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                 key={acc.id}
                 onClick={() => onOpenDetail(acc.id)}
                 style={{
-                  border: `1px solid ${isActive ? T.text : T.border}`,
+                  border: `1px solid ${T.border}`,
                   borderRadius: 12,
                   padding: 16,
                   background: T.surface,
