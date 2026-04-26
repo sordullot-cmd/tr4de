@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X } from "lucide-react";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -21,16 +22,11 @@ function parseTags(text) {
 }
 
 export default function NotesPage() {
-  const [notes, setNotes] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-  });
+  const [notes, setNotes] = useCloudState(STORAGE_KEY, "notes", []);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState("");
-
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); } catch {} }, [notes]);
 
   const createNote = () => {
     const note = { id: Date.now() + Math.random(), content: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
