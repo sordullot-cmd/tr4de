@@ -1128,19 +1128,37 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{t("dash.globalScore")}</span>
               </div>
 
-              <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
+              <div style={{position:"relative",height:10,paddingTop:2}}>
+                <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
+                  <div
+                    style={{
+                      width:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                      height:"100%",
+                      background:"#5F7FB4",
+                      transition:"width 0.6s ease",
+                      borderRadius:3,
+                    }}
+                  />
+                  {[20,40,60,80].map(v => (
+                    <div key={v} style={{position:"absolute",left:`${v}%`,top:0,bottom:0,width:1,background:"rgba(255,255,255,0.65)",transform:"translateX(-0.5px)",pointerEvents:"none"}} />
+                  ))}
+                </div>
                 <div
                   style={{
-                    width:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                    height:"100%",
+                    position:"absolute",
+                    left:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                    top:"50%",
+                    transform:"translate(-50%, -50%)",
+                    width:10,
+                    height:10,
+                    borderRadius:"50%",
                     background:"#5F7FB4",
-                    transition:"width 0.6s ease",
-                    borderRadius:3,
+                    border:"2px solid #FFFFFF",
+                    boxShadow:"0 1px 3px rgba(0,0,0,0.15)",
+                    transition:"left 0.6s ease",
+                    pointerEvents:"none",
                   }}
                 />
-                {[20,40,60,80].map(v => (
-                  <div key={v} style={{position:"absolute",left:`${v}%`,top:0,bottom:0,width:1,background:"rgba(255,255,255,0.65)",transform:"translateX(-0.5px)",pointerEvents:"none"}} />
-                ))}
               </div>
               <div style={{position:"relative",height:12,marginTop:4}}>
                 {[0,20,40,60,80,100].map(v => {

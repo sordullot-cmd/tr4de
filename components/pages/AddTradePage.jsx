@@ -352,9 +352,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         );
         const bId = brokerMatch?.id || "tradovate";
         const aType = selectedAccount.account_type || "live";
-        const aSize = (aType === "eval" && selectedAccount.eval_account_size)
+        const aSize = selectedAccount.eval_account_size
           ? selectedAccount.eval_account_size
-          : "25k";
+          : (aType === "live" ? "" : "25k");
 
         lastSavedRef.current = { broker: bId, type: aType, size: aSize };
         setSelectedBroker(bId);
@@ -409,9 +409,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       const updateData = {
         broker: brokerObj?.name || "Tradovate",
         account_type: accountType,
-        eval_account_size: accountType === "eval" ? selectedEvalAccount : null,
+        eval_account_size: selectedEvalAccount || null,
       };
-      
+
       const { error } = await supabase
         .from("trading_accounts")
         .update(updateData)
@@ -526,7 +526,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             name: accountName.trim(),
             broker: brokerFormatted,
             account_type: accountType,
-            eval_account_size: accountType === "eval" ? selectedEvalAccount : null,
+            eval_account_size: selectedEvalAccount || null,
           }])
           .select();
         
@@ -775,57 +775,56 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               emptyLabel="Aucun courtier"
             />
           </div>
-          {/* ACCOUNT TYPE — toggle live/eval */}
+          {/* ACCOUNT TYPE — pill selector live/eval/funded */}
           <div style={{ marginBottom: 24 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.accountType")}
             </label>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={accountType === "eval"}
-              onClick={() => setAccountType(accountType === "eval" ? "live" : "eval")}
+            <div
+              role="radiogroup"
+              aria-label={t("addTrade.accountType")}
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 10,
-                padding: 0,
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "var(--font-sans)",
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
               }}
             >
-              <span
-                style={{
-                  position: "relative",
-                  width: 36,
-                  height: 20,
-                  borderRadius: 999,
-                  background: accountType === "eval" ? T.text : "#D4D4D4",
-                  transition: "background 160ms ease",
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 2,
-                    left: accountType === "eval" ? 18 : 2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: "#fff",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                    transition: "left 160ms ease",
-                  }}
-                />
-              </span>
-              <span style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>
-                {accountType === "eval" ? t("addTrade.eval") : t("addTrade.live")}
-              </span>
-            </button>
-            {accountType === "eval" && (
+              {[
+                { id: "live",   label: t("addTrade.live") },
+                { id: "eval",   label: t("addTrade.eval") },
+                { id: "funded", label: t("addTrade.funded") },
+              ].map((opt) => {
+                const active = accountType === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setAccountType(opt.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      border: `1px solid ${active ? T.text : T.border}`,
+                      background: active ? T.text : "#FFFFFF",
+                      color: active ? "#FFFFFF" : T.text,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "background 140ms ease, border-color 140ms ease, color 140ms ease",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                    {active && <LucideCheck size={13} strokeWidth={2.5} />}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {(accountType === "eval" || accountType === "funded") && (
               <div style={{ marginTop: "12px" }}>
                 <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
                   {t("addTrade.accountSize")}
@@ -841,6 +840,39 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                   ]}
                   searchable={false}
                 />
+              </div>
+            )}
+            {accountType === "live" && (
+              <div style={{ marginTop: "12px" }}>
+                <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
+                  Balance initiale
+                </label>
+                <div style={{ position: "relative", display: "inline-block", width: "100%", maxWidth: 240 }}>
+                  <span style={{
+                    position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                    color: T.textSub, fontSize: 13, pointerEvents: "none",
+                  }}>$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="any"
+                    placeholder="10000"
+                    value={selectedEvalAccount && /^\d+(\.\d+)?$/.test(String(selectedEvalAccount)) ? selectedEvalAccount : ""}
+                    onChange={(e) => setSelectedEvalAccount(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "9px 12px 9px 22px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.border}`,
+                      background: "#FFFFFF",
+                      fontSize: 13,
+                      color: T.text,
+                      fontFamily: "inherit",
+                      outline: "none",
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>

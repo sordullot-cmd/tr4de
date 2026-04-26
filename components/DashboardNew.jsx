@@ -34,6 +34,9 @@ import TradeChartPage from "@/components/pages/TradeChartPage";
 import AddTradePage from "@/components/pages/AddTradePage";
 import BacktestPage from "@/components/pages/BacktestPage";
 import BrokersPage from "@/components/pages/BrokersPage";
+import AccountsPage from "@/components/pages/AccountsPage";
+import AccountDetailPage from "@/components/pages/AccountDetailPage";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 import MultiAccountSelector from "@/components/MultiAccountSelector";
 import ApexChatNew from "@/components/ApexChatNew";
@@ -76,6 +79,7 @@ import {
   Timer as LucideTimer,
   BookOpen as LucideBookOpen,
   Menu as LucideMenu,
+  Wallet as LucideWallet,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -194,6 +198,7 @@ export default function App() {
     return localStorage.getItem("sidebarCollapsed") === "1";
   });
   const [selectedStrategyId, setSelectedStrategyId] = useState(null);
+  const [selectedAccountDetailId, setSelectedAccountDetailId] = useState(null);
   const [aiReportsUnread, setAiReportsUnread] = useState(0);
 
   useEffect(() => {
@@ -565,6 +570,7 @@ export default function App() {
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
+        { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
       ],
     },
     {
@@ -609,6 +615,8 @@ export default function App() {
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
     backtest: <BacktestPage />,
     brokers: <BrokersPage />,
+    accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} />,
+    "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
@@ -802,22 +810,12 @@ export default function App() {
   // ✅ Afficher un écran de chargement pendant que l'authentification se charge
   // Le useEffect redirigera si l'utilisateur n'est pas authentifié
   if (authLoading) {
-    return (
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:T.bg,flexDirection:"column",gap:20}}>
-        <div style={{fontSize:16,fontWeight:600,color:T.text}}>⏳ Chargement...</div>
-        <div style={{fontSize:12,color:T.textMut}}>Vérification de votre authentification</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   // Si pas d'utilisateur après le chargement, le useEffect va rediriger vers "/"
   if (!user) {
-    return (
-      <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:T.bg,flexDirection:"column",gap:20}}>
-        <div style={{fontSize:16,fontWeight:600,color:T.text}}>⏳ Redirection...</div>
-        <div style={{fontSize:12,color:T.textMut}}>Redirection vers la page de connexion</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
