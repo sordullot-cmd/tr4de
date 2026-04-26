@@ -169,7 +169,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
     }
 
     return (
-      <div style={{ background: T.white, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 500, color: T.textMut }}>{monthName}</div>
@@ -199,7 +199,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
           </div>
         </div>
 
-        <div style={{ overflowX: "auto", fontFamily: "var(--font-sans)", borderLeft: `1px solid ${T.border}`, borderRight: `1px solid ${T.border}` }}>
+        <div style={{ overflowX: "auto", fontFamily: "var(--font-sans)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900, tableLayout: "fixed" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${T.border}` }}>

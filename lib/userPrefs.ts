@@ -22,6 +22,36 @@ export function getCurrencySymbol(code?: string): string {
   return CURRENCY_SYMBOLS[c] || c + " ";
 }
 
+/** Risque par défaut par trade (montant fixe en devise utilisateur). Permet de
+ * calculer le R-multiple = pnl / risk. Si non défini, fallback à 100. */
+export function getDefaultRiskPerTrade(): number {
+  if (typeof window === "undefined") return 100;
+  try {
+    const raw = localStorage.getItem("tr4de_risk_per_trade");
+    const n = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 100;
+  } catch { return 100; }
+}
+
+export function setDefaultRiskPerTrade(n: number): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem("tr4de_risk_per_trade", String(Math.max(1, n))); } catch {}
+}
+
+/** Calcule le R-multiple d'un trade. trade.risk override le défaut si présent. */
+export function rMultiple(trade: { pnl?: number; risk?: number }): number | null {
+  if (trade?.pnl == null) return null;
+  const risk = (trade.risk && trade.risk > 0) ? trade.risk : getDefaultRiskPerTrade();
+  if (!risk) return null;
+  return trade.pnl / risk;
+}
+
+export function fmtR(r: number | null): string {
+  if (r == null || !Number.isFinite(r)) return "—";
+  const sign = r >= 0 ? "+" : "";
+  return `${sign}${r.toFixed(2)}R`;
+}
+
 export function getUserTimezone(): string {
   if (typeof window === "undefined") return "UTC";
   try {

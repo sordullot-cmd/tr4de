@@ -107,9 +107,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         };
         // ✅ Ajouter la stratégie via le hook avec gestion d'erreur
         try {
-          console.log("📝 Creating strategy:", newStrategy);
           const created = await addStrategy(newStrategy);
-          console.log("✅ Strategy created successfully:", created);
           setSelectedImportStrategy(newId);
           setStrategyFormData(getDefaultStrategyFormData());
           setShowStrategyForm(false);
@@ -392,13 +390,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
 
   // Sauvegarder les changements du compte
   const saveAccountChanges = async () => {
-    console.log("🔄 Tentative de sauvegarde...");
-    console.log("accountName:", accountName);
-    console.log("isEditingAccount:", isEditingAccount);
-    console.log("accounts:", accounts);
     
     if (!isEditingAccount || !accountName || accounts.length === 0) {
-      console.log("❌ Conditions non remplies - early return");
       return;
     }
     
@@ -406,10 +399,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     try {
       const supabase = createClient();
       const selectedAccount = accounts.find(acc => acc.name === accountName);
-      console.log("selectedAccount trouvé:", selectedAccount);
       
       if (!selectedAccount) {
-        console.log("❌ Compte NOT trouvé avec le nom:", accountName);
         setSaveStatus("error");
         return;
       }
@@ -420,20 +411,17 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         account_type: accountType,
         eval_account_size: accountType === "eval" ? selectedEvalAccount : null,
       };
-      console.log("Données à sauvegarder:", updateData);
       
       const { error } = await supabase
         .from("trading_accounts")
         .update(updateData)
         .eq("id", selectedAccount.id);
       
-      console.log("Réponse DB - error:", error);
         
       if (error) {
         console.error("❌ Erreur DB:", error);
         setSaveStatus("error");
       } else {
-        console.log("✅ Compte mis à jour!");
         
         // RECHARGER les comptes depuis la DB
         const userId = user?.id;
@@ -443,7 +431,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           .eq("user_id", userId)
           .order("created_at", { ascending: false });
         
-        console.log("Comptes rechargés:", refreshedAccounts);
         
         if (setAccounts) {
           setAccounts(refreshedAccounts || []);
@@ -593,8 +580,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       
       // ⭐ RECHARGER les trades depuis Supabase pour avoir les IDs UUID corrects
       // (et pas les IDs numériques du CSV qui causent des erreurs lors de la suppression)
-      console.log("📥 Rechargement des trades depuis Supabase après import...");
-      console.log("  Fetching ALL trades for user:", userId);
       
       // ✅ CRITICAL FIX 1: Fetch ALL trades for the user (not just this account)
       // to update localStorage which feeds the useTrades() hook
@@ -604,7 +589,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
       
-      console.log("  Fetch result:", { hasError: !!fetchError, tradesCount: allUserTrades?.length });
       
       let freshTrades = [];
       if (fetchError) {
@@ -612,18 +596,14 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         // Continue anyway - at least trades are saved
       } else if (allUserTrades && allUserTrades.length > 0) {
         freshTrades = allUserTrades;
-        console.log(`✅ Loaded ${allUserTrades.length} fresh trades from Supabase`);
-        console.log("First trade structure:", allUserTrades[0]);
         
         // ✅ CRITICAL FIX 2: Update localStorage AND dispatch event so useTrades() hook sees new trades
         // This triggers the component to re-render with imported trades WITHOUT needing a refresh
         localStorage.setItem("tr4de_trades", JSON.stringify(allUserTrades));
-        console.log("💾 Updated tr4de_trades in localStorage");
         
         // ✅ CRITICAL FIX 2b: Dispatch custom event to notify useTrades hook in this same tab
         // (storage events don't fire in the same tab, only in other tabs)
         window.dispatchEvent(new CustomEvent("trades-refreshed", { detail: { trades: allUserTrades } }));
-        console.log("🔔 Dispatched trades-refreshed event");
       } else {
         console.warn("⚠️  No fresh trades returned from Supabase");
       }
@@ -632,29 +612,16 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       // ⭐ IMPORTANT: Use ONLY freshTrades (the ones actually saved to DB), not importedTrades
       // because importedTrades includes ALL trades but some are filtered out (pnl < $50)
       if (selectedImportStrategy && freshTrades && freshTrades.length > 0) {
-        console.log("🔗 LINKING TRADES TO STRATEGY START");
-        console.log("  Selected Strategy ID:", selectedImportStrategy);
-        console.log("  Fresh trades count (from Supabase):", freshTrades.length);
         
         const tradeStrategiesData = (() => {
           const saved = localStorage.getItem("tr4de_trade_strategies");
           return saved ? JSON.parse(saved) : {};
         })();
         
-        console.log("📋 Current trade-strategy mapping BEFORE:", JSON.stringify(tradeStrategiesData, null, 2));
         
         freshTrades.forEach((trade, idx) => {
           // Normalize entry to string with 2 decimals for consistent key
           const normalizedEntry = parseFloat(trade.entry).toFixed(2);
-          
-          console.log(`\n  Trade ${idx + 1}:`, {
-            date: trade.date,
-            symbol: trade.symbol,
-            entry: trade.entry,
-            normalized_entry: normalizedEntry,
-            pnl: trade.pnl,
-            id: trade.id
-          });
           
           // Use multiple key formats to ensure compatibility:
           // 1. date + symbol + entry (for backward compatibility with old format)
@@ -677,19 +644,14 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             if (!tradeStrategiesData[tradeIdKey].includes(strategyId)) {
               tradeStrategiesData[tradeIdKey].push(strategyId);
               if (!keyUsed) keyUsed = tradeIdKey;
-              console.log(`    ✓ KEY: "${tradeIdKey}"`);
-              console.log(`    ✓ Added strategy ${strategyId}`);
             }
           }
           
           if (!keyUsed) {
-            console.log(`    ⚠️  Strategy already linked`);
           }
         });
         
-        console.log("\n📝 Updated trade-strategy mapping AFTER:", JSON.stringify(tradeStrategiesData, null, 2));
         localStorage.setItem("tr4de_trade_strategies", JSON.stringify(tradeStrategiesData));
-        console.log("✅ Saved to tr4de_trade_strategies");
       } else {
         if (!selectedImportStrategy) {
           console.warn("⚠️  No strategy selected - trades won't be linked");
@@ -717,7 +679,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           const newSelectedIds = Array.from(new Set([...selectedAccountIds, accountId]));
           setSelectedAccountIds(newSelectedIds);
           localStorage.setItem('selectedAccountIds', JSON.stringify(newSelectedIds));
-          console.log("✅ Account added to selection:", newSelectedIds);
         }
       }
       
@@ -812,7 +773,6 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               })()}
               searchPlaceholder="Rechercher un courtier..."
               emptyLabel="Aucun courtier"
-              small
             />
           </div>
           {/* ACCOUNT TYPE — toggle live/eval */}

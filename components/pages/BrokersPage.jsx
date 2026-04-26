@@ -63,9 +63,16 @@ export default function BrokersPage() {
     }
   };
 
+  // Tradovate API n'est utilisable que si l'app a un client ID configuré.
+  const tradovateConfigured = !!process.env.NEXT_PUBLIC_TRADOVATE_CLIENT_ID;
+
   const onConnect = (broker) => {
     if (broker.meta.id !== "tradovate") {
       setFeedback(prev => ({ ...prev, [broker.meta.id]: { ok: false, msg: "Sync API pas encore disponible pour ce broker" } }));
+      return;
+    }
+    if (!tradovateConfigured) {
+      setFeedback(prev => ({ ...prev, [broker.meta.id]: { ok: false, msg: "Connexion API Tradovate non configurée — utilise l'import CSV." } }));
       return;
     }
     window.location.href = "/api/brokers/tradovate/oauth?action=start";
@@ -147,7 +154,7 @@ export default function BrokersPage() {
                     />
                   </>
                 )}
-                {m.features.apiSync && (
+                {m.features.apiSync && (m.id !== "tradovate" || tradovateConfigured) && (
                   <button
                     type="button"
                     onClick={() => onConnect(b)}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 
@@ -37,21 +37,44 @@ export default function NotesPage() {
 
   const selected = notes.find(n => n.id === selectedId);
 
-  // Sync draft <-> selected (loaded from picked note)
+  // Refs to flush pending saves on selection change / unmount
+  const draftRef = useRef("");
+  const selectedIdRef = useRef(null);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  const flushSave = (id, content) => {
+    if (!id) return;
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, content, updatedAt: new Date().toISOString() } : n));
+  };
+
+  // Sync draft <-> selected (loaded from picked note) + flush previous note
   useEffect(() => {
-    if (selected) setDraft(selected.content);
-    else setDraft("");
+    const prevId = selectedIdRef.current;
+    if (prevId && prevId !== selectedId) {
+      // Flush the previous note's draft synchronously before switching
+      flushSave(prevId, draftRef.current);
+    }
+    selectedIdRef.current = selectedId;
+    const cur = notes.find(n => n.id === selectedId);
+    setDraft(cur ? cur.content : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // Auto-save draft into selected note (debounced 400ms)
+  // Auto-save current draft (debounced 400ms)
   useEffect(() => {
     if (!selectedId) return;
-    const id = setTimeout(() => {
-      setNotes(prev => prev.map(n => n.id === selectedId ? { ...n, content: draft, updatedAt: new Date().toISOString() } : n));
-    }, 400);
+    const id = setTimeout(() => flushSave(selectedId, draft), 400);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
+
+  // Flush on unmount (page change / reload close)
+  useEffect(() => {
+    return () => {
+      if (selectedIdRef.current) flushSave(selectedIdRef.current, draftRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const removeNote = (id) => {
     setNotes(prev => prev.filter(n => n.id !== id));
@@ -172,6 +195,39 @@ export default function NotesPage() {
                 autoFocus
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const ta = e.currentTarget;
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    const indent = "        ";
+                    if (e.shiftKey) {
+                      // Outdent: remove up to 8 leading spaces (or 1 tab) from line start
+                      const lineStart = draft.lastIndexOf("\n", start - 1) + 1;
+                      const before = draft.slice(0, lineStart);
+                      const lineRest = draft.slice(lineStart);
+                      let removed = 0;
+                      let stripped = lineRest;
+                      if (stripped.startsWith("\t")) { stripped = stripped.slice(1); removed = 1; }
+                      else {
+                        const m = stripped.match(/^ {1,8}/);
+                        if (m) { removed = m[0].length; stripped = stripped.slice(removed); }
+                      }
+                      if (removed > 0) {
+                        const next = before + stripped;
+                        setDraft(next);
+                        const pos = Math.max(lineStart, start - removed);
+                        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = pos; });
+                      }
+                    } else {
+                      const next = draft.slice(0, start) + indent + draft.slice(end);
+                      setDraft(next);
+                      const pos = start + indent.length;
+                      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = pos; });
+                    }
+                  }
+                }}
                 placeholder={"Commence à écrire... utilise #tag pour catégoriser."}
                 style={{
                   flex: 1, width: "100%", border: "none", outline: "none",

@@ -10,20 +10,26 @@ import {
   TrendingUp as LucideTrendingUp,
   ArrowDown as LucideArrowDown,
   SlidersHorizontal as LucideSlidersHorizontal,
+  GripVertical as LucideGripVertical,
   Target as LucideTarget,
   FileText as LucideFileText,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
+import { rMultiple, fmtR } from "@/lib/userPrefs";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
+import { useTradeScreenshots } from "@/lib/hooks/useTradeScreenshots";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmotionTags";
 
 export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades }) {
   const { user } = useAuth();
   const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
+  const { urls: screenshotUrls, uploadScreenshot, removeScreenshot } = useTradeScreenshots();
+  const [screenshotBusy, setScreenshotBusy] = useState(false);
   const { emotionTags: emotionsFromHook, addEmotion, removeEmotion } = useTradeEmotionTags();
   const { errorTags: errorsFromHook, addError, removeError } = useTradeErrorTags();
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -44,6 +50,35 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeletingTrades, setIsDeletingTrades] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
+
+  // Ordre des colonnes du tableau, persisté côté compte (Supabase via useCloudState)
+  // avec fallback localStorage. L'utilisateur peut les réordonner par drag-and-drop.
+  const TRADE_COLUMN_IDS = ["asset","side","entryDate","entryTime","entry","exitDate","exitTime","exit","lots","volume","pnl","pnlPct","r","duration"];
+  const [rawColumnOrder, setRawColumnOrder] = useCloudState("tr4de_trades_columns", "trades_column_order", TRADE_COLUMN_IDS);
+  // Validation : si la valeur stockée est invalide (colonne ajoutée/supprimée
+  // dans le code, données corrompues), on retombe sur l'ordre par défaut.
+  const columnOrder = (Array.isArray(rawColumnOrder)
+    && rawColumnOrder.length === TRADE_COLUMN_IDS.length
+    && TRADE_COLUMN_IDS.every(id => rawColumnOrder.includes(id)))
+    ? rawColumnOrder
+    : TRADE_COLUMN_IDS;
+  const setColumnOrder = setRawColumnOrder;
+  const [dragColId, setDragColId] = useState(null);
+  const [dragGrabOffset, setDragGrabOffset] = useState(0);
+  const [dragWidth, setDragWidth] = useState(0);
+  const persistColumns = () => { /* useCloudState gère la persistance auto */ };
+  const moveColRelative = (srcId, targetId, before) => {
+    if (!srcId || srcId === targetId) return;
+    setColumnOrder(prev => {
+      const arr = prev.filter(x => x !== srcId);
+      const targetIdx = arr.indexOf(targetId);
+      if (targetIdx === -1) return prev;
+      const insertAt = before ? targetIdx : targetIdx + 1;
+      arr.splice(insertAt, 0, srcId);
+      if (arr.length === prev.length && arr.every((x, i) => x === prev[i])) return prev;
+      return arr;
+    });
+  };
   const [showBulkStrategyDropdown, setShowBulkStrategyDropdown] = useState(false);
   const [openStratMenuId, setOpenStratMenuId] = useState(null);
 
@@ -118,9 +153,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     if (!tradeId) { console.warn("⚠️ persistNote: tradeId manquant — note non sauvegardée en ligne"); return; }
     if (noteSaveTimers.current[tradeId]) clearTimeout(noteSaveTimers.current[tradeId]);
     noteSaveTimers.current[tradeId] = setTimeout(() => {
-      console.log("📤 Sauvegarde note (Supabase) trade:", tradeId);
       setNoteHook(tradeId, text)
-        .then(() => console.log("✅ Note sauvée"))
+        .then(() => { /* note saved */ })
         .catch(err => console.error("❌ Save note failed:", err?.message || err));
     }, 600);
   }, [setNoteHook]);
@@ -140,7 +174,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
   // Load trade notes and strategies from localStorage - RUNS EVERY TIME COMPONENT MOUNTS
   React.useEffect(() => {
-    console.log("📝 TradesPage mounted - reloading all data from localStorage");
     
     try {
       const savedNotes = localStorage.getItem("tr4de_trade_notes");
@@ -160,7 +193,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       const savedStrategies = localStorage.getItem("tr4de_strategies") || localStorage.getItem("apex_strategies");
       if (savedStrategies) {
         const parsed = JSON.parse(savedStrategies);
-        console.log("✅ Loaded", parsed.length, "strategies");
         setLoadedStrategies(parsed);
       }
 
@@ -187,7 +219,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
             }
           });
           setCheckedRules(cleaned);
-          console.log(`✅ Loaded ${Object.keys(cleaned).length} checked rules`);
         } catch (e) {
           console.warn("⚠️ Corrupt checked rules data, resetting");
           setCheckedRules({});
@@ -415,52 +446,119 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           <div style={{overflowX:"auto",overflowY:"auto",flex:1}}>
             <table style={{width:"max-content",minWidth:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:"var(--font-sans)"}}>
               <thead style={{position:"sticky",top:0,background:T.bg,zIndex:10}}>
-                <tr style={{borderBottom:`1px solid ${T.border}`}}>
+                <tr
+                  style={{borderBottom:`1px solid ${T.border}`}}
+                  onDragOver={(e) => {
+                    if (!dragColId) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    const dragLeft = e.clientX - dragGrabOffset;
+                    const dragRight = dragLeft + dragWidth;
+                    const sourceIdx = columnOrder.indexOf(dragColId);
+                    if (sourceIdx === -1) return;
+                    // On parcourt les en-têtes des colonnes réordonnables
+                    // (ils portent l'attribut data-col-id).
+                    const cells = e.currentTarget.querySelectorAll("th[data-col-id]");
+                    for (const th of cells) {
+                      const cid = th.getAttribute("data-col-id");
+                      if (!cid || cid === dragColId) continue;
+                      const r = th.getBoundingClientRect();
+                      const targetMid = r.left + r.width / 2;
+                      const targetIdx = columnOrder.indexOf(cid);
+                      if (targetIdx === -1) continue;
+                      const movingRight = sourceIdx < targetIdx;
+                      if (movingRight && dragRight >= targetMid) {
+                        moveColRelative(dragColId, cid, false);
+                        return;
+                      }
+                      if (!movingRight && dragLeft <= targetMid) {
+                        moveColRelative(dragColId, cid, true);
+                        return;
+                      }
+                    }
+                  }}
+                  onDrop={(e) => { e.preventDefault(); persistColumns(columnOrder); setDragColId(null); }}
+                >
                   {/* Symbol : master checkbox quand >= 1 selectionne */}
                   <th style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg,height:42,minWidth:130,width:130}}>
-                    <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
-                      {selectedIds.size > 0 && (
-                        <input
-                          type="checkbox"
-                          checked={filteredTrades.length > 0 && filteredTrades.every(t => selectedIds.has(tradeKey(t)))}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              const next = new Set(selectedIds);
-                              filteredTrades.forEach(t => next.add(tradeKey(t)));
-                              setSelectedIds(next);
-                            } else {
-                              setSelectedIds(new Set());
-                            }
-                          }}
-                          style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle"}}
-                          onClick={(e)=>e.stopPropagation()}
-                        />
-                      )}
+                    <span style={{display:"inline-flex",alignItems:"center",gap:8,height:22,verticalAlign:"middle"}}>
+                      <span style={{width:22,height:22,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {selectedIds.size > 0 && (
+                          <input
+                            type="checkbox"
+                            checked={filteredTrades.length > 0 && filteredTrades.every(t => selectedIds.has(tradeKey(t)))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const next = new Set(selectedIds);
+                                filteredTrades.forEach(t => next.add(tradeKey(t)));
+                                setSelectedIds(next);
+                              } else {
+                                setSelectedIds(new Set());
+                              }
+                            }}
+                            style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle"}}
+                            onClick={(e)=>e.stopPropagation()}
+                          />
+                        )}
+                      </span>
                       <span>{t("common.symbol")}</span>
                     </span>
                   </th>
-                  {[
-                    {label:t("trades.colAsset")},
-                    {label:t("trades.colSide")},
-                    {label:t("trades.colEntryDate"),sorted:true},
-                    {label:t("trades.colEntryTime")},
-                    {label:t("trades.colEntry")},
-                    {label:t("trades.colExitDate")},
-                    {label:t("trades.colExitTime")},
-                    {label:t("trades.colExit")},
-                    {label:t("trades.colLots")},
-                    {label:t("trades.colVolume")},
-                    {label:t("trades.colPnL")},
-                    {label:t("trades.colPnLPct")},
-                    {label:t("trades.colDuration")},
-                  ].map(h=>(
-                    <th key={h.label} style={{padding:"12px 14px",textAlign:"left",fontSize:11,fontWeight:500,color:T.textMut,whiteSpace:"nowrap",background:T.bg}}>
-                      <span style={{display:"inline-flex",alignItems:"center",gap:4}}>
-                        {h.label}
-                        {h.sorted && <LucideArrowDown size={11} strokeWidth={1.75} />}
-                      </span>
-                    </th>
-                  ))}
+                  {(() => {
+                    const labels = {
+                      asset:     { label: t("trades.colAsset") },
+                      side:      { label: t("trades.colSide") },
+                      entryDate: { label: t("trades.colEntryDate"), sorted: true },
+                      entryTime: { label: t("trades.colEntryTime") },
+                      entry:     { label: t("trades.colEntry") },
+                      exitDate:  { label: t("trades.colExitDate") },
+                      exitTime:  { label: t("trades.colExitTime") },
+                      exit:      { label: t("trades.colExit") },
+                      lots:      { label: t("trades.colLots") },
+                      volume:    { label: t("trades.colVolume") },
+                      pnl:       { label: t("trades.colPnL") },
+                      pnlPct:    { label: t("trades.colPnLPct") },
+                      r:         { label: "R" },
+                      duration:  { label: t("trades.colDuration") },
+                    };
+                    return columnOrder.map(id => {
+                      const h = labels[id]; if (!h) return null;
+                      const isDragging = dragColId === id;
+                      return (
+                        <th
+                          key={id}
+                          data-col-id={id}
+                          draggable
+                          onDragStart={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            e.dataTransfer.setData("text/plain", id);
+                            e.dataTransfer.effectAllowed = "move";
+                            setDragColId(id);
+                            setDragGrabOffset(e.clientX - rect.left);
+                            setDragWidth(rect.width);
+                          }}
+                          onDragEnd={() => { persistColumns(columnOrder); setDragColId(null); }}
+                          title="Glisser pour réordonner"
+                          style={{
+                            padding: "12px 14px",
+                            textAlign: "left", fontSize: 11, fontWeight: 500,
+                            color: T.textMut,
+                            whiteSpace: "nowrap",
+                            background: T.bg,
+                            cursor: "grab",
+                            opacity: isDragging ? 0.45 : 1,
+                            userSelect: "none",
+                          }}
+                        >
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <LucideGripVertical size={11} strokeWidth={1.75} style={{ color: T.textMut, opacity: 0.55, marginRight: -2, flexShrink: 0 }} />
+                            {h.label}
+                            {h.sorted && <LucideArrowDown size={11} strokeWidth={1.75} />}
+                          </span>
+                        </th>
+                      );
+                    });
+                  })()}
                   {/* Settings column header */}
                   <th style={{padding:"12px 8px",textAlign:"right",background:T.bg,width:32}}>
                     <button
@@ -552,22 +650,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           <span>{t.symbol}</span>
                         </span>
                       </td>
-                      <td style={{padding:"12px 14px",color:T.textSub}}>Future</td>
-                      <td style={{padding:"12px 14px",fontWeight:500,color:T.text,fontSize:13}}>
-                        {t.direction}
-                      </td>
-                      <td style={{padding:"12px 14px",color:T.textSub}}>{openDate}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>{openTime}</td>
-                      <td style={{padding:"12px 14px",color:T.text,fontFamily:"var(--font-sans)",fontSize:13}}>${t.entry.toFixed(2)}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub}}>{closeDate}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>{closeTime}</td>
-                      <td style={{padding:"12px 14px",color:T.text,fontFamily:"var(--font-sans)",fontSize:13}}>${t.exit.toFixed(2)}</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,textAlign:"center"}}>1</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,textAlign:"center"}}>2</td>
-                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{t.pnl>=0?"+":""}{fmt(t.pnl,false)}</td>
-                      <td style={{padding:"12px 14px",fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"}}>{ret>0?"+":""}{ret}%</td>
-                      <td style={{padding:"12px 14px",color:T.textSub,fontSize:12}}>
-                        {(() => {
+                      {(() => {
+                        const tdBase = { padding: "12px 14px" };
+                        const cellStyle = (_id, base) => base;
+                        const duration = (() => {
                           const entry = t.entryTime || t.entry_time;
                           const exit = t.exitTime || t.exit_time;
                           if (!entry || !exit) return "—";
@@ -576,20 +662,35 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             if (!m) return null;
                             return (+m[1])*3600 + (+m[2])*60 + (+(m[3]||0));
                           };
-                          const s1 = toSec(entry);
-                          const s2 = toSec(exit);
+                          const s1 = toSec(entry); const s2 = toSec(exit);
                           if (s1 === null || s2 === null) return "—";
                           let sec = s2 - s1;
-                          // Si l'heure de sortie est le lendemain (entree 23:50, sortie 00:30)
                           if (sec < 0) sec += 24*3600;
                           if (Number.isNaN(sec)) return "—";
                           if (sec < 60) return `${sec}s`;
                           if (sec < 3600) return `${Math.floor(sec/60)}m`;
                           const h = Math.floor(sec/3600);
-                          const m = Math.floor((sec%3600)/60);
-                          return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2,"0")}`;
-                        })()}
-                      </td>
+                          const mm = Math.floor((sec%3600)/60);
+                          return mm === 0 ? `${h}h` : `${h}h${String(mm).padStart(2,"0")}`;
+                        })();
+                        const cells = {
+                          asset:     <td key="asset" style={cellStyle("asset",{...tdBase,color:T.textSub})}>Future</td>,
+                          side:      <td key="side" style={cellStyle("side",{...tdBase,fontWeight:500,color:T.text,fontSize:13})}>{t.direction}</td>,
+                          entryDate: <td key="entryDate" style={cellStyle("entryDate",{...tdBase,color:T.textSub})}>{openDate}</td>,
+                          entryTime: <td key="entryTime" style={cellStyle("entryTime",{...tdBase,color:T.textSub,fontSize:12})}>{openTime}</td>,
+                          entry:     <td key="entry" style={cellStyle("entry",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.entry.toFixed(2)}</td>,
+                          exitDate:  <td key="exitDate" style={cellStyle("exitDate",{...tdBase,color:T.textSub})}>{closeDate}</td>,
+                          exitTime:  <td key="exitTime" style={cellStyle("exitTime",{...tdBase,color:T.textSub,fontSize:12})}>{closeTime}</td>,
+                          exit:      <td key="exit" style={cellStyle("exit",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.exit.toFixed(2)}</td>,
+                          lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub,textAlign:"center"})}>1</td>,
+                          volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub,textAlign:"center"})}>2</td>,
+                          pnl:       <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{t.pnl>=0?"+":""}{fmt(t.pnl,false)}</td>,
+                          pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
+                          r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple(t))}</td>,
+                          duration:  <td key="duration" style={cellStyle("duration",{...tdBase,color:T.textSub,fontSize:12})}>{duration}</td>,
+                        };
+                        return columnOrder.map(id => cells[id] || null);
+                      })()}
                       {/* Cellule vide pour aligner avec le header settings */}
                       <td style={{padding:"12px 8px",width:32}} />
                     </tr>
@@ -671,18 +772,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exitTime || "—"}</div>
                   </div>
 
-                  {/* INFO ROW - ENTRY */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Entrée</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.entry.toFixed(4)}</div>
-                  </div>
-
-                  {/* INFO ROW - EXIT */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Sortie</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{selectedTrade.exit.toFixed(4)}</div>
-                  </div>
-
                   {/* INFO ROW - P&L */}
                   <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
@@ -693,6 +782,12 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L %</div>
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
+                  </div>
+
+                  {/* INFO ROW - R-multiple */}
+                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R-multiple</div>
+                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
                   </div>
 
                   {/* EMOTION TAGS */}
@@ -780,6 +875,45 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       })}
                     </div>
                   </div>
+
+                  {/* SCREENSHOT — placé sous les tags d'erreurs */}
+                  {(() => {
+                    const tradeId = selectedTrade.id;
+                    const url = screenshotUrls[tradeId];
+                    return (
+                      <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                          <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Screenshot</div>
+                          {url && (
+                            <button type="button" onClick={async () => { setScreenshotBusy(true); try { await removeScreenshot(tradeId); } finally { setScreenshotBusy(false); } }}
+                              disabled={screenshotBusy}
+                              style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.red,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                              Supprimer
+                            </button>
+                          )}
+                        </div>
+                        {url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer" style={{display:"block",border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden",background:T.bg}}>
+                            <img src={url} alt="Trade screenshot" style={{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:T.bg}} />
+                          </a>
+                        ) : (
+                          <label style={{
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
+                            cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
+                            color:T.textSub,fontSize:12,fontWeight:500,
+                          }}
+                            onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
+                            onMouseLeave={(e)=>{e.currentTarget.style.background=T.bg}}>
+                            {screenshotBusy ? "Upload en cours…" : "Glisse une image ou clique pour ajouter"}
+                            <input type="file" accept="image/*" disabled={screenshotBusy}
+                              onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; setScreenshotBusy(true); try { await uploadScreenshot(tradeId, f); } finally { setScreenshotBusy(false); e.target.value = ""; } }}
+                              style={{display:"none"}} />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* NOTES */}
                   <div style={{padding:"16px 16px",flex:1,display:"flex",flexDirection:"column"}}>
@@ -917,7 +1051,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                         newTradeStrategies[k] = updated;
                                       });
                                       setTradeStrategies(newTradeStrategies);
-                                      console.log(`✓ Strategy link updated across keys [${tradeKeys.join(", ")}]`);
                                       setShowStrategyDropdown(false);
                                     }} style={{width:"100%",padding:"8px 12px",borderBottom:`1px solid ${T.border}`,background:isSelected?T.accentBg:T.white,border:"none",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:6,transition:"all .2s"}}>
                                     <div style={{width:10,height:10,borderRadius:3,background:strat.color}}/>

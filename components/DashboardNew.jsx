@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { createClient } from "@/lib/supabase/client";
@@ -56,7 +56,6 @@ import {
   Target as LucideTarget,
   Bot,
   Upload as LucideUpload,
-  Settings as LucideSettings,
   FileText as LucideFileText,
   X as LucideX,
   ChevronDown as LucideChevronDown,
@@ -66,10 +65,6 @@ import {
   ArrowDown as LucideArrowDown,
   SlidersHorizontal as LucideSlidersHorizontal,
   Check as LucideCheck,
-  User,
-  Moon,
-  Sun,
-  LogOut,
   Star,
   Pencil,
   Plus,
@@ -122,114 +117,7 @@ const css = `
 const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 // Bouton compte utilisateur dans la barre du haut (à droite du gris)
-function TopBarUserMenu({ user, onProfile, onSettings, onDarkMode, onLogout }) {
-  const [open, setOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-  // Synchronise l'état visuel du toggle avec l'attribut sur <html>
-  useEffect(() => {
-    const sync = () => setIsDark(document.documentElement.dataset.theme === "dark");
-    sync();
-    const obs = new MutationObserver(sync);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => obs.disconnect();
-  }, []);
-  const firstName = (user.name || "").split(" ")[0];
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          padding: "4px 12px 4px 4px", borderRadius: 999,
-          background: open ? "#EDEDED" : "transparent", border: "none",
-          cursor: "pointer", fontFamily: "var(--font-sans)", color: "#0D0D0D",
-        }}
-        onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = "#EDEDED"; }}
-        onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}
-      >
-        <div style={{
-          width: 32, height: 32, borderRadius: "50%", background: "#F7F7F7",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 14, fontWeight: 700, color: "#0D0D0D", flexShrink: 0,
-          border: "1px solid #ECECEC",
-        }}>{user.initials}</div>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>{firstName}</span>
-      </button>
-      {open && (
-        <div role="menu" style={{
-          position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 200,
-          background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 10,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.10)", padding: 4, zIndex: 100,
-          fontFamily: "var(--font-sans)",
-        }}>
-          {onProfile && (
-            <button onClick={() => { setOpen(false); onProfile(); }} style={menuItemStyle()}>
-              <User size={14} strokeWidth={1.75} /><span>Profil</span>
-            </button>
-          )}
-          {onSettings && (
-            <button onClick={() => { setOpen(false); onSettings(); }} style={menuItemStyle()}>
-              <LucideSettings size={14} strokeWidth={1.75} /><span>Paramètres</span>
-            </button>
-          )}
-          {onDarkMode && (
-            <button onClick={() => onDarkMode()} style={{ ...menuItemStyle(), justifyContent: "space-between" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                {isDark
-                  ? <Sun size={14} strokeWidth={1.75} />
-                  : <Moon size={14} strokeWidth={1.75} />}
-                <span>Mode Sombre</span>
-              </span>
-              {/* Mini toggle visuel */}
-              <span
-                aria-hidden
-                style={{
-                  position: "relative",
-                  width: 28, height: 16, borderRadius: 999,
-                  background: isDark ? "#16A34A" : "#D4D4D4",
-                  transition: "background 150ms ease",
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{
-                  position: "absolute", top: 2,
-                  left: isDark ? 14 : 2,
-                  width: 12, height: 12, borderRadius: "50%",
-                  background: "#FFFFFF",
-                  transition: "left 150ms ease",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
-                }}/>
-              </span>
-            </button>
-          )}
-          {onLogout && (onProfile || onSettings || onDarkMode) && (
-            <div style={{ height: 1, background: "#E5E5E5", margin: "4px 0" }} />
-          )}
-          {onLogout && (
-            <button onClick={() => { setOpen(false); onLogout(); }} style={{ ...menuItemStyle(), color: "#EF4444" }}>
-              <LogOut size={14} strokeWidth={1.75} /><span>Se déconnecter</span>
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-function menuItemStyle() {
-  return {
-    width: "100%", display: "flex", alignItems: "center", gap: 8,
-    textAlign: "left", padding: "8px 10px", borderRadius: 6, border: "none",
-    background: "transparent", color: "#0D0D0D",
-    fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-  };
-}
+import TopBarUserMenu from "./dashboard/TopBarUserMenu";
 
 // Portal: rend ses enfants dans le slot d'en-tête de page (id="tr4de-page-header-slot")
 // si présent. Permet aux pages d'inclure des éléments contrôlés depuis le layout.
@@ -358,7 +246,6 @@ export default function App() {
   // Sauvegarder la sélection de comptes dans localStorage
   useEffect(() => {
     localStorage.setItem('selectedAccountIds', JSON.stringify(selectedAccountIds));
-    console.log("💾 Saved selectedAccountIds to localStorage:", selectedAccountIds);
   }, [selectedAccountIds]);
 
   // (On ne ré-injecte plus le placeholder : aucune sélection = 0 trades)
@@ -374,7 +261,6 @@ export default function App() {
       if (hasPlaceholder && hasRealAccounts) {
         const cleaned = selectedAccountIds.filter(id => !isPlaceholderAccount(id));
         setSelectedAccountIds(cleaned);
-        console.log("🧹 Removed placeholder account, keeping real accounts:", cleaned);
       }
     }
   }, [selectedAccountIds, user?.id]);
@@ -481,7 +367,6 @@ export default function App() {
   // Fonction pour se déconnecter
   const handleLogout = async () => {
     try {
-      console.log("🔓 Déconnexion...");
       const supabase = createClient();
       await supabase.auth.signOut();
       
@@ -493,7 +378,6 @@ export default function App() {
       localStorage.clear();
       
       // 🚀 Rediriger vers la page d'accueil (qui redirigera vers /login)
-      console.log("✅ Déconnexion réussie, redirection vers login...");
       window.location.href = '/login';
     } catch (err) {
       console.error("❌ Erreur lors de la déconnexion:", err);
@@ -507,13 +391,11 @@ export default function App() {
   useEffect(() => {
     if (authLoading) {
       // Authentification en cours de chargement, ne rien faire
-      console.log("⏳ Authentification en cours de chargement...");
       return;
     }
 
     // Authentification terminée, vérifier si l'utilisateur existe
     if (!user) {
-      console.log("🚫 Utilisateur non authentifié, redirection vers connexion...");
       window.location.href = '/login';
     }
   }, [authLoading, user]);
@@ -572,14 +454,6 @@ export default function App() {
 
   // ✅ DEBUG: Log when account selection changes
   React.useEffect(() => {
-    console.log("📊 DEBUG - Account Selection State:");
-    console.log("   accounts:", accounts.map(a => ({ id: a.id, name: a.name })));
-    console.log("   selectedAccountIds:", selectedAccountIds);
-    console.log("   trades.length:", trades.length);
-    console.log("   filteredTrades.length:", filteredTrades.length);
-    console.log("   First trade structure:", trades[0]);
-    console.log("   Trades with account_id:", trades.filter(t => t.account_id).length);
-    console.log("   Filter logic: if selectedAccountIds.length (" + selectedAccountIds.length + ") > 0, filter by account, else show none");
   }, [selectedAccountIds, trades, accounts, filteredTrades]);
 
   const handleImport = async (data) => {

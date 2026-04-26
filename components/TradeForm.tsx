@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { TrendingUp, TrendingDown, Camera, Star, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 
@@ -279,399 +280,292 @@ export default function TradeForm({
     amberBg: "#FFF4E6",
   };
 
+  const sectionTitle = (label: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: T.border }} />
+    </div>
+  );
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "8px 12px",
+    border: `1px solid ${T.border}`,
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: "inherit",
+    color: T.text,
+    background: T.white,
+    outline: "none",
+    transition: "border-color .12s ease, box-shadow .12s ease",
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block", fontSize: 11, fontWeight: 600, color: T.textSub, marginBottom: 6,
+  };
+
+  const Field = ({ label, children }: { label?: string; children: React.ReactNode }) => (
+    <div>
+      {label && <label style={labelStyle}>{label}</label>}
+      {children}
+    </div>
+  );
+
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {error && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            background: T.redBg,
-            color: T.red,
-            borderRadius: 6,
-            fontSize: 12,
-          }}
-        >
+        <div role="alert" style={{ padding: "10px 14px", background: T.redBg, color: T.red, border: `1px solid ${T.redBg}`, borderRadius: 8, fontSize: 12, fontWeight: 500 }}>
           {error}
         </div>
       )}
-
       {success && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 14px",
-            background: T.greenBg,
-            color: T.green,
-            borderRadius: 6,
-            fontSize: 12,
-          }}
-        >
+        <div role="status" style={{ padding: "10px 14px", background: T.greenBg, color: T.green, border: `1px solid ${T.greenBg}`, borderRadius: 8, fontSize: 12, fontWeight: 500 }}>
           {success}
         </div>
       )}
 
-      {/* BASIC INFO SECTION */}
-      <div
-        style={{
-          marginBottom: 24,
-          padding: "16px 14px",
-          background: T.bg,
-          borderRadius: 6,
-          border: `1px solid ${T.border}`,
-        }}
-      >
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 12, color: T.text }}>
-          Informations de base
+      {/* —— Trade —— */}
+      <section>
+        {sectionTitle("Trade")}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
+          <Field label="Symbole">
+            <input
+              type="text"
+              placeholder="NQ, ES, BTC…"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              style={{ ...inputStyle, fontWeight: 600, letterSpacing: 0.4 }}
+            />
+          </Field>
+          <Field label="Direction">
+            <div style={{ display: "flex", gap: 6, padding: 3, background: T.accentBg, borderRadius: 8 }}>
+              {([
+                { id: "LONG", label: "Long", icon: TrendingUp, color: T.green },
+                { id: "SHORT", label: "Short", icon: TrendingDown, color: T.red },
+              ] as const).map(({ id, label, icon: Icon, color }) => {
+                const active = direction === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setDirection(id)}
+                    aria-pressed={active}
+                    style={{
+                      flex: 1,
+                      padding: "6px 10px",
+                      background: active ? T.white : "transparent",
+                      color: active ? color : T.textMut,
+                      border: "none", borderRadius: 6,
+                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+                      transition: "all .12s ease",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <Icon size={12} strokeWidth={2.25} /> {label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <Field label="Quantité">
+            <input type="number" step="0.01" placeholder="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} style={inputStyle} />
+          </Field>
+        </div>
+      </section>
+
+      {/* —— Compte & setup —— */}
+      <section>
+        {sectionTitle("Compte & setup")}
+
+        <div style={{ marginBottom: 12 }}>
+          <Field label="Compte de trading">
+            <QuickAccountSelector
+              selectedAccountName={setupName}
+              onAccountNameChange={setSetupName}
+              T={T}
+            />
+          </Field>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <input
-            type="text"
-            placeholder="Symbole (NQ, ES...)"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-
-          <select
-            value={exitType}
-            onChange={(e) => setExitType(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          >
-            <option value="">Type de sortie</option>
-            {exitTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+          <Field label="Setup">
+            <input
+              type="text"
+              placeholder="ICT killzone, ORB…"
+              value={setupName}
+              onChange={(e) => setSetupName(e.target.value)}
+              list="strategies-list"
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Stratégie">
+            <select value={selectedStrategy} onChange={(e) => setSelectedStrategy(e.target.value)} style={inputStyle}>
+              <option value="">— Aucune —</option>
+              {loadedStrategies.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+            </select>
+          </Field>
         </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            margin: "12px 0",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setDirection("LONG")}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              background: direction === "LONG" ? T.green : T.white,
-              color: direction === "LONG" ? T.white : T.text,
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            📈 LONG
-          </button>
-          <button
-            type="button"
-            onClick={() => setDirection("SHORT")}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              background: direction === "SHORT" ? T.red : T.white,
-              color: direction === "SHORT" ? T.white : T.text,
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            📉 SHORT
-          </button>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <input
-            type="number"
-            placeholder="Prix entry"
-            value={entryPrice}
-            onChange={(e) => setEntryPrice(e.target.value)}
-            step="0.01"
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-          <input
-            type="number"
-            placeholder="Prix exit"
-            value={exitPrice}
-            onChange={(e) => setExitPrice(e.target.value)}
-            step="0.01"
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-          <input
-            type="number"
-            placeholder="Quantité"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            step="0.01"
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-          <input
-            type="datetime-local"
-            value={entryTime}
-            onChange={(e) => setEntryTime(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-          <input
-            type="datetime-local"
-            value={exitTime}
-            onChange={(e) => setExitTime(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-        </div>
-
-        {/* Sélecteur de compte - remplace setupName */}
-        <div style={{ marginTop: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: T.textSub, display: "block", marginBottom: 6 }}>
-            Compte de Trading
-          </label>
-          <QuickAccountSelector
-            selectedAccountName={setupName}
-            onAccountNameChange={setSetupName}
-            T={T}
-          />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-          <input
-            type="text"
-            placeholder="Setup utilisé (optionnel)"
-            value={setupName}
-            onChange={(e) => setSetupName(e.target.value)}
-            list="strategies-list"
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          />
-          <select
-            value={selectedStrategy}
-            onChange={(e) => setSelectedStrategy(e.target.value)}
-            style={{
-              padding: "8px 10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-          >
-            <option value="">Sélectionner une stratégie (optionnel)</option>
-            {loadedStrategies.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>
-                {strategy.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <datalist id="strategies-list">
-          {loadedStrategies.map((s) => (
-            <option key={s.id} value={s.name} />
-          ))}
+          {loadedStrategies.map((s) => (<option key={s.id} value={s.name} />))}
         </datalist>
-      </div>
+      </section>
 
-      {/* SUBJECTIVE FIELDS */}
-      <div
-        style={{
-          marginBottom: 24,
-          padding: "16px 14px",
-          background: T.bg,
-          borderRadius: 6,
-          border: `1px solid ${T.border}`,
-        }}
-      >
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 12, color: T.text }}>
-          Analyse personnelle
-        </div>
+      {/* —— Analyse —— */}
+      <section>
+        {sectionTitle("Analyse")}
 
-        {/* Notes */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: T.textSub, display: "block", marginBottom: 6 }}>
-            Notes
-          </label>
+        <Field label="Notes">
           <textarea
             ref={textareaRef}
             value={notes}
             onChange={handleTextareaChange}
-            placeholder="Décris ce trade: pourquoi tu l'as pris, ce que tu ressentais, ce qui s'est passé..."
-            style={{
-              width: "100%",
-              minHeight: 120,
-              padding: "10px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-              fontFamily: "inherit",
-              resize: "vertical",
-              boxSizing: "border-box",
-            }}
+            placeholder="Pourquoi ce trade ? Ce que tu as ressenti, ce qui s'est passé…"
+            style={{ ...inputStyle, minHeight: 100, padding: "10px 12px", lineHeight: 1.5, resize: "vertical" }}
           />
-        </div>
+        </Field>
 
-        {/* Emotions */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: T.textSub, display: "block", marginBottom: 6 }}>
-            Émotions ressenties
-          </label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-            {emotionTags.map((tag) => {
-              let bgColor = T.white;
-              let textColor = T.text;
-              if (tag.type === "negative") {
-                bgColor = selectedEmotions.includes(tag.label) ? T.red : T.redBg;
-                textColor = selectedEmotions.includes(tag.label) ? T.white : T.red;
-              } else if (tag.type === "neutral") {
-                bgColor = selectedEmotions.includes(tag.label) ? T.amber : T.amberBg;
-                textColor = selectedEmotions.includes(tag.label) ? T.white : T.amber;
-              } else if (tag.type === "positive") {
-                bgColor = selectedEmotions.includes(tag.label) ? T.green : T.greenBg;
-                textColor = selectedEmotions.includes(tag.label) ? T.white : T.green;
-              }
-
-              return (
-                <button
-                  key={tag.label}
-                  type="button"
-                  onClick={() => handleEmotionToggle(tag.label)}
-                  style={{
-                    padding: "8px 10px",
-                    background: bgColor,
-                    color: textColor,
-                    border: `1px solid ${textColor}`,
-                    borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Quality Score */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: T.textSub, display: "block", marginBottom: 6 }}>
-            Score de qualité: <strong>{qualityScore}/10</strong> — {getQualityLabel(qualityScore)}
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={qualityScore}
-            onChange={(e) => setQualityScore(parseInt(e.target.value))}
-            style={{ width: "100%", cursor: "pointer" }}
-          />
-        </div>
-
-        {/* Screenshot Upload */}
-        <div
-          style={{
-            padding: "12px 10px",
-            border: `2px dashed ${T.border}`,
-            borderRadius: 6,
-            textAlign: "center",
-            cursor: "pointer",
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith("image/")) {
-              handleScreenshotUpload(file);
-            }
-          }}
-          onClick={() => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "image/*";
-            input.onchange = (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0];
-              if (file) handleScreenshotUpload(file);
-            };
-            input.click();
-          }}
-        >
-          {screenshot ? (
-            <div style={{ fontSize: 12, color: T.green }}>✅ {screenshot.name}</div>
-          ) : (
-            <div style={{ fontSize: 12, color: T.textSub }}>
-              📸 Drag & drop une image du graphique ou clique pour upload
+        <div style={{ marginTop: 12 }}>
+          <Field label={`Score de qualité — ${getQualityLabel(qualityScore)} (${qualityScore}/10)`}>
+            <div style={{ display: "flex", gap: 4 }}>
+              {Array.from({ length: 10 }, (_, i) => {
+                const v = i + 1;
+                const active = v <= qualityScore;
+                const dotColor = qualityScore <= 3 ? T.red : qualityScore <= 6 ? T.amber : T.green;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setQualityScore(v)}
+                    aria-label={`Score ${v} sur 10`}
+                    style={{
+                      flex: 1,
+                      height: 8,
+                      borderRadius: 4,
+                      border: "none",
+                      background: active ? dotColor : T.accentBg,
+                      cursor: "pointer",
+                      transition: "background .12s ease",
+                      padding: 0,
+                    }}
+                  />
+                );
+              })}
             </div>
-          )}
+          </Field>
         </div>
-      </div>
 
-      {/* Submit */}
+        <div style={{ marginTop: 12 }}>
+          <Field label="Émotions ressenties">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {emotionTags.map((tag) => {
+                const active = selectedEmotions.includes(tag.label);
+                const color = tag.type === "negative" ? T.red : tag.type === "positive" ? T.green : T.amber;
+                return (
+                  <button
+                    key={tag.label}
+                    type="button"
+                    onClick={() => handleEmotionToggle(tag.label)}
+                    aria-pressed={active}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "5px 10px", borderRadius: 999,
+                      border: `1px solid ${active ? color : T.border}`,
+                      background: active ? color + "18" : T.white,
+                      color: active ? color : T.textSub,
+                      fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      fontFamily: "inherit",
+                      transition: "all .12s ease",
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} aria-hidden />
+                    {tag.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <Field label="Screenshot">
+            {screenshot ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: `1px solid ${T.border}`, borderRadius: 8, background: T.bg }}>
+                <Camera size={14} strokeWidth={1.75} color={T.green} />
+                <span style={{ flex: 1, fontSize: 12, color: T.text, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{screenshot.name}</span>
+                <button type="button" onClick={() => setScreenshot(null)} aria-label="Retirer le screenshot"
+                  style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                  <X size={12} strokeWidth={2} />
+                </button>
+              </div>
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type.startsWith("image/")) handleScreenshotUpload(file);
+                }}
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) handleScreenshotUpload(file);
+                  };
+                  input.click();
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") (e.currentTarget as HTMLDivElement).click(); }}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+                  padding: "20px 12px",
+                  border: `1px dashed ${T.border}`, borderRadius: 8,
+                  background: T.bg, color: T.textSub, fontSize: 12, fontWeight: 500,
+                  cursor: "pointer",
+                  transition: "background .12s ease, border-color .12s ease",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; e.currentTarget.style.borderColor = T.text; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.borderColor = T.border; }}
+              >
+                <Camera size={16} strokeWidth={1.5} />
+                <span>Glisse une image ou clique pour ajouter</span>
+              </div>
+            )}
+          </Field>
+        </div>
+      </section>
+
+      {/* —— Submit —— */}
       <button
         type="submit"
         disabled={loading}
         style={{
           width: "100%",
-          padding: "10px 14px",
+          padding: "10px 16px",
+          height: 38,
           background: loading ? T.textMut : T.accent,
-          color: T.white,
-          border: "none",
-          borderRadius: 6,
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: loading ? "default" : "pointer",
+          color: "#FFFFFF",
+          border: `1px solid ${loading ? T.textMut : T.accent}`,
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: loading ? "wait" : "pointer",
+          fontFamily: "inherit",
+          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+          transition: "background .12s ease",
         }}
       >
-        {loading ? "Traitement..." : "Sauvegarder le trade"}
+        {loading ? "Sauvegarde…" : (existingTrade ? "Mettre à jour le trade" : "Enregistrer le trade")}
       </button>
     </form>
   );

@@ -685,6 +685,20 @@ function GlobalsSection() {
       />
       <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Devise par défaut affichée dans toute l&apos;application</div>
 
+      <SectionLabel mt={20}>Risque par trade (R)</SectionLabel>
+      <input
+        type="number"
+        min={1}
+        step={10}
+        defaultValue={typeof window !== "undefined" ? (parseFloat(localStorage.getItem("tr4de_risk_per_trade") || "100") || 100) : 100}
+        onChange={(e) => {
+          const n = Math.max(1, parseFloat(e.target.value) || 0);
+          try { localStorage.setItem("tr4de_risk_per_trade", String(n)); } catch {}
+        }}
+        style={{ width: "100%", padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: T.text, outline: "none", background: T.white }}
+      />
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Montant de risque par défaut. Sert à calculer le R-multiple (R = P&L / risque).</div>
+
       <SectionLabel mt={20}>Langue</SectionLabel>
       <SearchableSelect
         value={lang}
