@@ -155,7 +155,6 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             }}>
               {typeLabel}
             </span>
-            <span style={{ fontSize: 13, color: T.textSub }}>{account.broker || "—"}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {getBrokerLogo(account.broker) && (

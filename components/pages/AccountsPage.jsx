@@ -205,12 +205,6 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                             {typeLabel}
                           </span>
                         </div>
-                        <span style={{
-                          fontSize: 12, color: T.textSub, fontWeight: 500,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {acc.broker || "—"}
-                        </span>
                       </div>
                       {getBrokerLogo(acc.broker) && (
                         <img
