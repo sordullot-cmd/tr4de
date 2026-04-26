@@ -94,9 +94,12 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
     setPage?.("account-detail");
   };
 
+  const winRateGlobal = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0;
+  const pnlColorGlobal = totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
-      {/* Header */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }} className="anim-1">
+      {/* Header — titre + bouton */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>
           Mes comptes
@@ -116,36 +119,33 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
         </button>
       </div>
 
-      {/* Totaux — style OpenAI Home : carte fusionnée 4 KPIs */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiCell label="Comptes" value={String(totals.accounts)} />
-          <KpiCell label="Trades total" value={String(totals.trades)} />
-          <KpiCell
-            label="P&L cumulé"
-            value={fmt(totals.pnl, true)}
-            valueColor={totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text}
-          />
-          <KpiCell
-            label="Win rate global"
-            value={totals.trades > 0 ? `${((totals.wins / totals.trades) * 100).toFixed(1)}%` : "—"}
-            last
-          />
+      {/* Hero typographique — pas de carte, juste de la hiérarchie */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          P&amp;L cumulé
+        </div>
+        <div style={{
+          fontSize: 40, fontWeight: 600, color: pnlColorGlobal, letterSpacing: -0.8,
+          lineHeight: 1, fontVariantNumeric: "tabular-nums",
+        }}>
+          {fmt(totals.pnl, true)}
+        </div>
+        <div style={{ fontSize: 13, color: T.textSub, fontWeight: 500, marginTop: 4 }}>
+          <span style={{ color: T.text, fontWeight: 600 }}>{totals.accounts}</span> {totals.accounts > 1 ? "comptes" : "compte"}
+          <span style={{ color: T.textMut, margin: "0 8px" }}>·</span>
+          <span style={{ color: T.text, fontWeight: 600 }}>{totals.trades}</span> trade{totals.trades > 1 ? "s" : ""}
+          <span style={{ color: T.textMut, margin: "0 8px" }}>·</span>
+          <span style={{ color: T.text, fontWeight: 600 }}>{totals.trades > 0 ? `${winRateGlobal.toFixed(1)}%` : "—"}</span> de réussite
         </div>
       </div>
 
-      {/* Liste des comptes */}
+      {/* Liste des comptes — rows fines séparées par des hairlines */}
       {visibleAccounts.length === 0 ? (
-        <div style={{
-          border: `1px dashed ${T.border2}`, borderRadius: 12, padding: 40,
-          textAlign: "center", background: T.surface,
-        }}>
-          <p style={{ margin: 0, color: T.textSub, fontSize: 14 }}>
-            Aucun compte de trading. Ajoutez-en un depuis la page “Ajouter des trades”.
-          </p>
-        </div>
+        <p style={{ margin: 0, color: T.textMut, fontSize: 14, padding: "32px 0" }}>
+          Aucun compte de trading. Ajoutez-en un depuis la page “Ajouter des trades”.
+        </p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", borderTop: `1px solid ${T.border}` }}>
           {[...visibleAccounts].sort((a, b) => {
             const sa = stats.get(a.id) || { trades: 0, pnl: 0 };
             const sb = stats.get(b.id) || { trades: 0, pnl: 0 };
@@ -154,120 +154,95 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           }).map((acc) => {
             const s = stats.get(acc.id) || { trades: 0, wins: 0, losses: 0, pnl: 0 };
             const winRate = s.trades > 0 ? (s.wins / s.trades) * 100 : 0;
-            const isActive = selectedAccountIds.length === 1 && selectedAccountIds[0] === acc.id;
+            const type = acc.account_type || "live";
+            const typeLabel = type === "eval"
+              ? `Eval${acc.eval_account_size ? ` ${acc.eval_account_size}` : ""}`
+              : type === "funded"
+                ? `Funded${acc.eval_account_size ? ` ${acc.eval_account_size}` : ""}`
+                : "Live";
+            const capital = parseEvalSize(acc.eval_account_size);
+            const hasBalance = capital !== null;
+            const balance = hasBalance ? capital + s.pnl : null;
+            const pnlColor = s.pnl > 0 ? T.green : s.pnl < 0 ? T.red : T.textSub;
+            const pnlPct = capital ? (s.pnl / capital) * 100 : null;
+
             return (
               <div
                 key={acc.id}
                 onClick={() => onOpenDetail(acc.id)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#FAFAFA"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 style={{
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 12,
-                  padding: 16,
-                  background: T.surface,
                   cursor: "pointer",
+                  padding: "20px 4px",
+                  borderBottom: `1px solid ${T.border}`,
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  transition: "border-color .15s",
+                  alignItems: "center",
+                  gap: 24,
+                  transition: "background .12s ease",
+                  background: "transparent",
                 }}
               >
-                {(() => {
-                  const type = acc.account_type || "live";
-                  const dotColor = type === "eval" ? T.amber : type === "funded" ? "#2563EB" : T.green;
-                  const typeLabel = type === "eval"
-                    ? `Eval${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
-                    : type === "funded"
-                      ? `Funded${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
-                      : "Live";
-                  const capital = parseEvalSize(acc.eval_account_size);
-                  const hasBalance = capital !== null;
-                  const balance = hasBalance ? capital + s.pnl : null;
-                  const pnlColor = s.pnl > 0 ? T.green : s.pnl < 0 ? T.red : T.textSub;
-                  const pnlPct = capital ? (s.pnl / capital) * 100 : null;
+                {/* Logo broker (compact, à gauche) */}
+                <div style={{ width: 48, height: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {getBrokerLogo(acc.broker) ? (
+                    <img src={getBrokerLogo(acc.broker)} alt="" style={{ maxHeight: 28, maxWidth: 48, objectFit: "contain", opacity: 0.85 }} />
+                  ) : (
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: T.bg, border: `1px solid ${T.border}` }} />
+                  )}
+                </div>
 
-                  return (
-                    <>
-                      {/* Top row: name + meta · broker logo */}
-                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
-                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                          <div style={{
-                            fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.15,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          }}>
-                            {acc.name || "Compte"}
-                          </div>
-                          <div style={{
-                            display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap",
-                            fontSize: 11, color: T.textSub, fontWeight: 500,
-                          }}>
-                            <span style={{
-                              display: "inline-flex", alignItems: "center", gap: 5,
-                              padding: "2px 8px", borderRadius: 999,
-                              border: `1px solid ${T.border}`, background: T.white,
-                            }}>
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                              {typeLabel}
-                            </span>
-                            {acc.broker && (
-                              <span style={{
-                                display: "inline-flex", alignItems: "center",
-                                padding: "2px 8px", borderRadius: 999,
-                                border: `1px solid ${T.border}`, background: T.white,
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160,
-                              }}>
-                                {acc.broker}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {getBrokerLogo(acc.broker) && (
-                          <img
-                            src={getBrokerLogo(acc.broker)}
-                            alt=""
-                            style={{ height: 20, maxWidth: 64, objectFit: "contain", flexShrink: 0, opacity: 0.75 }}
-                          />
-                        )}
-                      </div>
+                {/* Nom + meta — typographique */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{
+                    fontSize: 17, fontWeight: 600, color: T.text, letterSpacing: -0.2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {acc.name || "Compte"}
+                  </div>
+                  <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>
+                    {typeLabel}
+                    {acc.broker && (
+                      <>
+                        <span style={{ margin: "0 8px" }}>·</span>
+                        {acc.broker}
+                      </>
+                    )}
+                  </div>
+                </div>
 
-                      {/* Hero balance (gauche) + stats (droite) */}
-                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: 4 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                          <span style={{
-                            fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
-                            fontVariantNumeric: "tabular-nums",
-                          }}>
-                            {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
-                          </span>
-                          {hasBalance && (
-                            <span style={{
-                              fontSize: 12, fontWeight: 500, color: pnlColor,
-                              fontVariantNumeric: "tabular-nums",
-                            }}>
-                              {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
-                              {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
-                            </span>
-                          )}
-                        </div>
+                {/* Stats compactes — typographie alignée à droite */}
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4,
+                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 140,
+                }}>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: T.text, letterSpacing: -0.3 }}>
+                    {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
+                  </span>
+                  {hasBalance ? (
+                    <span style={{ fontSize: 12, fontWeight: 500, color: pnlColor }}>
+                      {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
+                      {pnlPct !== null && ` · ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, fontWeight: 500, color: T.textMut }}>
+                      {s.trades > 0 ? `${s.trades} trade${s.trades > 1 ? "s" : ""}` : "Aucun trade"}
+                    </span>
+                  )}
+                </div>
 
-                        <div style={{
-                          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3,
-                          fontSize: 12, color: T.textSub, fontWeight: 400,
-                          fontVariantNumeric: "tabular-nums",
-                          flexShrink: 0,
-                        }}>
-                          <span>{s.trades} trade{s.trades > 1 ? "s" : ""}</span>
-                          <span>{s.trades > 0 ? `${winRate.toFixed(1)}% wr` : "—% wr"}</span>
-                          <span>
-                            <span style={{ color: T.green }}>{s.wins}W</span>
-                            <span style={{ color: T.textMut }}> / </span>
-                            <span style={{ color: T.red }}>{s.losses}L</span>
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-
+                {/* Win rate + W/L — colonne discrète */}
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4,
+                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 90,
+                }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
+                    {s.trades > 0 ? `${winRate.toFixed(1)}%` : "—"}
+                  </span>
+                  <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
+                    {s.trades > 0 ? <><span style={{ color: T.text }}>{s.wins}</span> / {s.losses}</> : "0 / 0"}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -277,28 +252,6 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
   );
 }
 
-function KpiCell({ label, value, valueColor, last }) {
-  return (
-    <div style={{
-      padding: "14px 18px",
-      borderRight: last ? "none" : `1px solid ${T.border}`,
-      position: "relative",
-    }}>
-      <div style={{
-        fontSize: 12, color: "#5C5C5C", marginBottom: 8, fontWeight: 500,
-        display: "inline-flex", alignItems: "center", gap: 4,
-      }}>
-        {label} <span style={{ color: "#8E8E8E" }}>›</span>
-      </div>
-      <div style={{
-        fontSize: 20, fontWeight: 600,
-        color: valueColor || T.text, letterSpacing: -0.2,
-      }}>
-        {value}
-      </div>
-    </div>
-  );
-}
 
 function Stat({ label, value, tone, sub }) {
   const color = tone === "green" ? T.green : tone === "red" ? T.red : T.text;
