@@ -529,7 +529,6 @@ body {
   .tr4de-journal-row > div:first-child {
     width: min(100%, 260px) !important;
     align-self: center !important;
-    aspect-ratio: 1 / 1 !important;
     height: auto !important;
     flex-shrink: 0 !important;
   }
