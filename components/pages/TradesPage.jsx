@@ -633,7 +633,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   const showCheckbox = isChecked || isHovered;
                   const selectedBg = "#F0F0F0";
                   const hoverBg = "#FAFAFA";
-                  const openBg = "#EBEBEB";
+                  const openBg = "#F5F5F5";
 
                   return (
                     <tr

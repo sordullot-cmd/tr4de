@@ -576,15 +576,36 @@ export default function DailyPlannerPage() {
 
 function HabitsChart({ habits, history }) {
   const total = habits.length;
-  const RANGE = 30; // 30 derniers jours
+  // Trouve la première date où au moins une habitude a été cochée
+  let firstIso = null;
+  for (const h of habits) {
+    const map = history[h.id] || {};
+    for (const iso of Object.keys(map)) {
+      if (map[iso] && (firstIso === null || iso < firstIso)) firstIso = iso;
+    }
+  }
+  // Fallback : si rien n'est coché, on affiche les 7 derniers jours
+  const today = new Date();
+  let startDate;
+  if (firstIso) {
+    const [y, m, d] = firstIso.split("-").map(Number);
+    startDate = new Date(y, m - 1, d);
+  } else {
+    startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 6);
+  }
+  // Nombre de jours entre startDate et aujourd'hui (inclus)
+  const msPerDay = 86400000;
+  const startMs = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
+  const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const span = Math.max(1, Math.round((todayMs - startMs) / msPerDay) + 1);
   const days = [];
-  for (let i = RANGE - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
+  for (let i = 0; i < span; i++) {
+    const d = new Date(startMs + i * msPerDay);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const done = habits.reduce((acc, h) => acc + (history[h.id]?.[iso] ? 1 : 0), 0);
     const pct = total > 0 ? (done / total) * 100 : 0;
-    days.push({ iso, day: d.getDate(), date: d, done, pct, isToday: i === 0 });
+    days.push({ iso, day: d.getDate(), date: d, done, pct, isToday: i === span - 1 });
   }
   const avg = total > 0 ? Math.round(days.reduce((s, x) => s + x.pct, 0) / days.length) : 0;
   let streak = 0;
