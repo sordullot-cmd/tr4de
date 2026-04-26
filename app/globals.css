@@ -501,14 +501,21 @@ body {
   /* Toolbars de page : header avec h1 + boutons → wrap propre */
   .anim-1 > div:first-child { flex-wrap: wrap !important; gap: 8px !important; }
 
-  /* Journal de trading : carte sparkline (carré) + tableau côte-à-côte → empilé.
-     La carte garde son ratio 1:1, fluide jusqu'à 280px de côté. */
-  .tr4de-journal-row { flex-direction: column !important; gap: 12px !important; }
-  .tr4de-journal-row > div:first-child {
+  /* Journal de trading : carte sparkline (carré) + notes + tableau empilés et
+     alignés sur la même largeur. La carte garde son ratio 1:1, le tableau
+     conserve son scroll horizontal interne via tr4de-table-wrap. */
+  .tr4de-journal-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+  .tr4de-journal-row > div {
     width: min(100%, 280px) !important;
+    max-width: 100% !important;
+  }
+  .tr4de-journal-row > div:first-child {
     aspect-ratio: 1 / 1 !important;
     height: auto !important;
-    align-self: center !important;
   }
 
   /* Goals page : grid 5-cols → empilé en 2 lignes (titre+actions / meta) */
@@ -568,3 +575,155 @@ body {
 @media (min-width: 480px) and (max-width: 767px) {
   .tr4de-cal-year-grid { grid-template-columns: 1fr 1fr !important; }
 }
+
+/* ============================================================
+   RESPONSIVE PASS 2 — overrides supplémentaires
+   Cible les patterns inline-style qui n'étaient pas couverts.
+   ============================================================ */
+
+/* Tablet (<1024px) : auto-fit/auto-fill avec minmax >= 280px qui causent
+   des cartes trop larges et débordent du conteneur. */
+@media (max-width: 1023px) {
+  [style*="minmax(400px"],
+  [style*="minmax(380px"],
+  [style*="minmax(360px"],
+  [style*="minmax(340px"],
+  [style*="minmax(320px"],
+  [style*="minmax(300px"],
+  [style*="minmax(280px"] {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)) !important;
+  }
+}
+
+/* Mobile (<768px) */
+@media (max-width: 767px) {
+  /* Cartes auto-fit/auto-fill : forcer minmax raisonnable */
+  [style*="minmax(400px"],
+  [style*="minmax(380px"],
+  [style*="minmax(360px"],
+  [style*="minmax(340px"],
+  [style*="minmax(320px"],
+  [style*="minmax(300px"],
+  [style*="minmax(280px"],
+  [style*="minmax(200px"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* Stat blocks denses : 2 col max sur mobile */
+  [style*="minmax(160px"],
+  [style*="minmax(140px"],
+  [style*="minmax(120px"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* GoalsPage header/row 5-col à minmax → géré par .tr4de-goals-row,
+     mais sécurise les variantes : */
+  [style*="minmax(70px, 110px) minmax(0, 1fr)"] {
+    grid-template-columns: 1fr auto !important;
+  }
+
+  /* Modales avec maxWidth >= 600px (TradeImportModal, etc.) */
+  [style*="max-width: 1000px"],
+  [style*="maxWidth: 1000px"],
+  [style*="max-width:1000px"],
+  [style*="maxWidth:1000"],
+  [style*="max-width: 900px"],
+  [style*="max-width: 800px"],
+  [style*="max-width: 760px"],
+  [style*="maxWidth: 760"],
+  [style*="max-width: 720px"],
+  [style*="max-width: 640px"] {
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  /* Modales : si flex row, stack vertical (TradeImportModal a 2 colonnes) */
+  [style*="max-width: 1000px"][style*="display: flex"],
+  [style*="max-width:1000px"][style*="display:flex"],
+  [style*="maxWidth: 1000"][style*="display: flex"] {
+    flex-direction: column !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+
+  /* Hauteurs viewport : 100vh → 100dvh pour éviter overflow sous la barre URL */
+  [style*="height: 100vh"],
+  [style*="height:100vh"],
+  [style*="min-height: 100vh"],
+  [style*="min-height:100vh"],
+  [style*="minHeight: 100vh"],
+  [style*="minHeight:100vh"] {
+    height: auto !important;
+    min-height: 100dvh !important;
+  }
+  [style*="calc(100vh - 120px)"] {
+    height: calc(100dvh - 100px) !important;
+  }
+  [style*="calc(100vh - 200px)"] {
+    max-height: none !important;
+  }
+
+  /* Badges absolus en haut-droite des KPIs : repositionner en flow */
+  .tr4de-kpi-row [style*="position: absolute"][style*="top: 10"],
+  .tr4de-kpi-row [style*="position:absolute"][style*="top:10"] {
+    position: static !important;
+    margin-bottom: 4px !important;
+    display: block !important;
+  }
+
+  /* Dashboard KPIs row (repeat(4,1fr) sans espace) : géré par règle générique
+     [style*="repeat(4"], mais sécurise la variante sans espace : */
+  [style*="repeat(4,1fr)"],
+  [style*="repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* fontSize inline 20-22 (P&L value, h2) → tailles réduites */
+  [style*="font-size: 20"]:not([style*="font-size: 200"]),
+  [style*="fontSize: 20"]:not([style*="fontSize: 200"]),
+  [style*="fontSize:20"]:not([style*="fontSize:200"]) {
+    font-size: 16px !important;
+  }
+  [style*="font-size: 22"], [style*="fontSize: 22"], [style*="fontSize:22"] {
+    font-size: 17px !important;
+  }
+
+  /* Padding cards 16px 20px → 12px 14px */
+  [style*="padding: 16px 20px"], [style*="padding:16px 20px"] {
+    padding: 12px 14px !important;
+  }
+  [style*="padding: 14px 18px"], [style*="padding:14px 18px"] {
+    padding: 10px 12px !important;
+  }
+
+  /* Calendrier semaine 7-col : reste en 7 col mais réduit la cellule */
+  [style*="repeat(7,1fr)"],
+  [style*="repeat(7, 1fr)"] {
+    font-size: 11px !important;
+  }
+  [style*="repeat(7,1fr)"] > *,
+  [style*="repeat(7, 1fr)"] > * {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Tableaux dans un wrapper non explicite : essaye de scroller le parent.
+     On évite display:block sur <table> qui casse les colgroup widths. */
+  .tr4de-main table:not(.tr4de-table-wrap table) {
+    max-width: 100% !important;
+  }
+}
+
+/* Mobile très petit (<480px) */
+@media (max-width: 479px) {
+  /* Stat blocks → 1 col sur très petit */
+  [style*="minmax(160px"],
+  [style*="minmax(140px"],
+  [style*="minmax(120px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Réduire encore les paddings cards */
+  [style*="padding: 32px"], [style*="padding:32px"] {
+    padding: 16px !important;
+  }
+}
+
