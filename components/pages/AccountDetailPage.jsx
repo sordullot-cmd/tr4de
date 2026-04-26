@@ -198,8 +198,8 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         </div>
       </div>
 
-      {/* KPIs principaux — style OpenAI Home */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      {/* KPIs principaux — collés au graphique en dessous */}
+      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "12px 12px 0 0", borderBottom: "none", overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
           <KpiCell
             label="Account balance"
@@ -247,13 +247,15 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         </div>
       </div>
 
-      {/* Equity curve */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 18px" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution P&L</div>
-          <div style={{ fontSize: 11, color: T.textMut }}>{stats.total} trades</div>
+      {/* Equity curve — collé à la carte KPIs */}
+      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden", marginTop: -16 }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution du P&L</div>
+          <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>P&L cumulé jour par jour — {stats.total} trades</div>
         </div>
-        <EquityCurve curve={stats.curve} />
+        <div style={{ padding: 12 }}>
+          <EquityCurve curve={stats.curve} />
+        </div>
       </div>
 
       {/* Best/Worst */}
@@ -365,41 +367,106 @@ function HighlightCard({ label, value, sub, tone }) {
 }
 
 function EquityCurve({ curve }) {
-  const ref = React.useRef(null);
-  const [w, setW] = React.useState(600);
-  React.useEffect(() => {
-    const ro = new ResizeObserver(() => {
-      if (ref.current) setW(ref.current.clientWidth || 600);
-    });
-    if (ref.current) ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, []);
   if (!curve || curve.length < 2) {
     return (
-      <div ref={ref} style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: T.textSub, fontSize: 12 }}>
+      <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: T.textSub, fontSize: 12 }}>
         Pas assez de données.
       </div>
     );
   }
-  const h = 180;
-  const padX = 10, padTop = 14, padBottom = 18;
-  const min = Math.min(0, ...curve.map(c => c.cum));
-  const max = Math.max(0, ...curve.map(c => c.cum));
-  const span = (max - min) || 1;
-  const innerH = h - padTop - padBottom;
-  const x = (i) => padX + (i / (curve.length - 1)) * (w - padX * 2);
-  const y = (v) => padTop + innerH - ((v - min) / span) * innerH;
-  const last = curve[curve.length - 1];
-  const lineColor = last.cum >= 0 ? T.green : T.red;
-  const path = curve.map((c, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(c.cum).toFixed(1)}`).join(" ");
-  const zeroY = y(0);
+
+  // Group by day (cumulative P&L per date)
+  const byDay = {};
+  let cum = 0;
+  const sorted = [...curve].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+  sorted.forEach(p => {
+    const d = String(p.date || "").slice(0, 10);
+    byDay[d] = p.cum;
+  });
+  const allDates = Object.keys(byDay).sort();
+  const points = allDates.map(d => ({ date: d, value: byDay[d] }));
+
+  const yMin = Math.min(0, ...points.map(p => p.value));
+  const yMax = Math.max(0, ...points.map(p => p.value));
+  const yRange = (yMax - yMin) || 1;
+
+  const W = 800, H = 220;
+  const padL = 0, padR = 28, padT = 10, padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
+  const yFor = (v) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+  const last = points[points.length - 1].value;
+  const lineColor = last >= 0 ? T.green : T.red;
+
+  const fmtVal = (v) => {
+    const sign = v >= 0 ? "+" : "-";
+    const abs = Math.abs(v);
+    if (abs >= 10000) return `${sign}${Math.round(abs / 10000) * 10}k`;
+    if (abs >= 1000)  return `${sign}${Math.round(abs / 1000)}k`;
+    return `${sign}${Math.round(abs)}`;
+  };
+  const fmtD = (d) => {
+    const [, m, dd] = d.split("-");
+    const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+    return `${parseInt(dd)} ${months[parseInt(m) - 1]}`;
+  };
+
+  // Y ticks (4 niveaux)
+  const yTicks = [];
+  const N = 3;
+  for (let i = 0; i <= N; i++) {
+    const ratio = i / N;
+    const v = yMax - ratio * yRange;
+    yTicks.push({ y: padT + plotH * ratio, value: v });
+  }
+
+  // X labels — premier, milieu, dernier (pour ne pas surcharger)
+  const xLabels = [];
+  if (allDates.length <= 6) {
+    allDates.forEach((d, i) => xLabels.push({ i, date: d, anchor: i === 0 ? "start" : i === allDates.length - 1 ? "end" : "middle" }));
+  } else {
+    xLabels.push({ i: 0, date: allDates[0], anchor: "start" });
+    xLabels.push({ i: Math.floor(allDates.length / 2), date: allDates[Math.floor(allDates.length / 2)], anchor: "middle" });
+    xLabels.push({ i: allDates.length - 1, date: allDates[allDates.length - 1], anchor: "end" });
+  }
+
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+  const areaPath = `${path} L ${xFor(points.length - 1).toFixed(1)} ${yFor(yMin).toFixed(1)} L ${xFor(0).toFixed(1)} ${yFor(yMin).toFixed(1)} Z`;
+  const zeroY = yFor(0);
+
   return (
-    <div ref={ref} style={{ width: "100%", height: h }}>
-      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block" }}>
-        <line x1="0" y1={zeroY} x2={w} y2={zeroY} stroke="#F0F0F0" strokeWidth="1" />
-        <path d={path} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible", aspectRatio: `${W} / ${H}` }}>
+      <defs>
+        <linearGradient id="acc-equity-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* Y labels (à droite) */}
+      {yTicks.map((tk, i) => (
+        <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="7" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
+      ))}
+
+      {/* Ligne de zéro si dans l'échelle */}
+      {yMin < 0 && yMax > 0 && (
+        <line x1={padL} y1={zeroY} x2={padL + plotW} y2={zeroY} stroke="#F0F0F0" strokeWidth="0.5" strokeDasharray="2 2" />
+      )}
+
+      {/* Gradient sous la courbe */}
+      <path d={areaPath} fill="url(#acc-equity-grad)" />
+
+      {/* Courbe */}
+      <path d={path} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* X labels */}
+      {xLabels.map((x, i) => (
+        <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="7" textAnchor={x.anchor}>{fmtD(x.date)}</text>
+      ))}
+    </svg>
   );
 }
 

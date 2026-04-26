@@ -442,36 +442,45 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           )}
           {/* Onglets de sélection du graphique — style minimal (pill sur l'actif uniquement) */}
           <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:6,flexWrap:"wrap"}}>
-            {[
-              { id: "cumulative", label: t("dash.cumulativePnL") },
-              { id: "byAccount",  label: "P&L par compte" },
-              { id: "byStrategy", label: "P&L par stratégie" },
-            ].map((opt) => {
-              const active = chartView === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setChartView(opt.id)}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 999,
-                    border: "none",
-                    background: active ? "#F5F5F5" : "transparent",
-                    color: active ? T.text : T.textSub,
-                    fontSize: 13,
-                    fontWeight: active ? 600 : 500,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    transition: "background 140ms ease, color 140ms ease",
-                  }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = T.text; }}
-                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = T.textSub; }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+            {(() => {
+              const opts = [
+                { id: "cumulative", label: t("dash.cumulativePnL") },
+                { id: "byAccount",  label: "P&L par compte" },
+                { id: "byStrategy", label: "P&L par stratégie" },
+              ];
+              return opts.map((opt, i) => {
+                const active = chartView === opt.id;
+                const prev = opts[i - 1];
+                const showSep = i > 0 && chartView !== opt.id && chartView !== prev?.id;
+                return (
+                  <React.Fragment key={opt.id}>
+                    {showSep && (
+                      <span aria-hidden="true" style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setChartView(opt.id)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 999,
+                        border: "none",
+                        background: active ? "#F5F5F5" : "transparent",
+                        color: active ? T.text : T.textSub,
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 500,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "background 140ms ease, color 140ms ease",
+                      }}
+                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = T.text; }}
+                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = T.textSub; }}
+                    >
+                      {opt.label}
+                    </button>
+                  </React.Fragment>
+                );
+              });
+            })()}
           </div>
           <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>
             {chartView === "cumulative"
