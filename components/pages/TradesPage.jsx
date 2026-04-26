@@ -659,7 +659,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       {/* Symbol + checkbox conditionnelle + icone trending */}
                       <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"var(--font-sans)",height:42,minWidth:130,width:130}}>
                         <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
-                          {showCheckbox ? (
+                          {showCheckbox && (
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -671,11 +671,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               onClick={(e) => e.stopPropagation()}
                               style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
                             />
-                          ) : (
-                            <span style={{width:22,height:22,borderRadius:6,background:T.bg,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                              <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
-                            </span>
                           )}
+                          <span style={{width:22,height:22,borderRadius:6,background:T.bg,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
+                          </span>
                           <span>{t.symbol}</span>
                         </span>
                       </td>
