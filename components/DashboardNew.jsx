@@ -189,6 +189,10 @@ export default function App() {
   });
   const { page, setPage } = useApp();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebarCollapsed") === "1";
+  });
   const [selectedStrategyId, setSelectedStrategyId] = useState(null);
   const [aiReportsUnread, setAiReportsUnread] = useState(0);
 
@@ -826,6 +830,14 @@ export default function App() {
         <Sidebar
           mobileOpen={mobileNavOpen}
           onMobileClose={() => setMobileNavOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => {
+            setSidebarCollapsed(c => {
+              const next = !c;
+              try { localStorage.setItem("sidebarCollapsed", next ? "1" : "0"); } catch {}
+              return next;
+            });
+          }}
           brand="tao trade"
           workspace={(() => {
             if (selectedAccountIds.length === 1) {
@@ -862,9 +874,19 @@ export default function App() {
             <button
               type="button"
               className="tr4de-hamburger"
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Ouvrir le menu"
-              style={{display:"none",width:36,height:36,borderRadius:8,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                  setMobileNavOpen(true);
+                } else {
+                  setSidebarCollapsed(c => {
+                    const next = !c;
+                    try { localStorage.setItem("sidebarCollapsed", next ? "1" : "0"); } catch {}
+                    return next;
+                  });
+                }
+              }}
+              aria-label="Basculer le menu"
+              style={{display:"inline-flex",width:36,height:36,borderRadius:8,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}
             >
               <LucideMenu size={18} strokeWidth={1.75} />
             </button>

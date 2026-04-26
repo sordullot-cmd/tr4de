@@ -411,6 +411,14 @@ body {
   /* Exceptions : grilles qui doivent rester en 2 colonnes même sur tablette/mobile.
      Le collapse `1fr 1fr → 1fr` au-dessus est trop large pour ces cas. */
   .tr4de-journal-kpis { grid-template-columns: 1fr 1fr !important; }
+
+  /* Journal : sur tablette (<1024px), réduire la carte du jour pour laisser
+     de la place au textarea + tableau à droite. */
+  .tr4de-journal-row { gap: 14px !important; }
+  .tr4de-journal-row > div:first-child {
+    width: 180px !important;
+    flex-shrink: 0 !important;
+  }
 }
 
 /* Mobile (<768px) */
@@ -449,7 +457,8 @@ body {
 }
 @media (min-width: 768px) {
   .show-mobile { display: none !important; }
-  .tr4de-hamburger { display: none !important; }
+  /* Le hamburger reste visible sur desktop pour permettre de collapse la sidebar */
+  .tr4de-hamburger { display: inline-flex !important; }
 }
 
 /* Sur mobile : tables → scroll horizontal + padding réduit sur les cellules */
@@ -501,21 +510,29 @@ body {
   /* Toolbars de page : header avec h1 + boutons → wrap propre */
   .anim-1 > div:first-child { flex-wrap: wrap !important; gap: 8px !important; }
 
-  /* Journal de trading : carte sparkline (carré) + notes + tableau empilés et
-     alignés sur la même largeur. La carte garde son ratio 1:1, le tableau
-     conserve son scroll horizontal interne via tr4de-table-wrap. */
+  /* Journal de trading (mobile <768px) : carte sparkline + notes + tableau
+     empilés verticalement. Carte en largeur limitée centrée, contenu droit
+     pleine largeur. */
   .tr4de-journal-row {
     flex-direction: column !important;
-    align-items: center !important;
-    gap: 12px !important;
-  }
-  .tr4de-journal-row > div {
-    width: min(100%, 280px) !important;
-    max-width: 100% !important;
+    align-items: stretch !important;
+    gap: 14px !important;
   }
   .tr4de-journal-row > div:first-child {
+    width: min(100%, 260px) !important;
+    align-self: center !important;
     aspect-ratio: 1 / 1 !important;
     height: auto !important;
+    flex-shrink: 0 !important;
+  }
+  .tr4de-journal-row > div:nth-child(2) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  /* Textarea daily notes : hauteur réduite sur mobile */
+  .tr4de-journal-row textarea {
+    height: 140px !important;
   }
 
   /* Goals page : grid 5-cols → empilé en 2 lignes (titre+actions / meta) */
