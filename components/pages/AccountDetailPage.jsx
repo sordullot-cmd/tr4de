@@ -368,14 +368,6 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       {/* Tableau de stats détaillées */}
       <StatsTable stats={stats} />
 
-      {/* Best/Worst */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-        <HighlightCard label="Meilleur trade" value={stats.bestTrade ? fmt(stats.bestTrade.pnl, true) : "—"} sub={stats.bestTrade ? `${stats.bestTrade.symbol || ""} · ${formatDate(stats.bestTrade.date)}` : ""} tone="green" />
-        <HighlightCard label="Pire trade" value={stats.worstTrade ? fmt(stats.worstTrade.pnl, true) : "—"} sub={stats.worstTrade ? `${stats.worstTrade.symbol || ""} · ${formatDate(stats.worstTrade.date)}` : ""} tone="red" />
-        <HighlightCard label="Meilleure journée" value={stats.bestDay ? fmt(stats.bestDay.pnl, true) : "—"} sub={stats.bestDay ? formatDate(stats.bestDay.date) : ""} tone="green" />
-        <HighlightCard label="Pire journée" value={stats.worstDay ? fmt(stats.worstDay.pnl, true) : "—"} sub={stats.worstDay ? formatDate(stats.worstDay.date) : ""} tone="red" />
-      </div>
-
       {/* Recent trades */}
       <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${T.border}` }}>

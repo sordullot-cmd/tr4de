@@ -229,40 +229,40 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                         )}
                       </div>
 
-                      {/* Hero balance */}
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
-                        <span style={{
-                          fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
-                          fontVariantNumeric: "tabular-nums",
-                        }}>
-                          {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
-                        </span>
-                        {hasBalance && (
+                      {/* Hero balance (gauche) + stats (droite) */}
+                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: 4 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                           <span style={{
-                            fontSize: 12, fontWeight: 500, color: pnlColor,
+                            fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
                             fontVariantNumeric: "tabular-nums",
                           }}>
-                            {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
-                            {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
+                            {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
                           </span>
-                        )}
-                      </div>
+                          {hasBalance && (
+                            <span style={{
+                              fontSize: 12, fontWeight: 500, color: pnlColor,
+                              fontVariantNumeric: "tabular-nums",
+                            }}>
+                              {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
+                              {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
+                            </span>
+                          )}
+                        </div>
 
-                      {/* Footer metadata — inline, separators */}
-                      <div style={{
-                        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                        fontSize: 12, color: T.textSub, fontWeight: 400,
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        <span>{s.trades} trade{s.trades > 1 ? "s" : ""}</span>
-                        <span style={{ color: T.border2 }}>·</span>
-                        <span>{s.trades > 0 ? `${winRate.toFixed(1)}% wr` : "—% wr"}</span>
-                        <span style={{ color: T.border2 }}>·</span>
-                        <span>
-                          <span style={{ color: T.green }}>{s.wins}W</span>
-                          <span style={{ color: T.textMut }}> / </span>
-                          <span style={{ color: T.red }}>{s.losses}L</span>
-                        </span>
+                        <div style={{
+                          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3,
+                          fontSize: 12, color: T.textSub, fontWeight: 400,
+                          fontVariantNumeric: "tabular-nums",
+                          flexShrink: 0,
+                        }}>
+                          <span>{s.trades} trade{s.trades > 1 ? "s" : ""}</span>
+                          <span>{s.trades > 0 ? `${winRate.toFixed(1)}% wr` : "—% wr"}</span>
+                          <span>
+                            <span style={{ color: T.green }}>{s.wins}W</span>
+                            <span style={{ color: T.textMut }}> / </span>
+                            <span style={{ color: T.red }}>{s.losses}L</span>
+                          </span>
+                        </div>
                       </div>
                     </>
                   );
