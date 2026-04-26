@@ -589,7 +589,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
       {/* CARD 1 : 4 KPIs collés dans une seule card */}
       {filteredTrades.length > 0 && (
-        <div style={{display:"flex",background:T.white,border:`1px solid ${T.border}`,borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden"}}>
+        <div className="tr4de-kpi-row" style={{display:"flex",background:T.white,border:`1px solid ${T.border}`,borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden"}}>
 
             {/* 1. P&L Net */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>

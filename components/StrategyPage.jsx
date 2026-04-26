@@ -366,7 +366,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         };
 
         return (
-          <div style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div className="tr4de-kpi-row" style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
             <Block icon={TrendingUp} label={t("strat.bestPerf")} item={best}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={best && best.pnl >= 0 ? T.green : T.red} />
             <Block icon={TrendingDown} label={t("strat.worstPerf")} item={worst}

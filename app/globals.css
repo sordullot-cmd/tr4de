@@ -496,6 +496,39 @@ body {
 
   /* Toolbars de page : header avec h1 + boutons → wrap propre */
   .anim-1 > div:first-child { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* Lignes de KPIs (4 blocs flex côte-à-côte) : 2x2 sur mobile */
+  .tr4de-kpi-row { flex-wrap: wrap !important; }
+  .tr4de-kpi-row > * {
+    flex: 1 1 50% !important;
+    min-width: 50% !important;
+    box-sizing: border-box !important;
+    border-right: none !important;
+  }
+  .tr4de-kpi-row > *:nth-child(odd) {
+    border-right: 1px solid var(--color-border, #E5E5E5) !important;
+  }
+  .tr4de-kpi-row > *:not(:nth-last-child(-n+2)) {
+    border-bottom: 1px solid var(--color-border, #E5E5E5) !important;
+  }
+}
+
+/* Très petit mobile : chaque KPI sur sa propre ligne */
+@media (max-width: 479px) {
+  .tr4de-kpi-row > * {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    border-right: none !important;
+  }
+  .tr4de-kpi-row > *:nth-child(odd) {
+    border-right: none !important;
+  }
+  .tr4de-kpi-row > *:not(:last-child) {
+    border-bottom: 1px solid var(--color-border, #E5E5E5) !important;
+  }
+  .tr4de-kpi-row > *:last-child {
+    border-bottom: none !important;
+  }
 }
 
 /* Tablet (>=480 et <768) : 2 mois par ligne */
