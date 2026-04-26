@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
-import { Pencil, Trash2, Plus, X, Target, TrendingUp, TrendingDown, Percent, Activity } from "lucide-react";
+import { Pencil, Trash2, Plus, X, Target } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { t, useLang } from "@/lib/i18n";
@@ -323,7 +323,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         const bestWr = stats.length ? stats.reduce((a, b) => b.wr > a.wr ? b : a) : null;
         const mostActive = stats.length ? stats.reduce((a, b) => b.count > a.count ? b : a) : null;
 
-        const Block = ({ icon: Icon, label, item, valueFn, valueColor, isLast }) => {
+        const Block = ({ label, item, valueFn, valueColor, isLast }) => {
           return (
             <div
               style={{
@@ -332,15 +332,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{
-                  width: 26, height: 26, borderRadius: 8, background: T.accentBg,
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>
-                  <Icon size={14} strokeWidth={1.75} color={T.text} />
-                </div>
-                <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
-              </div>
+              <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
               {item ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -367,13 +359,13 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
         return (
           <div className="tr4de-kpi-row" style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <Block icon={TrendingUp} label={t("strat.bestPerf")} item={best}
+            <Block label={t("strat.bestPerf")} item={best}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={best && best.pnl >= 0 ? T.green : T.red} />
-            <Block icon={TrendingDown} label={t("strat.worstPerf")} item={worst}
+            <Block label={t("strat.worstPerf")} item={worst}
               valueFn={(x) => fmt(x.pnl, true)} valueColor={worst && worst.pnl >= 0 ? T.green : T.red} />
-            <Block icon={Percent} label={t("strat.bestWr")} item={bestWr}
+            <Block label={t("strat.bestWr")} item={bestWr}
               valueFn={(x) => `${x.wr.toFixed(1)}%`} />
-            <Block icon={Activity} label={t("strat.mostActive")} item={mostActive}
+            <Block label={t("strat.mostActive")} item={mostActive}
               valueFn={(x) => `${x.count} trades`} isLast />
           </div>
         );

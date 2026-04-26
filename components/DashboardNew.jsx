@@ -296,8 +296,10 @@ export default function App() {
         if (selectedAccount.account_type) {
           setAccountType(selectedAccount.account_type);
         }
-        if (selectedAccount.eval_account_size && selectedAccount.account_type === "eval") {
+        if (selectedAccount.eval_account_size) {
           setSelectedEvalAccount(selectedAccount.eval_account_size);
+        } else {
+          setSelectedEvalAccount("");
         }
       }
     }
