@@ -648,7 +648,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           setSelectedTrade(null);
                         } else {
                           setSelectedTrade(t);
-                          setActiveTab("infos");
                         }
                       }}
                       onMouseEnter={()=>setHoveredRowId(tKey)}
@@ -972,7 +971,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
                               padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
                               cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
-                              color:T.textSub,fontSize:12,fontWeight:500,
+                              color:T.textSub,fontSize:12,fontWeight:400,
                               outline: "none",
                             }}
                             onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
