@@ -98,7 +98,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
   const pnlColorGlobal = totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }} className="anim-1">
       {/* Header — titre + bouton */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>
@@ -120,21 +120,21 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
       </div>
 
       {/* Hero typographique — pas de carte, juste de la hiérarchie */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 10, color: T.textMut, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.4 }}>
           P&amp;L cumulé
         </div>
         <div style={{
-          fontSize: 40, fontWeight: 600, color: pnlColorGlobal, letterSpacing: -0.8,
-          lineHeight: 1, fontVariantNumeric: "tabular-nums",
+          fontSize: 24, fontWeight: 600, color: pnlColorGlobal, letterSpacing: -0.4,
+          lineHeight: 1.1, fontVariantNumeric: "tabular-nums",
         }}>
           {fmt(totals.pnl, true)}
         </div>
-        <div style={{ fontSize: 13, color: T.textSub, fontWeight: 500, marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500, marginTop: 2 }}>
           <span style={{ color: T.text, fontWeight: 600 }}>{totals.accounts}</span> {totals.accounts > 1 ? "comptes" : "compte"}
-          <span style={{ color: T.textMut, margin: "0 8px" }}>·</span>
+          <span style={{ color: T.textMut, margin: "0 6px" }}>·</span>
           <span style={{ color: T.text, fontWeight: 600 }}>{totals.trades}</span> trade{totals.trades > 1 ? "s" : ""}
-          <span style={{ color: T.textMut, margin: "0 8px" }}>·</span>
+          <span style={{ color: T.textMut, margin: "0 6px" }}>·</span>
           <span style={{ color: T.text, fontWeight: 600 }}>{totals.trades > 0 ? `${winRateGlobal.toFixed(1)}%` : "—"}</span> de réussite
         </div>
       </div>
@@ -174,37 +174,37 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 style={{
                   cursor: "pointer",
-                  padding: "20px 4px",
+                  padding: "12px 4px",
                   borderBottom: `1px solid ${T.border}`,
                   display: "flex",
                   alignItems: "center",
-                  gap: 24,
+                  gap: 18,
                   transition: "background .12s ease",
                   background: "transparent",
                 }}
               >
                 {/* Logo broker (compact, à gauche) */}
-                <div style={{ width: 48, height: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 36, height: 36, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {getBrokerLogo(acc.broker) ? (
-                    <img src={getBrokerLogo(acc.broker)} alt="" style={{ maxHeight: 28, maxWidth: 48, objectFit: "contain", opacity: 0.85 }} />
+                    <img src={getBrokerLogo(acc.broker)} alt="" style={{ maxHeight: 22, maxWidth: 36, objectFit: "contain", opacity: 0.85 }} />
                   ) : (
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: T.bg, border: `1px solid ${T.border}` }} />
+                    <div style={{ width: 26, height: 26, borderRadius: 6, background: T.bg, border: `1px solid ${T.border}` }} />
                   )}
                 </div>
 
                 {/* Nom + meta — typographique */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                   <div style={{
-                    fontSize: 17, fontWeight: 600, color: T.text, letterSpacing: -0.2,
+                    fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {acc.name || "Compte"}
                   </div>
-                  <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>
+                  <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
                     {typeLabel}
                     {acc.broker && (
                       <>
-                        <span style={{ margin: "0 8px" }}>·</span>
+                        <span style={{ margin: "0 6px" }}>·</span>
                         {acc.broker}
                       </>
                     )}
@@ -213,19 +213,19 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
 
                 {/* Stats compactes — typographie alignée à droite */}
                 <div style={{
-                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4,
-                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 140,
+                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2,
+                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 120,
                 }}>
-                  <span style={{ fontSize: 18, fontWeight: 600, color: T.text, letterSpacing: -0.3 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.15 }}>
                     {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
                   </span>
                   {hasBalance ? (
-                    <span style={{ fontSize: 12, fontWeight: 500, color: pnlColor }}>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: pnlColor }}>
                       {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
                       {pnlPct !== null && ` · ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`}
                     </span>
                   ) : (
-                    <span style={{ fontSize: 12, fontWeight: 500, color: T.textMut }}>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut }}>
                       {s.trades > 0 ? `${s.trades} trade${s.trades > 1 ? "s" : ""}` : "Aucun trade"}
                     </span>
                   )}
@@ -233,13 +233,13 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
 
                 {/* Win rate + W/L — colonne discrète */}
                 <div style={{
-                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4,
-                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 90,
+                  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2,
+                  fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 70,
                 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
                     {s.trades > 0 ? `${winRate.toFixed(1)}%` : "—"}
                   </span>
-                  <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
+                  <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500 }}>
                     {s.trades > 0 ? <><span style={{ color: T.text }}>{s.wins}</span> / {s.losses}</> : "0 / 0"}
                   </span>
                 </div>
