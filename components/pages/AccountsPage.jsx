@@ -173,76 +173,92 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
               >
                 {(() => {
                   const type = acc.account_type || "live";
-                  const palette = type === "eval"
-                    ? { bg: T.amberBg, fg: T.amber, bd: T.amber }
-                    : type === "funded"
-                      ? { bg: "#EFF6FF", fg: "#2563EB", bd: "#93C5FD" }
-                      : { bg: T.greenBg, fg: T.green, bd: T.greenBd };
+                  const dotColor = type === "eval" ? T.amber : type === "funded" ? "#2563EB" : T.green;
                   const typeLabel = type === "eval"
-                    ? `Eval${acc.eval_account_size ? ` ${acc.eval_account_size}` : ""}`
+                    ? `Eval${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
                     : type === "funded"
-                      ? `Funded${acc.eval_account_size ? ` ${acc.eval_account_size}` : ""}`
+                      ? `Funded${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
                       : "Live";
+                  const capital = parseEvalSize(acc.eval_account_size);
+                  const hasBalance = capital !== null;
+                  const balance = hasBalance ? capital + s.pnl : null;
+                  const pnlColor = s.pnl > 0 ? T.green : s.pnl < 0 ? T.red : T.textSub;
+                  const pnlPct = capital ? (s.pnl / capital) * 100 : null;
+
                   return (
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                          <span style={{
-                            fontSize: 14, fontWeight: 600, color: T.text,
-                            letterSpacing: -0.1,
+                    <>
+                      {/* Top row: name + meta · broker logo */}
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                          <div style={{
+                            fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.15,
                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}>
                             {acc.name || "Compte"}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11, fontWeight: 600,
-                              padding: "3px 8px", borderRadius: 999,
-                              background: palette.bg, color: palette.fg,
-                              border: `1px solid ${palette.bd}`,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {typeLabel}
-                          </span>
+                          </div>
+                          <div style={{
+                            display: "inline-flex", alignItems: "center", gap: 8,
+                            fontSize: 12, color: T.textSub, fontWeight: 400,
+                          }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                              {typeLabel}
+                            </span>
+                            {acc.broker && (
+                              <>
+                                <span style={{ color: T.border2 }}>·</span>
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {acc.broker}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
+                        {getBrokerLogo(acc.broker) && (
+                          <img
+                            src={getBrokerLogo(acc.broker)}
+                            alt=""
+                            style={{ height: 20, maxWidth: 64, objectFit: "contain", flexShrink: 0, opacity: 0.75 }}
+                          />
+                        )}
                       </div>
-                      {getBrokerLogo(acc.broker) && (
-                        <img
-                          src={getBrokerLogo(acc.broker)}
-                          alt={acc.broker || ""}
-                          style={{ height: 20, maxWidth: 64, objectFit: "contain", flexShrink: 0 }}
-                        />
-                      )}
-                    </div>
-                  );
-                })()}
 
-                {(() => {
-                  const type = acc.account_type || "live";
-                  const capital = parseEvalSize(acc.eval_account_size);
-                  const hasBalance = (type === "eval" || type === "funded") && capital !== null;
-                  const balance = hasBalance ? capital + s.pnl : null;
-                  return (
-                    <div style={{
-                      display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
-                      borderTop: `1px solid ${T.border}`, paddingTop: 12,
-                    }}>
-                      <Stat
-                        label="Account balance"
-                        value={hasBalance ? fmtNoCents(balance) : "—"}
-                        sub={hasBalance ? `/ ${fmtNoCents(capital)}` : undefined}
-                      />
-                      <Stat
-                        label="P&L"
-                        value={fmt(s.pnl, true)}
-                        tone={s.pnl > 0 ? "green" : s.pnl < 0 ? "red" : undefined}
-                      />
-                      <Stat label="Win rate" value={s.trades > 0 ? `${winRate.toFixed(1)}%` : "—"} />
-                      <Stat label="Trades" value={String(s.trades)} />
-                      <Stat label="Wins" value={String(s.wins)} tone={s.wins > 0 ? "green" : undefined} />
-                      <Stat label="Losses" value={String(s.losses)} tone={s.losses > 0 ? "red" : undefined} />
-                    </div>
+                      {/* Hero balance */}
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
+                        <span style={{
+                          fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
+                          fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
+                        </span>
+                        {hasBalance && (
+                          <span style={{
+                            fontSize: 12, fontWeight: 500, color: pnlColor,
+                            fontVariantNumeric: "tabular-nums",
+                          }}>
+                            {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
+                            {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Footer metadata — inline, separators */}
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                        fontSize: 12, color: T.textSub, fontWeight: 400,
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        <span>{s.trades} trade{s.trades > 1 ? "s" : ""}</span>
+                        <span style={{ color: T.border2 }}>·</span>
+                        <span>{s.trades > 0 ? `${winRate.toFixed(1)}% wr` : "—% wr"}</span>
+                        <span style={{ color: T.border2 }}>·</span>
+                        <span>
+                          <span style={{ color: T.green }}>{s.wins}W</span>
+                          <span style={{ color: T.textMut }}> / </span>
+                          <span style={{ color: T.red }}>{s.losses}L</span>
+                        </span>
+                      </div>
+                    </>
                   );
                 })()}
 

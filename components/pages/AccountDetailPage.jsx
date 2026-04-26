@@ -249,7 +249,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
 
       {/* Equity curve — collé à la carte KPIs */}
       <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden", marginTop: -16 }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ padding: "16px 20px" }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution du P&L</div>
           <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>P&L cumulé jour par jour — {stats.total} trades</div>
         </div>
