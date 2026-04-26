@@ -629,18 +629,21 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   const tKey = tradeKey(t);
                   const isChecked = selectedIds.has(tKey);
                   const isHovered = hoveredRowId === tKey;
+                  const isOpen = selectedTrade && tradeKey(selectedTrade) === tKey;
                   const showCheckbox = isChecked || isHovered;
                   const selectedBg = "#F0F0F0";
                   const hoverBg = "#FAFAFA";
+                  const openBg = "#EBEBEB";
 
                   return (
                     <tr
                       key={i}
                       style={{
                         borderBottom:`1px solid ${T.border}`,
-                        background: isChecked ? selectedBg : (isHovered ? hoverBg : T.white),
+                        background: isOpen ? openBg : (isChecked ? selectedBg : (isHovered ? hoverBg : T.white)),
+                        boxShadow: isOpen ? `inset 3px 0 0 0 ${T.text}` : "none",
                         cursor:"pointer",
-                        transition:"background .12s ease",
+                        transition:"background .12s ease, box-shadow .12s ease",
                       }}
                       onClick={()=>{
                         const isSelectedDetail = selectedTrade && tradeKey(selectedTrade) === tKey;
@@ -971,7 +974,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
                               padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
                               cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
-                              color:T.textSub,fontSize:12,fontWeight:400,
+                              color:T.textMut,fontSize:12,fontWeight:400,
                               outline: "none",
                             }}
                             onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
