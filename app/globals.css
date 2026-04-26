@@ -368,13 +368,13 @@ body {
     z-index: 79; backdrop-filter: blur(2px);
     animation: fadeIn 180ms ease both;
   }
-  /* Hamburger flottant : toujours accessible même quand on scrolle */
-  .tr4de-hamburger {
-    display: inline-flex !important;
-    position: fixed !important;
-    top: 12px !important;
-    left: 12px !important;
-    z-index: 90 !important;
+  /* Hamburger visible dans la topbar */
+  .tr4de-hamburger { display: inline-flex !important; }
+  /* Topbar sticky : descend avec le scroll, le bandeau gris suit */
+  .tr4de-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 50 !important;
   }
   /* Contenu principal : pleine largeur */
   .tr4de-main { margin-left: 0 !important; padding-left: 16px !important; padding-right: 16px !important; }

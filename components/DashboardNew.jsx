@@ -876,7 +876,7 @@ export default function App() {
               className="tr4de-hamburger"
               onClick={() => setMobileNavOpen(true)}
               aria-label="Ouvrir le menu"
-              style={{display:"none",width:40,height:40,borderRadius:10,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}
+              style={{display:"none",width:36,height:36,borderRadius:8,border:"1px solid "+T.border,background:T.white,color:T.text,cursor:"pointer",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}
             >
               <LucideMenu size={18} strokeWidth={1.75} />
             </button>
