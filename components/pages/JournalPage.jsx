@@ -177,14 +177,19 @@ export default function JournalPage({ trades = [] }) {
                         >
                           <defs>
                             <linearGradient id={`grad-${dateStr}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.5" : "0.05"} />
-                              <stop offset="100%" stopColor={sparklineColor} stopOpacity={lastVal >= 0 ? "0.05" : "0.5"} />
+                              <stop offset="0%" stopColor={sparklineColor} stopOpacity="0.5" />
+                              <stop offset="100%" stopColor={sparklineColor} stopOpacity="0.05" />
                             </linearGradient>
                           </defs>
-                          <path
-                            d={`M ${points.split(' ')[0]} L ${points} L ${sparklineWidth},${zeroY} L 0,${zeroY} Z`}
-                            fill={`url(#grad-${dateStr})`}
-                          />
+                          {(() => {
+                            const fillBaseY = lastVal >= 0 ? zeroY : sparklineHeight;
+                            return (
+                              <path
+                                d={`M ${points.split(' ')[0]} L ${points} L ${sparklineWidth},${fillBaseY} L 0,${fillBaseY} Z`}
+                                fill={`url(#grad-${dateStr})`}
+                              />
+                            );
+                          })()}
                           <polyline points={points} fill="none" stroke={sparklineColor} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                         </svg>
                       </div>

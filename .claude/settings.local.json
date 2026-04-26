@@ -37,7 +37,8 @@
       "Bash(awk 'NR<637 || NR>1191' f:/tr4de/components/pages/DailyPlannerPage.jsx)",
       "Bash(grep -E \"app[\\\\\\\\\\\\\\\\/]planner\")",
       "Bash(npm uninstall *)",
-      "Bash(npx skills *)"
+      "Bash(npx skills *)",
+      "Bash(git revert *)"
     ]
   }
 }
