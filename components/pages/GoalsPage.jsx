@@ -47,6 +47,7 @@ const UNITS = [
   { id: "minutes", label: "Minutes",   suffix: " min" },
   { id: "pages",   label: "Pages",     suffix: " pages" },
   { id: "times",   label: "Fois",      suffix: "×" },
+  { id: "custom",  label: "Autre…",    suffix: "", isCustom: true },
 ];
 const CATEGORIES = [
   { id: "trading",   label: "Trading",       color: "#16A34A", icon: TrendingUp },
@@ -267,13 +268,13 @@ export default function GoalsPage() {
   };
 
   // Modal d'ajout/édition
-  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", accountTypeFilter: "live" };
+  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowForm(true); };
-  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", accountTypeFilter: g.accountTypeFilter || "live" }); setEditingId(g.id); setShowForm(true); };
+  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", customUnit: g.customUnit || "", accountTypeFilter: g.accountTypeFilter || "live" }); setEditingId(g.id); setShowForm(true); };
   const close = () => { setForm(emptyForm); setEditingId(null); setShowForm(false); };
 
   // Auto-save : dès qu'un champ change et qu'il y a assez d'infos, on enregistre
@@ -288,6 +289,7 @@ export default function GoalsPage() {
           ...g, label: form.label.trim(), horizon, level: form.level,
           category: form.category, autoType: form.autoType,
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
+          customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
         })));
       } else {
@@ -298,6 +300,7 @@ export default function GoalsPage() {
           label: form.label.trim(), horizon, level: form.level,
           category: form.category, autoType: form.autoType,
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
+          customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
           manual: 0,
         }]);
@@ -378,6 +381,7 @@ export default function GoalsPage() {
     }
     const unit = UNITS.find(u => u.id === (g.unit || "count")) || UNITS[0];
     if (unit.isMoney) return { prefix: getCurrencySymbol(), suffix: "" };
+    if (unit.isCustom) return { prefix: "", suffix: g.customUnit ? ` ${g.customUnit}` : "" };
     return { prefix: "", suffix: unit.suffix };
   };
   const fmtVal = (v, u) => {
@@ -633,21 +637,32 @@ export default function GoalsPage() {
                   className="no-spin"
                   style={{ ...stackInput(), MozAppearance: "textfield", appearance: "textfield" }} />
                 {form.autoType === "manual" ? (
-                  <div style={{ flexShrink: 0, marginLeft: 8, padding: "4px 10px 4px 12px", background: T.bg, borderRadius: 999, border: `1px solid ${T.border}` }}>
-                    <FancyDropdown
-                      value={form.unit}
-                      options={UNITS}
-                      onChange={(v) => setForm({ ...form, unit: v })}
-                      renderValue={(u) => (
-                        <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{u.label}</span>
-                      )}
-                      renderOption={(u, active) => (
-                        <>
-                          <span style={{ flex: 1 }}>{u.label}</span>
-                          {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
-                        </>
-                      )}
-                    />
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                    <div style={{ padding: "4px 10px 4px 12px", background: T.bg, borderRadius: 999, border: `1px solid ${T.border}` }}>
+                      <FancyDropdown
+                        value={form.unit}
+                        options={UNITS}
+                        onChange={(v) => setForm({ ...form, unit: v })}
+                        renderValue={(u) => (
+                          <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{u.label}</span>
+                        )}
+                        renderOption={(u, active) => (
+                          <>
+                            <span style={{ flex: 1 }}>{u.label}</span>
+                            {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
+                          </>
+                        )}
+                      />
+                    </div>
+                    {form.unit === "custom" && (
+                      <input
+                        type="text"
+                        value={form.customUnit}
+                        onChange={(e) => setForm({ ...form, customUnit: e.target.value })}
+                        placeholder="ex: séances"
+                        style={{ width: 120, padding: "6px 10px", border: `1px solid ${T.border}`, borderRadius: 999, background: T.bg, fontSize: 12, fontWeight: 500, color: T.text, fontFamily: "inherit", outline: "none" }}
+                      />
+                    )}
                   </div>
                 ) : (() => {
                   const a = AUTO_TYPES.find(x => x.id === form.autoType);
@@ -767,7 +782,7 @@ export default function GoalsPage() {
                 const g = goals.find(gg => gg.id === editingId);
                 if (!g) return null;
                 const unit = UNITS.find(u => u.id === (form.unit || "count")) || UNITS[0];
-                const suffix = unit.isMoney ? getCurrencySymbol() : unit.suffix;
+                const suffix = unit.isMoney ? getCurrencySymbol() : (unit.isCustom ? (form.customUnit ? ` ${form.customUnit}` : "") : unit.suffix);
                 return (
                   <StackField label="Progression actuelle" last>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>

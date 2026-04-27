@@ -122,6 +122,7 @@ const defaultHabits = () => {
     mk(4, "Salle de sport"),
     mk(5, "Éloquence"),
     mk(6, "Sommeil"),
+    mk(7, "Code de la route"),
   ];
 };
 

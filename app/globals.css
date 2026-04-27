@@ -250,9 +250,9 @@ html, body {
 
 html {
   scroll-behavior: smooth;
-  /* Réduit l'ensemble du site de 10 % (taille des polices, paddings,
-     dimensions des cartes — tout est rendu à 0.9×). */
-  zoom: 0.9;
+  /* Réduit l'ensemble du site de 5 % (taille des polices, paddings,
+     dimensions des cartes — tout est rendu à 0.95×). */
+  zoom: 0.95;
 }
 
 @media (prefers-reduced-motion: reduce) {

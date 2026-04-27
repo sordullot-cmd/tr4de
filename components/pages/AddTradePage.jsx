@@ -546,27 +546,58 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         accountId = newAccount[0].id;
       }
       
-      // Insérer les trades
-      const tradesToInsert = importedTrades
-        .map(t => ({
-          user_id: userId,
-          account_id: accountId,
-          date: t.date,
-          symbol: t.symbol,
-          direction: t.direction,
-          entry: t.entry,
-          exit: t.exit,
-          pnl: t.pnl,
-          entry_time: t.entryTime || t.entry_time || null,
-          exit_time: t.exitTime || t.exit_time || null,
-        }));
-      
-      if (tradesToInsert.length === 0) {
+      // Construit la liste à insérer
+      const allTrades = importedTrades.map(t => ({
+        user_id: userId,
+        account_id: accountId,
+        date: t.date,
+        symbol: t.symbol,
+        direction: t.direction,
+        entry: t.entry,
+        exit: t.exit,
+        pnl: t.pnl,
+        entry_time: t.entryTime || t.entry_time || null,
+        exit_time: t.exitTime || t.exit_time || null,
+      }));
+
+      if (allTrades.length === 0) {
         setError("❌ Aucun trade avec un P&L >= $50 trouvé");
         setLoading(false);
         return;
       }
-      
+
+      // Filtre anti-doublons : on récupère les trades existants pour ce compte
+      // et on retire ceux qui matchent date+symbol+entry+exit (au centime près).
+      const { data: existingTrades } = await supabase
+        .from("apex_trades")
+        .select("date, symbol, entry, exit, entry_time")
+        .eq("user_id", userId)
+        .eq("account_id", accountId);
+
+      const norm = (v) => (v == null ? "" : String(v));
+      const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+      const sigOf = (t) => `${norm(t.date).slice(0, 10)}|${norm(t.symbol).toUpperCase()}|${round2(t.entry)}|${round2(t.exit)}|${norm(t.entry_time)}`;
+      const existingSet = new Set((existingTrades || []).map(sigOf));
+
+      const tradesToInsert = [];
+      const seenInBatch = new Set();
+      let duplicateCount = 0;
+      for (const t of allTrades) {
+        const sig = sigOf(t);
+        if (existingSet.has(sig) || seenInBatch.has(sig)) {
+          duplicateCount += 1;
+          continue;
+        }
+        seenInBatch.add(sig);
+        tradesToInsert.push(t);
+      }
+
+      if (tradesToInsert.length === 0) {
+        setError(`ℹ️ Tous les trades importés (${allTrades.length}) sont déjà présents dans ce compte.`);
+        setLoading(false);
+        return;
+      }
+
       const { error: insertError } = await supabase
         .from("apex_trades")
         .insert(tradesToInsert);
@@ -688,7 +719,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setPreview([]);
       setSelectedBroker("tradovate");
       setSelectedImportStrategy("");
-      setError("");
+      setError(duplicateCount > 0 ? `ℹ️ ${tradesToInsert.length} trade${tradesToInsert.length>1?"s":""} importé${tradesToInsert.length>1?"s":""} — ${duplicateCount} doublon${duplicateCount>1?"s":""} ignoré${duplicateCount>1?"s":""}.` : "");
       setLoading(false);
       
       // Rediriger vers la page des trades après 1.5s

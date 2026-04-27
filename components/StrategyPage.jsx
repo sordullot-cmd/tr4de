@@ -554,6 +554,12 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               const yFor = (v) => padT + plotH - ((v - minVal) / range) * plotH;
 
               const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(d.value).toFixed(1)}`).join(" ");
+              // Surface fermée pour le dégradé : on referme la courbe vers le bas du chart.
+              const baselineY = padT + plotH;
+              const areaPath = data.length === 0
+                ? ""
+                : `${linePath} L ${xFor(data.length - 1).toFixed(1)} ${baselineY} L ${xFor(0).toFixed(1)} ${baselineY} Z`;
+              const gradientId = `strat-grad-${strategy.id}`;
 
               const fmtD = (d) => {
                 if (!d) return "";
@@ -565,7 +571,15 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
               return (
                 <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:"block",overflow:"visible",aspectRatio:`${W} / ${H}`}}>
-                  {/* Courbe seule — pas de gradient, pas d'axe Y, pas de dates */}
+                  <defs>
+                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={lineColor} stopOpacity="0.28" />
+                      <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {/* Surface dégradée sous la courbe */}
+                  <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+                  {/* Courbe par-dessus */}
                   <path d={linePath} fill="none" stroke={lineColor} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               );

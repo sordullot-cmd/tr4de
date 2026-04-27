@@ -1128,6 +1128,30 @@ export default function DisciplinePage({ trades = [] }) {
 
         {/* RULES TABLE */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.text,letterSpacing:-0.1}}>Règles</div>
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(true)}
+              aria-label="Modifier les règles"
+              title="Modifier les règles"
+              style={{
+                width:28, height:28,
+                display:"inline-flex", alignItems:"center", justifyContent:"center",
+                background:T.white,
+                border:`1px solid ${T.border}`,
+                color:T.textSub,
+                borderRadius:999,
+                cursor:"pointer",
+                fontFamily:"inherit",
+                transition:"background .12s ease, color .12s ease, border-color .12s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.color = T.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = T.white; e.currentTarget.style.color = T.textSub; }}
+            >
+              <Pencil size={13} strokeWidth={1.75}/>
+            </button>
+          </div>
           <div className="tr4de-table-wrap" style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:1000}}>
               <thead>
@@ -1178,24 +1202,7 @@ export default function DisciplinePage({ trades = [] }) {
               </tbody>
             </table>
           </div>
-          <div style={{padding:12,borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:11,color:T.textSub}}>{allRules.length} rules</div>
-            <button
-              onClick={() => setShowRulesModal(true)}
-              style={{
-                padding:"6px 12px",
-                background:T.bg,
-                border:`1px solid ${T.border}`,
-                color:T.text,
-                borderRadius:6,
-                fontSize:11,
-                fontWeight:600,
-                cursor:"pointer"
-              }}
-            >
-              ✏️ Edit rules
-            </button>
-          </div>
+          <div style={{padding:"10px 14px",borderTop:`1px solid ${T.border}`,fontSize:11,color:T.textSub}}>{allRules.length} rules</div>
         </div>
       </div>
 
@@ -1206,105 +1213,105 @@ export default function DisciplinePage({ trades = [] }) {
 
       {/* MODAL MODIFIER REGLES */}
       {showRulesModal && (
-        <div onClick={() => setShowRulesModal(false)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-          <div onClick={(e) => e.stopPropagation()} style={{background:T.white,borderRadius:12,paddingTop:40,paddingRight:40,paddingBottom:40,paddingLeft:40,maxWidth:450,width:"90%",maxHeight:"90vh",overflowY:"auto"}}>
-            <button 
-              onClick={() => setShowRulesModal(false)}
-              style={{float:"right",background:"none",border:"none",fontSize:20,cursor:"pointer",color:T.textMut,marginBottom:12}}
-            >
-              ✕
-            </button>
-
-            {/* AUTOMATED RULES WITH ACTIVE DAYS */}
-            <div style={{marginBottom:24}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:12}}>Règles journalières</div>
-
-              {allRules.filter(r => ["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map(rule => (
-                <div key={rule.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
-                  <input 
-                    type="checkbox"
-                    checked={checkedRuleIds[rule.id] || false}
-                    onChange={() => toggleRule(rule.id, allRules)}
-                    style={{marginTop:4,width:18,height:18,cursor:"pointer"}}
-                  />
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:4}}>{rule.label}</div>
-                    <div style={{fontSize:11,color:T.textSub,marginBottom:8}}>{ruleDescriptions[rule.id]}</div>
-                  </div>
-                </div>
-              ))}
+        <div onClick={() => setShowRulesModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,fontFamily:"var(--font-sans)",padding:24}}>
+          <div onClick={(e) => e.stopPropagation()} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:16,maxWidth:480,width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 64px rgba(0,0,0,0.18)"}}>
+            {/* HEADER */}
+            <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:600,color:T.text,letterSpacing:-0.1}}>Modifier les règles</div>
+                <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Active ou ajoute des règles à suivre.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(false)}
+                aria-label="Fermer"
+                style={{width:28,height:28,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:999,color:T.textMut,cursor:"pointer",fontSize:16,fontFamily:"inherit"}}
+                onMouseEnter={(e)=>{e.currentTarget.style.background=T.bg;e.currentTarget.style.color=T.text;}}
+                onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textMut;}}
+              >
+                ✕
+              </button>
             </div>
 
-            {/* MANUAL RULES */}
-            {customRules.length > 0 && (
-              <div style={{marginBottom:24}}>
-                <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:12}}>{t("disc.personalRules")}</div>
-                {allRules.filter(r => !["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map(rule => (
-                  <div key={rule.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:`1px solid ${T.border}`,marginBottom:12}}>
-                    <input 
-                      type="checkbox"
-                      checked={checkedRuleIds[rule.id] || false}
-                      onChange={() => toggleRule(rule.id, allRules)}
-                      style={{marginTop:4,width:18,height:18,cursor:"pointer"}}
-                    />
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:4}}>{rule.label}</div>
+            {/* BODY */}
+            <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:20}}>
+              {/* AUTOMATED */}
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>Règles journalières</div>
+                <div style={{borderRadius:12,overflow:"hidden",background:T.white}}>
+                  {allRules.filter(r => ["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map((rule, idx, arr) => (
+                    <label key={rule.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 14px",cursor:"pointer",borderBottom:idx<arr.length-1?`1px solid ${T.border}`:"none"}}>
+                      <input
+                        type="checkbox"
+                        checked={checkedRuleIds[rule.id] || false}
+                        onChange={() => toggleRule(rule.id, allRules)}
+                        style={{marginTop:2,width:16,height:16,accentColor:T.text,cursor:"pointer",flexShrink:0}}
+                      />
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:2}}>{rule.label}</div>
+                        <div style={{fontSize:11,color:T.textSub,lineHeight:1.4}}>{ruleDescriptions[rule.id]}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* PERSONAL — custom rules + add row */}
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>{t("disc.personalRules")}</div>
+                <div style={{borderRadius:12,overflow:"hidden",background:T.white}}>
+                  {allRules.filter(r => !["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map((rule, idx, arr) => (
+                    <div key={rule.id} style={{display:"flex",alignItems:"center",gap:12,padding:"16px 14px",borderBottom:idx<arr.length-1?`1px solid ${T.border}`:"none"}}>
+                      <input
+                        type="checkbox"
+                        checked={checkedRuleIds[rule.id] || false}
+                        onChange={() => toggleRule(rule.id, allRules)}
+                        style={{width:16,height:16,accentColor:T.text,cursor:"pointer",flexShrink:0}}
+                      />
+                      <div style={{flex:1,minWidth:0,fontSize:13,fontWeight:500,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{rule.label}</div>
                       <button
+                        type="button"
                         onClick={() => removeManualRule(rule.uuid || rule.id)}
-                        style={{fontSize:11,color:T.accent,background:"none",border:"none",cursor:"pointer",padding:0,marginTop:4}}
+                        aria-label="Supprimer"
+                        title="Supprimer"
+                        style={{width:24,height:24,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:6,color:T.textMut,cursor:"pointer",flexShrink:0}}
+                        onMouseEnter={(e)=>{e.currentTarget.style.background="#FEF2F2";e.currentTarget.style.color=T.red;}}
+                        onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textMut;}}
                       >
-                        Supprimer
+                        <LucideTrash2 size={12} strokeWidth={1.75}/>
                       </button>
                     </div>
+                  ))}
+                  {/* ADD ROW intégrée à la catégorie */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px"}}>
+                    <input
+                      type="text"
+                      placeholder="Ajouter une règle…"
+                      value={newManualRule}
+                      onChange={(e) => setNewManualRule(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && newManualRule.trim()) addManualRule(); }}
+                      style={{flex:1,padding:"8px 10px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,background:T.white,color:T.text,outline:"none",fontFamily:"inherit"}}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { if (newManualRule.trim()) addManualRule(); }}
+                      disabled={!newManualRule.trim()}
+                      aria-label="Ajouter"
+                      title="Ajouter"
+                      style={{width:32,height:32,display:"inline-flex",alignItems:"center",justifyContent:"center",background:newManualRule.trim()?T.text:T.bg,color:newManualRule.trim()?"#fff":T.textMut,border:`1px solid ${newManualRule.trim()?T.text:T.border}`,borderRadius:999,cursor:newManualRule.trim()?"pointer":"not-allowed",fontFamily:"inherit",flexShrink:0}}
+                    >
+                      <Plus size={14} strokeWidth={2}/>
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* ADD NEW RULE */}
-            <div style={{marginBottom:24,paddingBottom:12,borderBottom:`1px solid ${T.border}`}}>
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <input
-                  type="text"
-                  placeholder="Ajouter une règle..."
-                  value={newManualRule}
-                  onChange={(e) => setNewManualRule(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      if (newManualRule.trim()) {
-                        addManualRule();
-                      }
-                    }
-                  }}
-                  style={{flex:1,padding:"8px 12px",border:`1px solid ${T.border}`,borderRadius:6,fontSize:12,background:T.bg,color:T.text}}
-                />
-                <button
-                  onClick={() => {
-                    if (newManualRule.trim()) {
-                      addManualRule();
-                    }
-                  }}
-                  style={{padding:"8px 18px",background:"#0D0D0D",color:"white",border:"none",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer"}}
-                >
-                  Ajouter
-                </button>
+                </div>
               </div>
             </div>
 
-            {/* BUTTONS */}
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+            {/* FOOTER */}
+            <div style={{padding:"12px 20px",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"flex-end",background:T.bg}}>
               <button
                 onClick={() => setShowRulesModal(false)}
-                style={{
-                  padding:"10px 22px",
-                  background:"#0D0D0D",
-                  color:"white",
-                  border:"none",
-                  borderRadius:999,
-                  fontSize:12,
-                  fontWeight:600,
-                  cursor:"pointer"
-                }}
+                style={{padding:"8px 20px",height:36,background:T.text,color:"#fff",border:`1px solid ${T.text}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
               >
                 Terminé
               </button>
