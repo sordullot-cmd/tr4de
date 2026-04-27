@@ -539,12 +539,12 @@ export default function ApexChatNew({
                       maxWidth: "80%",
                       padding: "12px 16px",
                       borderRadius: m.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                      background: m.role === "user" ? "#DDDDDD" : T.panel,
+                      background: m.role === "user" ? "#DDDDDD" : "#FAFAFA",
                       color: m.role === "user" ? "#333333" : T.text,
                       fontSize: 14,
                       lineHeight: 1.5,
                       whiteSpace: "pre-wrap",
-                      border: m.role === "user" ? "none" : `1px solid ${T.border}`,
+                      border: "none",
                       fontWeight: m.role === "user" ? 500 : 400,
                     }}
                   >
@@ -862,20 +862,20 @@ function InputBar({
             aria-label="Suggestions"
             style={{
               position: "absolute",
-              right: 50,
-              bottom: 10,
-              width: 34,
-              height: 34,
+              right: 42,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 28,
+              height: 28,
               borderRadius: "50%",
               border: "none",
-              background: showPrompts ? T.accent : "rgba(0,0,0,0.08)",
-              color: showPrompts ? "#fff" : T.text,
+              background: showPrompts ? T.accent : "rgba(0,0,0,0.06)",
+              color: showPrompts ? "#fff" : T.textSub,
               cursor: disabled ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               transition: "background 0.15s",
-              fontWeight: 700,
             }}
             onMouseEnter={(e) => {
               if (!disabled) {
@@ -886,7 +886,7 @@ function InputBar({
               e.currentTarget.style.background = showPrompts ? T.accent : "rgba(0,0,0,0.08)";
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
             </svg>
