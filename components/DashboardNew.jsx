@@ -588,9 +588,9 @@ export default function App() {
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
-        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
+        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];

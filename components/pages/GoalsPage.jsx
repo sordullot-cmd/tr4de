@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import {
   Plus, Target, Trash2, Pencil, Check, X, TrendingUp, Heart,
@@ -64,14 +64,24 @@ const CATEGORIES = [
 // sur l'horizon de l'objectif. Ces types ne sont proposés qu'en catégorie
 // "Trading".
 const AUTO_TYPES = [
-  { id: "manual",   label: "Manuel",      unit: "",  trading: false },
-  { id: "pnl",      label: "P&L",         unit: "$", trading: true  },
-  { id: "winrate",  label: "Win rate",    unit: "%", trading: true  },
-  { id: "trades",   label: "Nb de trades", unit: "", trading: true  },
-  { id: "max_dd",   label: "Drawdown max", unit: "$", trading: true },
+  { id: "manual",     label: "Manuel",              unit: "",  trading: false, group: "Général" },
+  { id: "pnl",        label: "P&L (sur l'horizon)", unit: "$", trading: true,  group: "P&L" },
+  { id: "pnl_day",    label: "P&L du jour",         unit: "$", trading: true,  group: "P&L", horizon: "day"   },
+  { id: "pnl_week",   label: "P&L de la semaine",   unit: "$", trading: true,  group: "P&L", horizon: "week"  },
+  { id: "pnl_month",  label: "P&L du mois",         unit: "$", trading: true,  group: "P&L", horizon: "month" },
+  { id: "pnl_year",   label: "P&L de l'année",      unit: "$", trading: true,  group: "P&L", horizon: "year"  },
+  { id: "winrate",    label: "Win rate",            unit: "%", trading: true,  group: "Performance" },
+  { id: "trades",     label: "Nb de trades",        unit: "",  trading: true,  group: "Performance" },
+  { id: "max_dd",     label: "Drawdown max",        unit: "$", trading: true,  group: "Risque" },
 ];
 
 /* ---------- Helpers ---------- */
+function dayRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return { start, end };
+}
 function weekRange() {
   const now = new Date();
   const dow = now.getDay();
@@ -100,6 +110,96 @@ function daysLeft(deadline) {
   const d = new Date(deadline + "T23:59:59");
   if (isNaN(d.getTime())) return null;
   return Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+}
+
+// Walk the goals tree (top level + 1 level of nested goal-subtasks) and apply
+// `updater` to the goal whose id matches. Used so that nested goals (créés
+// via drag d'un objectif sur un autre) ont les mêmes opérations que les goals
+// top-level (édition, ajustement manuel, mutation des sous-objectifs).
+function updateGoalById(goals, id, updater) {
+  return goals.map(g => {
+    if (g.id === id) return updater(g);
+    if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+      let changed = false;
+      const next = g.subtasks.map(s => {
+        if (s.id === id) { changed = true; return updater(s); }
+        return s;
+      });
+      if (changed) return { ...g, subtasks: next };
+    }
+    return g;
+  });
+}
+// Retire récursivement le goal d'id `id` de l'arbre et renvoie l'arbre allégé
+// + le goal extrait. Utilisé par le drag & drop pour pouvoir le ré-insérer.
+function findAndRemoveGoal(goals, id) {
+  let source = null;
+  const recurse = (arr) => {
+    let changed = false;
+    const out = [];
+    for (const g of arr) {
+      if (g.id === id) { source = g; changed = true; continue; }
+      if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+        const newSubs = recurse(g.subtasks);
+        if (newSubs !== g.subtasks) {
+          changed = true;
+          out.push({ ...g, subtasks: newSubs });
+          continue;
+        }
+      }
+      out.push(g);
+    }
+    return changed ? out : arr;
+  };
+  return { without: recurse(goals), source };
+}
+function containsGoalId(goal, id) {
+  if (!goal) return false;
+  if (goal.id === id) return true;
+  return (goal.subtasks || []).some(s => containsGoalId(s, id));
+}
+function insertGoalAtTarget(goals, source, targetId, mode) {
+  if (mode === "into") {
+    const recurse = (arr) => arr.map(g => {
+      if (g.id === targetId) return { ...g, subtasks: [source, ...(g.subtasks || [])] };
+      if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+        return { ...g, subtasks: recurse(g.subtasks) };
+      }
+      return g;
+    });
+    return recurse(goals);
+  }
+  // before / after: insertion en tant que frère de la cible (au niveau où elle vit)
+  const topIdx = goals.findIndex(g => g.id === targetId);
+  if (topIdx !== -1) {
+    const insertIdx = mode === "after" ? topIdx + 1 : topIdx;
+    const next = [...goals];
+    next.splice(insertIdx, 0, source);
+    return next.map((g, i) => ({ ...g, position: i }));
+  }
+  return goals.map(g => {
+    if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+      const sIdx = g.subtasks.findIndex(s => s.id === targetId);
+      if (sIdx !== -1) {
+        const insertIdx = mode === "after" ? sIdx + 1 : sIdx;
+        const newSubs = [...g.subtasks];
+        newSubs.splice(insertIdx, 0, source);
+        return { ...g, subtasks: newSubs };
+      }
+      return { ...g, subtasks: insertGoalAtTarget(g.subtasks, source, targetId, mode) };
+    }
+    return g;
+  });
+}
+
+function removeGoalById(goals, id) {
+  if (goals.some(g => g.id === id)) return goals.filter(g => g.id !== id);
+  return goals.map(g => {
+    if (Array.isArray(g.subtasks) && g.subtasks.some(s => s.id === id)) {
+      return { ...g, subtasks: g.subtasks.filter(s => s.id !== id) };
+    }
+    return g;
+  });
 }
 
 function defaultGoals() {
@@ -136,7 +236,7 @@ export default function GoalsPage() {
 
   // Migration : anciens autoType et anciens levels -> nouveaux
   useEffect(() => {
-    const autoMap  = { pnl_week: "pnl", pnl_month: "pnl", pnl_year: "pnl", trades_month: "trades" };
+    const autoMap  = { trades_month: "trades" };
     const levelMap = { easy: "low", medium: "normal", hard: "high" };
     let changed = false;
     const migrated = goals.map(g => {
@@ -181,11 +281,11 @@ export default function GoalsPage() {
     const horizon = horizonFromDeadline(form.deadline);
     const handle = setTimeout(() => {
       if (editingId) {
-        setGoals(prev => prev.map(g => g.id === editingId ? {
+        setGoals(prev => updateGoalById(prev, editingId, g => ({
           ...g, label: form.label.trim(), horizon, level: form.level,
           category: form.category, autoType: form.autoType,
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
-        } : g));
+        })));
       } else {
         // Créer le nouveau goal et passer immédiatement en mode édition
         const id = Date.now();
@@ -201,26 +301,46 @@ export default function GoalsPage() {
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, showForm]);
-  const remove = (id) => setGoals(prev => prev.filter(g => g.id !== id));
+  const remove = (id) => setGoals(prev => removeGoalById(prev, id));
 
-  const adjustManual = (gid, delta) => setGoals(prev => prev.map(g => g.id === gid ? { ...g, manual: Math.max(0, (parseFloat(g.manual) || 0) + delta) } : g));
+  const adjustManual = (gid, delta) =>
+    setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, manual: Math.max(0, (parseFloat(g.manual) || 0) + delta) })));
 
   const setSubtasksFor = (gid, nextSubtasks) =>
-    setGoals(prev => prev.map(g => g.id === gid ? { ...g, subtasks: nextSubtasks } : g));
+    setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, subtasks: nextSubtasks })));
+
+  // Drag & drop state: long-press a goal row to drag, drop on another row
+  // to nest it as a subtask, drop between rows to reorder. Source et cible
+  // peuvent être à n'importe quel niveau de l'arbre.
+  const [drag, setDrag] = useState({ sourceId: null, overId: null, mode: null });
+  const reorderOrNest = (sourceId, targetId, mode) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    setGoals(prev => {
+      const { without, source } = findAndRemoveGoal(prev, sourceId);
+      if (!source) return prev;
+      // Empêche de déposer un objectif dans un de ses propres descendants
+      if (containsGoalId(source, targetId)) return prev;
+      return insertGoalAtTarget(without, source, targetId, mode);
+    });
+  };
 
   // Compute current/target/pct pour un goal
   // L'horizon détermine la fenêtre temporelle pour les métriques trading.
   const rangeOf = (horizon) => {
+    if (horizon === "day") return dayRange();
     if (horizon === "week") return weekRange();
     if (horizon === "year") return yearRange();
     return monthRange();
   };
   const compute = (g) => {
     const tgt = parseFloat(g.target) || 0;
-    const { start, end } = rangeOf(g.horizon || "month");
+    const at = AUTO_TYPES.find(a => a.id === g.autoType);
+    // Si l'autoType impose un horizon (pnl_day/week/month/year), on l'utilise.
+    const horizonForCompute = at?.horizon || g.horizon || "month";
+    const { start, end } = rangeOf(horizonForCompute);
     let current = 0;
     if (g.autoType === "manual") current = parseFloat(g.manual) || 0;
-    else if (g.autoType === "pnl") current = tradesInRange(trades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
+    else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(trades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
     else if (g.autoType === "winrate") {
       const list = tradesInRange(trades, start, end);
       const w = list.filter(t => (t.pnl || 0) > 0).length;
@@ -346,13 +466,19 @@ export default function GoalsPage() {
       ) : (
         <>
           {(() => {
-            // Tri par priorité (urgent > haute > normale > basse), puis par deadline la plus proche
+            // Si l'utilisateur a réordonné manuellement (drag & drop), on respecte
+            // l'ordre via le champ `position`. Sinon : tri par priorité puis deadline.
             const priorityRank = { urgent: 0, high: 1, normal: 2, low: 3 };
+            const hasManualOrder = goals.some(g => typeof g.position === "number");
             const byPriority = (a, b) => {
-              const pa = priorityRank[a.level || "normal"] ?? 2;
-              const pb = priorityRank[b.level || "normal"] ?? 2;
-              if (pa !== pb) return pa - pb;
-              // Même priorité : deadline la plus proche d'abord (pas de deadline = dernier)
+              if (hasManualOrder) {
+                const pa = typeof a.position === "number" ? a.position : Infinity;
+                const pb = typeof b.position === "number" ? b.position : Infinity;
+                if (pa !== pb) return pa - pb;
+              }
+              const ra = priorityRank[a.level || "normal"] ?? 2;
+              const rb = priorityRank[b.level || "normal"] ?? 2;
+              if (ra !== rb) return ra - rb;
               const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
               const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
               return da - db;
@@ -373,6 +499,7 @@ export default function GoalsPage() {
                     onEdit={openEdit} onDelete={remove}
                     onAdjustManual={adjustManual}
                     onSubtasksChange={setSubtasksFor}
+                    drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
                   />
                 )}
                 {done.length > 0 && (
@@ -401,6 +528,7 @@ export default function GoalsPage() {
                         onEdit={openEdit} onDelete={remove}
                         onAdjustManual={adjustManual}
                         onSubtasksChange={setSubtasksFor}
+                        drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
                         doneSection
                       />
                     )}
@@ -718,25 +846,26 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
       {rows.map(g => (
         <TimelineRow key={g.id} goal={g}
           compute={compute} unitOf={unitOf} fmtVal={fmtVal}
-          onEdit={() => onEdit(g)}
-          onDelete={() => onDelete(g.id)}
-          onAdjustManual={(d) => onAdjustManual(g.id, d)}
-          onSubtasksChange={(next) => onSubtasksChange(g.id, next)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onAdjustManual={onAdjustManual}
+          onSubtasksChange={onSubtasksChange}
           doneSection={doneSection}
+          drag={drag} setDrag={setDrag} onDrop={onDrop}
         />
       ))}
     </div>
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -761,39 +890,133 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
 
   const [hover, setHover] = useState(false);
   const [open, setOpen] = useState(false);
+  const [armed, setArmed] = useState(false);
+  const prevSubCount = useRef((g.subtasks || []).length);
+  useEffect(() => {
+    const count = (g.subtasks || []).length;
+    if (count > prevSubCount.current) setOpen(true);
+    prevSubCount.current = count;
+  }, [g.subtasks]);
+  const longPressTimer = useRef(null);
+  const pressedRef = useRef(false);
   const subtasks = g.subtasks || [];
+
+  const isDragging = drag?.sourceId === g.id;
+  const isOver = drag?.overId === g.id && drag?.sourceId && drag.sourceId !== g.id;
+  const overMode = isOver ? drag.mode : null;
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    pressedRef.current = false;
+    if (drag?.sourceId !== g.id) setArmed(false);
+  };
+
+  const handlePointerDown = (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (e.target.closest("button, input, a")) return;
+    pressedRef.current = true;
+    longPressTimer.current = setTimeout(() => {
+      if (pressedRef.current) setArmed(true);
+    }, 50);
+  };
+
+  const handleDragStart = (e) => {
+    if (!armed) { e.preventDefault(); return; }
+    setDrag && setDrag({ sourceId: g.id, overId: null, mode: null });
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(g.id)); } catch {}
+  };
+
+  const handleDragOver = (e) => {
+    if (!drag?.sourceId || drag.sourceId === g.id) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "move"; } catch {}
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const h = rect.height;
+    let mode = "into";
+    if (y < h * 0.28) mode = "before";
+    else if (y > h * 0.72) mode = "after";
+    if (drag.overId !== g.id || drag.mode !== mode) setDrag({ ...drag, overId: g.id, mode });
+  };
+
+  const handleDragLeave = (e) => {
+    if (!drag?.sourceId) return;
+    const rel = e.relatedTarget;
+    if (rel && e.currentTarget.contains(rel)) return;
+    if (drag.overId === g.id) setDrag({ ...drag, overId: null, mode: null });
+  };
+
+  const handleDropEvt = (e) => {
+    if (!drag?.sourceId) return;
+    e.preventDefault();
+    const mode = drag.mode || "into";
+    onDrop && onDrop(drag.sourceId, g.id, mode);
+    setDrag({ sourceId: null, overId: null, mode: null });
+    setArmed(false);
+    pressedRef.current = false;
+  };
+
+  const handleDragEnd = () => {
+    setDrag && setDrag({ sourceId: null, overId: null, mode: null });
+    setArmed(false);
+    pressedRef.current = false;
+  };
 
   return (
     <>
       <div
         className="tr4de-goals-row"
+        draggable={armed}
+        onPointerDown={handlePointerDown}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDropEvt}
+        onDragEnd={handleDragEnd}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onClick={() => setOpen(v => !v)}
+        onClick={(e) => { if (armed || drag?.sourceId) { e.preventDefault(); return; } setOpen(v => !v); }}
         style={{
-          display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12,
-          alignItems: "center", padding: "12px 16px",
-          background: hover || open ? "#FAFAFA" : "transparent",
+          display: "grid",
+          gridTemplateColumns: nested
+            ? "minmax(0, 1fr) minmax(80px, 130px) minmax(110px, 160px) 50px"
+            : "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px",
+          gap: nested ? 10 : 12,
+          alignItems: "center",
+          padding: nested ? "8px 10px" : "12px 16px",
+          background: overMode === "into" ? "#EAF3FF" : (hover || open ? "#FAFAFA" : (nested ? "#FFFFFF" : "transparent")),
+          border: nested ? `1px solid ${T.border}` : "none",
           borderRadius: 8,
-          cursor: "pointer",
+          cursor: armed ? "grabbing" : "pointer",
           transition: "background .12s ease",
+          opacity: isDragging ? 0.45 : 1,
+          boxShadow: overMode === "before" ? "inset 0 2px 0 0 #3B82F6"
+                  : overMode === "after"  ? "inset 0 -2px 0 0 #3B82F6"
+                  : "none",
+          userSelect: armed ? "none" : "auto",
+          touchAction: armed ? "none" : "auto",
         }}
       >
-        <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{createdLabel}</div>
+        {!nested && (
+          <div style={{ fontSize: 12, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{createdLabel}</div>
+        )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: nested ? 10 : 12, minWidth: 0 }}>
           {/* Icon bubble — gris neutre, cohérent avec le reste du site */}
           <div style={{
-            width: 34, height: 34, borderRadius: "50%",
+            width: nested ? 26 : 34, height: nested ? 26 : 34, borderRadius: "50%",
             background: T.accentBg,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             color: isAchieved ? T.textMut : T.text,
           }}>
-            <Ic size={15} strokeWidth={2} />
+            <Ic size={nested ? 12 : 15} strokeWidth={2} />
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{
-              fontSize: 13, fontWeight: 600,
+              fontSize: nested ? 12.5 : 13, fontWeight: 600,
               color: T.text,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               textDecoration: doneSection ? "line-through" : "none",
@@ -868,13 +1091,13 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
             }}
           />
           <div style={{ display: "flex", gap: 2, opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          <button onClick={(e) => { e.stopPropagation(); onEdit(g); }}
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
             <Pencil size={11} strokeWidth={1.75} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          <button onClick={(e) => { e.stopPropagation(); onDelete(g.id); }}
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
@@ -886,28 +1109,54 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
 
       {open && (
         <div style={{
-          margin: "0 16px 8px",
-          padding: "12px 14px 12px",
-          background: "#FAFAFA",
+          margin: nested ? "0 0 4px" : "0 16px 8px",
+          padding: nested ? "8px 10px" : "12px 14px 12px",
+          background: nested ? "#F4F4F4" : "#FAFAFA",
           borderRadius: 8,
           borderTop: `1px solid ${T.border}`,
           marginTop: -2,
         }}>
-          <RoadmapStrip subtasks={subtasks} deadline={g.deadline} />
+          {!nested && <RoadmapStrip subtasks={subtasks} deadline={g.deadline} />}
           {subtasks.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
-              {sortByDeadline(subtasks).map((s) => (
-                <SubtaskNode
-                  key={s.id}
-                  node={s}
-                  onChange={(next) => onSubtasksChange(subtasks.map(x => x.id === s.id ? next : x))}
-                  onRemove={() => onSubtasksChange(subtasks.filter(x => x.id !== s.id))}
-                />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+              {(() => {
+                // Les sous-objectifs++ (objectifs déposés ici) passent toujours
+                // avant les sous-tâches simples, peu importe la deadline.
+                const goalSubs = sortByDeadline(subtasks.filter(s => s.autoType));
+                const simpleSubs = sortByDeadline(subtasks.filter(s => !s.autoType));
+                return [...goalSubs, ...simpleSubs];
+              })().map((s) => (
+                s.autoType ? (
+                  <div key={s.id} style={{ position: "relative", paddingLeft: 28 }}>
+                    <div style={{ position: "absolute", left: 10, top: 0, bottom: 0, width: 2, background: T.border, borderRadius: 1 }} />
+                    <div style={{ position: "absolute", left: 10, top: "50%", width: 14, height: 2, background: T.border, borderRadius: 1 }} />
+                    <TimelineRow
+                      goal={s}
+                      compute={compute} unitOf={unitOf} fmtVal={fmtVal}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onAdjustManual={onAdjustManual}
+                      onSubtasksChange={onSubtasksChange}
+                      drag={drag} setDrag={setDrag} onDrop={onDrop}
+                      nested
+                    />
+                  </div>
+                ) : (
+                  <div key={s.id} style={{ position: "relative", paddingLeft: 28 }}>
+                    <div style={{ position: "absolute", left: 10, top: 0, bottom: 0, width: 2, background: T.border, borderRadius: 1 }} />
+                    <div style={{ position: "absolute", left: 10, top: 14, width: 14, height: 2, background: T.border, borderRadius: 1 }} />
+                    <SubtaskNode
+                      node={s}
+                      onChange={(next) => onSubtasksChange(g.id, subtasks.map(x => x.id === s.id ? next : x))}
+                      onRemove={() => onSubtasksChange(g.id, subtasks.filter(x => x.id !== s.id))}
+                    />
+                  </div>
+                )
               ))}
             </div>
           )}
           <SubtaskAdder
-            onAdd={(label) => onSubtasksChange([...subtasks, { id: Date.now(), label, done: false, subtasks: [] }])}
+            onAdd={(label) => onSubtasksChange(g.id, [...subtasks, { id: Date.now(), label, done: false, subtasks: [] }])}
           />
         </div>
       )}
@@ -1092,6 +1341,108 @@ function MiniCalendar({ value, viewDate, setViewDate, onPick }) {
   );
 }
 
+// Body du dropdown : si les options ont un champ `group`, on affiche un
+// mini-menu avec drill-down (clic sur une catégorie → items de la catégorie
+// avec un bouton retour). Sinon liste plate.
+function DropdownBody({ options, value, onSelect, renderOption }) {
+  const hasGroups = options.some(o => o.group);
+  // Catégorie courante (null = niveau racine).
+  const current = options.find(o => o.id === value);
+  const [activeGroup, setActiveGroup] = useState(current?.group || null);
+
+  if (!hasGroups) {
+    return options.map(o => (
+      <DropdownItem key={o.id} option={o} active={value === o.id}
+        renderOption={renderOption} onSelect={() => onSelect(o.id)} />
+    ));
+  }
+
+  // Construit la liste des groupes et items "racine" (sans group ou groupe à 1 entrée)
+  const groupOrder = [];
+  const groups = {};
+  options.forEach(o => {
+    const g = o.group || "Autres";
+    if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
+    groups[g].push(o);
+  });
+
+  if (activeGroup && groups[activeGroup]) {
+    return (
+      <>
+        <button type="button"
+          onClick={() => setActiveGroup(null)}
+          style={{
+            width: "100%", padding: "8px 10px", borderRadius: 6, border: "none",
+            background: "transparent", cursor: "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 6, textAlign: "left",
+            fontSize: 11, fontWeight: 600, color: T.textMut,
+            textTransform: "uppercase", letterSpacing: 0.4,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <ChevronRight size={12} strokeWidth={2} style={{ transform: "rotate(180deg)" }} />
+          {activeGroup}
+        </button>
+        <div style={{ height: 1, background: T.border, margin: "4px 0" }} />
+        {groups[activeGroup].map(o => (
+          <DropdownItem key={o.id} option={o} active={value === o.id}
+            renderOption={renderOption} onSelect={() => onSelect(o.id)} />
+        ))}
+      </>
+    );
+  }
+
+  // Vue racine : 1 entrée par groupe (ou item direct si groupe à 1)
+  return groupOrder.map(gName => {
+    const items = groups[gName];
+    if (items.length === 1) {
+      const o = items[0];
+      return (
+        <DropdownItem key={o.id} option={o} active={value === o.id}
+          renderOption={renderOption} onSelect={() => onSelect(o.id)} />
+      );
+    }
+    const isActiveGroup = items.some(o => o.id === value);
+    return (
+      <button key={gName} type="button"
+        onClick={() => setActiveGroup(gName)}
+        style={{
+          width: "100%", padding: "8px 10px", borderRadius: 6, border: "none",
+          background: isActiveGroup ? T.accentBg : "transparent",
+          cursor: "pointer", fontFamily: "inherit",
+          display: "flex", alignItems: "center", gap: 8, textAlign: "left",
+          fontSize: 13, fontWeight: isActiveGroup ? 600 : 500, color: T.text,
+          transition: "background .12s ease",
+        }}
+        onMouseEnter={(e) => { if (!isActiveGroup) e.currentTarget.style.background = T.bg; }}
+        onMouseLeave={(e) => { if (!isActiveGroup) e.currentTarget.style.background = "transparent"; }}>
+        <span style={{ flex: 1 }}>{gName}</span>
+        <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500 }}>{items.length}</span>
+        <ChevronRight size={12} strokeWidth={2} color={T.textMut} />
+      </button>
+    );
+  });
+}
+
+function DropdownItem({ option: o, active, onSelect, renderOption }) {
+  return (
+    <button type="button"
+      onClick={onSelect}
+      style={{
+        width: "100%", padding: "8px 10px", borderRadius: 6, border: "none",
+        background: active ? T.accentBg : "transparent",
+        cursor: "pointer", fontFamily: "inherit",
+        display: "flex", alignItems: "center", gap: 8, textAlign: "left",
+        fontSize: 13, fontWeight: active ? 600 : 500, color: T.text,
+        transition: "background .12s ease",
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = T.bg; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+      {renderOption ? renderOption(o, active) : o.label}
+    </button>
+  );
+}
+
 function FancyDropdown({ value, options, onChange, renderValue, renderOption, align = "right" }) {
   const [open, setOpen] = useState(false);
   const ref = React.useRef(null);
@@ -1123,24 +1474,12 @@ function FancyDropdown({ value, options, onChange, renderValue, renderOption, al
           [align === "left" ? "left" : "right"]: 0, minWidth: 200,
           background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
           boxShadow: "0 12px 32px rgba(0,0,0,0.10)",
-          padding: 4, zIndex: 100, maxHeight: 280, overflowY: "auto",
+          padding: 4, zIndex: 100, maxHeight: 320, overflowY: "auto",
         }}>
-          {options.map(o => (
-            <button key={o.id} type="button"
-              onClick={() => { onChange(o.id); setOpen(false); }}
-              style={{
-                width: "100%", padding: "8px 10px", borderRadius: 6, border: "none",
-                background: value === o.id ? T.accentBg : "transparent",
-                cursor: "pointer", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: 8, textAlign: "left",
-                fontSize: 13, fontWeight: value === o.id ? 600 : 500, color: T.text,
-                transition: "background .12s ease",
-              }}
-              onMouseEnter={(e) => { if (value !== o.id) e.currentTarget.style.background = T.bg; }}
-              onMouseLeave={(e) => { if (value !== o.id) e.currentTarget.style.background = "transparent"; }}>
-              {renderOption ? renderOption(o, value === o.id) : o.label}
-            </button>
-          ))}
+          <DropdownBody
+            options={options} value={value} renderOption={renderOption}
+            onSelect={(id) => { onChange(id); setOpen(false); }}
+          />
         </div>
       )}
     </div>
@@ -1255,21 +1594,92 @@ function NoteChip({ value, onChange }) {
   );
 }
 
+function RoadmapDot({ item: it, pct, color }) {
+  const [hover, setHover] = useState(false);
+  const dateLabel = it._date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  // Le dernier élément du chemin est l'item lui-même ; les autres sont ses ancêtres.
+  const ancestors = (it._path || []).slice(0, -1).filter(Boolean);
+  const onLeftHalf = pct > 60;
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "absolute", top: 5, left: `${pct}%`,
+        transform: "translateX(-50%)",
+        width: 12, height: 12, borderRadius: "50%",
+        background: color,
+        border: `2px solid ${T.white}`,
+        boxShadow: hover
+          ? "0 0 0 3px rgba(59,130,246,0.20), 0 2px 6px rgba(0,0,0,0.18)"
+          : "0 0 0 1px rgba(0,0,0,0.06)",
+        opacity: it._depth >= 2 && !it.level ? 0.7 : 1,
+        cursor: "default",
+        transition: "box-shadow .12s ease, transform .12s ease",
+      }}>
+      {hover && (
+        <div style={{
+          position: "absolute", bottom: "calc(100% + 8px)",
+          [onLeftHalf ? "right" : "left"]: -4,
+          padding: "8px 10px",
+          background: T.text, color: T.white,
+          borderRadius: 6, fontSize: 11, lineHeight: 1.35,
+          whiteSpace: "nowrap", maxWidth: 260,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+          pointerEvents: "none", zIndex: 10,
+        }}>
+          {ancestors.length > 0 && (
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis" }}>
+              {ancestors.join(" › ")}
+            </div>
+          )}
+          <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{it.label || "Sans titre"}</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{dateLabel}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RoadmapStrip({ subtasks, deadline }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const end = deadline ? new Date(deadline + "T23:59:59") : null;
   if (!end || isNaN(end.getTime()) || end <= today) return null;
 
-  const items = (subtasks || [])
-    .filter(s => s.deadline)
-    .map(s => {
-      const d = new Date(s.deadline + "T12:00:00");
-      return isNaN(d.getTime()) ? null : { ...s, _date: d };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a._date - b._date);
+  // Aplatit récursivement l'arbre des sous-objectifs : on récupère aussi
+  // les sous-sous-objectifs (sous-objectifs du sous-objectif imbriqué).
+  // Chaque item garde la chaîne de ses ancêtres dans `_path` pour pouvoir
+  // afficher au survol à quel objectif il est lié.
+  const flatten = (arr, depth, parents) => {
+    const out = [];
+    (arr || []).forEach(s => {
+      const path = [...parents, s.label];
+      if (s.deadline) {
+        const d = new Date(s.deadline + "T12:00:00");
+        if (!isNaN(d.getTime())) out.push({ ...s, _date: d, _depth: depth, _path: path });
+      }
+      if (Array.isArray(s.subtasks) && s.subtasks.length > 0) {
+        out.push(...flatten(s.subtasks, depth + 1, path));
+      }
+    });
+    return out;
+  };
+  const items = flatten(subtasks, 1, []).sort((a, b) => a._date - b._date);
 
   const totalMs = end.getTime() - today.getTime();
+
+  // Couleur d'un point :
+  //  - objectif (a un `level` de priorité) → couleur de sa priorité
+  //  - sous-tâche simple à profondeur ≥ 2 (sous-objectif du sous-objectif++) → gris
+  //  - sous-tâche simple à profondeur 1 → vert si done, sinon bleu
+  const dotColor = (it) => {
+    if (it.level) {
+      const lv = LEVELS.find(l => l.id === it.level);
+      if (lv) return lv.color;
+    }
+    if (it._depth >= 2) return T.textMut;
+    return it.done ? T.green : T.blue;
+  };
 
   return (
     <div style={{ marginBottom: 12, padding: "10px 12px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
@@ -1284,15 +1694,7 @@ function RoadmapStrip({ subtasks, deadline }) {
         {items.map(it => {
           const pct = Math.max(0, Math.min(100, ((it._date.getTime() - today.getTime()) / totalMs) * 100));
           return (
-            <div key={it.id} title={`${it.label} — ${it._date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}`}
-              style={{
-                position: "absolute", top: 5, left: `${pct}%`,
-                transform: "translateX(-50%)",
-                width: 12, height: 12, borderRadius: "50%",
-                background: it.done ? T.green : T.blue,
-                border: `2px solid ${T.white}`,
-                boxShadow: "0 0 0 1px rgba(0,0,0,0.06)",
-              }} />
+            <RoadmapDot key={it.id} item={it} pct={pct} color={dotColor(it)} />
           );
         })}
       </div>

@@ -13,12 +13,34 @@ const T = {
 
 const STORAGE_KEY = "tr4de_notes";
 
+const TAG_RE = /#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+
 function parseTags(text) {
   const out = [];
-  const re = /#([a-zA-Z0-9_-]+)/g;
   let m;
-  while ((m = re.exec(text)) !== null) out.push(m[1].toLowerCase());
+  TAG_RE.lastIndex = 0;
+  while ((m = TAG_RE.exec(text)) !== null) out.push(m[1].toLowerCase());
   return Array.from(new Set(out));
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderHighlighted(text) {
+  let html = "";
+  let last = 0;
+  const re = /#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    html += escapeHtml(text.slice(last, m.index));
+    html += `<span style="color:#3B82F6">${escapeHtml(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  html += escapeHtml(text.slice(last));
+  // ensure trailing newline keeps height
+  if (html.endsWith("\n")) html += " ";
+  return html;
 }
 
 export default function NotesPage() {
@@ -40,6 +62,7 @@ export default function NotesPage() {
   // Refs to flush pending saves on selection change / unmount
   const draftRef = useRef("");
   const selectedIdRef = useRef(null);
+  const highlightRef = useRef(null);
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const flushSave = (id, content) => {
@@ -191,10 +214,23 @@ export default function NotesPage() {
                   <Trash2 size={14} strokeWidth={1.75} />
                 </button>
               </div>
+              <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+                <div
+                  aria-hidden
+                  ref={(el) => { highlightRef.current = el; }}
+                  style={{
+                    position: "absolute", inset: 0, padding: 20,
+                    fontSize: 14, lineHeight: 1.6, fontFamily: "inherit",
+                    color: T.text, whiteSpace: "pre-wrap", wordWrap: "break-word",
+                    overflow: "auto", pointerEvents: "none",
+                  }}
+                  dangerouslySetInnerHTML={{ __html: draft ? renderHighlighted(draft) : `<span style="color:${T.textMut}">Commence à écrire... utilise #tag pour catégoriser.</span>` }}
+                />
               <textarea
                 autoFocus
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                onScroll={(e) => { if (highlightRef.current) { highlightRef.current.scrollTop = e.currentTarget.scrollTop; highlightRef.current.scrollLeft = e.currentTarget.scrollLeft; } }}
                 onKeyDown={(e) => {
                   if (e.key === "Tab") {
                     e.preventDefault();
@@ -228,13 +264,16 @@ export default function NotesPage() {
                     }
                   }
                 }}
-                placeholder={"Commence à écrire... utilise #tag pour catégoriser."}
+                placeholder=""
                 style={{
-                  flex: 1, width: "100%", border: "none", outline: "none",
+                  position: "absolute", inset: 0, width: "100%", height: "100%",
+                  border: "none", outline: "none",
                   padding: 20, fontSize: 14, lineHeight: 1.6, fontFamily: "inherit",
-                  color: T.text, background: "transparent", resize: "none",
+                  color: "transparent", caretColor: T.text, background: "transparent", resize: "none",
+                  WebkitTextFillColor: "transparent",
                 }}
               />
+              </div>
             </>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, color: T.textSub, gap: 8 }}>

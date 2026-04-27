@@ -8,6 +8,7 @@ import {
   LogOut,
   User,
   Moon,
+  ChevronDown,
   LucideIcon,
 } from "lucide-react";
 import { t, useLang } from "@/lib/i18n";
@@ -71,6 +72,23 @@ export default function Sidebar(props: SidebarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
 
+  // Sections de la navbar repliables — état mémorisé en localStorage par label.
+  const NAV_COLLAPSE_KEY = "tr4de_nav_collapsed_sections";
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(NAV_COLLAPSE_KEY);
+      if (raw) setCollapsedSections(JSON.parse(raw));
+    } catch {}
+  }, []);
+  const toggleSection = (label: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [label]: !prev[label] };
+      try { localStorage.setItem(NAV_COLLAPSE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (userRef.current && !userRef.current.contains(e.target as Node)) setUserMenuOpen(false);
@@ -123,17 +141,47 @@ export default function Sidebar(props: SidebarProps) {
 
       {/* NAV */}
       <nav aria-label="Navigation principale" style={{ padding: "10px 8px", flex: 1, overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
-        {sections.map((sec, i) => (
+        {sections.map((sec, i) => {
+          const containsActive = sec.items.some(it => it.id === activeId);
+          const sectionCollapsed = !!(sec.label && collapsedSections[sec.label]);
+          // Si la sidebar est en mode icônes seules ou pas de label : tout afficher.
+          // Sinon, si la section est repliée et contient la page active,
+          // on n'affiche que cette page ; sinon on cache tout.
+          const showAll = collapsed || !sec.label || !sectionCollapsed;
+          const itemsToShow = showAll
+            ? sec.items
+            : (containsActive ? sec.items.filter(it => it.id === activeId) : []);
+          return (
           <div key={i} style={{ marginBottom: 12 }}>
             {!collapsed && sec.label && (
-              <div style={{
-                padding: "8px 12px 6px", fontSize: 10, fontWeight: 600,
-                color: "var(--color-text-muted)", letterSpacing: 0.5, textTransform: "uppercase",
-              }}>
-                {sec.label}
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection(sec.label!)}
+                aria-expanded={!sectionCollapsed}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 12px 6px", fontSize: 10, fontWeight: 600,
+                  color: "var(--color-text-muted)", letterSpacing: 0.5, textTransform: "uppercase",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  fontFamily: "inherit", textAlign: "left",
+                  borderRadius: 6,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--color-text-sub)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
+              >
+                <span style={{ flex: 1 }}>{sec.label}</span>
+                {sectionCollapsed && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 600, color: "var(--color-text-muted)",
+                    background: "var(--color-hover-bg)", padding: "1px 6px", borderRadius: 999,
+                    letterSpacing: 0,
+                  }}>
+                    {sec.items.length}
+                  </span>
+                )}
+              </button>
             )}
-            {sec.items.map(item => {
+            {itemsToShow.map(item => {
               const Icon = item.icon;
               const active = item.id === activeId;
               return (
@@ -175,7 +223,8 @@ export default function Sidebar(props: SidebarProps) {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* FOOTER : user + collapse */}

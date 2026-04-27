@@ -31,6 +31,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
   const { urls: screenshotUrls, uploadScreenshot, removeScreenshot } = useTradeScreenshots();
   const [screenshotBusy, setScreenshotBusy] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const { emotionTags: emotionsFromHook, addEmotion, removeEmotion } = useTradeEmotionTags();
   const { errorTags: errorsFromHook, addError, removeError } = useTradeErrorTags();
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -1056,17 +1057,32 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                           <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Screenshot</div>
                           {url && (
-                            <button type="button" onClick={async () => { setScreenshotBusy(true); try { await removeScreenshot(tradeId); } finally { setScreenshotBusy(false); } }}
-                              disabled={screenshotBusy}
-                              style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.red,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
-                              Supprimer
-                            </button>
+                            <div style={{display:"inline-flex",alignItems:"center",gap:4}}>
+                              <label
+                                style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.text,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                                Modifier
+                                <input type="file" accept="image/*" disabled={screenshotBusy}
+                                  onChange={async (e) => {
+                                    const f = e.target.files?.[0]; if (!f) { return; }
+                                    setScreenshotBusy(true);
+                                    try { await removeScreenshot(tradeId); await uploadScreenshot(tradeId, f); }
+                                    finally { setScreenshotBusy(false); e.target.value = ""; }
+                                  }}
+                                  style={{display:"none"}} />
+                              </label>
+                              <button type="button" onClick={async () => { setScreenshotBusy(true); try { await removeScreenshot(tradeId); } finally { setScreenshotBusy(false); } }}
+                                disabled={screenshotBusy}
+                                style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.red,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                                Supprimer
+                              </button>
+                            </div>
                           )}
                         </div>
                         {url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" style={{display:"block",border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden",background:T.bg}}>
+                          <button type="button" onClick={() => setLightboxUrl(url)}
+                            style={{display:"block",width:"100%",padding:0,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden",background:T.bg,cursor:"zoom-in",fontFamily:"inherit"}}>
                             <img src={url} alt="Trade screenshot" style={{display:"block",width:"100%",maxHeight:320,objectFit:"contain",background:T.bg}} />
-                          </a>
+                          </button>
                         ) : (
                           <label
                             tabIndex={0}
@@ -1535,6 +1551,22 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
             ×
           </button>
         </div>
+      )}
+
+      {lightboxUrl && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",background:"rgba(0,0,0,0.2)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
+          <div onClick={(e)=>e.stopPropagation()} style={{position:"relative",display:"inline-block",lineHeight:0}}>
+            <img src={lightboxUrl} alt="Trade screenshot"
+              style={{display:"block",maxWidth:"70vw",maxHeight:"75vh",objectFit:"contain",borderRadius:8,boxShadow:"0 12px 48px rgba(0,0,0,0.4)"}} />
+            <button type="button" aria-label="Fermer" onClick={()=>setLightboxUrl(null)}
+              style={{position:"absolute",top:8,right:8,width:24,height:24,borderRadius:999,background:"rgba(0,0,0,0.55)",border:"none",color:"#fff",fontSize:14,lineHeight:1,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>
+              ×
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
