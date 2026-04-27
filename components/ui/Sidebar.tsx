@@ -339,9 +339,9 @@ export default function Sidebar(props: SidebarProps) {
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Étendre" : "Réduire"}
             style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 8,
-              justifyContent: collapsed ? "center" : "flex-start",
-              padding: collapsed ? "6px 0" : "6px 8px",
+              width: "100%", display: "flex", alignItems: "center",
+              justifyContent: "center",
+              padding: "6px 0",
               borderRadius: 8, border: "none", background: "transparent",
               cursor: "pointer", fontFamily: "inherit",
               color: "var(--color-text-sub)",
@@ -350,7 +350,6 @@ export default function Sidebar(props: SidebarProps) {
             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            {!collapsed && <span style={{ fontSize: 12 }}>Réduire</span>}
           </button>
         )}
       </div>

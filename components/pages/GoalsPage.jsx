@@ -9,7 +9,7 @@ import {
   Clock, Trophy,
 } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
-import { useTrades } from "@/lib/hooks/useTradeData";
+import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { t, useLang } from "@/lib/i18n";
 
@@ -73,6 +73,7 @@ const AUTO_TYPES = [
   { id: "winrate",    label: "Win rate",            unit: "%", trading: true,  group: "Performance" },
   { id: "trades",     label: "Nb de trades",        unit: "",  trading: true,  group: "Performance" },
   { id: "max_dd",     label: "Drawdown max",        unit: "$", trading: true,  group: "Risque" },
+  { id: "account_type", label: "Type de compte",    unit: "",  trading: true,  group: "Compte" },
 ];
 
 /* ---------- Helpers ---------- */
@@ -231,6 +232,8 @@ export default function GoalsPage() {
   useLang();
   const tradesHook = useTrades();
   const trades = tradesHook?.trades || [];
+  const accountsHook = useTradingAccounts();
+  const accounts = accountsHook?.accounts || [];
 
   const [goals, setGoals] = useCloudState(STORAGE_KEY, "goals", defaultGoals());
 
@@ -264,13 +267,13 @@ export default function GoalsPage() {
   };
 
   // Modal d'ajout/édition
-  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count" };
+  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", accountTypeFilter: "live" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowForm(true); };
-  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count" }); setEditingId(g.id); setShowForm(true); };
+  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", accountTypeFilter: g.accountTypeFilter || "live" }); setEditingId(g.id); setShowForm(true); };
   const close = () => { setForm(emptyForm); setEditingId(null); setShowForm(false); };
 
   // Auto-save : dès qu'un champ change et qu'il y a assez d'infos, on enregistre
@@ -285,14 +288,17 @@ export default function GoalsPage() {
           ...g, label: form.label.trim(), horizon, level: form.level,
           category: form.category, autoType: form.autoType,
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
+          accountTypeFilter: form.accountTypeFilter,
         })));
       } else {
         // Créer le nouveau goal et passer immédiatement en mode édition
         const id = Date.now();
         setGoals(prev => [...prev, {
-          id, label: form.label.trim(), horizon, level: form.level,
+          id, createdAt: new Date(id).toISOString(),
+          label: form.label.trim(), horizon, level: form.level,
           category: form.category, autoType: form.autoType,
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
+          accountTypeFilter: form.accountTypeFilter,
           manual: 0,
         }]);
         setEditingId(id);
@@ -348,6 +354,10 @@ export default function GoalsPage() {
       current = (w + l) > 0 ? (w / (w + l)) * 100 : 0;
     }
     else if (g.autoType === "trades") current = tradesInRange(trades, start, end).length;
+    else if (g.autoType === "account_type") {
+      const wanted = g.accountTypeFilter || "live";
+      current = (accounts || []).filter(a => (a.account_type || "live") === wanted).length;
+    }
     else if (g.autoType === "max_dd") {
       const list = tradesInRange(trades, start, end).sort((a, b) => new Date(a.date) - new Date(b.date));
       let peak = 0, cum = 0, mdd = 0;
@@ -718,6 +728,28 @@ export default function GoalsPage() {
                 </StackField>
               )}
 
+              {/* Sélecteur du type de compte — visible uniquement quand
+                  la source de suivi est "Type de compte". */}
+              {form.category === "trading" && form.autoType === "account_type" && (
+                <StackField label="Type de compte">
+                  <FancyDropdown
+                    value={form.accountTypeFilter || "live"}
+                    options={[
+                      { id: "live",   label: "Live" },
+                      { id: "eval",   label: "Eval" },
+                      { id: "funded", label: "Funded" },
+                    ]}
+                    onChange={(v) => setForm({ ...form, accountTypeFilter: v })}
+                    renderOption={(o, active) => (
+                      <>
+                        <span style={{ flex: 1 }}>{o.label}</span>
+                        {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
+                      </>
+                    )}
+                  />
+                </StackField>
+              )}
+
               {/* Sous-objectifs — visibles uniquement après création */}
               {editingId && (() => {
                 const g = goals.find(gg => gg.id === editingId);
@@ -917,7 +949,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
     pressedRef.current = true;
     longPressTimer.current = setTimeout(() => {
       if (pressedRef.current) setArmed(true);
-    }, 50);
+    }, 10);
   };
 
   const handleDragStart = (e) => {
@@ -1116,7 +1148,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
           borderTop: `1px solid ${T.border}`,
           marginTop: -2,
         }}>
-          {!nested && <RoadmapStrip subtasks={subtasks} deadline={g.deadline} />}
+          {!nested && <RoadmapStrip subtasks={subtasks} deadline={g.deadline} createdAt={g.createdAt || g.id} />}
           {subtasks.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
               {(() => {
@@ -1202,12 +1234,26 @@ function DeadlineField({ value, onChange }) {
   const activePreset = presets.find(p => p.id === value);
 
   const [calOpen, setCalOpen] = useState(false);
-  const calRef = React.useRef(null);
+  const calBtnRef = React.useRef(null);
+  const calPopRef = React.useRef(null);
+  const [calRect, setCalRect] = useState(null);
   useEffect(() => {
-    if (!calOpen) return;
-    const onDoc = (e) => { if (calRef.current && !calRef.current.contains(e.target)) setCalOpen(false); };
+    if (!calOpen) { setCalRect(null); return; }
+    const update = () => { if (calBtnRef.current) setCalRect(calBtnRef.current.getBoundingClientRect()); };
+    update();
+    const onDoc = (e) => {
+      if ((calPopRef.current && calPopRef.current.contains(e.target)) ||
+          (calBtnRef.current && calBtnRef.current.contains(e.target))) return;
+      setCalOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [calOpen]);
 
   // État du mois affiché dans le popover
@@ -1241,18 +1287,22 @@ function DeadlineField({ value, onChange }) {
         />
       </div>
       {/* Bouton calendrier : poussé à droite */}
-      <div ref={calRef} style={{ position: "relative", flexShrink: 0, marginLeft: "auto" }}>
-        <button type="button" title="Choisir une date" onClick={() => setCalOpen(v => !v)}
+      <div style={{ position: "relative", flexShrink: 0, marginLeft: "auto" }}>
+        <button ref={calBtnRef} type="button" title="Choisir une date" onClick={() => setCalOpen(v => !v)}
           style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${T.border}`, background: calOpen ? T.accentBg : T.white, color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <Calendar size={13} strokeWidth={1.75} />
         </button>
-        {calOpen && (
-          <MiniCalendar
-            value={value}
-            viewDate={viewDate}
-            setViewDate={setViewDate}
-            onPick={(iso) => { onChange(iso); setCalOpen(false); }}
-          />
+        {calOpen && calRect && typeof document !== "undefined" && ReactDOM.createPortal(
+          <div ref={calPopRef}
+            style={{ position: "fixed", top: calRect.bottom + 6, right: Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 0) - calRect.right), zIndex: 10000 }}>
+            <MiniCalendar
+              value={value}
+              viewDate={viewDate}
+              setViewDate={setViewDate}
+              onPick={(iso) => { onChange(iso); setCalOpen(false); }}
+            />
+          </div>,
+          document.body
         )}
       </div>
     </StackField>
@@ -1346,9 +1396,17 @@ function MiniCalendar({ value, viewDate, setViewDate, onPick }) {
 // avec un bouton retour). Sinon liste plate.
 function DropdownBody({ options, value, onSelect, renderOption }) {
   const hasGroups = options.some(o => o.group);
-  // Catégorie courante (null = niveau racine).
+  // Catégorie courante (null = niveau racine). On n'ouvre PAS sur un groupe
+  // qui ne contient qu'un seul item — il est de toute façon montré à la
+  // racine, sans dossier intermédiaire.
   const current = options.find(o => o.id === value);
-  const [activeGroup, setActiveGroup] = useState(current?.group || null);
+  const initialGroup = (() => {
+    const g = current?.group;
+    if (!g) return null;
+    const count = options.filter(o => (o.group || "Autres") === g).length;
+    return count > 1 ? g : null;
+  })();
+  const [activeGroup, setActiveGroup] = useState(initialGroup);
 
   if (!hasGroups) {
     return options.map(o => (
@@ -1445,17 +1503,44 @@ function DropdownItem({ option: o, active, onSelect, renderOption }) {
 
 function FancyDropdown({ value, options, onChange, renderValue, renderOption, align = "right" }) {
   const [open, setOpen] = useState(false);
-  const ref = React.useRef(null);
+  const btnRef = React.useRef(null);
+  const menuRef = React.useRef(null);
+  const [rect, setRect] = useState(null);
   useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (!open) { setRect(null); return; }
+    const update = () => {
+      if (btnRef.current) setRect(btnRef.current.getBoundingClientRect());
+    };
+    update();
+    const onDoc = (e) => {
+      if ((menuRef.current && menuRef.current.contains(e.target)) ||
+          (btnRef.current && btnRef.current.contains(e.target))) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
   const selected = options.find(o => o.id === value) || options[0];
+  const menuStyle = rect ? {
+    position: "fixed",
+    top: rect.bottom + 6,
+    minWidth: Math.max(200, rect.width),
+    background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
+    boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+    padding: 4, zIndex: 10000, maxHeight: 320, overflowY: "auto",
+    ...(align === "left"
+      ? { left: rect.left }
+      : { right: Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 0) - rect.right) }),
+  } : null;
   return (
-    <div ref={ref} style={{ position: "relative", flex: 1, minWidth: 0 }}>
-      <button type="button" onClick={() => setOpen(v => !v)}
+    <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+      <button ref={btnRef} type="button" onClick={() => setOpen(v => !v)}
         style={{
           width: "100%", padding: 0, border: "none", background: "transparent",
           cursor: "pointer", fontFamily: "inherit",
@@ -1468,19 +1553,14 @@ function FancyDropdown({ value, options, onChange, renderValue, renderOption, al
         <ChevronDown size={14} strokeWidth={1.75} color={T.textMut}
           style={{ transition: "transform .15s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }} />
       </button>
-      {open && (
-        <div style={{
-          position: "absolute", top: "calc(100% + 6px)",
-          [align === "left" ? "left" : "right"]: 0, minWidth: 200,
-          background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
-          boxShadow: "0 12px 32px rgba(0,0,0,0.10)",
-          padding: 4, zIndex: 100, maxHeight: 320, overflowY: "auto",
-        }}>
+      {open && rect && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div ref={menuRef} style={menuStyle}>
           <DropdownBody
             options={options} value={value} renderOption={renderOption}
             onSelect={(id) => { onChange(id); setOpen(false); }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1508,16 +1588,30 @@ function countSubtasks(arr) {
 
 function DateChip({ value, onChange, placeholder = "Date" }) {
   const [open, setOpen] = useState(false);
-  const ref = React.useRef(null);
+  const btnRef = React.useRef(null);
+  const popRef = React.useRef(null);
+  const [rect, setRect] = useState(null);
   const [viewDate, setViewDate] = useState(() => {
     const d = value ? new Date(value + "T00:00:00") : new Date();
     return isNaN(d.getTime()) ? new Date() : d;
   });
   useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (!open) { setRect(null); return; }
+    const update = () => { if (btnRef.current) setRect(btnRef.current.getBoundingClientRect()); };
+    update();
+    const onDoc = (e) => {
+      if ((popRef.current && popRef.current.contains(e.target)) ||
+          (btnRef.current && btnRef.current.contains(e.target))) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
 
   const label = value
@@ -1525,8 +1619,8 @@ function DateChip({ value, onChange, placeholder = "Date" }) {
     : placeholder;
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+    <div style={{ position: "relative", display: "inline-flex" }}>
+      <button ref={btnRef} type="button" onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
         style={{
           display: "inline-flex", alignItems: "center", gap: 4,
           padding: "2px 8px", borderRadius: 999,
@@ -1542,15 +1636,17 @@ function DateChip({ value, onChange, placeholder = "Date" }) {
             style={{ marginLeft: 2, color: T.textMut, fontSize: 11, lineHeight: 1 }}>×</span>
         )}
       </button>
-      {open && (
-        <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 200 }}>
+      {open && rect && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div ref={popRef} onClick={(e) => e.stopPropagation()}
+          style={{ position: "fixed", top: rect.bottom + 6, left: rect.left, zIndex: 10000 }}>
           <MiniCalendar
             value={value}
             viewDate={viewDate}
             setViewDate={setViewDate}
             onPick={(iso) => { onChange(iso); setOpen(false); }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1641,10 +1737,19 @@ function RoadmapDot({ item: it, pct, color }) {
   );
 }
 
-function RoadmapStrip({ subtasks, deadline }) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+function RoadmapStrip({ subtasks, deadline, createdAt }) {
+  // Bornes fixes : début = date de création de l'objectif, fin = deadline.
+  // La barre n'évolue plus avec le temps ; à la place, un curseur "Aujourd'hui"
+  // se déplace le long pour montrer la progression.
+  const start = (() => {
+    if (createdAt == null) return null;
+    const v = typeof createdAt === "number" ? new Date(createdAt) : new Date(createdAt);
+    if (isNaN(v.getTime())) return null;
+    v.setHours(0, 0, 0, 0);
+    return v;
+  })();
   const end = deadline ? new Date(deadline + "T23:59:59") : null;
-  if (!end || isNaN(end.getTime()) || end <= today) return null;
+  if (!start || !end || isNaN(end.getTime()) || end <= start) return null;
 
   // Aplatit récursivement l'arbre des sous-objectifs : on récupère aussi
   // les sous-sous-objectifs (sous-objectifs du sous-objectif imbriqué).
@@ -1666,7 +1771,9 @@ function RoadmapStrip({ subtasks, deadline }) {
   };
   const items = flatten(subtasks, 1, []).sort((a, b) => a._date - b._date);
 
-  const totalMs = end.getTime() - today.getTime();
+  const totalMs = end.getTime() - start.getTime();
+  const now = Date.now();
+  const todayPct = Math.max(0, Math.min(100, ((now - start.getTime()) / totalMs) * 100));
 
   // Couleur d'un point :
   //  - objectif (a un `level` de priorité) → couleur de sa priorité
@@ -1684,15 +1791,28 @@ function RoadmapStrip({ subtasks, deadline }) {
   return (
     <div style={{ marginBottom: 12, padding: "10px 12px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 10, color: T.textMut, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
-        <span>Aujourd&apos;hui</span>
+        <span>{start.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
         <span>{end.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
       </div>
       <div style={{ position: "relative", height: 22 }}>
+        {/* Rail de fond */}
         <div style={{ position: "absolute", top: 10, left: 0, right: 0, height: 2, background: T.accentBg, borderRadius: 1 }} />
-        <div style={{ position: "absolute", top: 7, left: 0, width: 8, height: 8, borderRadius: "50%", background: T.text }} />
-        <div style={{ position: "absolute", top: 7, right: 0, width: 8, height: 8, borderRadius: "50%", background: T.text }} />
+        {/* Portion écoulée (de la création à aujourd'hui) */}
+        <div style={{ position: "absolute", top: 10, left: 0, width: `${todayPct}%`, height: 2, background: T.text, borderRadius: 1 }} />
+        {/* Curseur "Aujourd'hui" : pastille noire qui se déplace */}
+        {todayPct >= 0 && todayPct <= 100 && (
+          <div title="Aujourd'hui"
+            style={{
+              position: "absolute", top: 5, left: `${todayPct}%`, transform: "translateX(-50%)",
+              width: 12, height: 12, borderRadius: "50%",
+              background: T.text,
+              border: `2px solid ${T.white}`,
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.06)",
+              zIndex: 2,
+            }} />
+        )}
         {items.map(it => {
-          const pct = Math.max(0, Math.min(100, ((it._date.getTime() - today.getTime()) / totalMs) * 100));
+          const pct = Math.max(0, Math.min(100, ((it._date.getTime() - start.getTime()) / totalMs) * 100));
           return (
             <RoadmapDot key={it.id} item={it} pct={pct} color={dotColor(it)} />
           );
