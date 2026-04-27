@@ -55,16 +55,46 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
   // Ordre des colonnes du tableau, persisté côté compte (Supabase via useCloudState)
   // avec fallback localStorage. L'utilisateur peut les réordonner par drag-and-drop.
-  const TRADE_COLUMN_IDS = ["asset","side","entryDate","entryTime","entry","exitDate","exitTime","exit","lots","volume","pnl","pnlPct","r","duration"];
+  // Colonnes existantes (visibles par défaut) + nouvelles catégories optionnelles
+  // (masquées par défaut, activables depuis le bouton de config).
+  const TRADE_COLUMN_IDS = [
+    "asset","side","entryDate","entryTime","entry","exitDate","exitTime","exit",
+    "lots","volume","pnl","pnlPct","r","duration",
+    // Nouvelles colonnes
+    "fees","netPnl","strategy","notes","emotion","session","weekday","broker","mae","mfe",
+  ];
+  const DEFAULT_VISIBLE_COLUMNS = [
+    "asset","side","entryDate","entryTime","entry","exitDate","exitTime","exit",
+    "lots","volume","pnl","pnlPct","r","duration",
+  ];
   const [rawColumnOrder, setRawColumnOrder] = useCloudState("tr4de_trades_columns", "trades_column_order", TRADE_COLUMN_IDS);
-  // Validation : si la valeur stockée est invalide (colonne ajoutée/supprimée
-  // dans le code, données corrompues), on retombe sur l'ordre par défaut.
-  const columnOrder = (Array.isArray(rawColumnOrder)
-    && rawColumnOrder.length === TRADE_COLUMN_IDS.length
-    && TRADE_COLUMN_IDS.every(id => rawColumnOrder.includes(id)))
-    ? rawColumnOrder
-    : TRADE_COLUMN_IDS;
+  // Validation : tout id stocké doit appartenir à TRADE_COLUMN_IDS et toutes
+  // les colonnes du code doivent y être (autoriser la migration en ajoutant
+  // les nouvelles colonnes en fin si elles manquent).
+  const columnOrder = (() => {
+    if (!Array.isArray(rawColumnOrder)) return TRADE_COLUMN_IDS;
+    const cleaned = rawColumnOrder.filter(id => TRADE_COLUMN_IDS.includes(id));
+    const missing = TRADE_COLUMN_IDS.filter(id => !cleaned.includes(id));
+    return [...cleaned, ...missing];
+  })();
   const setColumnOrder = setRawColumnOrder;
+
+  // Colonnes visibles : persistées séparément. Par défaut on garde les
+  // colonnes historiques visibles ; les nouvelles sont à activer manuellement.
+  const [rawVisibleColumns, setRawVisibleColumns] = useCloudState(
+    "tr4de_trades_visible_columns", "trades_visible_columns", DEFAULT_VISIBLE_COLUMNS
+  );
+  const visibleColumns = Array.isArray(rawVisibleColumns)
+    ? rawVisibleColumns.filter(id => TRADE_COLUMN_IDS.includes(id))
+    : DEFAULT_VISIBLE_COLUMNS;
+  const setVisibleColumns = setRawVisibleColumns;
+  const toggleColumnVisibility = (id) => {
+    setVisibleColumns(prev => {
+      const arr = Array.isArray(prev) ? prev : DEFAULT_VISIBLE_COLUMNS;
+      return arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
+    });
+  };
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [dragColId, setDragColId] = useState(null);
   const [dragGrabOffset, setDragGrabOffset] = useState(0);
   const [dragWidth, setDragWidth] = useState(0);
@@ -519,6 +549,103 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         <div id="tr4de-page-header-slot" />
       </div>
 
+      {/* MODAL CONFIG COLONNES — apparaît centrée devant l'écran avec backdrop. */}
+      {columnsMenuOpen && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div
+          onClick={() => setColumnsMenuOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, animation: "fadeIn .15s ease",
+          }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true"
+            style={{
+              width: "min(560px, 100%)", maxHeight: "min(80vh, 720px)",
+              background: T.white, borderRadius: 14,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.28)",
+              display: "flex", flexDirection: "column", overflow: "hidden",
+              fontFamily: "var(--font-sans)",
+              animation: "scaleIn .18s cubic-bezier(.2,.8,.2,1)",
+            }}>
+            <style>{`
+              @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+              @keyframes scaleIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            `}</style>
+            <div style={{
+              padding: "18px 22px 14px", display: "flex", alignItems: "center", gap: 12,
+              borderBottom: `1px solid ${T.border}`,
+            }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
+                  Colonnes du tableau
+                </div>
+                <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>
+                  Coche les catégories à afficher dans le tableau des trades.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setColumnsMenuOpen(false)}
+                aria-label="Fermer"
+                style={{
+                  marginLeft: "auto", width: 30, height: 30, borderRadius: 8,
+                  border: "none", background: "transparent", color: T.textSub, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                <LucideX size={16} strokeWidth={1.75} />
+              </button>
+            </div>
+            <div style={{
+              padding: "14px 16px", overflowY: "auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 4,
+            }}>
+              {TRADE_COLUMN_IDS.map(id => {
+                const labelMap = {
+                  asset: t("trades.colAsset"), side: t("trades.colSide"),
+                  entryDate: t("trades.colEntryDate"), entryTime: t("trades.colEntryTime"),
+                  entry: t("trades.colEntry"), exitDate: t("trades.colExitDate"),
+                  exitTime: t("trades.colExitTime"), exit: t("trades.colExit"),
+                  lots: t("trades.colLots"), volume: t("trades.colVolume"),
+                  pnl: t("trades.colPnL"), pnlPct: t("trades.colPnLPct"),
+                  r: "R", duration: t("trades.colDuration"),
+                  fees: "Frais", netPnl: "P&L net", strategy: "Stratégie",
+                  notes: "Note", emotion: "Émotion", session: "Session",
+                  weekday: "Jour", broker: "Broker", mae: "MAE", mfe: "MFE",
+                };
+                const checked = visibleColumns.includes(id);
+                return (
+                  <label key={id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "9px 12px", borderRadius: 8, cursor: "pointer",
+                      fontSize: 13, color: T.text, fontWeight: 500,
+                      transition: "background .12s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleColumnVisibility(id)}
+                      style={{ accentColor: T.text, cursor: "pointer", width: 14, height: 14, flexShrink: 0 }}
+                    />
+                    <span style={{ flex: 1 }}>{labelMap[id] || id}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* LAYOUT WITH TABLE + SIDE PANEL WITH TABS */}
       <div className="tr4de-trades-layout" style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
@@ -603,8 +730,19 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       pnlPct:    { label: t("trades.colPnLPct") },
                       r:         { label: "R" },
                       duration:  { label: t("trades.colDuration") },
+                      // Nouvelles colonnes (activables via le bouton de config)
+                      fees:      { label: "Frais" },
+                      netPnl:    { label: "P&L net" },
+                      strategy:  { label: "Stratégie" },
+                      notes:     { label: "Note" },
+                      emotion:   { label: "Émotion" },
+                      session:   { label: "Session" },
+                      weekday:   { label: "Jour" },
+                      broker:    { label: "Broker" },
+                      mae:       { label: "MAE" },
+                      mfe:       { label: "MFE" },
                     };
-                    return columnOrder.map(id => {
+                    return columnOrder.filter(id => visibleColumns.includes(id)).map(id => {
                       const h = labels[id]; if (!h) return null;
                       const isDragging = dragColId === id;
                       return (
@@ -646,9 +784,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   <th style={{padding:"12px 8px",textAlign:"right",background:T.bg,width:32}}>
                     <button
                       aria-label="Configurer colonnes"
-                      style={{background:"transparent",border:"none",padding:4,cursor:"pointer",color:T.textMut,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"background .12s ease"}}
-                      onMouseEnter={(e)=>{e.currentTarget.style.background="#F0F0F0"}}
-                      onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                      onClick={(e) => { e.stopPropagation(); setColumnsMenuOpen(v => !v); }}
+                      style={{background: columnsMenuOpen ? "#F0F0F0" : "transparent",border:"none",padding:4,cursor:"pointer",color:T.textMut,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"background .12s ease"}}
+                      onMouseEnter={(e)=>{ if(!columnsMenuOpen) e.currentTarget.style.background="#F0F0F0" }}
+                      onMouseLeave={(e)=>{ if(!columnsMenuOpen) e.currentTarget.style.background="transparent" }}
                     >
                       <LucideSlidersHorizontal size={14} strokeWidth={1.75} />
                     </button>
@@ -806,6 +945,32 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           const mm = Math.floor((sec%3600)/60);
                           return mm === 0 ? `${h}h` : `${h}h${String(mm).padStart(2,"0")}`;
                         })();
+                        // Helpers pour les nouvelles colonnes
+                        const fees = Number(t.fees ?? t.commission) || 0;
+                        const netPnl = (Number(t.pnl) || 0) - fees;
+                        const tk = tradeKey(t);
+                        const stratObj = strategies.find(s => s.id === tradeStrategies[tk]);
+                        const noteText = (tradeNotes[tk] || "").trim();
+                        const emotionTag = emotionTags[tk] || "";
+                        const sessionLabel = (() => {
+                          const v = t.entryTime || t.entry_time || "";
+                          const m = String(v).match(/(\d{1,2}):/);
+                          if (!m) return "—";
+                          const h = +m[1];
+                          if (h < 8) return "Asia";
+                          if (h < 13) return "London";
+                          if (h < 22) return "NY";
+                          return "Asia";
+                        })();
+                        const weekdayLabel = (() => {
+                          const d = new Date(t.date);
+                          if (isNaN(d.getTime())) return "—";
+                          return d.toLocaleDateString("fr-FR", { weekday: "short" });
+                        })();
+                        const brokerLabel = t.broker || t.platform || "—";
+                        const maeVal = Number(t.mae) || null;
+                        const mfeVal = Number(t.mfe) || null;
+
                         const cells = {
                           asset:     <td key="asset" style={cellStyle("asset",{...tdBase,color:T.textSub})}>Future</td>,
                           side:      <td key="side" style={cellStyle("side",{...tdBase,fontWeight:500,color:T.text,fontSize:13})}>{t.direction}</td>,
@@ -821,8 +986,19 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
                           r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple(t))}</td>,
                           duration:  <td key="duration" style={cellStyle("duration",{...tdBase,color:T.textSub,fontSize:12})}>{duration}</td>,
+                          // Nouvelles cellules
+                          fees:      <td key="fees" style={cellStyle("fees",{...tdBase,color:T.textSub,fontFamily:"var(--font-sans)",fontSize:12})}>{fees > 0 ? `$${fees.toFixed(2)}` : "—"}</td>,
+                          netPnl:    <td key="netPnl" style={cellStyle("netPnl",{...tdBase,fontWeight:600,color:netPnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{netPnl>=0?"+":""}{fmt(netPnl,false)}</td>,
+                          strategy:  <td key="strategy" style={cellStyle("strategy",{...tdBase,color:T.textSub,fontSize:12,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"})}>{stratObj?.name || "—"}</td>,
+                          notes:     <td key="notes" style={cellStyle("notes",{...tdBase,color:T.textSub,fontSize:12,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"})}>{noteText || "—"}</td>,
+                          emotion:   <td key="emotion" style={cellStyle("emotion",{...tdBase,color:T.textSub,fontSize:12})}>{emotionTag || "—"}</td>,
+                          session:   <td key="session" style={cellStyle("session",{...tdBase,color:T.textSub,fontSize:12})}>{sessionLabel}</td>,
+                          weekday:   <td key="weekday" style={cellStyle("weekday",{...tdBase,color:T.textSub,fontSize:12,textTransform:"capitalize"})}>{weekdayLabel}</td>,
+                          broker:    <td key="broker" style={cellStyle("broker",{...tdBase,color:T.textSub,fontSize:12,textTransform:"capitalize"})}>{brokerLabel}</td>,
+                          mae:       <td key="mae" style={cellStyle("mae",{...tdBase,color:T.red,fontFamily:"var(--font-sans)",fontSize:12})}>{maeVal !== null ? `-${fmt(Math.abs(maeVal),false)}` : "—"}</td>,
+                          mfe:       <td key="mfe" style={cellStyle("mfe",{...tdBase,color:T.green,fontFamily:"var(--font-sans)",fontSize:12})}>{mfeVal !== null ? `+${fmt(mfeVal,false)}` : "—"}</td>,
                         };
-                        return columnOrder.map(id => cells[id] || null);
+                        return columnOrder.filter(id => visibleColumns.includes(id)).map(id => cells[id] || null);
                       })()}
                       {/* Cellule vide pour aligner avec le header settings */}
                       <td style={{padding:"12px 8px",width:32}} />
@@ -840,7 +1016,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           <div style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
-            <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{display:"flex",gap:16}}>
                 {[
                   {id:"infos",label:t("trades.tab.infos"),Icon:LucideFileText},
@@ -888,13 +1064,13 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
               {activeTab === "infos" && (
                 <>
                   {/* INFO ROW - DIRECTION */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Direction</div>
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
                   </div>
 
                   {/* INFO ROW - HEURE D'OUVERTURE */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
                     <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
                       const v = selectedTrade.entryTime || selectedTrade.entry_time;
@@ -906,7 +1082,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   </div>
 
                   {/* INFO ROW - HEURE DE FERMETURE */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
                     <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
                       const v = selectedTrade.exitTime || selectedTrade.exit_time;
@@ -918,25 +1094,19 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   </div>
 
                   {/* INFO ROW - P&L */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
                   </div>
 
-                  {/* INFO ROW - P&L % */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L %</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{(((selectedTrade.pnl/(selectedTrade.entry*100))*100)>=0?"+":"")}{ ((selectedTrade.pnl/(selectedTrade.entry*100))*100).toFixed(2)}%</div>
-                  </div>
-
-                  {/* INFO ROW - R-multiple */}
-                  <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R-multiple</div>
+                  {/* INFO ROW - R:R */}
+                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R:R</div>
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
                   </div>
 
                   {/* EMOTION TAGS */}
-                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
+                  <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Tags Émotionnels</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allEmotionTags.map(tag=>{
@@ -984,7 +1154,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   </div>
 
                   {/* ERROR TAGS */}
-                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`error-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
+                  <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`error-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Erreurs</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allErrorTags.map(tag=>{
