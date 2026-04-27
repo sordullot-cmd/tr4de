@@ -4,6 +4,7 @@ import { JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/supabaseAuthProvider";
+import { UndoProvider } from "@/lib/contexts/UndoContext";
 import PWAInstall from "@/components/PWAInstall";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -32,10 +33,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "tao trade",
-  description: "Professional trading platform with analytics",
-  manifest: "/manifest.webmanifest",
+  metadataBase: new URL("https://tao-trade.vercel.app"),
+  title: {
+    default: "tao trade",
+    template: "%s · tao trade",
+  },
+  description: "Plateforme de trading : journal, stratégies, discipline, productivité.",
   applicationName: "tao trade",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
@@ -45,6 +50,31 @@ export const metadata: Metadata = {
     apple: [
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
+  },
+  // Open Graph (Facebook / LinkedIn / Discord / Slack)
+  openGraph: {
+    type: "website",
+    siteName: "tao trade",
+    title: "tao trade",
+    description: "Plateforme de trading : journal, stratégies, discipline, productivité.",
+    url: "https://tao-trade.vercel.app",
+    images: [
+      { url: "/web-app-manifest-512x512.png", width: 512, height: 512, alt: "tao trade" },
+    ],
+    locale: "fr_FR",
+  },
+  // Twitter / X card
+  twitter: {
+    card: "summary",
+    title: "tao trade",
+    description: "Plateforme de trading : journal, stratégies, discipline, productivité.",
+    images: ["/web-app-manifest-512x512.png"],
+  },
+  // Indexation : on autorise sur la landing/login (server-side redirect →
+  // /login) ; les pages applicatives privées sont exclues via robots.ts.
+  robots: {
+    index: true,
+    follow: true,
   },
   appleWebApp: {
     capable: true,
@@ -78,7 +108,9 @@ export default function RootLayout({
         </Script>
         <ErrorBoundary>
           <AuthProvider>
-            {children}
+            <UndoProvider>
+              {children}
+            </UndoProvider>
           </AuthProvider>
         </ErrorBoundary>
         <PWAInstall />

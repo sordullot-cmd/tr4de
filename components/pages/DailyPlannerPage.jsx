@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2,
@@ -12,7 +13,7 @@ import {
   Dumbbell, BookOpen, Brain, Footprints, Bike, Waves, PenLine, BedDouble, AlarmClock,
   Droplets, Coffee, Apple, Salad, ShoppingCart, GraduationCap, TrendingUp,
   Music, Sparkles as Sparkle, Wallet, Code as CodeIcon, Users, ShowerHead,
-  Pill, Dog, Sprout, Wind, Sun, Star, Mic, Utensils,
+  Pill, Dog, Sprout, Wind, Sun, Star, Mic, Utensils, Car,
 } from "lucide-react";
 
 const T = {
@@ -65,6 +66,8 @@ const ICON_RULES = [
   { re: /(trading|marché|marche|bourse|chart)/i, Icon: TrendingUp },
   { re: /(musique|guitare|piano|music)/i, Icon: Music },
   { re: /(argent|budget|money|finance)/i, Icon: Wallet },
+  // "Code de la route" / permis : icône voiture (priorité sur le match `code` générique).
+  { re: /(code de la route|permis|conduite|driving)/i, Icon: Car },
   { re: /(code|dev|program)/i, Icon: CodeIcon },
   { re: /(famille|family|appel|call)/i, Icon: Users },
   { re: /(douche|shower|bain|hygiène|hygiene)/i, Icon: ShowerHead },
@@ -101,6 +104,7 @@ const DESC_RULES = [
   { re: /(musique|guitare|piano|music)/i,                   desc: "Pratique musicale" },
   { re: /(nettoya|clean|rang|ménage|menage)/i,              desc: "Mise en ordre de l'espace" },
   { re: /(argent|budget|money|finance)/i,                   desc: "Revue du budget" },
+  { re: /(code de la route|permis|conduite|driving)/i,      desc: "Réviser le code de la route" },
   { re: /(code|dev|program)/i,                              desc: "Session de code dédiée" },
   { re: /(famille|family|appel|call)/i,                     desc: "Appeler un proche" },
   { re: /(étirement|etirement|stretch)/i,                   desc: "Étirements 10 minutes" },
@@ -138,17 +142,38 @@ export default function DailyPlannerPage() {
   // Habits — synchronisées Supabase
   const [habits, setHabits] = useCloudState(STORAGE_HABITS, "habits", defaultHabits());
   const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, "habits_history", {});
+  const { pushUndo } = useUndo();
 
   const toggleHabit = (habitId) => {
+    const snapDate = dateKey;
     setHabitHistory(prev => {
       const h = { ...(prev[habitId] || {}) };
-      if (h[dateKey]) delete h[dateKey]; else h[dateKey] = true;
+      if (h[snapDate]) delete h[snapDate]; else h[snapDate] = true;
       return { ...prev, [habitId]: h };
     });
+    const toggle = () => setHabitHistory(prev => {
+      const h = { ...(prev[habitId] || {}) };
+      if (h[snapDate]) delete h[snapDate]; else h[snapDate] = true;
+      return { ...prev, [habitId]: h };
+    });
+    pushUndo({ label: "Habitude", undo: async () => toggle(), redo: async () => toggle() });
   };
   const removeHabit = (id) => {
+    const snapHabit = habits.find(h => h.id === id);
+    const snapHistory = habitHistory[id];
     setHabits(prev => prev.filter(h => h.id !== id));
     setHabitHistory(prev => { const n = { ...prev }; delete n[id]; return n; });
+    if (snapHabit) pushUndo({
+      label: "Suppression de l'habitude",
+      undo: async () => {
+        setHabits(prev => [...prev, snapHabit]);
+        if (snapHistory) setHabitHistory(prev => ({ ...prev, [id]: snapHistory }));
+      },
+      redo: async () => {
+        setHabits(prev => prev.filter(h => h.id !== id));
+        setHabitHistory(prev => { const n = { ...prev }; delete n[id]; return n; });
+      },
+    });
   };
 
   // Habit form (add + edit)
@@ -576,6 +601,7 @@ export default function DailyPlannerPage() {
 }
 
 function HabitsChart({ habits, history }) {
+  const [hoverIdx, setHoverIdx] = React.useState(null);
   const total = habits.length;
   // Trouve la première date où au moins une habitude a été cochée
   let firstIso = null;
@@ -625,16 +651,22 @@ function HabitsChart({ habits, history }) {
   });
   // Lignes droites entre points (pas de Bezier)
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  // Aire fermée vers le bas du chart pour le dégradé
+  const baselineY = padT + chartH;
+  const areaD = points.length === 0
+    ? ""
+    : `${pathD} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`;
 
   const yTicks = [0, 50, 100];
   const xTicks = points.filter((_, i) => i === 0 || i === points.length - 1 || i % 5 === 0);
 
   return (
     <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <TrendingUp size={13} strokeWidth={1.75} color={T.green} />
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Complétion des habitudes</div>
-        <span style={{ fontSize: 11, color: T.textMut }}>· 30 derniers jours</span>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Complétion des habitudes</div>
+          <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>30 derniers jours</div>
+        </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
           {streak >= 2 && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#F59E0B", fontSize: 12, fontWeight: 700 }}>
@@ -642,7 +674,7 @@ function HabitsChart({ habits, history }) {
             </span>
           )}
           <span style={{ fontSize: 12, color: avg >= 70 ? T.green : T.textSub, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-            {avg}% moy.
+            Moyenne · {avg}%
           </span>
         </div>
       </div>
@@ -652,30 +684,92 @@ function HabitsChart({ habits, history }) {
           Ajoute des habitudes pour voir ton graphique
         </div>
       ) : (
-        <div style={{ position: "relative", width: "100%" }}>
+        <div
+          style={{ position: "relative", width: "100%" }}
+          onMouseLeave={() => setHoverIdx(null)}
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const ratio = rect.width > 0 ? x / rect.width : 0;
+            const idx = Math.max(0, Math.min(points.length - 1, Math.round(ratio * (points.length - 1))));
+            setHoverIdx(idx);
+          }}
+        >
           <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none"
-            style={{ width: "100%", height: 180, display: "block", fontFamily: "var(--font-sans)" }}>
-            {/* Grid très clair */}
-            {yTicks.map(t => {
-              const y = padT + chartH - (t / 100) * chartH;
-              return <line key={t} x1={padL} y1={y} x2={VB_W - padR} y2={y} stroke="#F5F5F5" strokeWidth="1" />;
-            })}
-
-            {/* Courbe — pas de gradient, lignes droites */}
-            <path d={pathD} fill="none" stroke={T.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-
-            {/* Dot final */}
-            {points.length > 0 && (() => {
-              const last = points[points.length - 1];
-              return <circle cx={last.x} cy={last.y} r="3" fill="#fff" stroke={T.green} strokeWidth="2" vectorEffect="non-scaling-stroke" />;
-            })()}
-
+            style={{ width: "100%", height: 240, display: "block", fontFamily: "var(--font-sans)" }}>
+            <defs>
+              <linearGradient id="habits-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={T.green} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={T.green} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={areaD} fill="url(#habits-grad)" stroke="none" />
+            <path d={pathD} fill="none" stroke={T.green} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {hoverIdx !== null && points[hoverIdx] && (
+              <line x1={points[hoverIdx].x} y1={padT} x2={points[hoverIdx].x} y2={padT + chartH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+            )}
           </svg>
 
-          {/* X labels HTML overlay — non étirés par preserveAspectRatio="none" */}
+
+          {/* Point au survol + tooltip listant les habitudes cochées ce jour-là */}
+          {hoverIdx !== null && points[hoverIdx] && (() => {
+            const p = points[hoverIdx];
+            const leftPct = (p.x / VB_W) * 100;
+            const topPct = (p.y / VB_H) * 100;
+            const checked = habits.filter(h => history[h.id]?.[p.iso]);
+            const dateLabel = p.date.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" });
+            const onLeftHalf = leftPct > 60;
+            return (
+              <>
+                <div style={{
+                  position: "absolute",
+                  left: `${leftPct}%`,
+                  top: `${topPct}%`,
+                  transform: onLeftHalf
+                    ? "translate(calc(-100% - 14px), -50%)"
+                    : "translate(14px, -50%)",
+                  background: "#FFFFFF", color: T.text,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 8, padding: "10px 12px",
+                  fontSize: 11, lineHeight: 1.4,
+                  minWidth: 170, maxWidth: 260,
+                  boxShadow: "0 12px 32px rgba(0,0,0,0.14), 0 2px 6px rgba(0,0,0,0.06)",
+                  pointerEvents: "none", zIndex: 5,
+                  fontFamily: "var(--font-sans)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{dateLabel}</span>
+                    <span style={{ color: T.textMut, fontSize: 10, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                      {p.done}/{habits.length} · {Math.round(p.pct)}%
+                    </span>
+                  </div>
+                  {checked.length === 0 ? (
+                    <div style={{ color: T.textMut, fontStyle: "italic", fontSize: 10 }}>
+                      Aucune habitude cochée
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      {checked.slice(0, 6).map(h => (
+                        <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Check size={10} strokeWidth={2.5} color={T.green} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</span>
+                        </div>
+                      ))}
+                      {checked.length > 6 && (
+                        <div style={{ color: T.textMut, fontSize: 10, marginTop: 2 }}>
+                          + {checked.length - 6} autre{checked.length - 6 > 1 ? "s" : ""}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: padB, pointerEvents: "none" }}>
-            {xTicks.map(p => {
-              const label = p.isToday ? "Ajd" : `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
+            {xTicks.filter(p => !p.isToday).map(p => {
+              const label = `${String(p.date.getDate()).padStart(2, "0")}/${String(p.date.getMonth() + 1).padStart(2, "0")}`;
               const isFirst = p === points[0];
               const isLast = p === points[points.length - 1];
               const leftPct = (p.x / VB_W) * 100;
@@ -684,8 +778,8 @@ function HabitsChart({ habits, history }) {
                 <div key={`xh-${p.iso}`} style={{
                   position: "absolute", left: `${leftPct}%`, bottom: 4,
                   transform, fontSize: 10,
-                  color: p.isToday ? "#0D0D0D" : "#8E8E8E",
-                  fontWeight: p.isToday ? 600 : 500,
+                  color: "#8E8E8E",
+                  fontWeight: 500,
                   whiteSpace: "nowrap",
                 }}>
                   {label}
@@ -694,7 +788,6 @@ function HabitsChart({ habits, history }) {
             })}
           </div>
 
-          {/* Y labels HTML overlay (à droite, non étirés par preserveAspectRatio) */}
           <div style={{ position: "absolute", top: 0, right: 0, width: 36, height: "100%", pointerEvents: "none" }}>
             {yTicks.map(t => {
               const yPx = padT + chartH - (t / 100) * chartH;

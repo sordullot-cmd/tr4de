@@ -11,7 +11,10 @@
     "lint": "eslint",
     "lint:strict": "eslint --rule 'react/jsx-no-undef: error' --rule 'no-undef: error' --max-warnings 0 components/ lib/ app/",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.52",
@@ -45,6 +48,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",

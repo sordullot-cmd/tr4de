@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
+import { useUndo } from "@/lib/contexts/UndoContext";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getLocalDateString } from "@/lib/dateUtils";
 import { getCurrencySymbol } from "@/lib/userPrefs";
@@ -388,6 +389,7 @@ export default function DisciplinePage({ trades = [] }) {
   const { user } = useAuth();
   const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules, disciplineData } = useDisciplineTracking();
   const { customRules, loading: rulesLoading, addRule, deleteRule } = useCustomDisciplineRules();
+  const { pushUndo } = useUndo();
   
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRuleForm, setShowRuleForm] = useState(false);
@@ -668,7 +670,12 @@ export default function DisciplinePage({ trades = [] }) {
 
   const removeManualRule = async (id) => {
     try {
+      const snap = customRules.find(r => r.id === id);
       await deleteRule(id);
+      if (snap) pushUndo({
+        label: "Suppression de la règle",
+        undo: async () => { try { await addRule(snap.text); } catch (e) { console.error("undo rule failed:", e); } },
+      });
     } catch (err) {
       console.error("❌ Erreur suppression règle:", err);
     }
@@ -1138,18 +1145,17 @@ export default function DisciplinePage({ trades = [] }) {
               style={{
                 width:28, height:28,
                 display:"inline-flex", alignItems:"center", justifyContent:"center",
-                background:T.white,
-                border:`1px solid ${T.border}`,
+                background:"transparent",
+                border:"none",
                 color:T.textSub,
-                borderRadius:999,
                 cursor:"pointer",
                 fontFamily:"inherit",
-                transition:"background .12s ease, color .12s ease, border-color .12s ease",
+                transition:"color .12s ease",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.color = T.text; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = T.white; e.currentTarget.style.color = T.textSub; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = T.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = T.textSub; }}
             >
-              <Pencil size={13} strokeWidth={1.75}/>
+              <Pencil size={14} strokeWidth={1.75}/>
             </button>
           </div>
           <div className="tr4de-table-wrap" style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
@@ -1186,9 +1192,14 @@ export default function DisciplinePage({ trades = [] }) {
                         </div>
                       </td>
                       <td style={{padding:"10px 12px",fontSize:11}}>
-                        <span style={{background:data?.type==="Auto"?T.accentBg:T.bg,color:data?.type==="Auto"?T.accent:T.text,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600}}>
-                          {data?.type||"Manuel"}
-                        </span>
+                        {(() => {
+                          const displayType = rule.status ? "Auto" : (data?.type || "Manuel");
+                          return (
+                            <span style={{background:displayType==="Auto"?T.accentBg:T.bg,color:displayType==="Auto"?T.accent:T.text,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600}}>
+                              {displayType}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{padding:"10px 12px",fontSize:12,color:T.textMut}}>{data?.condition||"—"}</td>
                       <td style={{padding:"10px 12px",fontSize:12,textAlign:"center",fontWeight:600,color:T.text}}>0</td>

@@ -347,13 +347,13 @@ export default function FocusTimerPage() {
                     </button>
                   ))}
                 </div>
-                <button onClick={saveDuration} style={miniBtn(T.green, true)} title="Valider"><Check size={12} strokeWidth={2.5} /></button>
+                <button onClick={saveDuration} aria-label="Valider la durée" style={miniBtn(T.green, true)} title="Valider"><Check size={12} strokeWidth={2.5} /></button>
               </>
             ) : (
               <>
                 <span style={{ fontSize: 11, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Durée</span>
                 <span style={{ fontSize: 12, color: T.text, fontWeight: 600 }}>{fmtDuration(modeDuration)}</span>
-                <button onClick={startEditDuration} disabled={running} title={running ? "Mets en pause pour modifier" : "Modifier la durée"}
+                <button onClick={startEditDuration} disabled={running} aria-label="Modifier la durée" title={running ? "Mets en pause pour modifier" : "Modifier la durée"}
                   style={{ ...miniBtn(), opacity: running ? 0.4 : 1, cursor: running ? "not-allowed" : "pointer" }}>
                   <Pencil size={10} strokeWidth={1.75} />
                 </button>
@@ -371,8 +371,8 @@ export default function FocusTimerPage() {
 
           {/* Controls */}
           <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-            <button onClick={reset} style={ctrlBtn(false)} title="Reset"><RotateCcw size={16} strokeWidth={1.75} /></button>
-            <button onClick={toggleRun} style={{ ...ctrlBtn(true, modeConf.color), width: 56, height: 56 }} title={running ? "Pause" : "Start"}>
+            <button onClick={reset} aria-label="Réinitialiser" style={ctrlBtn(false)} title="Reset"><RotateCcw size={16} strokeWidth={1.75} /></button>
+            <button onClick={toggleRun} aria-label={running ? "Mettre en pause" : "Démarrer"} style={{ ...ctrlBtn(true, modeConf.color), width: 56, height: 56 }} title={running ? "Pause" : "Start"}>
               {running ? <Pause size={20} strokeWidth={2} /> : <Play size={20} strokeWidth={2} style={{ marginLeft: 3 }} />}
             </button>
             <button onClick={skip} style={ctrlBtn(false)} title={isStopwatch ? "Terminer & enregistrer" : "Skip"}>

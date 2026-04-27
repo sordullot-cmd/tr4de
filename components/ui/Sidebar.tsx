@@ -129,7 +129,7 @@ export default function Sidebar(props: SidebarProps) {
             alt="tao"
             width={32}
             height={32}
-            style={{ flexShrink: 0, display: "block" }}
+            style={{ flexShrink: 0, display: "block", borderRadius: "50%", objectFit: "cover" }}
           />
           {!collapsed && (
             <div style={{ flex: 1, overflow: "hidden", fontSize: 14, fontWeight: 600, color: "var(--color-text)", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>

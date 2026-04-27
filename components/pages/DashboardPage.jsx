@@ -9,7 +9,13 @@ import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/contexts/AppContext";
 
-export default function DashboardPage({ trades = [], allTrades = [], accounts = [], selectedAccountIds = [], strategies = [], setPage }) {
+export default function DashboardPage({ trades = [], allTrades = [], accounts = [], selectedAccountIds = [], strategies = [], setPage, setDateRangesByPage }) {
+  const goToTradesForDate = (iso) => {
+    if (typeof setDateRangesByPage === "function") {
+      setDateRangesByPage(prev => ({ ...(prev || {}), trades: { start: iso, end: iso } }));
+    }
+    if (typeof setPage === "function") setPage("trades");
+  };
   // Vue du graphique : "cumulative" | "byAccount" | "byStrategy"
   const [chartView, setChartView] = React.useState("cumulative");
   const [hoveredDayIdx, setHoveredDayIdx] = React.useState(null);
@@ -434,51 +440,48 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
         {/* ROW 2: P&L Cumulatif (a l'interieur de la meme carte) */}
         <div style={{padding:"16px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
-          {/* Total P&L (uniquement vue cumulative) à droite */}
-          {chartView === "cumulative" && (
-            <div style={{position:"absolute",top:16,right:20,zIndex:10}}>
-              <div style={{fontSize:12,fontWeight:600,color:totalPnL>=0?"#16A34A":"#EF4444"}}>{totalPnL>=0?"+":""}${Math.abs(totalPnL).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0})}</div>
+          {/* Titre + onglets de sélection du graphique sur la même ligne */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:4,flexWrap:"wrap"}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.text}}>Évolution du P&L</div>
+            <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+              {(() => {
+                const opts = [
+                  { id: "cumulative", label: t("dash.cumulativePnL") },
+                  { id: "byAccount",  label: "P&L par compte" },
+                  { id: "byStrategy", label: "P&L par stratégie" },
+                ];
+                return opts.map((opt, i) => {
+                  const active = chartView === opt.id;
+                  return (
+                    <React.Fragment key={opt.id}>
+                      {i > 0 && (
+                        <span aria-hidden="true" style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setChartView(opt.id)}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: 999,
+                          border: "none",
+                          background: active ? "#F5F5F5" : "transparent",
+                          color: active ? T.text : T.textSub,
+                          fontSize: 13,
+                          fontWeight: active ? 600 : 500,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: "background 140ms ease, color 140ms ease",
+                        }}
+                        onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = T.text; }}
+                        onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = T.textSub; }}
+                      >
+                        {opt.label}
+                      </button>
+                    </React.Fragment>
+                  );
+                });
+              })()}
             </div>
-          )}
-          {/* Onglets de sélection du graphique — style minimal (pill sur l'actif uniquement) */}
-          <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:6,flexWrap:"wrap"}}>
-            {(() => {
-              const opts = [
-                { id: "cumulative", label: t("dash.cumulativePnL") },
-                { id: "byAccount",  label: "P&L par compte" },
-                { id: "byStrategy", label: "P&L par stratégie" },
-              ];
-              return opts.map((opt, i) => {
-                const active = chartView === opt.id;
-                return (
-                  <React.Fragment key={opt.id}>
-                    {i > 0 && (
-                      <span aria-hidden="true" style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setChartView(opt.id)}
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: 999,
-                        border: "none",
-                        background: active ? "#F5F5F5" : "transparent",
-                        color: active ? T.text : T.textSub,
-                        fontSize: 13,
-                        fontWeight: active ? 600 : 500,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        transition: "background 140ms ease, color 140ms ease",
-                      }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = T.text; }}
-                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = T.textSub; }}
-                    >
-                      {opt.label}
-                    </button>
-                  </React.Fragment>
-                );
-              });
-            })()}
           </div>
           <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>
             {chartView === "cumulative"
@@ -493,7 +496,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               style={{position:"relative",width:"100%",height:280,paddingLeft:0,paddingBottom:22}}
               onMouseLeave={() => setHoveredChart(null)}
             >
-              <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:50,bottom:22,width:"calc(100% - 50px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
+              <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:22,width:"calc(100% - 64px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
 
 
                 {/* Chart area - smooth Catmull-Rom curve, sans gradient (style stats stratégie) */}
@@ -530,6 +533,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                         </defs>
                         <path d={areaD} fill={`url(#${gradId})`} stroke="none"/>
                         <path d={pathD} stroke={lineColor} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+                        {hoveredChart !== null && points[hoveredChart] && (
+                          <line x1={points[hoveredChart][0]} y1={topY} x2={points[hoveredChart][0]} y2={bottomY} stroke="#8E8E8E" strokeWidth="0.5" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" pointerEvents="none"/>
+                        )}
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -556,7 +562,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               </svg>
 
               {/* Y-axis labels en HTML overlay (à droite) — pas étirés par preserveAspectRatio */}
-              <div style={{position:"absolute",top:0,right:0,width:50,height:"calc(100% - 22px)",pointerEvents:"none"}}>
+              <div style={{position:"absolute",top:0,right:0,width:64,height:"calc(100% - 22px)",pointerEvents:"none"}}>
                 {(() => {
                   const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
                   const niceStep = (max) => {
@@ -602,37 +608,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 })()}
               </div>
 
-              {/* Dot au hover (n'apparaît que pendant le survol) */}
-              {hoveredChart !== null && (() => {
-                const idx = hoveredChart;
-                if (!pnlCurve[idx]) return null;
-                const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 0);
-                const minCum = Math.min(...pnlCurve.map(x=>x.cum), 0);
-                const span = (maxCum - minCum) || 1;
-                const p = pnlCurve[idx];
-                const topPct = (220 - ((p.cum - minCum) / span) * 204) / 240 * 100;
-                const svgX = 10 + (idx / Math.max(pnlCurve.length - 1, 1)) * 590;
-                const leftPct = (svgX / 600) * 100;
-                const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
-                const dotColor = lastCum >= 0 ? "#16A34A" : "#EF4444";
-                const dotShadow = lastCum >= 0 ? "rgba(16, 163, 127, 0.2)" : "rgba(239, 68, 68, 0.2)";
-                return (
-                  <div style={{
-                    position:"absolute",
-                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
-                    left:`calc(${leftPct}% * (100% - 50px) / 100%)`,
-                    width:10, height:10, borderRadius:"50%",
-                    background:"#FFFFFF",
-                    border:`2px solid ${dotColor}`,
-                    boxShadow:`0 0 0 1px ${dotShadow}`,
-                    transform:"translate(-50%, -50%)",
-                    pointerEvents:"none",
-                  }} />
-                );
-              })()}
 
               {/* X-axis labels en HTML - chaque jour, premier collé à gauche, dernier collé à droite */}
-              <div style={{position:"absolute",bottom:2,left:0,right:50,height:18,pointerEvents:"none"}}>
+              <div style={{position:"absolute",bottom:2,left:0,right:64,height:18,pointerEvents:"none"}}>
                 {(() => {
                   return pnlCurve.map((p, i) => {
                     const dateStr = p.date || '';
@@ -653,7 +631,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 })()}
               </div>
               
-              {/* Tooltip (n'apparaît que pendant le survol) */}
+              {/* Tooltip — même style que byAccount / byStrategy */}
               {hoveredChart !== null && (() => {
                 const idx = hoveredChart;
                 const p = pnlCurve[idx];
@@ -665,28 +643,28 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 const svgY = 220 - ((p.cum - minCum) / span) * 204;
                 const leftPct = (svgX / 600) * 100;
                 const topPct = (svgY / 240) * 100;
+                const flip = leftPct > 60;
+                const fmtD = (d) => { const dt = new Date(d); const months = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"]; return `${dt.getDate()} ${months[dt.getMonth()]}`; };
                 return (
                   <div style={{
                     position:"absolute",
-                    left:`calc(${leftPct}% * (100% - 50px) / 100%)`,
-                    top:`calc(${topPct}% * (100% - 22px) / 100%)`,
-                    transform:"translate(-50%, -120%)",
+                    left:`calc(${leftPct}% * (100% - 64px) / 100%)`,
+                    top:`${topPct}%`,
+                    transform:`translateY(-100%) translateY(-12px) ${flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
                     background:"#FFFFFF",
                     color:"#0D0D0D",
-                    padding:"8px 12px",
-                    borderRadius:"6px",
-                    fontSize:"12px",
-                    fontWeight:"600",
-                    whiteSpace:"nowrap",
-                    zIndex:100,
-                    pointerEvents:"none",
                     border:"1px solid #E5E5E5",
-                    boxShadow:"0 4px 12px rgba(0,0,0,0.08)"
+                    padding:"8px 10px",
+                    borderRadius:6,
+                    fontSize:11,
+                    fontFamily:"var(--font-sans)",
+                    boxShadow:"0 4px 12px rgba(0,0,0,0.08)",
+                    pointerEvents:"none",
+                    zIndex:9999,
+                    whiteSpace:"nowrap",
                   }}>
-                    <div style={{color:"#5C5C5C",fontWeight:500,fontSize:11,marginBottom:2}}>{new Date(p.date).toLocaleDateString('fr-FR',{weekday:'short',month:'short',day:'numeric'})}</div>
-                    <div style={{fontSize:"13px",fontWeight:"700",color:p.pnl>=0?"#16A34A":"#EF4444"}}>
-                      {p.pnl>=0?"+":""}${Math.abs(p.pnl).toFixed(0)}
-                    </div>
+                    <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C",fontSize:11}}>{fmtD(p.date)}</div>
+                    <div style={{fontWeight:700,fontSize:12,color:p.cum>0?"#16A34A":p.cum<0?"#EF4444":"#0D0D0D"}}>{p.cum>0?"+":p.cum<0?"-":""}${Math.abs(p.cum).toFixed(0)}</div>
                   </div>
                 );
               })()}
@@ -749,7 +727,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               const yRange = (yMax - yMin) || 1;
 
               const W = 600, H = 240;
-              const padL = 10, padR = 50, padT = 12, padB = 22;
+              const padL = 10, padR = 0, padT = 12, padB = 22;
               const plotW = W - padL - padR;
               const plotH = H - padT - padB;
               const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
@@ -772,7 +750,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
               return (
                 <div style={{position:"relative",width:"100%",height:280}}>
-                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
                     <defs>
                       {seriesFilled.map(s => (
                         <linearGradient key={`g-${s.id}`} id={`dash-strat-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -814,7 +792,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   </svg>
 
                   {/* Y labels (échelle, gris) + P&L final par stratégie (couleur de la courbe) */}
-                  <div style={{position:"absolute",top:0,right:0,width:50,height:"100%",pointerEvents:"none"}}>
+                  <div style={{position:"absolute",top:0,right:0,width:64,height:"100%",pointerEvents:"none"}}>
                     {yTicks.map((tk, i) => (
                       <div key={`yh-${i}`} style={{position:"absolute",top:`${(tk.y / H) * 100}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500}}>{fmtVal(tk.value)}</div>
                     ))}
@@ -845,17 +823,20 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                       .map(s => ({ strategy: s, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
                       .sort((a, b) => b.value - a.value);
                     const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                    const trackVal = Math.max(...items.map(it => it.value));
+                    const trackY = yFor(trackVal);
+                    const topPct = (trackY / H) * 100;
                     const flip = leftPct > 60;
                     const fmtD = (d) => { const [, m, dd] = d.split("-"); const months = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"]; return `${parseInt(dd)} ${months[parseInt(m)-1]}`; };
                     return (
-                      <div style={{position:"absolute",left:`${leftPct}%`,top:16,transform: flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",background:"#FFFFFF",color:"#0D0D0D",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",border:"1px solid #E5E5E5",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
-                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C"}}>{fmtD(date)}</div>
+                      <div style={{position:"absolute",left:`calc(${leftPct}% * (100% - 64px) / 100%)`,top:`${topPct}%`,transform:`translateY(-100%) translateY(-12px) ${flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,background:"#FFFFFF",color:"#0D0D0D",border:"1px solid #E5E5E5",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:9999,whiteSpace:"nowrap"}}>
+                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C",fontSize:11}}>{fmtD(date)}</div>
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           {items.map(it => (
                             <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6}}>
                               <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                               <span style={{fontWeight:600,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value > 0 ? "#16A34A" : it.value < 0 ? "#EF4444" : "#0D0D0D"}}>{fmtVal(it.value)}</span>
                             </div>
                           ))}
                         </div>
@@ -918,7 +899,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               const yRange = (yMax - yMin) || 1;
 
               const W = 600, H = 240;
-              const padL = 10, padR = 50, padT = 12, padB = 22;
+              const padL = 10, padR = 0, padT = 12, padB = 22;
               const plotW = W - padL - padR;
               const plotH = H - padT - padB;
               const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
@@ -941,7 +922,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
               return (
                 <div style={{position:"relative",width:"100%",height:280}}>
-                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
                     {/* Lignes de grille */}
                     {/* Courbes — non-sélectionnés en arrière-plan, sélectionnés au-dessus */}
                     {seriesFilled.filter(s => !(selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id))).map(s => {
@@ -989,7 +970,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   </svg>
 
                   {/* Y labels (échelle, gris) + P&L de chaque compte (couleur de la courbe) */}
-                  <div style={{position:"absolute",top:0,right:0,width:50,height:"100%",pointerEvents:"none"}}>
+                  <div style={{position:"absolute",top:0,right:0,width:64,height:"100%",pointerEvents:"none"}}>
                     {/* Échelle (ticks ronds) */}
                     {yTicks.map((tk, i) => (
                       <div key={`yh-${i}`} style={{position:"absolute",top:`${(tk.y / H) * 100}%`,right:6,transform:"translateY(-50%)",fontSize:10,color:"#8E8E8E",fontWeight:500}}>{fmtVal(tk.value)}</div>
@@ -1026,11 +1007,14 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                       .map(s => ({ strategy: s, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
                       .sort((a, b) => b.value - a.value);
                     const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                    const trackVal = Math.max(...items.map(it => it.value));
+                    const trackY = yFor(trackVal);
+                    const topPct = (trackY / H) * 100;
                     const flip = leftPct > 60;
                     const fmtD = (d) => { const [, m, dd] = d.split("-"); const months = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Août","Sep","Oct","Nov","Déc"]; return `${parseInt(dd)} ${months[parseInt(m)-1]}`; };
                     return (
-                      <div style={{position:"absolute",left:`${leftPct}%`,top:16,transform: flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",background:"#FFFFFF",color:"#0D0D0D",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",border:"1px solid #E5E5E5",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:10,whiteSpace:"nowrap"}}>
-                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C"}}>{fmtD(date)}</div>
+                      <div style={{position:"absolute",left:`calc(${leftPct}% * (100% - 64px) / 100%)`,top:`${topPct}%`,transform:`translateY(-100%) translateY(-12px) ${flip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,background:"#FFFFFF",color:"#0D0D0D",border:"1px solid #E5E5E5",padding:"8px 10px",borderRadius:6,fontSize:11,fontFamily:"var(--font-sans)",boxShadow:"0 4px 12px rgba(0,0,0,0.08)",pointerEvents:"none",zIndex:9999,whiteSpace:"nowrap"}}>
+                        <div style={{fontWeight:600,marginBottom:6,color:"#5C5C5C",fontSize:11}}>{fmtD(date)}</div>
                         <div style={{display:"flex",flexDirection:"column",gap:4}}>
                           {items.map(it => {
                             const isSelected = selectedAccountIds.length === 0 || selectedAccountIds.includes(it.strategy.id);
@@ -1038,7 +1022,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                               <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.55}}>
                                 <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                                 <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                                <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                                <span style={{marginLeft:"auto",fontWeight:600,color:it.value > 0 ? "#16A34A" : it.value < 0 ? "#EF4444" : "#0D0D0D"}}>{fmtVal(it.value)}</span>
                               </div>
                             );
                           })}
@@ -1098,16 +1082,20 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             const maxDayPnL = Math.max(...Object.values(dayPnLMap).map(Math.abs), 1);
             const bgColor = pnl > 0 ? T.greenBg : pnl < 0 ? T.redBg : T.bg;
             const textColor = pnl > 0 ? T.green : pnl < 0 ? T.red : T.text;
-            const opacity = Math.abs(pnl) / Math.abs(maxDayPnL);
+            const opacity = Math.max(0.35, Math.abs(pnl) / Math.abs(maxDayPnL));
             const borderStyle = day === 31 ? `2px solid ${T.accent}` : `1px solid ${T.border}`;
+            const dayIso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const clickable = pnl !== 0;
 
             return (
               <div
                 key={i}
+                onClick={clickable ? () => goToTradesForDate(dayIso) : undefined}
+                title={clickable ? "Voir les trades du jour" : undefined}
                 style={{
                   aspectRatio:"1",
                   background:bgColor,
-                  opacity:Math.max(0.35,opacity),
+                  opacity,
                   borderRadius:3,
                   display:"flex",
                   flexDirection:"column",
@@ -1117,11 +1105,11 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                   fontWeight:600,
                   color:T.text,
                   border:borderStyle,
-                  cursor:"pointer",
-                  transition:"all 0.2s"
+                  cursor: clickable ? "pointer" : "default",
+                  transition:"opacity .15s ease, filter .15s ease"
                 }}
-                onMouseEnter={(e)=>{e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.1)"}}
-                onMouseLeave={(e)=>{e.currentTarget.style.boxShadow="none"}}
+                onMouseEnter={clickable ? (e) => { e.currentTarget.style.filter = "brightness(0.97)"; } : undefined}
+                onMouseLeave={clickable ? (e) => { e.currentTarget.style.filter = "none"; } : undefined}
               >
                 <div style={{fontSize:11,fontWeight:700}}>{day}</div>
                 {pnl !== 0 && <div style={{fontSize:10,color:textColor,fontWeight:600}}>{pnl>0?"+":""}{pnl.toFixed(0)}</div>}
@@ -1184,8 +1172,8 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                     left:`${parseFloat(pentagonMetrics.overallScore)}%`,
                     top:"50%",
                     transform:"translate(-50%, -50%)",
-                    width:10,
-                    height:10,
+                    width:14,
+                    height:14,
                     borderRadius:"50%",
                     background:"#5F7FB4",
                     border:"2px solid #FFFFFF",

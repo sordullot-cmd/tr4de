@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, BookOpen, Check, Trash2, Pencil, X, BookMarked, FileText, Library, ChevronDown } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useUndo } from "@/lib/contexts/UndoContext";
 import { Stat } from "@/components/ui/Stat";
 
 const T = {
@@ -41,6 +42,7 @@ function defaultBooks() {
 
 export default function ReadingListPage() {
   const [books, setBooks] = useCloudState(STORAGE_KEY, "reading_list", defaultBooks());
+  const { pushUndo } = useUndo();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const emptyForm = { title: "", author: "", category: "trading", status: "toRead", priority: "normal", totalPages: "", currentPage: "" };
@@ -67,7 +69,16 @@ export default function ReadingListPage() {
     setEditingId(b.id); setShowForm(true);
   };
   const cancel = () => { setForm(emptyForm); setEditingId(null); setShowForm(false); };
-  const remove = (id) => { setBooks(prev => prev.filter(b => b.id !== id)); if (expandedId === id) setExpandedId(null); };
+  const remove = (id) => {
+    const snap = books.find(b => b.id === id);
+    setBooks(prev => prev.filter(b => b.id !== id));
+    if (expandedId === id) setExpandedId(null);
+    if (snap) pushUndo({
+      label: "Suppression du livre",
+      undo: async () => setBooks(prev => [snap, ...prev]),
+      redo: async () => setBooks(prev => prev.filter(b => b.id !== snap.id)),
+    });
+  };
   const updateNote = (id, val) => setBooks(prev => prev.map(b => b.id === id ? { ...b, notes: val } : b));
 
   const shown = books.filter(b => filter === "all" ? true : (b.status || "toRead") === filter);

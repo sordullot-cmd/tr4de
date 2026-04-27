@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import {
-  Plus, Target, Trash2, Pencil, Check, X, TrendingUp, Heart,
+  Plus, Target, Trash2, Pencil, Copy, Check, X, TrendingUp, Heart,
   ChevronDown, ChevronRight, Calendar, AlertCircle, Flag, Sparkles,
   Dumbbell, BookOpen, Users, GraduationCap, Wallet, Briefcase, Activity, Code,
   Clock, Trophy,
@@ -11,6 +11,7 @@ import {
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
 
 const T = {
@@ -237,6 +238,7 @@ export default function GoalsPage() {
   const accounts = accountsHook?.accounts || [];
 
   const [goals, setGoals] = useCloudState(STORAGE_KEY, "goals", defaultGoals());
+  const { pushUndo } = useUndo();
 
   // Migration : anciens autoType et anciens levels -> nouveaux
   useEffect(() => {
@@ -310,7 +312,49 @@ export default function GoalsPage() {
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, showForm]);
-  const remove = (id) => setGoals(prev => removeGoalById(prev, id));
+  const remove = (id) => {
+    const snap = goals;
+    const after = removeGoalById(goals, id);
+    setGoals(after);
+    pushUndo({
+      label: "Suppression de l'objectif",
+      undo: async () => setGoals(snap),
+      redo: async () => setGoals(after),
+    });
+  };
+
+  // Duplique un objectif (top-level ou imbriqué) : insère une copie juste
+  // après l'original, avec de nouveaux ids pour le goal et tous ses
+  // sous-objectifs / sous-tâches.
+  const duplicate = (id) => {
+    let nextId = Date.now();
+    const newId = () => ++nextId;
+    const cloneNode = (n) => ({
+      ...n,
+      id: newId(),
+      subtasks: (n.subtasks || []).map(cloneNode),
+    });
+    const insertAfter = (arr) => {
+      const idx = arr.findIndex(g => g.id === id);
+      if (idx === -1) return null;
+      const orig = arr[idx];
+      const copy = cloneNode({ ...orig, label: `${orig.label || ""} (copie)`.trim() });
+      const next = [...arr];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    };
+    setGoals(prev => {
+      const atTop = insertAfter(prev);
+      if (atTop) return atTop.map((g, i) => (typeof g.position === "number" ? { ...g, position: i } : g));
+      return prev.map(g => {
+        if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+          const next = insertAfter(g.subtasks);
+          if (next) return { ...g, subtasks: next };
+        }
+        return g;
+      });
+    });
+  };
 
   const adjustManual = (gid, delta) =>
     setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, manual: Math.max(0, (parseFloat(g.manual) || 0) + delta) })));
@@ -510,7 +554,7 @@ export default function GoalsPage() {
                 {onGoing.length > 0 && (
                   <TimelineSection title="En cours" rows={onGoing}
                     compute={compute} unitOf={unitOf} fmtVal={fmtVal}
-                    onEdit={openEdit} onDelete={remove}
+                    onEdit={openEdit} onDelete={remove} onDuplicate={duplicate}
                     onAdjustManual={adjustManual}
                     onSubtasksChange={setSubtasksFor}
                     drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
@@ -539,7 +583,7 @@ export default function GoalsPage() {
                     {showDone && (
                       <TimelineSection title="Terminés" rows={done}
                         compute={compute} unitOf={unitOf} fmtVal={fmtVal}
-                        onEdit={openEdit} onDelete={remove}
+                        onEdit={openEdit} onDelete={remove} onDuplicate={duplicate}
                         onAdjustManual={adjustManual}
                         onSubtasksChange={setSubtasksFor}
                         drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
@@ -664,6 +708,27 @@ export default function GoalsPage() {
                       />
                     )}
                   </div>
+                ) : form.autoType === "account_type" ? (
+                  <div style={{ flexShrink: 0, marginLeft: 8, padding: "4px 10px 4px 12px", background: T.bg, borderRadius: 999, border: `1px solid ${T.border}` }}>
+                    <FancyDropdown
+                      value={form.accountTypeFilter || "live"}
+                      options={[
+                        { id: "live",   label: "Live" },
+                        { id: "eval",   label: "Eval" },
+                        { id: "funded", label: "Funded" },
+                      ]}
+                      onChange={(v) => setForm({ ...form, accountTypeFilter: v })}
+                      renderValue={(o) => (
+                        <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{o.label}</span>
+                      )}
+                      renderOption={(o, active) => (
+                        <>
+                          <span style={{ flex: 1 }}>{o.label}</span>
+                          {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
+                        </>
+                      )}
+                    />
+                  </div>
                 ) : (() => {
                   const a = AUTO_TYPES.find(x => x.id === form.autoType);
                   const label = a?.unit === "$" ? getCurrencySymbol() : a?.unit === "%" ? "%" : "trades";
@@ -743,29 +808,7 @@ export default function GoalsPage() {
                 </StackField>
               )}
 
-              {/* Sélecteur du type de compte — visible uniquement quand
-                  la source de suivi est "Type de compte". */}
-              {form.category === "trading" && form.autoType === "account_type" && (
-                <StackField label="Type de compte">
-                  <FancyDropdown
-                    value={form.accountTypeFilter || "live"}
-                    options={[
-                      { id: "live",   label: "Live" },
-                      { id: "eval",   label: "Eval" },
-                      { id: "funded", label: "Funded" },
-                    ]}
-                    onChange={(v) => setForm({ ...form, accountTypeFilter: v })}
-                    renderOption={(o, active) => (
-                      <>
-                        <span style={{ flex: 1 }}>{o.label}</span>
-                        {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
-                      </>
-                    )}
-                  />
-                </StackField>
-              )}
-
-              {/* Sous-objectifs — visibles uniquement après création */}
+{/* Sous-objectifs — visibles uniquement après création */}
               {editingId && (() => {
                 const g = goals.find(gg => gg.id === editingId);
                 if (!g) return null;
@@ -893,7 +936,7 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
@@ -902,6 +945,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
           compute={compute} unitOf={unitOf} fmtVal={fmtVal}
           onEdit={onEdit}
           onDelete={onDelete}
+          onDuplicate={onDuplicate}
           onAdjustManual={onAdjustManual}
           onSubtasksChange={onSubtasksChange}
           doneSection={doneSection}
@@ -912,7 +956,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -1139,11 +1183,22 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
           />
           <div style={{ display: "flex", gap: 2, opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
           <button onClick={(e) => { e.stopPropagation(); onEdit(g); }}
+            aria-label="Modifier"
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
             <Pencil size={11} strokeWidth={1.75} />
           </button>
+          {onDuplicate && (
+            <button onClick={(e) => { e.stopPropagation(); onDuplicate(g.id); }}
+              aria-label="Dupliquer"
+              title="Dupliquer"
+              style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+              <Copy size={11} strokeWidth={1.75} />
+            </button>
+          )}
           <button onClick={(e) => { e.stopPropagation(); onDelete(g.id); }}
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
@@ -1182,6 +1237,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onAdj
                       compute={compute} unitOf={unitOf} fmtVal={fmtVal}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onDuplicate={onDuplicate}
                       onAdjustManual={onAdjustManual}
                       onSubtasksChange={onSubtasksChange}
                       drag={drag} setDrag={setDrag} onDrop={onDrop}
@@ -1261,12 +1317,16 @@ function DeadlineField({ value, onChange }) {
           (calBtnRef.current && calBtnRef.current.contains(e.target))) return;
       setCalOpen(false);
     };
+    const onScroll = (e) => {
+      if (calPopRef.current && calPopRef.current.contains(e.target)) return;
+      setCalOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", update);
     return () => {
       document.removeEventListener("mousedown", onDoc);
-      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", update);
     };
   }, [calOpen]);
@@ -1308,15 +1368,23 @@ function DeadlineField({ value, onChange }) {
           <Calendar size={13} strokeWidth={1.75} />
         </button>
         {calOpen && calRect && typeof document !== "undefined" && ReactDOM.createPortal(
-          <div ref={calPopRef}
-            style={{ position: "fixed", top: calRect.bottom + 6, right: Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 0) - calRect.right), zIndex: 10000 }}>
-            <MiniCalendar
-              value={value}
-              viewDate={viewDate}
-              setViewDate={setViewDate}
-              onPick={(iso) => { onChange(iso); setCalOpen(false); }}
-            />
-          </div>,
+          (() => {
+            const POPOVER_H = 320;
+            const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+            const wouldOverflow = calRect.bottom + POPOVER_H + 12 > vh;
+            const top = wouldOverflow ? Math.max(4, vh - POPOVER_H - 4) :calRect.bottom + 6;
+            return (
+              <div ref={calPopRef}
+                style={{ position: "fixed", top, right: Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 0) - calRect.right), zIndex: 10000 }}>
+                <MiniCalendar
+                  value={value}
+                  viewDate={viewDate}
+                  setViewDate={setViewDate}
+                  onPick={(iso) => { onChange(iso); setCalOpen(false); }}
+                />
+              </div>
+            );
+          })(),
           document.body
         )}
       </div>
@@ -1619,12 +1687,17 @@ function DateChip({ value, onChange, placeholder = "Date" }) {
           (btnRef.current && btnRef.current.contains(e.target))) return;
       setOpen(false);
     };
+    const onScroll = (e) => {
+      // On laisse passer le scroll interne du popover lui-même.
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", update);
     return () => {
       document.removeEventListener("mousedown", onDoc);
-      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", update);
     };
   }, [open]);
@@ -1652,15 +1725,25 @@ function DateChip({ value, onChange, placeholder = "Date" }) {
         )}
       </button>
       {open && rect && typeof document !== "undefined" && ReactDOM.createPortal(
-        <div ref={popRef} onClick={(e) => e.stopPropagation()}
-          style={{ position: "fixed", top: rect.bottom + 6, left: rect.left, zIndex: 10000 }}>
-          <MiniCalendar
-            value={value}
-            viewDate={viewDate}
-            setViewDate={setViewDate}
-            onPick={(iso) => { onChange(iso); setOpen(false); }}
-          />
-        </div>,
+        (() => {
+          // Si le calendrier débordait par le bas de la fenêtre, on le colle
+          // juste au-dessus de la fin de la page (8 px de marge).
+          const POPOVER_H = 320;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+          const wouldOverflow = rect.bottom + POPOVER_H + 12 > vh;
+          const top = wouldOverflow ? Math.max(4, vh - POPOVER_H - 4) : rect.bottom + 6;
+          return (
+            <div ref={popRef} onClick={(e) => e.stopPropagation()}
+              style={{ position: "fixed", top, left: rect.left, zIndex: 10000 }}>
+              <MiniCalendar
+                value={value}
+                viewDate={viewDate}
+                setViewDate={setViewDate}
+                onPick={(iso) => { onChange(iso); setOpen(false); }}
+              />
+            </div>
+          );
+        })(),
         document.body
       )}
     </div>
@@ -1716,8 +1799,17 @@ function RoadmapDot({ item: it, pct, color }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        position: "absolute", top: 5, left: `${pct}%`,
+        // Hit-area élargie (28×28) centrée sur le point visible — plus
+        // facile à cibler. Le point lui-même garde sa taille (12×12) en
+        // tant qu'enfant, sans pointer-events.
+        position: "absolute", top: -3, left: `${pct}%`,
         transform: "translateX(-50%)",
+        width: 28, height: 28,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "transparent",
+        cursor: "default",
+      }}>
+      <div style={{
         width: 12, height: 12, borderRadius: "50%",
         background: color,
         border: `2px solid ${T.white}`,
@@ -1725,27 +1817,28 @@ function RoadmapDot({ item: it, pct, color }) {
           ? "0 0 0 3px rgba(59,130,246,0.20), 0 2px 6px rgba(0,0,0,0.18)"
           : "0 0 0 1px rgba(0,0,0,0.06)",
         opacity: it._depth >= 2 && !it.level ? 0.7 : 1,
-        cursor: "default",
         transition: "box-shadow .12s ease, transform .12s ease",
-      }}>
+        pointerEvents: "none",
+      }} />
       {hover && (
         <div style={{
-          position: "absolute", bottom: "calc(100% + 8px)",
-          [onLeftHalf ? "right" : "left"]: -4,
+          position: "absolute", bottom: "calc(100% + 4px)",
+          [onLeftHalf ? "right" : "left"]: 0,
           padding: "8px 10px",
-          background: T.text, color: T.white,
-          borderRadius: 6, fontSize: 11, lineHeight: 1.35,
+          background: T.white, color: T.text,
+          border: `1px solid ${T.border}`,
+          borderRadius: 8, fontSize: 11, lineHeight: 1.35,
           whiteSpace: "nowrap", maxWidth: 260,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.14), 0 2px 6px rgba(0,0,0,0.06)",
           pointerEvents: "none", zIndex: 10,
         }}>
           {ancestors.length > 0 && (
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: 10, color: T.textMut, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis" }}>
               {ancestors.join(" › ")}
             </div>
           )}
           <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{it.label || "Sans titre"}</div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{dateLabel}</div>
+          <div style={{ fontSize: 10, color: T.textMut, marginTop: 2 }}>{dateLabel}</div>
         </div>
       )}
     </div>

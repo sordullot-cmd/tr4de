@@ -311,15 +311,14 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       </div>
 
       {/* Equity curve — collé à la carte KPIs */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden", marginTop: -16 }}>
-        <div style={{ padding: "16px 20px" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution du P&L</div>
-          <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>P&L cumulé jour par jour — {stats.total} trades</div>
-        </div>
-        <div style={{ padding: 12 }}>
-          <EquityCurve curve={stats.curve} />
-        </div>
-      </div>
+      <ChartCard
+        currentAccountId={accountId}
+        currentName={account.name || "Compte"}
+        trades={trades}
+        accounts={accounts}
+        currentCurve={stats.curve}
+        currentTotal={stats.total}
+      />
 
       {/* Séparateur avant le tableau de stats */}
       <div style={{ height: 1, background: T.border }} />
@@ -578,6 +577,272 @@ function StatsTable({ stats }) {
   );
 }
 
+const ACCOUNT_COLORS = ["#3B82F6", "#16A34A", "#F97316", "#A855F7", "#EAB308", "#0EA5E9", "#EC4899", "#EF4444"];
+
+function ChartCard({ currentAccountId, currentName, trades, accounts, currentCurve, currentTotal }) {
+  const [tab, setTab] = React.useState("self"); // "self" | "compare"
+  const tabs = [
+    { id: "self", label: "Mon compte" },
+    { id: "compare", label: "Comparaison", disabled: (accounts || []).length < 2 },
+  ];
+  return (
+    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "visible", marginTop: -16, position: "relative", zIndex: 1 }}>
+      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution du P&L</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+            {tabs.map((tb, i) => {
+              const active = tab === tb.id;
+              return (
+                <React.Fragment key={tb.id}>
+                  {i > 0 && <span aria-hidden="true" style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />}
+                  <button
+                    type="button"
+                    disabled={tb.disabled}
+                    onClick={() => !tb.disabled && setTab(tb.id)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 999,
+                      border: "none",
+                      background: active ? "#F5F5F5" : "transparent",
+                      color: active ? T.text : T.textSub,
+                      fontSize: 13,
+                      fontWeight: active ? 600 : 500,
+                      cursor: tb.disabled ? "not-allowed" : "pointer",
+                      opacity: tb.disabled ? 0.45 : 1,
+                      fontFamily: "inherit",
+                      transition: "background 140ms ease, color 140ms ease",
+                    }}
+                    onMouseEnter={(e) => { if (!active && !tb.disabled) e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e) => { if (!active && !tb.disabled) e.currentTarget.style.color = T.textSub; }}
+                  >
+                    {tb.label}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: T.textMut, marginBottom: 12 }}>
+          {tab === "self" ? `P&L cumulé jour par jour — ${currentTotal} trades` : "Comparaison des comptes — P&L cumulé"}
+        </div>
+        {tab === "self"
+          ? <EquityCurve curve={currentCurve} />
+          : <EquityCompare trades={trades} accounts={accounts} highlightId={currentAccountId} />
+        }
+      </div>
+    </div>
+  );
+}
+
+function EquityCompare({ trades, accounts, highlightId }) {
+  const [hoverIdx, setHoverIdx] = React.useState(null);
+
+  const series = (accounts || []).map((acc, idx) => {
+    const accTrades = (trades || []).filter(t => t.account_id === acc.id);
+    if (accTrades.length === 0) return null;
+    const sorted = [...accTrades].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+    const byDay = {};
+    sorted.forEach(tr => {
+      const d = String(tr.date || "").slice(0, 10);
+      byDay[d] = (byDay[d] || 0) + (tr.pnl || 0);
+    });
+    const dates = Object.keys(byDay).sort();
+    let cum = 0;
+    const points = dates.map(d => { cum += byDay[d]; return { date: d, value: cum }; });
+    return { id: acc.id, name: acc.name || "Compte", color: ACCOUNT_COLORS[idx % ACCOUNT_COLORS.length], points };
+  }).filter(Boolean);
+
+  if (series.length === 0) {
+    return <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: T.textSub, fontSize: 12 }}>Pas de données.</div>;
+  }
+
+  const allDatesSet = new Set();
+  series.forEach(s => s.points.forEach(p => allDatesSet.add(p.date)));
+  const allDates = Array.from(allDatesSet).sort();
+
+  // Forward-fill chaque compte
+  const seriesFilled = series.map(s => {
+    const map = Object.fromEntries(s.points.map(p => [p.date, p.value]));
+    let lastVal = 0;
+    const filled = allDates.map(d => {
+      if (map[d] !== undefined) lastVal = map[d];
+      return { date: d, value: lastVal };
+    });
+    return { ...s, filled };
+  });
+
+  let yMin = 0, yMax = 0;
+  seriesFilled.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+  const yRange = (yMax - yMin) || 1;
+
+  const W = 800, H = 220;
+  const padL = 0, padR = 28, padT = 10, padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const xFor = (i) => padL + (allDates.length === 1 ? plotW / 2 : (i / (allDates.length - 1)) * plotW);
+  const yFor = (v) => padT + plotH - ((v - yMin) / yRange) * plotH;
+  const cellW = allDates.length === 1 ? plotW : plotW / Math.max(1, allDates.length - 1);
+
+  const fmtVal = (v) => {
+    const sign = v >= 0 ? "+" : "-";
+    const abs = Math.abs(v);
+    if (abs >= 10000) return `${sign}${Math.round(abs / 10000) * 10}k`;
+    if (abs >= 1000) return `${sign}${Math.round(abs / 1000)}k`;
+    return `${sign}${Math.round(abs)}`;
+  };
+  const fmtD = (d) => {
+    const [, m, dd] = d.split("-");
+    const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+    return `${parseInt(dd)} ${months[parseInt(m) - 1]}`;
+  };
+  const fullDate = (d) => {
+    const [y, m, dd] = d.split("-");
+    return `${parseInt(dd)} ${["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."][parseInt(m)-1]} ${y}`;
+  };
+
+  const yTicks = [];
+  for (let i = 0; i <= 3; i++) {
+    const ratio = i / 3;
+    yTicks.push({ y: padT + plotH * ratio, value: yMax - ratio * yRange });
+  }
+  const xLabels = allDates.map((d, i) => ({ i, date: d, anchor: i === 0 ? "start" : i === allDates.length - 1 ? "end" : "middle" }));
+
+  const hoverX = hoverIdx != null ? xFor(hoverIdx) : null;
+  const tooltipPct = hoverX != null ? Math.min(100, Math.max(0, (hoverX / W) * 100)) : 0;
+  const tooltipFlip = tooltipPct > 70;
+  const trackVal = hoverIdx != null ? Math.max(...seriesFilled.map(s => s.filled[hoverIdx]?.value ?? 0)) : 0;
+  const trackY = hoverIdx != null ? yFor(trackVal) : 0;
+  const topPct = hoverIdx != null ? (trackY / H) * 100 : 0;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible", aspectRatio: `${W} / ${H}` }}>
+        {/* Y labels */}
+        {yTicks.map((tk, i) => (
+          <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="6" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
+        ))}
+
+        <defs>
+          {seriesFilled.map(s => (
+            <linearGradient key={`g-${s.id}`} id={`acc-cmp-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity={s.id === highlightId ? 0.22 : 0.08} />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* Aires + lignes : non-mis-en-avant en arrière-plan */}
+        {seriesFilled.filter(s => s.id !== highlightId).map(s => {
+          const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+          const baselineY = yFor(yMin);
+          const lastX = xFor(s.filled.length - 1).toFixed(1);
+          const firstX = xFor(0).toFixed(1);
+          const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+          return (
+            <g key={s.id}>
+              <path d={areaPath} fill={`url(#acc-cmp-grad-${s.id})`} stroke="none" />
+              <path d={path} fill="none" stroke={s.color} strokeWidth="1" strokeOpacity="0.4" strokeLinecap="round" strokeLinejoin="round" />
+            </g>
+          );
+        })}
+        {/* Compte courant en avant-plan */}
+        {seriesFilled.filter(s => s.id === highlightId).map(s => {
+          const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+          const baselineY = yFor(yMin);
+          const lastX = xFor(s.filled.length - 1).toFixed(1);
+          const firstX = xFor(0).toFixed(1);
+          const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+          return (
+            <g key={s.id}>
+              <path d={areaPath} fill={`url(#acc-cmp-grad-${s.id})`} stroke="none" />
+              <path d={path} fill="none" stroke={s.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </g>
+          );
+        })}
+
+        {/* Indicateur vertical au hover */}
+        {hoverIdx != null && (
+          <line x1={hoverX} y1={padT} x2={hoverX} y2={padT + plotH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2" />
+        )}
+
+        {/* X labels */}
+        {xLabels.map((x, i) => (
+          <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="6" textAnchor={x.anchor}>{fmtD(x.date)}</text>
+        ))}
+
+        {/* Capture rects */}
+        {allDates.map((d, i) => {
+          const x = xFor(i) - cellW / 2;
+          return (
+            <rect
+              key={`hov-${i}`}
+              x={Math.max(0, x)}
+              y={padT}
+              width={cellW}
+              height={plotH + padB}
+              fill="transparent"
+              style={{ cursor: "crosshair" }}
+              onMouseEnter={() => setHoverIdx(i)}
+              onMouseLeave={() => setHoverIdx(null)}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Légende — toutes les courbes avec leur P&L final */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "8px 4px 0" }}>
+        {seriesFilled.map(s => {
+          const last = s.filled[s.filled.length - 1]?.value || 0;
+          const isCur = s.id === highlightId;
+          return (
+            <div key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: isCur ? 1 : 0.7 }}>
+              <span style={{ width: 10, height: 2, background: s.color, borderRadius: 2 }} />
+              <span style={{ fontSize: 11, fontWeight: isCur ? 600 : 500, color: T.text }}>{s.name}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: last >= 0 ? T.green : T.red }}>{fmt(last, true)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tooltip */}
+      {hoverIdx != null && (
+        <div
+          style={{
+            position: "absolute",
+            left: `${tooltipPct}%`,
+            top: `${topPct}%`,
+            transform: `translateY(-100%) translateY(-12px) ${tooltipFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
+            background: "#FFFFFF",
+            color: T.text,
+            border: `1px solid ${T.border}`,
+            padding: "8px 10px",
+            borderRadius: 6,
+            fontSize: 11,
+            fontFamily: "var(--font-sans)",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+            zIndex: 9999,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            minWidth: 140,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 11, color: T.textSub }}>{fmtD(allDates[hoverIdx])}</div>
+          {seriesFilled.map(s => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 11, lineHeight: 1.5 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color }} />
+                {s.name}
+              </span>
+              {(() => { const v = s.filled[hoverIdx]?.value || 0; const c = v > 0 ? T.green : v < 0 ? T.red : T.text; return <span style={{ fontWeight: 600, color: c }}>{fmt(v, true)}</span>; })()}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HighlightCard({ label, value, sub, tone }) {
   const color = tone === "green" ? T.green : tone === "red" ? T.red : T.text;
   return (
@@ -590,6 +855,7 @@ function HighlightCard({ label, value, sub, tone }) {
 }
 
 function EquityCurve({ curve }) {
+  const [hoverIdx, setHoverIdx] = React.useState(null);
   if (!curve || curve.length < 2) {
     return (
       <div style={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center", color: T.textSub, fontSize: 12 }}>
@@ -646,50 +912,117 @@ function EquityCurve({ curve }) {
     yTicks.push({ y: padT + plotH * ratio, value: v });
   }
 
-  // X labels — premier, milieu, dernier (pour ne pas surcharger)
-  const xLabels = [];
-  if (allDates.length <= 6) {
-    allDates.forEach((d, i) => xLabels.push({ i, date: d, anchor: i === 0 ? "start" : i === allDates.length - 1 ? "end" : "middle" }));
-  } else {
-    xLabels.push({ i: 0, date: allDates[0], anchor: "start" });
-    xLabels.push({ i: Math.floor(allDates.length / 2), date: allDates[Math.floor(allDates.length / 2)], anchor: "middle" });
-    xLabels.push({ i: allDates.length - 1, date: allDates[allDates.length - 1], anchor: "end" });
-  }
+  // X labels — un par point (chaque jour où il y a un nouveau point)
+  const xLabels = allDates.map((d, i) => ({
+    i, date: d,
+    anchor: i === 0 ? "start" : i === allDates.length - 1 ? "end" : "middle",
+  }));
 
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
   const areaPath = `${path} L ${xFor(points.length - 1).toFixed(1)} ${yFor(yMin).toFixed(1)} L ${xFor(0).toFixed(1)} ${yFor(yMin).toFixed(1)} Z`;
   const zeroY = yFor(0);
 
+  const fullDate = (d) => {
+    const [y, m, dd] = d.split("-");
+    return `${parseInt(dd)} ${["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."][parseInt(m)-1]} ${y}`;
+  };
+  const cellW = allDates.length === 1 ? plotW : plotW / Math.max(1, allDates.length - 1);
+  const hovered = hoverIdx != null ? points[hoverIdx] : null;
+  const hoverX = hovered ? xFor(hoverIdx) : null;
+  const hoverY = hovered ? yFor(hovered.value) : null;
+  const tooltipPct = hoverX != null ? Math.min(100, Math.max(0, (hoverX / W) * 100)) : 0;
+  const tooltipFlip = tooltipPct > 70;
+  const topPct = hoverY != null ? (hoverY / H) * 100 : 0;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible", aspectRatio: `${W} / ${H}` }}>
-      <defs>
-        <linearGradient id="acc-equity-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible", aspectRatio: `${W} / ${H}` }}>
+        <defs>
+          <linearGradient id="acc-equity-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+          </linearGradient>
+        </defs>
 
-      {/* Y labels (à droite) */}
-      {yTicks.map((tk, i) => (
-        <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="7" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
-      ))}
+        {/* Y labels (à droite) */}
+        {yTicks.map((tk, i) => (
+          <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="6" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
+        ))}
 
-      {/* Ligne de zéro si dans l'échelle */}
-      {yMin < 0 && yMax > 0 && (
-        <line x1={padL} y1={zeroY} x2={padL + plotW} y2={zeroY} stroke="#F0F0F0" strokeWidth="0.5" strokeDasharray="2 2" />
+        {/* Ligne de zéro si dans l'échelle */}
+        {yMin < 0 && yMax > 0 && (
+          <line x1={padL} y1={zeroY} x2={padL + plotW} y2={zeroY} stroke="#F0F0F0" strokeWidth="0.5" strokeDasharray="2 2" />
+        )}
+
+        {/* Gradient sous la courbe */}
+        <path d={areaPath} fill="url(#acc-equity-grad)" />
+
+        {/* Courbe */}
+        <path d={path} fill="none" stroke={lineColor} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Indicateur vertical au hover */}
+        {hovered && (
+          <line x1={hoverX} y1={padT} x2={hoverX} y2={padT + plotH} stroke={T.textMut} strokeWidth="0.5" strokeDasharray="2 2" pointerEvents="none" />
+        )}
+
+        {/* X labels */}
+        {xLabels.map((x, i) => (
+          <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="6" textAnchor={x.anchor}>{fmtD(x.date)}</text>
+        ))}
+
+        {/* Capture rects pour le hover (transparents) */}
+        {allDates.map((d, i) => {
+          const x = xFor(i) - cellW / 2;
+          return (
+            <rect
+              key={`hov-${i}`}
+              x={Math.max(0, x)}
+              y={padT}
+              width={cellW}
+              height={plotH + padB}
+              fill="transparent"
+              style={{ cursor: "crosshair" }}
+              onMouseEnter={() => setHoverIdx(i)}
+              onMouseLeave={() => setHoverIdx(null)}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Tooltip HTML */}
+      {hovered && (
+        <div
+          style={{
+            position: "absolute",
+            left: `${tooltipPct}%`,
+            top: `${topPct}%`,
+            transform: `translateY(-100%) translateY(-12px) ${tooltipFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
+            background: "#FFFFFF",
+            color: T.text,
+            border: `1px solid ${T.border}`,
+            padding: "8px 10px",
+            borderRadius: 6,
+            fontSize: 11,
+            fontFamily: "var(--font-sans)",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+            zIndex: 9999,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          }}
+        >
+          {(() => {
+            const prev = hoverIdx > 0 ? points[hoverIdx - 1].value : 0;
+            const day = hovered.value - prev;
+            return (
+              <>
+                <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 11, color: T.textSub }}>{fmtD(hovered.date)}</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: day > 0 ? T.green : day < 0 ? T.red : T.text }}>{fmt(day, true)}</div>
+              </>
+            );
+          })()}
+        </div>
       )}
-
-      {/* Gradient sous la courbe */}
-      <path d={areaPath} fill="url(#acc-equity-grad)" />
-
-      {/* Courbe */}
-      <path d={path} fill="none" stroke={lineColor} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* X labels */}
-      {xLabels.map((x, i) => (
-        <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="7" textAnchor={x.anchor}>{fmtD(x.date)}</text>
-      ))}
-    </svg>
+    </div>
   );
 }
 

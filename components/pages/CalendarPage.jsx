@@ -5,7 +5,13 @@ import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 
-export default function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25k", accounts = [], selectedAccountIds = [] }) {
+export default function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25k", accounts = [], selectedAccountIds = [], setPage, setDateRangesByPage }) {
+  const goToTradesForDate = (iso) => {
+    if (typeof setDateRangesByPage === "function") {
+      setDateRangesByPage(prev => ({ ...(prev || {}), trades: { start: iso, end: iso } }));
+    }
+    if (typeof setPage === "function") setPage("trades");
+  };
   const [year, setYear] = useState(new Date().getFullYear());
   const [expandedMonth, setExpandedMonth] = useState(new Date().getMonth());
 
@@ -290,15 +296,33 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
                       let valueColor = T.textMut;
 
                       if (pnl > 0) {
-                        bg = "rgba(16, 163, 127, 0.02)";
+                        bg = "rgba(16, 163, 127, 0.03)";
                         valueColor = T.green;
                       } else if (pnl < 0) {
-                        bg = "rgba(239, 68, 68, 0.02)";
+                        bg = "rgba(239, 68, 68, 0.03)";
                         valueColor = T.red;
                       }
 
+                      const dayIso = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const clickable = tradesCount > 0;
                       return (
-                        <td key={day} style={{ padding: "10px 12px", background: bg, verticalAlign: "top", textAlign: "left", borderRight: cellBorder }}>
+                        <td key={day}
+                          onClick={(e) => {
+                            if (!clickable) return;
+                            e.stopPropagation();
+                            goToTradesForDate(dayIso);
+                          }}
+                          title={clickable ? "Voir les trades du jour" : undefined}
+                          style={{
+                            padding: "10px 12px", background: bg,
+                            verticalAlign: "top", textAlign: "left",
+                            borderRight: cellBorder,
+                            cursor: clickable ? "pointer" : "default",
+                            transition: "background .12s ease",
+                          }}
+                          onMouseEnter={clickable ? (e) => { e.currentTarget.style.background = "#F5F5F5"; } : undefined}
+                          onMouseLeave={clickable ? (e) => { e.currentTarget.style.background = bg; } : undefined}
+                        >
                           <div style={{ fontWeight: 500, color: textColor, fontSize: 13, marginBottom: 6 }}>{String(day).padStart(2, '0')}</div>
                           <div style={{ color: tradesCount > 0 ? valueColor : T.textMut, fontWeight: 400, fontSize: 12, marginBottom: 2 }}>
                             {tradesCount > 0 ? `${pnl >= 0 ? "+" : ""}${getCurrencySymbol()}${pnl.toFixed(0)}` : `${getCurrencySymbol()}0`}

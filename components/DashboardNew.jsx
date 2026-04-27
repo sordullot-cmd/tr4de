@@ -17,6 +17,7 @@ import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useTradeAlerts } from "@/lib/hooks/useTradeAlerts";
 import { useApp } from "@/lib/contexts/AppContext";
+import { useUndo } from "@/lib/contexts/UndoContext";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
@@ -221,6 +222,7 @@ export default function App() {
   }, [page]);
   // ✅ Utiliser les hooks pour Trades et Stratégies (auto-stockés dans Supabase)
   const { trades, addTrade, updateTrade, deleteTrade } = useTrades();
+  const { pushUndo } = useUndo();
   // Surveillance des seuils P&L (alertes navigateur + événement interne)
   useTradeAlerts(trades || []);
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
@@ -487,10 +489,14 @@ export default function App() {
 
   const handleClearTrades = async () => {
     try {
-      // ✅ Supprimer tous les trades filtrés via la fonction du hook
-      for (const trade of filteredTrades) {
+      const snapshot = [...filteredTrades];
+      for (const trade of snapshot) {
         await deleteTrade(trade.id);
       }
+      pushUndo({
+        label: `${snapshot.length} trade${snapshot.length>1?"s":""}`,
+        undo: async () => { for (const tr of snapshot) { try { await addTrade(tr); } catch {} } },
+      });
     } catch (err) {
       console.error("Error deleting trades:", err);
     }
@@ -501,8 +507,12 @@ export default function App() {
       console.warn("❌ Trade invalid ou sans ID:", trade);
       return;
     }
-    // ✅ Supprimer le trade directement via le hook
+    const snapshot = { ...trade };
     await deleteTrade(trade.id);
+    pushUndo({
+      label: "Suppression du trade",
+      undo: async () => { try { await addTrade(snapshot); } catch (e) { console.error("undo add trade failed:", e); } },
+    });
   };
 
   const handleDeleteAccount = async (accountId) => {
@@ -557,6 +567,36 @@ export default function App() {
         .order("created_at", { ascending: false });
 
       setAccounts(updatedAccounts || []);
+      // Les trades du compte supprimé pour pouvoir les restaurer
+      const snapshotTrades = trades.filter(t => t.account_id === accountId).map(t => ({ ...t }));
+      const accountSnap = { ...accountToDelete };
+      pushUndo({
+        label: `Compte « ${accountToDelete.name || ""} »`,
+        undo: async () => {
+          try {
+            const sb = createClient();
+            const { data: created } = await sb.from("trading_accounts").insert([{
+              user_id: userId,
+              name: accountSnap.name,
+              broker: accountSnap.broker,
+              account_type: accountSnap.account_type,
+              eval_account_size: accountSnap.eval_account_size,
+            }]).select();
+            const newId = created?.[0]?.id;
+            if (newId && snapshotTrades.length) {
+              await sb.from("apex_trades").insert(snapshotTrades.map(tr => ({
+                user_id: userId,
+                account_id: newId,
+                date: tr.date, symbol: tr.symbol, direction: tr.direction,
+                entry: tr.entry, exit: tr.exit, pnl: tr.pnl,
+                entry_time: tr.entry_time || null, exit_time: tr.exit_time || null,
+              })));
+            }
+            const { data: after } = await sb.from("trading_accounts").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+            setAccounts(after || []);
+          } catch (e) { console.error("undo delete account failed:", e); }
+        },
+      });
       // ✅ Les trades seront auto-reloadés via le hook useTrades
     } catch (err) {
       console.error("Error:", err);
@@ -606,11 +646,11 @@ export default function App() {
   );
 
   const pages = {
-    dashboard:  <DashboardPage trades={filteredTrades} allTrades={trades} accounts={accounts} selectedAccountIds={selectedAccountIds} strategies={strategies} setPage={setPage} />,
+    dashboard:  <DashboardPage trades={filteredTrades} allTrades={trades} accounts={accounts} selectedAccountIds={selectedAccountIds} strategies={strategies} setPage={setPage} setDateRangesByPage={setDateRangesByPage} />,
     "add-trade": <AddTradePage trades={filteredTrades} setPage={setPage} setAccounts={setAccounts} setSelectedAccountIds={setSelectedAccountIds} accountType={accountType} setAccountType={setAccountType} selectedEvalAccount={selectedEvalAccount} setSelectedEvalAccount={setSelectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} addTrade={addTrade} addStrategy={addStrategy} strategies={strategies} user={user} />,
     trades:     <TradesPage trades={filteredTrades} strategies={strategies} onImportClick={() => setPage("add-trade")} onDeleteTrade={handleDeleteTrade} onClearTrades={handleClearTrades} />,
     "trade-chart": <TradeChartPage trades={filteredTrades} />,
-    calendar:   <CalendarPage trades={filteredTrades} accountType={accountType} evalAccountSize={selectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} />,
+    calendar:   <CalendarPage trades={filteredTrades} accountType={accountType} evalAccountSize={selectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} setPage={setPage} setDateRangesByPage={setDateRangesByPage} />,
     journal: <JournalPage trades={filteredTrades} />,
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,

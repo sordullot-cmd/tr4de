@@ -246,13 +246,15 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* Confine la page exactement à la taille du viewport. Sans ça, certaines
+     combinaisons de min-height (Tailwind h-full / min-h-full + flex root à
+     min-height: 100vh) laissent une bande blanche en bas du body. */
+  height: 100%;
+  overflow: hidden;
 }
 
 html {
   scroll-behavior: smooth;
-  /* Réduit l'ensemble du site de 5 % (taille des polices, paddings,
-     dimensions des cartes — tout est rendu à 0.95×). */
-  zoom: 0.95;
 }
 
 @media (prefers-reduced-motion: reduce) {

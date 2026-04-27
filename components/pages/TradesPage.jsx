@@ -837,7 +837,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   const closeDate = openDate;
                   const closeTime = fmtTime(t.exitTime || t.exit_time);
                   const tKey = tradeKey(t);
-                  const isChecked = selectedIds.has(tKey);
+                  // Pour un parent de groupe : la case est cochée seulement si
+                  // TOUS les enfants du lot sont sélectionnés. Permet à la
+                  // suppression en masse de viser le lot entier.
+                  const groupChildKeys = isGroupParent && Array.isArray(t._children)
+                    ? t._children.map(c => tradeKey(c))
+                    : null;
+                  const isChecked = isGroupParent
+                    ? (groupChildKeys && groupChildKeys.length > 0 && groupChildKeys.every(k => selectedIds.has(k)))
+                    : selectedIds.has(tKey);
                   const isHovered = hoveredRowId === tKey;
                   const isOpen = selectedTrade && tradeKey(selectedTrade) === tKey;
                   const showCheckbox = isChecked || isHovered;
@@ -875,7 +883,13 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               checked={isChecked}
                               onChange={(e) => {
                                 const next = new Set(selectedIds);
-                                if (e.target.checked) next.add(tKey); else next.delete(tKey);
+                                if (isGroupParent && groupChildKeys) {
+                                  // Cocher / décocher TOUS les trades du lot
+                                  if (e.target.checked) groupChildKeys.forEach(k => next.add(k));
+                                  else groupChildKeys.forEach(k => next.delete(k));
+                                } else {
+                                  if (e.target.checked) next.add(tKey); else next.delete(tKey);
+                                }
                                 setSelectedIds(next);
                               }}
                               onClick={(e) => e.stopPropagation()}

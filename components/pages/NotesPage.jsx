@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useUndo } from "@/lib/contexts/UndoContext";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -45,6 +46,7 @@ function renderHighlighted(text) {
 
 export default function NotesPage() {
   const [notes, setNotes] = useCloudState(STORAGE_KEY, "notes", []);
+  const { pushUndo } = useUndo();
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -100,8 +102,16 @@ export default function NotesPage() {
   }, []);
 
   const removeNote = (id) => {
+    const snapshot = notes.find(n => n.id === id);
     setNotes(prev => prev.filter(n => n.id !== id));
     if (selectedId === id) setSelectedId(null);
+    if (snapshot) {
+      pushUndo({
+        label: "Suppression de la note",
+        undo: async () => { setNotes(prev => [snapshot, ...prev]); setSelectedId(snapshot.id); },
+        redo: async () => { setNotes(prev => prev.filter(n => n.id !== snapshot.id)); if (selectedId === snapshot.id) setSelectedId(null); },
+      });
+    }
   };
 
   const allTags = useMemo(() => {

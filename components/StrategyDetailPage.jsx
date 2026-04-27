@@ -754,7 +754,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         }));
 
         return (
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"0 0 12px 12px",overflow:"hidden",marginTop:-24}}>
+          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"0 0 12px 12px",overflow:"visible",marginTop:-24,position:"relative",zIndex:1}}>
             <div style={{padding:"16px 20px"}}>
               <div style={{fontSize:13,fontWeight:600,color:T.text}}>Comparaison des performances</div>
               <div style={{fontSize:11,color:T.textMut,marginTop:2}}>P&L cumulé jour par jour — toutes les stratégies, courante mise en avant</div>
@@ -782,7 +782,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                 <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:"block",overflow:"visible",aspectRatio:`${W} / ${H}`}}>
                   {/* Y labels (colonne à droite, alignés verticalement sur chaque tick) */}
                   {yTicks.map((tk, i) => (
-                    <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="7" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
+                    <text key={i} x={W - 2} y={tk.y + 2.5} fill={T.textMut} fontSize="6" fontWeight="500" textAnchor="end" dominantBaseline="middle">{fmtVal(tk.value)}</text>
                   ))}
 
                   {/* Lines : non-selected first (so selected stays on top) */}
@@ -816,7 +816,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
                   {/* X-axis labels — premier collé à gauche, dernier collé à droite */}
                   {xLabels.map((x, i) => (
-                    <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="7" textAnchor={x.anchor}>{fmtD(x.date)}</text>
+                    <text key={i} x={xFor(x.i)} y={H - 5} fill={T.textMut} fontSize="6" textAnchor={x.anchor}>{fmtD(x.date)}</text>
                   ))}
 
                   {/* Vertical hover indicator */}
@@ -852,6 +852,11 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                     .map(s => ({ strategy: s.strategy, value: s.filled[hoveredDayIdx]?.value ?? 0 }))
                     .sort((a, b) => b.value - a.value);
                   const leftPct = (xFor(hoveredDayIdx) / W) * 100;
+                  // Position verticale : on suit le point de la stratégie sélectionnée (sinon le max).
+                  const selSeries = seriesFilled.find(s => String(s.strategy.id) === String(selectedStrategy?.id));
+                  const trackVal = selSeries ? (selSeries.filled[hoveredDayIdx]?.value ?? 0) : Math.max(...items.map(i => i.value));
+                  const trackY = yFor(trackVal);
+                  const topPct = (trackY / H) * 100;
                   // Si on est à droite, basculer la tooltip à gauche du curseur
                   const shouldFlip = leftPct > 60;
                   return (
@@ -859,21 +864,22 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                       style={{
                         position:"absolute",
                         left:`calc(12px + ${leftPct}% * (100% - 24px) / 100%)`,
-                        top:16,
-                        transform: shouldFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)",
-                        background:"#0D0D0D",
-                        color:"#FFF",
+                        top:`${topPct}%`,
+                        transform: `translateY(-100%) translateY(-12px) ${shouldFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
+                        background:"#FFFFFF",
+                        color:T.text,
+                        border:`1px solid ${T.border}`,
                         padding:"8px 10px",
                         borderRadius:6,
                         fontSize:11,
                         fontFamily:"var(--font-sans)",
-                        boxShadow:"0 4px 12px rgba(0,0,0,0.18)",
+                        boxShadow:"0 4px 12px rgba(0,0,0,0.08)",
                         pointerEvents:"none",
-                        zIndex:10,
+                        zIndex:9999,
                         whiteSpace:"nowrap",
                       }}
                     >
-                      <div style={{fontWeight:600,marginBottom:6,fontSize:11}}>{fmtD(date)}</div>
+                      <div style={{fontWeight:600,marginBottom:6,color:T.textSub,fontSize:11}}>{fmtD(date)}</div>
                       <div style={{display:"flex",flexDirection:"column",gap:4}}>
                         {items.map(it => {
                           const isSelected = String(it.strategy.id) === String(selectedStrategy?.id);
@@ -881,7 +887,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                             <div key={it.strategy.id} style={{display:"flex",alignItems:"center",gap:6,opacity:isSelected ? 1 : 0.85}}>
                               <span style={{width:6,height:6,borderRadius:"50%",background:it.strategy.color,flexShrink:0}}/>
                               <span style={{fontWeight:isSelected ? 600 : 500,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis"}}>{it.strategy.name}</span>
-                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value >= 0 ? "#16A34A" : "#EF4444"}}>{fmtVal(it.value)}</span>
+                              <span style={{marginLeft:"auto",fontWeight:600,color:it.value > 0 ? "#16A34A" : it.value < 0 ? "#EF4444" : T.text}}>{fmtVal(it.value)}</span>
                             </div>
                           );
                         })}
@@ -946,7 +952,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
         {/* CARD 3 : tao score */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
+          <div style={{padding:"16px 20px"}}>
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
               tao score <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
@@ -985,8 +991,8 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                     left:`${parseFloat(pentagonMetrics.overallScore)}%`,
                     top:"50%",
                     transform:"translate(-50%, -50%)",
-                    width:10,
-                    height:10,
+                    width:14,
+                    height:14,
                     borderRadius:"50%",
                     background:selectedStrategy.color,
                     border:"2px solid #FFFFFF",

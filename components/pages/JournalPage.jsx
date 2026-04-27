@@ -201,20 +201,21 @@ export default function JournalPage({ trades = [] }) {
                       position: "absolute",
                       left: `${tooltipPositions[dateStr]?.x}px`,
                       top: `${tooltipPositions[dateStr]?.y - 40}px`,
-                      background: "#000000",
-                      color: sparklineData[hoveredPoints[dateStr]] >= 0 ? T.green : T.red,
+                      background: "#FFFFFF",
+                      color: (() => { const v = sparklineData[hoveredPoints[dateStr]]; return v > 0 ? T.green : v < 0 ? T.red : T.text; })(),
+                      border: "1px solid #E5E5E5",
                       padding: "6px 12px",
                       borderRadius: 6,
                       fontSize: 12,
-                      fontWeight: 400,
+                      fontWeight: 600,
                       whiteSpace: "nowrap",
                       pointerEvents: "none",
                       transform: "translateX(-50%)",
-                      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
-                      letterSpacing: "0.3px",
+                      fontFamily: "var(--font-sans)",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       zIndex: 9999,
                     }}>
-                      {sparklineData[hoveredPoints[dateStr]] >= 0 ? "+" : ""}{sparklineData[hoveredPoints[dateStr]].toFixed(2)}
+                      {sparklineData[hoveredPoints[dateStr]] > 0 ? "+" : ""}{sparklineData[hoveredPoints[dateStr]].toFixed(2)}
                     </div>
                   )}
 

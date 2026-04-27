@@ -8,6 +8,7 @@ import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { t, useLang } from "@/lib/i18n";
 import { useStrategies } from "@/lib/hooks/useUserData";
 import { useTrades } from "@/lib/hooks/useTradeData";
+import { useUndo } from "@/lib/contexts/UndoContext";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -62,6 +63,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
   
   // ✅ Destructure with safe defaults
   const { strategies = [], addStrategy = async () => {}, updateStrategy = async () => {}, deleteStrategy = async () => {} } = strategiesHook || {};
+  const { pushUndo } = useUndo();
   const { trades = [] } = tradesHook || {};
   
   // ✅ Debug logs
@@ -215,8 +217,13 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
     if (!strategyToDelete) return;
     try {
       setLoading(true);
+      const snap = strategies.find(s => s.id === strategyToDelete);
       await deleteStrategy(strategyToDelete);
       console.log('✅ Stratégie supprimée');
+      if (snap) pushUndo({
+        label: "Suppression de la stratégie",
+        undo: async () => { try { await addStrategy({ name: snap.name, description: snap.description, color: snap.color, groups: snap.groups }); } catch (e) { console.error("undo strategy failed:", e); } },
+      });
       setShowDeleteConfirm(false);
       setStrategyToDelete(null);
     } catch (err) {
@@ -580,7 +587,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   {/* Surface dégradée sous la courbe */}
                   <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
                   {/* Courbe par-dessus */}
-                  <path d={linePath} fill="none" stroke={lineColor} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               );
             };
