@@ -7,7 +7,7 @@
  *  - APIs (/api/*) : pas de cache (toujours réseau)
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `tao-shell-${VERSION}`;
 const RUNTIME_CACHE = `tao-runtime-${VERSION}`;
 
@@ -16,16 +16,21 @@ const SHELL_URLS = [
   "/dashboard",
   "/login",
   "/manifest.webmanifest",
-  "/icon.svg",
+  "/favicon.svg",
   "/favicon.ico",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_URLS))
-      .then(() => self.skipWaiting())
+    caches.open(SHELL_CACHE).then((cache) =>
+      Promise.all(
+        SHELL_URLS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn("[sw] skip pre-cache:", url, err?.message || err);
+          })
+        )
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
