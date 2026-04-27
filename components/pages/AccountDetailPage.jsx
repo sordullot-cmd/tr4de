@@ -295,25 +295,21 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             label="Account balance"
             value={balance !== null ? fmtNoCents(balance) : "—"}
             sub={capital !== null ? `/ ${fmtNoCents(capital)}` : undefined}
-            desc="Capital + P&L cumulé"
           />
           <KpiCell
             label="P&L cumulé"
             value={fmt(stats.pnl, true)}
             sub={pnlPct !== null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` : undefined}
             valueColor={stats.pnl > 0 ? T.green : stats.pnl < 0 ? T.red : T.text}
-            desc="Profit ou perte total"
           />
           <KpiCell
             label="Trades"
             value={String(stats.total)}
             sub={`${stats.wins} W / ${stats.losses} L`}
-            desc="Trades exécutés"
           />
           <KpiCell
             label="Win rate"
             value={stats.total > 0 ? `${stats.winRate.toFixed(1)}%` : "—"}
-            desc="Gagnants / total"
             last
           />
         </div>
@@ -322,24 +318,20 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
           <KpiCell
             label="Profit factor"
             value={stats.profitFactor === Infinity ? "∞" : (stats.total > 0 ? stats.profitFactor.toFixed(2) : "—")}
-            desc="Gains bruts / pertes brutes"
           />
           <KpiCell
             label="Espérance / trade"
             value={stats.total > 0 ? fmt(stats.expectancy, true) : "—"}
             valueColor={stats.expectancy > 0 ? T.green : stats.expectancy < 0 ? T.red : T.text}
-            desc="Gain moyen par trade"
           />
           <KpiCell
             label="Drawdown max"
             value={stats.maxDD > 0 ? `-${fmtNoCents(stats.maxDD)}` : "—"}
             valueColor={stats.maxDD > 0 ? T.red : T.text}
-            desc="Plus grosse perte depuis un sommet"
           />
           <KpiCell
             label="Avg win / loss"
             value={stats.total > 0 ? `${fmtNoCents(stats.avgWin)} / -${fmtNoCents(stats.avgLoss)}` : "—"}
-            desc="Moyenne par victoire / défaite"
             last
           />
         </div>
