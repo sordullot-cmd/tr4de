@@ -560,22 +560,8 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:24}} className="anim-1">
-      {/* HEADER WITH BACK BUTTON */}
+      {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
-        <button
-          onClick={() => setPage('strategies')}
-          style={{
-            padding:"6px 12px",
-            fontSize:13,
-            border:`1px solid ${T.border}`,
-            background:T.white,
-            borderRadius:8,
-            cursor:"pointer",
-            color:T.textSub,
-            fontFamily:"var(--font-sans)",
-            fontWeight:500,
-          }}
-        >← Retour</button>
         <div>
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)",display:"flex",alignItems:"center",gap:8}}>
             <span style={{width:10,height:10,borderRadius:"50%",background:selectedStrategy.color}}/>

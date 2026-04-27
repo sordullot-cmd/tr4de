@@ -106,6 +106,61 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   // Helper pour identifier un trade de maniere unique
   const tradeKey = (t) => t?.id != null ? `id:${t.id}` : `${t.date}_${t.symbol}_${t.entry}_${t.exit ?? ''}_${t.direction ?? ''}_${t.entryTime || ''}_${t.exitTime || ''}_${t.pnl ?? ''}`;
 
+  // Groupes "trades pris sur plusieurs comptes" (même symbole/sens/prix d'entrée à 1 min près)
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+
+  const buildGroups = (list, windowSec = 60) => {
+    const parseTs = (t) => {
+      const dateStr = String(t.date || "").slice(0, 10);
+      const time = t.entryTime || t.entry_time || "00:00:00";
+      const m = String(time).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (!m) return null;
+      const dt = new Date(`${dateStr}T${String(m[1]).padStart(2, "0")}:${m[2]}:${m[3] || "00"}`);
+      const v = dt.getTime();
+      return isNaN(v) ? null : v;
+    };
+    const sig = (t) => {
+      const sym = String(t.symbol || "").toUpperCase();
+      const dir = String(t.direction || "").toLowerCase();
+      const entry = Math.round((Number(t.entry) || 0) * 100);
+      return `${sym}|${dir}|${entry}`;
+    };
+    // Bucket par signature
+    const buckets = new Map();
+    for (const t of list) {
+      const key = sig(t);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push({ t, ts: parseTs(t) });
+    }
+    const groups = [];
+    for (const arr of buckets.values()) {
+      arr.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      let cur = null;
+      for (const item of arr) {
+        if (cur && item.ts !== null && cur.lastTs !== null && Math.abs(item.ts - cur.lastTs) <= windowSec * 1000) {
+          cur.children.push(item.t);
+          cur.lastTs = item.ts;
+        } else {
+          if (cur) groups.push(cur);
+          cur = { children: [item.t], lastTs: item.ts };
+        }
+      }
+      if (cur) groups.push(cur);
+    }
+    // Une clé stable basée sur le premier child
+    return groups.map(g => ({
+      key: `g_${tradeKey(g.children[0])}`,
+      parent: g.children[0],
+      children: g.children,
+      pnlSum: g.children.reduce((s, x) => s + (Number(x.pnl) || 0), 0),
+    }));
+  };
+
+  // Propage une opération à tous les trades enfants d'un groupe (si applicable)
+  const childrenOf = (selected) => Array.isArray(selected?._children) && selected._children.length > 1
+    ? selected._children
+    : (selected ? [selected] : []);
+
   const allEmotionTags = [
     { id: "fomo", label: "FOMO", color: "#C94F4F" },
     { id: "revenge", label: "Vengeance", color: "#C94F4F" },
@@ -610,16 +665,31 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     if (isNaN(d.getTime())) return '—';
                     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                   };
-                  return [...filteredTrades].sort((a,b)=>{
-                    // Tri decroissant par date + heure de sortie (trades les plus
-                    // recemment fermes en haut).
-                    const dateA = String(a.date || "").slice(0,10);
-                    const dateB = String(b.date || "").slice(0,10);
+                  // Construire les groupes d'abord, puis aplatir en rangées (parent + enfants si dépliés)
+                  const groups = buildGroups(filteredTrades, 60);
+                  groups.sort((a, b) => {
+                    const dateA = String(a.parent.date || "").slice(0, 10);
+                    const dateB = String(b.parent.date || "").slice(0, 10);
                     if (dateA !== dateB) return dateB.localeCompare(dateA);
-                    const timeA = a.exitTime || a.exit_time || "00:00:00";
-                    const timeB = b.exitTime || b.exit_time || "00:00:00";
+                    const timeA = a.parent.exitTime || a.parent.exit_time || "00:00:00";
+                    const timeB = b.parent.exitTime || b.parent.exit_time || "00:00:00";
                     return String(timeB).localeCompare(String(timeA));
-                  }).map((t,i)=>{
+                  });
+                  // Aplatir : pour chaque groupe → ligne parent (groupRow=true si N>1) + enfants si déplié
+                  const rows = [];
+                  for (const g of groups) {
+                    const isGroup = g.children.length > 1;
+                    const parentTrade = isGroup
+                      ? { ...g.parent, _children: g.children, _groupKey: g.key, _groupPnl: g.pnlSum }
+                      : g.parent;
+                    rows.push({ trade: parentTrade, isGroupParent: isGroup, isChild: false, groupKey: g.key, groupSize: g.children.length });
+                    if (isGroup && expandedGroups.has(g.key)) {
+                      for (let ci = 1; ci < g.children.length; ci++) {
+                        rows.push({ trade: g.children[ci], isGroupParent: false, isChild: true, groupKey: g.key, groupSize: g.children.length });
+                      }
+                    }
+                  }
+                  return rows.map(({ trade: t, isGroupParent, isChild, groupKey, groupSize }, i) => {
                   const ret = ((t.pnl/(t.entry*100))*100).toFixed(2);
                   const dateObj = new Date(t.date);
                   const openDate = dateObj.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
@@ -656,10 +726,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       onMouseEnter={()=>setHoveredRowId(tKey)}
                       onMouseLeave={()=>setHoveredRowId(null)}
                     >
-                      {/* Symbol + checkbox conditionnelle + icone trending */}
-                      <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"var(--font-sans)",height:42,minWidth:130,width:130}}>
+                      {/* Symbol + checkbox conditionnelle + icone trending + badge groupe */}
+                      <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"var(--font-sans)",height:42,minWidth:130,width:130, paddingLeft: isChild ? 36 : 14}}>
                         <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
-                          {showCheckbox && (
+                          {!isChild && showCheckbox && (
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -672,10 +742,44 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
                             />
                           )}
-                          <span style={{width:22,height:22,borderRadius:6,background:T.bg,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                            <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
-                          </span>
+                          {isGroupParent ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedGroups(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
+                                  return next;
+                                });
+                              }}
+                              aria-label={expandedGroups.has(groupKey) ? "Replier" : "Déplier"}
+                              style={{
+                                width: 22, height: 22, borderRadius: 6,
+                                background: T.bg, border: "none",
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                cursor: "pointer", color: T.textMut, flexShrink: 0, padding: 0,
+                                transform: expandedGroups.has(groupKey) ? "rotate(0deg)" : "rotate(-90deg)",
+                                transition: "transform .15s ease",
+                              }}
+                            >
+                              <LucideChevronDown size={13} strokeWidth={2} />
+                            </button>
+                          ) : (
+                            <span style={{width:22,height:22,borderRadius:6,background:T.bg,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              <LucideTrendingUp size={13} strokeWidth={1.75} color={T.textMut} />
+                            </span>
+                          )}
                           <span>{t.symbol}</span>
+                          {isGroupParent && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, color: T.textSub,
+                              padding: "1px 6px", borderRadius: 999,
+                              background: T.bg, border: `1px solid ${T.border}`,
+                            }}>
+                              ×{groupSize}
+                            </span>
+                          )}
                         </span>
                       </td>
                       {(() => {
@@ -712,7 +816,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           exit:      <td key="exit" style={cellStyle("exit",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.exit.toFixed(2)}</td>,
                           lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub,textAlign:"center"})}>1</td>,
                           volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub,textAlign:"center"})}>2</td>,
-                          pnl:       <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{t.pnl>=0?"+":""}{fmt(t.pnl,false)}</td>,
+                          pnl:       (() => { const p = t._groupPnl != null ? t._groupPnl : t.pnl; return <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:p>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{p>=0?"+":""}{fmt(p,false)}</td>; })(),
                           pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
                           r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple(t))}</td>,
                           duration:  <td key="duration" style={cellStyle("duration",{...tdBase,color:T.textSub,fontSize:12})}>{duration}</td>,
@@ -836,20 +940,25 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allEmotionTags.map(tag=>{
                         const tradeId = selectedTrade.id;
+                        const targets = childrenOf(selectedTrade);
                         const isSelected = emotionTags[tradeId] && emotionTags[tradeId].includes(tag.id);
                         return (
                           <button
                             key={tag.id}
                             onClick={()=>{
                               if (!tradeId) return;
-                              const current = emotionTags[tradeId] || [];
-                              let updated;
-                              if(isSelected){
-                                updated = {...emotionTags,[tradeId]: current.filter(t=>t!==tag.id)};
-                                removeEmotion(tradeId, tag.id).catch(err => console.error("❌ Remove emotion failed:", err?.message));
-                              } else {
-                                updated = {...emotionTags,[tradeId]: [...current, tag.id]};
-                                addEmotion(tradeId, tag.id).catch(err => console.error("❌ Add emotion failed:", err?.message));
+                              const updated = { ...emotionTags };
+                              for (const child of targets) {
+                                const cid = child.id;
+                                if (!cid) continue;
+                                const cur = updated[cid] || [];
+                                if (isSelected) {
+                                  updated[cid] = cur.filter(t => t !== tag.id);
+                                  removeEmotion(cid, tag.id).catch(err => console.error("❌ Remove emotion failed:", err?.message));
+                                } else if (!cur.includes(tag.id)) {
+                                  updated[cid] = [...cur, tag.id];
+                                  addEmotion(cid, tag.id).catch(err => console.error("❌ Add emotion failed:", err?.message));
+                                }
                               }
                               setEmotionTags(updated);
                               localStorage.setItem("tr4de_emotion_tags", JSON.stringify(updated));
@@ -879,20 +988,25 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allErrorTags.map(tag=>{
                         const tradeId = selectedTrade.id;
+                        const targets = childrenOf(selectedTrade);
                         const isSelected = errorTags[tradeId] && errorTags[tradeId].includes(tag.id);
                         return (
                           <button
                             key={tag.id}
                             onClick={()=>{
                               if (!tradeId) return;
-                              const current = errorTags[tradeId] || [];
-                              let updated;
-                              if(isSelected){
-                                updated = {...errorTags,[tradeId]: current.filter(t=>t!==tag.id)};
-                                removeError(tradeId, tag.id).catch(err => console.error("❌ Remove error failed:", err?.message));
-                              } else {
-                                updated = {...errorTags,[tradeId]: [...current, tag.id]};
-                                addError(tradeId, tag.id).catch(err => console.error("❌ Add error failed:", err?.message));
+                              const updated = { ...errorTags };
+                              for (const child of targets) {
+                                const cid = child.id;
+                                if (!cid) continue;
+                                const cur = updated[cid] || [];
+                                if (isSelected) {
+                                  updated[cid] = cur.filter(t => t !== tag.id);
+                                  removeError(cid, tag.id).catch(err => console.error("❌ Remove error failed:", err?.message));
+                                } else if (!cur.includes(tag.id)) {
+                                  updated[cid] = [...cur, tag.id];
+                                  addError(cid, tag.id).catch(err => console.error("❌ Add error failed:", err?.message));
+                                }
                               }
                               setErrorTags(updated);
                               localStorage.setItem("tr4de_error_tags", JSON.stringify(updated));
@@ -1027,13 +1141,17 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 // Toutes les clés sous lesquelles ce trade peut être indexé (l'import en crée 3) :
                 // UUID Supabase, composite, composite normalisé. On les met TOUTES à jour pour
                 // éviter qu'une stratégie reste fantôme via une clé non nettoyée.
-                const tradeKeys = [
-                  selectedTrade.id,
-                  tradeId,
-                  selectedTrade.date && selectedTrade.symbol && selectedTrade.entry != null
-                    ? `${selectedTrade.date}${selectedTrade.symbol}${parseFloat(selectedTrade.entry).toFixed(2)}`
-                    : null,
-                ].filter(Boolean).map(String);
+                // Inclut les clés de TOUS les trades du groupe (si groupé) pour appliquer en bloc
+                const allTrades = childrenOf(selectedTrade);
+                const tradeKeys = Array.from(new Set(
+                  allTrades.flatMap(tr => [
+                    tr.id,
+                    `${tr.date || ""}${tr.symbol || ""}${tr.entry ?? ""}`,
+                    (tr.date && tr.symbol && tr.entry != null)
+                      ? `${tr.date}${tr.symbol}${parseFloat(tr.entry).toFixed(2)}`
+                      : null,
+                  ]).filter(Boolean).map(String)
+                ));
                 // Source de vérité pour l'UI : union de toutes les stratégies trouvées sur n'importe quelle clé
                 const selectedIds = Array.from(new Set(tradeKeys.flatMap(k => tradeStrategies[k] || [])));
                 

@@ -4,7 +4,7 @@ import React from "react";
 import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
-import { ArrowLeft, ArrowRight, Pencil, TrendingUp as LucideTrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, TrendingUp as LucideTrendingUp } from "lucide-react";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -231,60 +231,20 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       {/* Header */}
       <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <button
-              type="button"
-              onClick={() => setPage?.("accounts")}
-              aria-label="Retour aux comptes"
-              title="Retour"
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 26, height: 26, borderRadius: 6,
-                border: `1px solid ${T.border}`, background: "#FFFFFF",
-                color: T.textSub, cursor: "pointer", flexShrink: 0,
-                fontFamily: "inherit",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#F5F5F5"; e.currentTarget.style.color = T.text; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; e.currentTarget.style.color = T.textSub; }}
-            >
-              <ArrowLeft size={14} strokeWidth={1.75} />
-            </button>
-            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#0D0D0D", letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-sans)" }}>
-              {account.name || "Compte"}
-            </h1>
-            {getBrokerLogo(account.broker) && (
-              <img src={getBrokerLogo(account.broker)} alt={account.broker || ""} style={{ height: 20, maxWidth: 64, objectFit: "contain" }} />
-            )}
-            <span style={{
-              fontSize: 11, fontWeight: 600,
-              padding: "3px 8px", borderRadius: 999,
-              background: T.bg, color: T.textSub, border: `1px solid ${T.border}`,
-            }}>
-              {typeLabel}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedAccountIds?.([account.id]);
-                try { localStorage.setItem("selectedAccountIds", JSON.stringify([account.id])); } catch {}
-                setPage?.("add-trade");
-              }}
-              title="Éditer / Importer"
-              aria-label="Éditer / Importer"
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 26, height: 26, borderRadius: 6,
-                border: `1px solid ${T.border}`, background: "#FFFFFF",
-                color: T.textMut, cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              <Pencil size={12} strokeWidth={1.75} />
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexWrap: "wrap" }}>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#0D0D0D", letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-sans)" }}>
+            {account.name || "Compte"}
+          </h1>
+          {getBrokerLogo(account.broker) && (
+            <img src={getBrokerLogo(account.broker)} alt={account.broker || ""} style={{ height: 20, maxWidth: 64, objectFit: "contain" }} />
+          )}
+          <span style={{
+            fontSize: 11, fontWeight: 600,
+            padding: "3px 8px", borderRadius: 999,
+            background: T.bg, color: T.textSub, border: `1px solid ${T.border}`,
+          }}>
+            {typeLabel}
+          </span>
         </div>
       </div>
 
