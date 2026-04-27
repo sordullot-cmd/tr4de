@@ -143,6 +143,21 @@ export default function DailyPlannerPage() {
   const [habits, setHabits] = useCloudState(STORAGE_HABITS, "habits", defaultHabits());
   const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, "habits_history", {});
   const { pushUndo } = useUndo();
+  const [dragHabitId, setDragHabitId] = useState(null);
+  const [dragOverHabitId, setDragOverHabitId] = useState(null);
+
+  const reorderHabit = (sourceId, targetId) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    setHabits(prev => {
+      const arr = [...prev];
+      const sIdx = arr.findIndex(h => h.id === sourceId);
+      const tIdx = arr.findIndex(h => h.id === targetId);
+      if (sIdx < 0 || tIdx < 0) return prev;
+      const [moved] = arr.splice(sIdx, 1);
+      arr.splice(tIdx, 0, moved);
+      return arr;
+    });
+  };
 
   const toggleHabit = (habitId) => {
     const snapDate = dateKey;
@@ -414,11 +429,33 @@ export default function DailyPlannerPage() {
                 const Ico = autoIcon(h.name);
                 return (
                   <div key={h.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragHabitId(h.id);
+                      try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(h.id)); } catch {}
+                    }}
+                    onDragOver={(e) => {
+                      if (!dragHabitId || dragHabitId === h.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverHabitId(h.id);
+                    }}
+                    onDragLeave={() => { if (dragOverHabitId === h.id) setDragOverHabitId(null); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      reorderHabit(dragHabitId, h.id);
+                      setDragHabitId(null);
+                      setDragOverHabitId(null);
+                    }}
+                    onDragEnd={() => { setDragHabitId(null); setDragOverHabitId(null); }}
                     style={{
                       display: "flex", alignItems: "center", gap: 12,
                       padding: "12px 16px",
                       borderRadius: 8,
-                      transition: "background .12s ease",
+                      transition: "background .12s ease, box-shadow .12s ease",
+                      opacity: dragHabitId === h.id ? 0.4 : 1,
+                      boxShadow: dragOverHabitId === h.id ? `inset 0 2px 0 ${T.text}` : "none",
+                      cursor: "grab",
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = "#FAFAFA";

@@ -311,7 +311,7 @@ export default function GoalsPage() {
     }, 350);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, showForm]);
+  }, [form, showForm, editingId]);
   const remove = (id) => {
     const snap = goals;
     const after = removeGoalById(goals, id);
@@ -558,6 +558,7 @@ export default function GoalsPage() {
                     onAdjustManual={adjustManual}
                     onSubtasksChange={setSubtasksFor}
                     drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
+                    drawerOpen={showForm}
                   />
                 )}
                 {done.length > 0 && (
@@ -587,6 +588,7 @@ export default function GoalsPage() {
                         onAdjustManual={adjustManual}
                         onSubtasksChange={setSubtasksFor}
                         drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
+                        drawerOpen={showForm}
                         doneSection
                       />
                     )}
@@ -936,7 +938,7 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, drawerOpen }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
@@ -950,13 +952,14 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
           onSubtasksChange={onSubtasksChange}
           doneSection={doneSection}
           drag={drag} setDrag={setDrag} onDrop={onDrop}
+          drawerOpen={drawerOpen}
         />
       ))}
     </div>
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -1008,7 +1011,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
     pressedRef.current = true;
     longPressTimer.current = setTimeout(() => {
       if (pressedRef.current) setArmed(true);
-    }, 10);
+    }, 5);
   };
 
   const handleDragStart = (e) => {
@@ -1069,7 +1072,14 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
         onDragEnd={handleDragEnd}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onClick={(e) => { if (armed || drag?.sourceId) { e.preventDefault(); return; } setOpen(v => !v); }}
+        onClick={(e) => {
+          if (armed || drag?.sourceId) { e.preventDefault(); return; }
+          // Comportement de base : déplier/replier les sous-objectifs.
+          setOpen(v => !v);
+          // En plus, si le drawer d'édition est ouvert, on bascule l'objectif
+          // édité vers celui qu'on vient de cliquer.
+          if (drawerOpen) onEdit(g);
+        }}
         style={{
           display: "grid",
           gridTemplateColumns: nested
@@ -1096,12 +1106,13 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: nested ? 10 : 12, minWidth: 0 }}>
-          {/* Icon bubble — gris neutre, cohérent avec le reste du site */}
+          {/* Icon bubble — fond plein à la couleur de la catégorie,
+              icône en blanc pour le contraste. */}
           <div style={{
             width: nested ? 26 : 34, height: nested ? 26 : 34, borderRadius: "50%",
-            background: T.accentBg,
+            background: isAchieved ? T.accentBg : `${cat.color}CC`,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            color: isAchieved ? T.textMut : T.text,
+            color: isAchieved ? T.textMut : "#FFFFFF",
           }}>
             <Ic size={nested ? 12 : 15} strokeWidth={2} />
           </div>
@@ -1241,6 +1252,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
                       onAdjustManual={onAdjustManual}
                       onSubtasksChange={onSubtasksChange}
                       drag={drag} setDrag={setDrag} onDrop={onDrop}
+                      drawerOpen={drawerOpen}
                       nested
                     />
                   </div>
