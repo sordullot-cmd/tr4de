@@ -160,8 +160,8 @@ export default function Sidebar(props: SidebarProps) {
                 aria-expanded={!sectionCollapsed}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 6,
-                  padding: "8px 12px 6px", fontSize: 10, fontWeight: 600,
-                  color: "var(--color-text-muted)", letterSpacing: 0.5, textTransform: "uppercase",
+                  padding: "8px 12px 6px", fontSize: 14, fontWeight: 600,
+                  color: "var(--color-text-muted)", letterSpacing: 0,
                   background: "transparent", border: "none", cursor: "pointer",
                   fontFamily: "inherit", textAlign: "left",
                   borderRadius: 6,
@@ -198,7 +198,7 @@ export default function Sidebar(props: SidebarProps) {
                     borderRadius: 8, border: "none",
                     background: active ? "var(--color-active-bg)" : "transparent",
                     color: "var(--color-text)", fontSize: 13,
-                    fontWeight: active ? 600 : 500, cursor: "pointer", fontFamily: "inherit",
+                    fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
                     transition: "background 120ms ease",
                     position: "relative",
                   }}

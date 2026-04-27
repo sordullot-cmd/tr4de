@@ -219,7 +219,7 @@ function Pill({ children, color }) {
 function btnStyle(disabled, variant) {
   const base = {
     display: "inline-flex", alignItems: "center", gap: 6,
-    padding: "7px 12px", borderRadius: 6,
+    padding: "7px 14px", borderRadius: 999,
     fontSize: 12, fontWeight: 600,
     cursor: disabled ? "not-allowed" : "pointer",
     fontFamily: "inherit",

@@ -127,7 +127,7 @@ function MonthGrid({
                 color: edge ? "#FFFFFF" : (inMonth ? "#0D0D0D" : "#C8C8C8"),
                 background: edge ? "#0D0D0D" : (within ? "#E5E5E5" : "transparent"),
                 border: "none",
-                borderRadius: 6,
+                borderRadius: 8,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 transition: "background 80ms ease",
@@ -225,11 +225,11 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
           display: "inline-flex",
           alignItems: "center",
           gap: 8,
-          padding: "7px 12px",
+          padding: "7px 14px",
           width: width ?? "auto",
           height: 34,
           border: "1px solid #E5E5E5",
-          borderRadius: 8,
+          borderRadius: 999,
           background: "#FFFFFF",
           color: "#0D0D0D",
           fontSize: 12,
@@ -251,7 +251,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
             right: 0,
             background: "#FFFFFF",
             border: "1px solid #E5E5E5",
-            borderRadius: 12,
+            borderRadius: 16,
             boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
             zIndex: 100,
             display: "flex",
@@ -274,7 +274,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
                   color: "#0D0D0D",
                   background: "transparent",
                   border: "none",
-                  borderRadius: 6,
+                  borderRadius: 8,
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -292,7 +292,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
               <button
                 type="button"
                 onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
-                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: "#5C5C5C", borderRadius: 6 }}
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: "#5C5C5C", borderRadius: 8 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
@@ -302,7 +302,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
               <button
                 type="button"
                 onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
-                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: "#5C5C5C", borderRadius: 6 }}
+                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", color: "#5C5C5C", borderRadius: 8 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
@@ -337,7 +337,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
                 <button
                   type="button"
                   onClick={clear}
-                  style={{ padding: "6px 14px", border: "1px solid #E5E5E5", background: "#FFFFFF", color: "#0D0D0D", fontSize: 12, fontWeight: 500, borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}
+                  style={{ padding: "6px 16px", border: "1px solid #E5E5E5", background: "#FFFFFF", color: "#0D0D0D", fontSize: 12, fontWeight: 500, borderRadius: 999, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   Clear
                 </button>
@@ -345,7 +345,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
                   type="button"
                   onClick={apply}
                   disabled={!draftStart}
-                  style={{ padding: "6px 14px", border: "1px solid #0D0D0D", background: "#0D0D0D", color: "#FFFFFF", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: draftStart ? "pointer" : "not-allowed", opacity: draftStart ? 1 : 0.5, fontFamily: "inherit" }}
+                  style={{ padding: "6px 16px", border: "1px solid #0D0D0D", background: "#0D0D0D", color: "#FFFFFF", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: draftStart ? "pointer" : "not-allowed", opacity: draftStart ? 1 : 0.5, fontFamily: "inherit" }}
                 >
                   Apply
                 </button>

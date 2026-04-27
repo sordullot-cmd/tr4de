@@ -209,9 +209,21 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
       <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: T.textMut }}>{monthName}</div>
-            <div style={{ fontSize: 18, fontWeight: 500, color: monthPnL >= 0 ? T.green : T.red, marginTop: 4 }}>
-              {monthPnL >= 0 ? "+" : ""}{getCurrencySymbol()}{monthPnL.toFixed(2)}
+            <div style={{ fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>{monthName}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.4, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                {monthPnL >= 0 ? "+" : ""}{getCurrencySymbol()}{monthPnL.toFixed(2)}
+              </div>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 3,
+                fontSize: 11, fontWeight: 600,
+                padding: "2px 8px", borderRadius: 999,
+                color: monthPnL >= 0 ? T.green : T.red,
+                background: monthPnL >= 0 ? (T.greenBg || "#ECFDF5") : (T.redBg || "#FEF2F2"),
+                border: `1px solid ${monthPnL >= 0 ? (T.greenBd || "#A7F3D0") : (T.redBd || "#FECACA")}`,
+              }}>
+                {monthPnL >= 0 ? "▲" : "▼"} P&L
+              </span>
             </div>
           </div>
 

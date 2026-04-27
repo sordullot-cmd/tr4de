@@ -89,7 +89,7 @@ export default function ReadingListPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Liste de lecture</h1>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}
-          style={{ marginLeft: "auto", padding: "7px 14px", height: 34, borderRadius: 8, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Ajouter un livre
         </button>
         <div id="tr4de-page-header-slot" />

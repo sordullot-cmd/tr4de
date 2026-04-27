@@ -744,7 +744,7 @@ function AddInput({ value, onChange, onAdd, placeholder }) {
         onKeyDown={(e) => { if (e.key === "Enter") onAdd(); }}
         placeholder={placeholder}
         style={{ flex: 1, padding: "6px 10px", border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-      <button onClick={onAdd} style={{ padding: "0 10px", height: 28, background: T.text, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+      <button onClick={onAdd} style={{ padding: "0 12px", height: 28, background: T.text, color: "#fff", border: "none", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
         <Plus size={12} strokeWidth={2.5} />
       </button>
     </div>

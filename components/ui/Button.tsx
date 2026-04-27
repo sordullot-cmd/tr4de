@@ -35,9 +35,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   const isDisabled = disabled || loading;
 
   const sizeStyles: Record<Size, React.CSSProperties> = {
-    sm: { padding: "6px 10px", fontSize: 12, height: 28, borderRadius: 6 },
-    md: { padding: "8px 14px", fontSize: 13, height: 34, borderRadius: 8 },
-    lg: { padding: "10px 18px", fontSize: 14, height: 40, borderRadius: 8 },
+    sm: { padding: "6px 12px", fontSize: 12, height: 28, borderRadius: 999 },
+    md: { padding: "8px 16px", fontSize: 13, height: 34, borderRadius: 999 },
+    lg: { padding: "10px 20px", fontSize: 14, height: 40, borderRadius: 999 },
   };
 
   const iconSize = size === "sm" ? 13 : size === "md" ? 14 : 16;

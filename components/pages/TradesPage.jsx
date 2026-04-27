@@ -514,7 +514,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
         <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
         <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
-          <button onClick={onImportClick} style={{padding:"7px 14px",height:34,borderRadius:8,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
+          <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
         </div>
         <div id="tr4de-page-header-slot" />
       </div>

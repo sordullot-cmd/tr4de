@@ -288,7 +288,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
         <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("strat.title")}</h1>
-        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 14px",height:34,borderRadius:8,background:T.text,border:`1px solid ${T.text}`,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
+        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 16px",height:34,borderRadius:999,background:T.text,border:`1px solid ${T.text}`,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
           <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
         </button>
         <div id="tr4de-page-header-slot" />
@@ -709,7 +709,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           </div>
           <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>{t("strat.empty")}</div>
           <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>{t("strat.emptySub")}</div>
-          <button onClick={()=>setShowStrategyForm(true)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:"var(--font-sans)"}}>
+          <button onClick={()=>setShowStrategyForm(true)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:999,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:"var(--font-sans)"}}>
             <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
           </button>
         </div>
@@ -852,9 +852,9 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
             {/* Footer */}
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:`1px solid ${T.border}`,background:T.bg}}>
-              <button onClick={handleCancelEdit} style={{padding:"8px 16px",height:34,borderRadius:8,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,fontFamily:"var(--font-sans)"}}>Annuler</button>
+              <button onClick={handleCancelEdit} style={{padding:"8px 18px",height:34,borderRadius:999,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,fontFamily:"var(--font-sans)"}}>Annuler</button>
               <button onClick={handleCreateStrategy} disabled={!formData.name.trim()}
-                style={{padding:"8px 16px",height:34,borderRadius:8,border:`1px solid ${T.text}`,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:formData.name.trim()?"pointer":"not-allowed",opacity:formData.name.trim()?1:0.5,fontFamily:"var(--font-sans)"}}>
+                style={{padding:"8px 18px",height:34,borderRadius:999,border:`1px solid ${T.text}`,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:formData.name.trim()?"pointer":"not-allowed",opacity:formData.name.trim()?1:0.5,fontFamily:"var(--font-sans)"}}>
                 {editingStrategyId ? "Enregistrer" : "Créer la stratégie"}
               </button>
             </div>

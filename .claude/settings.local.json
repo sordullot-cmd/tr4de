@@ -38,7 +38,10 @@
       "Bash(grep -E \"app[\\\\\\\\\\\\\\\\/]planner\")",
       "Bash(npm uninstall *)",
       "Bash(npx skills *)",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "Bash(node -e \"require\\('@babel/parser'\\).parse\\(require\\('fs'\\).readFileSync\\('components/pages/GoalsPage.jsx','utf8'\\), {sourceType:'module', plugins:['jsx']}\\)\")",
+      "Bash(node -e \"require\\('@babel/parser'\\).parse\\(require\\('fs'\\).readFileSync\\('components/ui/Sidebar.tsx','utf8'\\), {sourceType:'module', plugins:['jsx', ['typescript', {isTSX:true}]]}\\)\")",
+      "Bash(node -e \"require\\('@babel/parser'\\).parse\\(require\\('fs'\\).readFileSync\\('components/pages/DashboardPage.jsx','utf8'\\), {sourceType:'module', plugins:['jsx']}\\)\")"
     ]
   }
 }

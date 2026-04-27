@@ -88,7 +88,7 @@ export default function JournalPage({ trades = [] }) {
           })}
           style={{
             marginLeft: "auto",
-            padding: "7px 14px", height: 34, borderRadius: 8,
+            padding: "7px 16px", height: 34, borderRadius: 999,
             background: trades.length === 0 ? T.bg : T.text,
             border: `1px solid ${trades.length === 0 ? T.border : T.text}`,
             color: trades.length === 0 ? T.textMut : "#fff",
@@ -190,7 +190,7 @@ export default function JournalPage({ trades = [] }) {
                               />
                             );
                           })()}
-                          <polyline points={points} fill="none" stroke={sparklineColor} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                          <polyline points={points} fill="none" stroke={sparklineColor} strokeWidth="1.75" vectorEffect="non-scaling-stroke" />
                         </svg>
                       </div>
                     )}

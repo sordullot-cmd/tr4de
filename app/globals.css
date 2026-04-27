@@ -267,6 +267,13 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Force les contrôles natifs (input, button, select, textarea) à hériter
+   de la police du parent — sinon ils gardent la police système et tranchent
+   visuellement avec le reste du texte. */
+input, button, select, textarea, optgroup {
+  font-family: inherit;
+}
+
 /* === Scrollbar fine OpenAI-style === */
 ::-webkit-scrollbar {
   width: 8px;

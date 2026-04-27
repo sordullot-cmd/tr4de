@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
@@ -562,6 +563,16 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
     <div style={{display:"flex",flexDirection:"column",gap:24}} className="anim-1">
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+        <button
+          type="button"
+          onClick={() => setPage('strategies')}
+          aria-label="Retour"
+          style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:999,border:`1px solid ${T.border}`,background:"#FFFFFF",color:T.text,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; }}
+        >
+          <ArrowLeft size={14} strokeWidth={1.75} />
+        </button>
         <div>
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)",display:"flex",alignItems:"center",gap:8}}>
             <span style={{width:10,height:10,borderRadius:"50%",background:selectedStrategy.color}}/>
@@ -781,11 +792,25 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                       <path key={s.strategy.id} d={path} fill="none" stroke={s.strategy.color} strokeWidth="1" strokeOpacity="0.4" strokeLinecap="round" strokeLinejoin="round"/>
                     );
                   })}
-                  {/* Selected on top */}
+                  {/* Selected on top — with gradient fill */}
                   {seriesFilled.filter(s => String(s.strategy.id) === String(selectedStrategy?.id)).map(s => {
                     const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
+                    const baselineY = yFor(yMin);
+                    const lastX = xFor(s.filled.length - 1).toFixed(1);
+                    const firstX = xFor(0).toFixed(1);
+                    const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+                    const gradId = `strat-grad-${s.strategy.id}`;
                     return (
-                      <path key={s.strategy.id} d={path} fill="none" stroke={s.strategy.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <g key={s.strategy.id}>
+                        <defs>
+                          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={s.strategy.color} stopOpacity="0.22"/>
+                            <stop offset="100%" stopColor={s.strategy.color} stopOpacity="0"/>
+                          </linearGradient>
+                        </defs>
+                        <path d={areaPath} fill={`url(#${gradId})`} stroke="none"/>
+                        <path d={path} fill="none" stroke={s.strategy.color} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                      </g>
                     );
                   })}
 
@@ -874,8 +899,8 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
       {filteredTrades.length > 0 && (
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"stretch"}}>
         {/* CARD 2 : Condition probabilite */}
-        <div style={{background:T.white,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"16px 20px"}}>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
               Condition probabilité <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>

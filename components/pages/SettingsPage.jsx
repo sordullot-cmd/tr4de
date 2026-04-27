@@ -160,8 +160,8 @@ function PrimaryButton({ children, onClick, disabled, icon: Icon }) {
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: "8px 14px",
-        borderRadius: 8,
+        padding: "8px 16px",
+        borderRadius: 999,
         border: "1px solid #0D0D0D",
         background: "#0D0D0D",
         color: "#FFFFFF",
@@ -999,14 +999,14 @@ function NumberInput({ value, onChange, suffix, placeholder }) {
 
 function primaryBtn() {
   return {
-    padding: "8px 14px", borderRadius: 8, border: "none",
+    padding: "8px 16px", borderRadius: 999, border: "none",
     background: T.text, color: "#fff",
     fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
 }
 function secondaryBtn(disabled) {
   return {
-    padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
+    padding: "8px 16px", borderRadius: 999, border: `1px solid ${T.border}`,
     background: T.white, color: T.text,
     fontSize: 12, fontWeight: 600, cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.7 : 1, fontFamily: "inherit",

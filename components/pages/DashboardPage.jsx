@@ -394,7 +394,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     <div style={{display:"flex",flexDirection:"column",gap:12,fontFamily:"var(--font-sans)"}} className="anim-1">
       {/* PAGE TITLE */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:4}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>{t("dash.title")}</h1>
+        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("dash.title")}</h1>
         <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
       </div>
 
@@ -495,26 +495,6 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             >
               <svg width="100%" height="100%" viewBox="0 0 600 240" preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:50,bottom:22,width:"calc(100% - 50px)",height:"calc(100% - 22px)",fontFamily:"inherit"}}>
 
-                {/* Lignes de grille horizontales très claires alignées sur ticks Y */}
-                {(() => {
-                  const maxCum = Math.max(...pnlCurve.map(x=>x.cum), 1);
-                  const niceStep = (max) => {
-                    const rough = max / 3;
-                    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-                    const n = rough / mag;
-                    const nice = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
-                    return nice * mag;
-                  };
-                  const step = niceStep(maxCum);
-                  const topMax = Math.ceil(maxCum / step) * step;
-                  const ticks = [];
-                  for (let v = 0; v <= topMax; v += step) ticks.push(v);
-                  return ticks.map((value, i) => {
-                    const topPct = 91 - ((value / topMax) * 83);
-                    const y = (topPct / 100) * 240;
-                    return <line key={`grid-${i}`} x1="0" y1={y} x2="600" y2={y} stroke="#F5F5F5" strokeWidth="1"/>;
-                  });
-                })()}
 
                 {/* Chart area - smooth Catmull-Rom curve, sans gradient (style stats stratégie) */}
                 <g>
@@ -538,9 +518,18 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                     const lastCum = pnlCurve[pnlCurve.length - 1]?.cum ?? 0;
                     const lineColor = lastCum >= 0 ? "#16A34A" : "#EF4444";
 
+                    const gradId = `chart-grad-${lastCum >= 0 ? "pos" : "neg"}`;
+                    const areaD = `${pathD} L ${points[points.length - 1][0]} ${bottomY} L ${points[0][0]} ${bottomY} Z`;
                     return (
                       <g>
-                        <path d={pathD} stroke={lineColor} strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+                        <defs>
+                          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={lineColor} stopOpacity="0.22"/>
+                            <stop offset="100%" stopColor={lineColor} stopOpacity="0"/>
+                          </linearGradient>
+                        </defs>
+                        <path d={areaD} fill={`url(#${gradId})`} stroke="none"/>
+                        <path d={pathD} stroke={lineColor} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
                         {/* Hover areas - invisible rectangles for each point */}
                         {points.map((point, i) => (
                           <rect
@@ -784,12 +773,26 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               return (
                 <div style={{position:"relative",width:"100%",height:280}}>
                   <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
-                    {yTicks.map((tk, i) => (
-                      <line key={`gr-${i}`} x1={padL} y1={tk.y} x2={W - padR} y2={tk.y} stroke="#F5F5F5" strokeWidth="1"/>
-                    ))}
+                    <defs>
+                      {seriesFilled.map(s => (
+                        <linearGradient key={`g-${s.id}`} id={`dash-strat-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={s.color} stopOpacity="0.18"/>
+                          <stop offset="100%" stopColor={s.color} stopOpacity="0"/>
+                        </linearGradient>
+                      ))}
+                    </defs>
                     {seriesFilled.map(s => {
                       const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
-                      return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+                      const baselineY = yFor(yMin);
+                      const lastX = xFor(s.filled.length - 1).toFixed(1);
+                      const firstX = xFor(0).toFixed(1);
+                      const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+                      return (
+                        <g key={s.id}>
+                          <path d={areaPath} fill={`url(#dash-strat-grad-${s.id})`} stroke="none"/>
+                          <path d={path} fill="none" stroke={s.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+                        </g>
+                      );
                     })}
 
                     {/* Indicateur vertical au hover */}
@@ -940,17 +943,31 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 <div style={{position:"relative",width:"100%",height:280}}>
                   <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:0,bottom:0,fontFamily:"inherit"}}>
                     {/* Lignes de grille */}
-                    {yTicks.map((tk, i) => (
-                      <line key={`gr-${i}`} x1={padL} y1={tk.y} x2={W - padR} y2={tk.y} stroke="#F5F5F5" strokeWidth="1"/>
-                    ))}
                     {/* Courbes — non-sélectionnés en arrière-plan, sélectionnés au-dessus */}
                     {seriesFilled.filter(s => !(selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id))).map(s => {
                       const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
                       return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="1" strokeOpacity="0.35" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
                     })}
+                    <defs>
+                      {seriesFilled.filter(s => selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id)).map(s => (
+                        <linearGradient key={`g-${s.id}`} id={`dash-acc-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={s.color} stopOpacity="0.18"/>
+                          <stop offset="100%" stopColor={s.color} stopOpacity="0"/>
+                        </linearGradient>
+                      ))}
+                    </defs>
                     {seriesFilled.filter(s => selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id)).map(s => {
                       const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
-                      return <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>;
+                      const baselineY = yFor(yMin);
+                      const lastX = xFor(s.filled.length - 1).toFixed(1);
+                      const firstX = xFor(0).toFixed(1);
+                      const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
+                      return (
+                        <g key={s.id}>
+                          <path d={areaPath} fill={`url(#dash-acc-grad-${s.id})`} stroke="none"/>
+                          <path d={path} fill="none" stroke={s.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+                        </g>
+                      );
                     })}
 
                     {/* Indicateur vertical au hover */}

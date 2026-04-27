@@ -705,18 +705,18 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   const brokerInfo = getBrokerInstructions();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, background: "#fff", width: "100%", minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1 }}>{t("addTrade.title") || "Importer des trades"}</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title") || "Importer des trades"}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "row", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "row", gap: 16, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
-      <div style={{ display: "flex", flexDirection: "column", borderRadius: 12, padding: 0, background: "#fff", flex: "0.7" }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: "0.7" }}>
           <div style={{ padding: 24 }}>
           
           {/* ACCOUNT SELECTOR */}
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.account")}
             </label>
@@ -727,7 +727,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             />
           </div>
           {/* BROKER */}
-          <div style={{ marginTop: "14px", marginBottom: 24 }}>
+          <div style={{ marginTop: "14px", paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.broker")}
             </label>
@@ -776,7 +776,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             />
           </div>
           {/* ACCOUNT TYPE — pill selector live/eval/funded */}
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.accountType")}
             </label>
@@ -826,7 +826,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             </div>
             {(accountType === "eval" || accountType === "funded") && (
               <div style={{ marginTop: "12px" }}>
-                <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
                   {t("addTrade.accountSize")}
                 </label>
                 <SearchableSelect
@@ -844,10 +844,10 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             )}
             {accountType === "live" && (
               <div style={{ marginTop: "12px" }}>
-                <label style={{ display: "block", fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px", marginBottom: "8px", color: T.textMut, textTransform: "uppercase" }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
                   Balance initiale
                 </label>
-                <div style={{ position: "relative", display: "inline-block", width: "100%", maxWidth: 240 }}>
+                <div style={{ position: "relative", width: "100%" }}>
                   <span style={{
                     position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
                     color: T.textSub, fontSize: 13, pointerEvents: "none",
@@ -878,7 +878,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           </div>
           <div style={{ borderTop: `1px solid ${T.border}`, margin: "24px 0" }} />
           {/* FILE */}
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               Fichier
             </label>
@@ -937,7 +937,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           </div>
           {/* PREVIEW */}
           {preview.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
               <label style={{ display: "block", fontSize: "10px", fontWeight: "700", color: T.textMut, marginBottom: "12px", textTransform: "uppercase" }}>
                 Aperçu ({preview.length} trades)
               </label>
@@ -1054,7 +1054,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         </div>
 
         {/* RIGHT: INSTRUCTIONS */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "24px", paddingLeft: "32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1, marginTop: "-16px", marginBottom: "-16px", paddingTop: "40px" }}>
+        <div style={{ display: "flex", flexDirection: "column", padding: "24px", paddingLeft: "32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
             <img src={brokerInfo.iconPath} alt={brokerInfo.name} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
             <h3 style={{ fontSize: "14px", fontWeight: "700", color: T.text }}>{brokerInfo.name}</h3>

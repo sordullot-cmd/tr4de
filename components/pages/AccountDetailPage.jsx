@@ -232,6 +232,16 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       {/* Header */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setPage?.("accounts")}
+            aria-label="Retour"
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 999, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.text, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; }}
+          >
+            <ArrowLeft size={14} strokeWidth={1.75} />
+          </button>
           <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#0D0D0D", letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-sans)" }}>
             {account.name || "Compte"}
           </h1>
@@ -247,6 +257,9 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
           </span>
         </div>
       </div>
+
+      {/* Séparateur entre l'en-tête et les KPIs */}
+      <div style={{ height: 1, background: T.border }} />
 
       {/* KPIs principaux — collés au graphique en dessous */}
       <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "12px 12px 0 0", borderBottom: "none", overflow: "hidden" }}>
@@ -308,8 +321,14 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         </div>
       </div>
 
+      {/* Séparateur avant le tableau de stats */}
+      <div style={{ height: 1, background: T.border }} />
+
       {/* Tableau de stats détaillées */}
       <StatsTable stats={stats} />
+
+      {/* Séparateur avant les trades récents */}
+      <div style={{ height: 1, background: T.border }} />
 
       {/* Recent trades */}
       <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -664,7 +683,7 @@ function EquityCurve({ curve }) {
       <path d={areaPath} fill="url(#acc-equity-grad)" />
 
       {/* Courbe */}
-      <path d={path} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} fill="none" stroke={lineColor} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
 
       {/* X labels */}
       {xLabels.map((x, i) => (

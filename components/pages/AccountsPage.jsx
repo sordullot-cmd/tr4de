@@ -109,7 +109,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           onClick={() => setPage?.("add-trade")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "7px 12px", borderRadius: 6,
+            padding: "7px 14px", borderRadius: 999,
             border: `1px solid ${T.text}`, background: T.text, color: "#FFFFFF",
             fontSize: 12, fontWeight: 600, cursor: "pointer",
             fontFamily: "inherit",

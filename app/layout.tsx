@@ -1,15 +1,28 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import { JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/supabaseAuthProvider";
 import PWAInstall from "@/components/PWAInstall";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
-const interSans = Inter({
+// OpenAI Sans (locale) — variable utilisée dans toute l'app : --font-geist-sans
+const openAISans = localFont({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
   display: "swap",
+  src: [
+    { path: "../public/fonts/OpenAISans-Light.woff2",         weight: "300", style: "normal" },
+    { path: "../public/fonts/OpenAISans-LightItalic.woff2",   weight: "300", style: "italic" },
+    { path: "../public/fonts/OpenAISans-Regular.woff2",       weight: "400", style: "normal" },
+    { path: "../public/fonts/OpenAISans-RegularItalic.woff2", weight: "400", style: "italic" },
+    { path: "../public/fonts/OpenAISans-Medium.woff2",        weight: "500", style: "normal" },
+    { path: "../public/fonts/OpenAISans-MediumItalic.woff2",  weight: "500", style: "italic" },
+    { path: "../public/fonts/OpenAISans-Semibold.woff2",      weight: "600", style: "normal" },
+    { path: "../public/fonts/OpenAISans-SemiboldItalic.woff2",weight: "600", style: "italic" },
+    { path: "../public/fonts/OpenAISans-Bold.woff2",          weight: "700", style: "normal" },
+    { path: "../public/fonts/OpenAISans-BoldItalic.woff2",    weight: "700", style: "italic" },
+  ],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -55,7 +68,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${interSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${openAISans.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

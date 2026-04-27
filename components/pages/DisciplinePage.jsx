@@ -159,8 +159,8 @@ function EditListModal({ open, title, accent, items, isCheckList, onClose, onSav
             {draft.filter(d => (d.label || "").trim()).length} règle{draft.length > 1 ? "s" : ""}
           </span>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={onClose} style={{padding:"0 16px",height:34,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
-            <button onClick={save} style={{padding:"0 16px",height:34,borderRadius:8,border:"1px solid #0D0D0D",background:"#0D0D0D",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
+            <button onClick={onClose} style={{padding:"0 18px",height:34,borderRadius:999,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+            <button onClick={save} style={{padding:"0 18px",height:34,borderRadius:999,border:"1px solid #0D0D0D",background:"#0D0D0D",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
           </div>
         </div>
 
@@ -1284,7 +1284,7 @@ export default function DisciplinePage({ trades = [] }) {
                       addManualRule();
                     }
                   }}
-                  style={{padding:"8px 16px",background:"#0D0D0D",color:"white",border:"none",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}
+                  style={{padding:"8px 18px",background:"#0D0D0D",color:"white",border:"none",borderRadius:999,fontSize:12,fontWeight:600,cursor:"pointer"}}
                 >
                   Ajouter
                 </button>
@@ -1296,11 +1296,11 @@ export default function DisciplinePage({ trades = [] }) {
               <button
                 onClick={() => setShowRulesModal(false)}
                 style={{
-                  padding:"10px 20px",
+                  padding:"10px 22px",
                   background:"#0D0D0D",
                   color:"white",
                   border:"none",
-                  borderRadius:6,
+                  borderRadius:999,
                   fontSize:12,
                   fontWeight:600,
                   cursor:"pointer"
