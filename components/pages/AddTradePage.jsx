@@ -741,7 +741,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title") || "Importer des trades"}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "row", gap: 16, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", flexDirection: "row", gap: 16, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12 }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
       <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: "0.7" }}>
           <div style={{ padding: 24 }}>
