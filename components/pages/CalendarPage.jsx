@@ -5,17 +5,54 @@ import { T } from "@/lib/ui/tokens";
 import { t } from "@/lib/i18n";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 
-export default function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25k" }) {
+export default function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25k", accounts = [], selectedAccountIds = [] }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [expandedMonth, setExpandedMonth] = useState(new Date().getMonth());
 
-  // Objetifs par taille de compte
+  // Objetifs par taille de compte (paliers prop firms)
   const evalObjectives = {
     "25k": 1500,
     "50k": 3000,
     "100k": 6000,
     "150k": 9000,
   };
+
+  // Convertit n'importe quelle taille (ex. "50k", "10000") en montant USD,
+  // puis dérive l'objectif (paliers connus, sinon 6% du capital comme défaut).
+  const parseSizeToUsd = (size) => {
+    if (size == null) return null;
+    const m = String(size).match(/(\d+(?:\.\d+)?)\s*([kKmM])?/);
+    if (!m) return null;
+    const num = parseFloat(m[1]);
+    const unit = (m[2] || "").toLowerCase();
+    if (unit === "k") return num * 1000;
+    if (unit === "m") return num * 1000000;
+    return num;
+  };
+  const objectiveForSize = (size) => {
+    if (!size) return 0;
+    if (evalObjectives[String(size).toLowerCase()] != null) return evalObjectives[String(size).toLowerCase()];
+    const usd = parseSizeToUsd(size);
+    return usd ? Math.round(usd * 0.06) : 0;
+  };
+
+  // Cumul des objectifs sur tous les comptes Eval/Funded actuellement sélectionnés
+  const cumulativeObjective = (() => {
+    const selected = (accounts || []).filter(a => selectedAccountIds.includes(a.id));
+    const evalLikeAccounts = selected.filter(a => a.account_type === "eval" || a.account_type === "funded");
+    if (evalLikeAccounts.length > 0) {
+      return evalLikeAccounts.reduce((s, a) => s + objectiveForSize(a.eval_account_size), 0);
+    }
+    // Fallback : ancien comportement (compte unique avec taille passée en prop)
+    return objectiveForSize(evalAccountSize);
+  })();
+  const cumulativeLabel = (() => {
+    const selected = (accounts || []).filter(a => selectedAccountIds.includes(a.id));
+    const evalLikeAccounts = selected.filter(a => a.account_type === "eval" || a.account_type === "funded");
+    if (evalLikeAccounts.length > 1) return `${evalLikeAccounts.length} comptes`;
+    if (evalLikeAccounts.length === 1) return `EVAL ${getCurrencySymbol()}${String(evalLikeAccounts[0].eval_account_size || "").toUpperCase()}`;
+    return `EVAL ${getCurrencySymbol()}${String(evalAccountSize).toUpperCase()}`;
+  })();
 
   const pnlByDate = {};
   const tradesByDate = {};
@@ -179,19 +216,19 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {accountType === "eval" && (
+            {cumulativeObjective > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 160, alignItems: "flex-end" }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: T.textMut, marginBottom: 4 }}>EVAL {getCurrencySymbol()}{evalAccountSize.toUpperCase()}</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: totalPnL >= evalObjectives[evalAccountSize] ? T.green : T.text }}>
-                    {getCurrencySymbol()}{totalPnL.toFixed(2)} / {getCurrencySymbol()}{evalObjectives[evalAccountSize]}
+                  <div style={{ fontSize: 11, fontWeight: 500, color: T.textMut, marginBottom: 4 }}>{cumulativeLabel}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: totalPnL >= cumulativeObjective ? T.green : T.text }}>
+                    {getCurrencySymbol()}{totalPnL.toFixed(2)} / {getCurrencySymbol()}{cumulativeObjective.toLocaleString("en-US")}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
                   <div style={{ flex: 1, height: 6, background: T.border, borderRadius: 3, overflow: "hidden", minWidth: 100 }}>
-                    <div style={{ height: "100%", background: totalPnL >= evalObjectives[evalAccountSize] ? T.green : "#8E8E8E", width: `${Math.min(100, (totalPnL / evalObjectives[evalAccountSize]) * 100)}%`, transition: "width 0.3s" }} />
+                    <div style={{ height: "100%", background: totalPnL >= cumulativeObjective ? T.green : "#8E8E8E", width: `${Math.min(100, (totalPnL / cumulativeObjective) * 100)}%`, transition: "width 0.3s" }} />
                   </div>
-                  <div style={{ fontSize: 11, color: T.textMut, minWidth: 35, textAlign: "right" }}>{((totalPnL / evalObjectives[evalAccountSize]) * 100).toFixed(0)}%</div>
+                  <div style={{ fontSize: 11, color: T.textMut, minWidth: 35, textAlign: "right" }}>{((totalPnL / cumulativeObjective) * 100).toFixed(0)}%</div>
                 </div>
               </div>
             )}
