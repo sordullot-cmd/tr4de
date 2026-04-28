@@ -387,7 +387,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         if (!strat?.groups) return;
         strat.groups.forEach((g) => {
           (g.rules || []).forEach((rule) => {
-            const ruleKey = `${t.date}_${t.symbol}_${t.entry}_${t.exit || "none"}_${t.direction || "long"}_${strat.id}_${rule.id}`;
+            const ruleKey = `${t.date}_${t.symbol}_${t.entry}_${t.exit}_${t.direction}_${strat.id}_${rule.id}`;
             total++;
             if (checkedRules[ruleKey] === true) checked++;
           });

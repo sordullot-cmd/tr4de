@@ -174,7 +174,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
     
     allStrategyRules.forEach(rule => {
       // Clé unique format: date_symbol_entry_exit_direction_stratId_ruleId
-      const ruleKey = `${trade.date}_${trade.symbol}_${trade.entry}_${trade.exit || 'none'}_${trade.direction || 'long'}_${selectedStrategy.id}_${rule.id}`;
+      const ruleKey = `${trade.date}_${trade.symbol}_${trade.entry}_${trade.exit}_${trade.direction}_${selectedStrategy.id}_${rule.id}`;
       totalCount++;
       if (checkedRules[ruleKey] === true) {
         checkedCount++;
