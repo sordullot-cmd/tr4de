@@ -5,6 +5,7 @@ import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { ArrowLeft, ArrowRight, TrendingUp as LucideTrendingUp } from "lucide-react";
+import TradesPage from "@/components/pages/TradesPage";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -49,7 +50,7 @@ const BROKER_LOGOS = {
 };
 const getBrokerLogo = (b) => b ? (BROKER_LOGOS[String(b).trim().toLowerCase()] || null) : null;
 
-export default function AccountDetailPage({ accountId, accounts = [], trades = [], setPage, setSelectedAccountIds }) {
+export default function AccountDetailPage({ accountId, accounts = [], trades = [], strategies = [], setPage, setSelectedAccountIds }) {
   const account = accounts.find(a => a.id === accountId);
   const accountTrades = (trades || []).filter(t => t.account_id === accountId);
 
@@ -329,9 +330,18 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       {/* Séparateur avant les trades récents */}
       <div style={{ height: 1, background: T.border }} />
 
-      {/* Recent trades */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${T.border}` }}>
+      {/* Trades récents — header + tableau complet (TradesPage embedded),
+          filtré sur les trades du compte sélectionné. Même bloc unifié que
+          sur la page détail d'une stratégie. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "14px 18px",
+          background: "#FFFFFF",
+          border: `1px solid ${T.border}`,
+          borderRadius: "12px 12px 0 0",
+          borderBottom: "none",
+        }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Trades récents</div>
           <button
             type="button"
@@ -341,8 +351,8 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
               setPage?.("trades");
             }}
             style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "5px 10px", borderRadius: 6,
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "6px 14px", borderRadius: 999,
               border: `1px solid ${T.border}`, background: "#FFFFFF",
               color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer",
               fontFamily: "inherit",
@@ -351,10 +361,21 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             Tout voir <ArrowRight size={11} />
           </button>
         </div>
-        {stats.sorted.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", color: T.textSub, fontSize: 13 }}>Aucun trade sur ce compte.</div>
+
+        {/* Séparateur explicite entre le titre et le tableau */}
+        <div style={{ height: 1, background: T.border, borderLeft: `1px solid ${T.border}`, borderRight: `1px solid ${T.border}`, boxSizing: "border-box" }} />
+
+        {accountTrades.length === 0 ? (
+          <div style={{
+            background: "#FFFFFF",
+            border: `1px solid ${T.border}`,
+            borderRadius: "0 0 12px 12px",
+            padding: "40px 24px", textAlign: "center", color: T.textSub, fontSize: 13,
+          }}>
+            Aucun trade sur ce compte.
+          </div>
         ) : (
-          <RecentTradesTable trades={[...stats.sorted].slice(-10).reverse()} />
+          <TradesPage trades={accountTrades} strategies={strategies} embedded />
         )}
       </div>
 

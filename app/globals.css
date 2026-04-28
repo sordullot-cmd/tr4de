@@ -458,6 +458,14 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
 
 /* Mobile (<768px) */
 @media (max-width: 767px) {
+  /* Mobile : laisser le body scroller (au lieu d'un conteneur interne fixe).
+     Sinon le scroll tactile est fragile / cassé sur iOS et Android. */
+  html, body { overflow: auto !important; height: auto !important; min-height: 100% !important; }
+  .tr4de-root { min-height: 100dvh !important; height: auto !important; }
+  .tr4de-main { height: auto !important; min-height: 100dvh !important; }
+  .tr4de-main > div:last-child { min-height: 0 !important; }
+  .tr4de-main .scroll-thin { overflow: visible !important; height: auto !important; flex: none !important; }
+
   /* Header compressé */
   .tr4de-topbar { height: auto !important; padding: 10px 12px !important; gap: 8px !important; flex-wrap: wrap !important; }
   .tr4de-main { padding: 12px !important; }
@@ -727,6 +735,33 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
   [style*="repeat(4,1fr)"],
   [style*="repeat(4, 1fr)"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* AccountsPage : grid de cartes "repeat(2, minmax(0, 1fr))" → 1 colonne */
+  [style*="repeat(2, minmax(0, 1fr))"],
+  [style*="repeat(2,minmax(0,1fr))"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* AccountsPage simulator stepper : "minmax(160px, 1fr) 2fr 80px" → stack */
+  [style*="minmax(160px, 1fr) 2fr 80px"],
+  [style*="minmax(160px,1fr) 2fr 80px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* NotesPage : "320px 1fr" → stack vertical, liste hauteur limitée */
+  .tr4de-notes-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 220px 1fr !important;
+    height: auto !important;
+    min-height: calc(100dvh - 140px) !important;
+  }
+  .tr4de-notes-layout > div:first-child {
+    max-height: 220px !important;
+    min-height: 0 !important;
+  }
+  .tr4de-notes-page {
+    height: auto !important;
+    min-height: calc(100dvh - 100px) !important;
   }
 
   /* fontSize inline 20-22 (P&L value, h2) → tailles réduites */

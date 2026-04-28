@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getCurrencySymbol, rMultiple, fmtR } from "@/lib/userPrefs";
 import TradesPage from "@/components/pages/TradesPage";
 import LoadingScreen from "@/components/ui/LoadingScreen";
@@ -108,6 +108,24 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
       console.error("Error loading data:", err);
     }
     setLoading(false);
+  }, []);
+
+  // Re-sync checkedRules quand TradesPage (même onglet) coche/décoche une règle,
+  // ou quand un autre onglet modifie localStorage.
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const data = localStorage.getItem('tr4de_checked_rules');
+        setCheckedRules(data ? JSON.parse(data) : {});
+      } catch {}
+    };
+    const onStorage = (e) => { if (e.key === 'tr4de_checked_rules') reload(); };
+    window.addEventListener('tr4de:checked-rules-changed', reload);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('tr4de:checked-rules-changed', reload);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   // Filter trades by selected strategy
@@ -400,10 +418,20 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
     // Consistency score: lower stdDev = higher score (invert and normalize)
     const consistencyScore = Math.max(0, 100 - (stdDev / Math.max(...filteredTrades.map(t => t.pnl), 1000) * 100));
 
-    // 5. Rule Adherence (trades with rules / total trades * 100)
-    const ruleAdherenceScore = trades.length > 0 
-      ? ((filteredTrades.length / trades.length) * 100)
-      : 0;
+    // 5. Rule Adherence — moyenne, sur les trades de la stratégie, du
+    // pourcentage de règles cochées (= respectées) par trade.
+    // Si la stratégie n'a aucune règle définie → 100 (rien à respecter).
+    // Si aucun trade rattaché → 0.
+    let ruleAdherenceScore = 0;
+    if (allStrategyRules.length === 0) {
+      ruleAdherenceScore = 100;
+    } else if (filteredTrades.length > 0) {
+      const sumPct = filteredTrades.reduce((sum, t) => {
+        const { checkedCount, totalCount } = getCheckedRulesCount(t);
+        return sum + (totalCount > 0 ? (checkedCount / totalCount) * 100 : 0);
+      }, 0);
+      ruleAdherenceScore = sumPct / filteredTrades.length;
+    }
 
     // Calculate overall TradePath Score (average of all 5 metrics)
     const overallScore = ((winPercent + profitFactorScore + winLossScore + consistencyScore + ruleAdherenceScore) / 5).toFixed(2);
@@ -1017,24 +1045,52 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
       </div>
       )}
 
-      {/* EMPTY STATE */}
-      {filteredTrades.length === 0 && (
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"80px 40px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:600,marginBottom:8,color:T.text}}>Aucun trade pour cette stratégie</div>
-          <p style={{color:T.textSub,marginBottom:20}}>Assignez des trades à cette stratégie depuis la page "Trades" pour voir les statistiques ici.</p>
+      {/* HEADER VISUEL collé au tableau — petite barre titre + bouton "Tout
+          voir". Le tableau réel est rendu juste en-dessous via TradesPage
+          embedded ; un trait 1px sépare le header du tableau. */}
+      <div style={{display:"flex",flexDirection:"column",gap:0}}>
+        <div style={{
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          padding:"14px 18px",
+          background:T.white,
+          border:`1px solid ${T.border}`,
+          borderRadius:"12px 12px 0 0",
+          borderBottom:"none",
+          marginBottom:0,
+        }}>
+          <div style={{fontSize:13,fontWeight:600,color:T.text}}>Trades récents</div>
           <button
-            onClick={() => setPage('trades')}
-            style={{padding:"10px 20px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}
-          >Aller aux trades</button>
+            type="button"
+            onClick={() => setPage?.("trades")}
+            style={{
+              display:"inline-flex",alignItems:"center",gap:6,
+              padding:"6px 14px",borderRadius:999,
+              border:`1px solid ${T.border}`,background:"#FFFFFF",
+              color:T.textSub,fontSize:11,fontWeight:500,cursor:"pointer",
+              fontFamily:"inherit",
+            }}
+          >
+            Tout voir <ArrowRight size={11} />
+          </button>
         </div>
-      )}
 
-      {/* TABLEAU DES TRADES DE LA STRATÉGIE — réutilise la TradesPage
-          complète avec les mêmes fonctionnalités (config colonnes, drag,
-          panneau latéral détail, sélection multiple, etc.). */}
-      {filteredTrades.length > 0 && (
-        <TradesPage trades={filteredTrades} strategies={strategies} />
-      )}
+        {/* Séparateur explicite entre le titre du bloc et le tableau */}
+        <div style={{height:1,background:T.border,borderLeft:`1px solid ${T.border}`,borderRight:`1px solid ${T.border}`,boxSizing:"border-box"}} />
+
+        {filteredTrades.length === 0 ? (
+          <div style={{
+            background:T.white,
+            border:`1px solid ${T.border}`,
+            borderRadius:"0 0 12px 12px",
+            padding:"40px 24px",textAlign:"center",color:T.textSub,fontSize:13,
+          }}>
+            Aucun trade
+          </div>
+        ) : (
+          <TradesPage trades={filteredTrades} strategies={strategies} embedded />
+        )}
+      </div>
     </div>
   );
 }
+

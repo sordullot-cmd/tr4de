@@ -26,7 +26,7 @@ import { useTradeScreenshots } from "@/lib/hooks/useTradeScreenshots";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmotionTags";
 
-export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades }) {
+export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades, embedded = false }) {
   const { user } = useAuth();
   const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
   const { urls: screenshotUrls, uploadScreenshot, removeScreenshot } = useTradeScreenshots();
@@ -416,6 +416,11 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     if (Object.keys(checkedRules).length > 0) {
       localStorage.setItem("tr4de_checked_rules", JSON.stringify(checkedRules));
     }
+    // Notifier les autres composants du même onglet (le `storage` event
+    // natif ne se déclenche que pour les autres onglets).
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tr4de:checked-rules-changed"));
+    }
   }, [checkedRules]);
 
   // Paste depuis le presse-papier → upload sur le trade sélectionné (si pas déjà de screenshot)
@@ -475,6 +480,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const filteredTrades = trades;
 
   if (!trades || trades.length === 0) {
+    if (embedded) return null; // l'empty state est géré par le parent
     return (
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
         <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -541,13 +547,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
-      <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
-        <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
-        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
-          <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
+      {!embedded && (
+        <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
+          <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
+          <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
+            <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
+          </div>
+          <div id="tr4de-page-header-slot" />
         </div>
-        <div id="tr4de-page-header-slot" />
-      </div>
+      )}
 
       {/* MODAL CONFIG COLONNES — apparaît centrée devant l'écran avec backdrop. */}
       {columnsMenuOpen && typeof document !== "undefined" && ReactDOM.createPortal(
@@ -650,7 +658,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       <div className="tr4de-trades-layout" style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
         {/* LEFT - TRADES TABLE */}
-        <div className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
+        <div className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderTop: embedded ? "none" : `1px solid ${T.border}`,borderRadius: embedded ? "0 0 12px 12px" : 12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
 
           <div style={{overflowX:"auto",overflowY:"auto",flex:1}}>
@@ -1027,7 +1035,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
         {/* RIGHT - DETAIL PANEL WITH TABS */}
         {selectedTrade && (
-          <div style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div className="tr4de-trade-side hide-mobile" style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
             <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center"}}>

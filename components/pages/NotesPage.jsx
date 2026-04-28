@@ -133,19 +133,43 @@ export default function NotesPage() {
   const firstLine = (content) => (content || "").split("\n").find(l => l.trim()) || "(Sans titre)";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "calc(100vh - 120px)" }} className="anim-1">
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "calc(100vh - 120px)" }} className="anim-1 tr4de-notes-page">
+      {/* Responsive: en dessous de 900px on passe en stack vertical
+          (liste au-dessus, éditeur en dessous) ; en dessous de 600px la page
+          n'a plus de hauteur fixe pour pouvoir scroller naturellement. */}
+      <style>{`
+        @media (max-width: 900px) {
+          .tr4de-notes-layout {
+            grid-template-columns: 1fr !important;
+            grid-template-rows: auto 1fr;
+          }
+          .tr4de-notes-list { max-height: 260px; }
+        }
+        @media (max-width: 600px) {
+          .tr4de-notes-page {
+            height: auto !important;
+            min-height: calc(100vh - 120px);
+          }
+          .tr4de-notes-layout { gap: 10px !important; }
+          .tr4de-notes-list { max-height: 220px; }
+          .tr4de-notes-editor { min-height: 60vh; }
+        }
+        @media (max-width: 480px) {
+          .tr4de-notes-newbtn-label { display: none; }
+        }
+      `}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Notes & Idées</h1>
         <button onClick={createNote}
           style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Plus size={14} strokeWidth={2} /> Nouvelle note
+          <Plus size={14} strokeWidth={2} /> <span className="tr4de-notes-newbtn-label">Nouvelle note</span>
         </button>
         <div id="tr4de-page-header-slot" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 12, flex: 1, minHeight: 0 }}>
+      <div className="tr4de-notes-layout" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 12, flex: 1, minHeight: 0 }}>
         {/* Left : list */}
-        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div className="tr4de-notes-list" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
           {/* Search */}
           <div style={{ padding: 10, borderBottom: `1px solid ${T.border}` }}>
             <div style={{ position: "relative" }}>
@@ -210,7 +234,7 @@ export default function NotesPage() {
         </div>
 
         {/* Right : editor */}
-        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: selected ? 0 : 20, display: "flex", flexDirection: "column" }}>
+        <div className="tr4de-notes-editor" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: selected ? 0 : 20, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {selected ? (
             <>
               <div style={{ padding: "10px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

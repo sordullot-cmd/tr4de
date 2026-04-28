@@ -31,6 +31,27 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     try { return JSON.parse(localStorage.getItem("tr4de_trade_strategies") || "{}"); }
     catch { return {}; }
   }, []);
+  // État des règles cochées par trade × stratégie × règle.
+  // Live-updated quand TradesPage (même onglet) émet
+  // 'tr4de:checked-rules-changed', ou quand un autre onglet modifie le storage.
+  const [checkedRules, setCheckedRules] = React.useState(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("tr4de_checked_rules") || "{}"); }
+    catch { return {}; }
+  });
+  React.useEffect(() => {
+    const reload = () => {
+      try { setCheckedRules(JSON.parse(localStorage.getItem("tr4de_checked_rules") || "{}")); }
+      catch { setCheckedRules({}); }
+    };
+    const onStorage = (e) => { if (e.key === "tr4de_checked_rules") reload(); };
+    window.addEventListener("tr4de:checked-rules-changed", reload);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("tr4de:checked-rules-changed", reload);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
   const [emotionTags, setEmotionTags] = React.useState({});
   const [errorTags, setErrorTags] = React.useState({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
@@ -343,7 +364,40 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     const consistencyScore = filteredTrades.length > 0
       ? Math.max(0, 100 - (stdDev / Math.max(...filteredTrades.map(t => t.pnl), 1000) * 100))
       : 0;
-    const ruleAdherenceScore = 75; // Default pour Dashboard basé sur comptes
+    // Rule Adherence — moyenne, sur les trades rattachés à une stratégie,
+    // du % de règles cochées (= respectées). Trades sans stratégie ou sans
+    // règle ignorés (n'influent pas sur la moyenne). Pas de trade évaluable
+    // → 100 (neutre, rien à pénaliser).
+    const adherencePcts = [];
+    filteredTrades.forEach((t) => {
+      // Récupère les IDs de stratégie du trade (3 formats de clé possibles)
+      let strategyIds = [];
+      if (t.id && tradeStrategiesData[t.id]) {
+        strategyIds = tradeStrategiesData[t.id];
+      } else if (t.date && t.symbol && t.entry != null) {
+        const k1 = `${t.date}${t.symbol}${t.entry}`;
+        const k2 = `${t.date}${t.symbol}${parseFloat(t.entry).toFixed(2)}`;
+        strategyIds = tradeStrategiesData[k1] || tradeStrategiesData[k2] || [];
+      }
+      if (!strategyIds.length) return;
+
+      let checked = 0, total = 0;
+      strategyIds.forEach((sid) => {
+        const strat = (strategies || []).find((s) => String(s.id) === String(sid));
+        if (!strat?.groups) return;
+        strat.groups.forEach((g) => {
+          (g.rules || []).forEach((rule) => {
+            const ruleKey = `${t.date}_${t.symbol}_${t.entry}_${t.exit || "none"}_${t.direction || "long"}_${strat.id}_${rule.id}`;
+            total++;
+            if (checkedRules[ruleKey] === true) checked++;
+          });
+        });
+      });
+      if (total > 0) adherencePcts.push((checked / total) * 100);
+    });
+    const ruleAdherenceScore = adherencePcts.length === 0
+      ? 100
+      : adherencePcts.reduce((s, v) => s + v, 0) / adherencePcts.length;
 
     const overallScore = ((winPercent + profitFactorScore + winLossScore + consistencyScore + ruleAdherenceScore) / 5).toFixed(2);
 

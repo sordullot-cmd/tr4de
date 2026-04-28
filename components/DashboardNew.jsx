@@ -661,7 +661,7 @@ export default function App() {
     backtest: <BacktestPage />,
     brokers: <BrokersPage />,
     accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} />,
-    "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
+    "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} strategies={strategies} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
