@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 export default function TradeImportModal({ isOpen, onClose, onImport, T }) {
   // Account Setup
@@ -199,7 +200,7 @@ export default function TradeImportModal({ isOpen, onClose, onImport, T }) {
         justifyContent: "center",
         zIndex: 1000,
       }}
-      onClick={onClose}
+      {...backdropDismiss(onClose)}
     >
       <div
         style={{

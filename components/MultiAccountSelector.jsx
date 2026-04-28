@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 export default function MultiAccountSelector({
   accounts = [],
@@ -258,7 +259,7 @@ export default function MultiAccountSelector({
           (et non dans le dropdown) pour ne pas être unmount quand le
           dropdown se ferme. */}
       {confirmDelete && typeof document !== "undefined" && ReactDOM.createPortal(
-        <div onClick={()=>!deleting && setConfirmDelete(null)}
+        <div {...backdropDismiss(()=>!deleting && setConfirmDelete(null))}
           style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}>
           <div onClick={(e)=>e.stopPropagation()}
             style={{background:"#FFFFFF",borderRadius:14,maxWidth:420,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.22)",border:"1px solid #E5E5E5",overflow:"hidden"}}>

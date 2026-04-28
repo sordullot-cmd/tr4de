@@ -630,10 +630,10 @@ export default function App() {
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
-        { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
-        { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
-        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
+        { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
+        { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
+        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];
@@ -944,7 +944,7 @@ export default function App() {
               background: "#FFFFFF",
               border: "1px solid rgba(0, 0, 0, 0.06)",
               borderRadius: 10,
-              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+              boxShadow: "none",
               padding: page === "add-trade" ? "0" : "20px 24px",
               display: page === "add-trade" ? "flex" : "block",
               width: "100%",
@@ -968,14 +968,16 @@ export default function App() {
                           onChange={(r) => setGlobalDateRange(r)}
                         />
                       )}
-                      <MultiAccountSelector
-                        accounts={visibleAccounts}
-                        selectedAccountIds={selectedAccountIds}
-                        onSelectionChange={setSelectedAccountIds}
-                        onDeleteAccount={handleDeleteAccount}
-                        onCreateAccount={() => setPage("add-trade")}
-                        T={T}
-                      />
+                      {page !== "accounts" && page !== "account-detail" && (
+                        <MultiAccountSelector
+                          accounts={visibleAccounts}
+                          selectedAccountIds={selectedAccountIds}
+                          onSelectionChange={setSelectedAccountIds}
+                          onDeleteAccount={handleDeleteAccount}
+                          onCreateAccount={() => setPage("add-trade")}
+                          T={T}
+                        />
+                      )}
                     </div>
                   </HeaderSlotPortal>
                 );

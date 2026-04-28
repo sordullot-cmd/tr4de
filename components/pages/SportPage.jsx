@@ -3,10 +3,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import {
   Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight,
   TrendingUp, Trophy, Flame, Calendar, Clock,
   Dumbbell, Activity, Bike, Footprints, Heart,
+  Star, EyeOff,
 } from "lucide-react";
 
 const T = {
@@ -34,6 +36,138 @@ const CATEGORIES = [
   { id: "cardio",    label: "Cardio",    color: "#06B6D4" },
 ];
 
+/* Bibliothèque d'exercices populaires avec catégorie par défaut + alias EN.
+   Les alias permettent de retrouver un exo en tapant son nom anglais. */
+const EXERCISE_LIBRARY = [
+  // Push
+  { name: "Développé couché",           category: "push", aliases: ["bench press", "flat bench"] },
+  { name: "Développé incliné",          category: "push", aliases: ["incline bench press", "incline press"] },
+  { name: "Développé décliné",          category: "push", aliases: ["decline bench press", "decline press"] },
+  { name: "Développé militaire",        category: "push", aliases: ["overhead press", "ohp", "military press", "shoulder press"] },
+  { name: "Développé haltères",         category: "push", aliases: ["dumbbell press", "db press"] },
+  { name: "Développé Arnold",           category: "push", aliases: ["arnold press"] },
+  { name: "Élévations latérales",       category: "push", aliases: ["lateral raises", "side raises"] },
+  { name: "Élévations frontales",       category: "push", aliases: ["front raises"] },
+  { name: "Oiseau (rear delt)",         category: "push", aliases: ["rear delt fly", "reverse fly", "rear delts"] },
+  { name: "Dips",                       category: "push", aliases: ["chest dips", "tricep dips"] },
+  { name: "Pompes",                     category: "push", aliases: ["push-ups", "push ups"] },
+  { name: "Pompes diamant",             category: "push", aliases: ["diamond push-ups"] },
+  { name: "Pompes inclinées",           category: "push", aliases: ["incline push-ups"] },
+  { name: "Écarté couché (haltères)",   category: "push", aliases: ["dumbbell flyes", "chest fly", "db fly"] },
+  { name: "Écarté à la poulie",         category: "push", aliases: ["cable fly", "cable crossover"] },
+  { name: "Extensions triceps poulie",  category: "push", aliases: ["tricep pushdown", "cable pushdown"] },
+  { name: "Triceps barre EZ",           category: "push", aliases: ["skull crushers", "lying tricep extension"] },
+  { name: "Triceps haltère nuque",      category: "push", aliases: ["overhead tricep extension"] },
+  { name: "Pull-over",                  category: "push", aliases: ["pullover", "dumbbell pullover"] },
+  // Pull
+  { name: "Tractions",                  category: "pull", aliases: ["pull-ups", "pull ups"] },
+  { name: "Tractions pronation",        category: "pull", aliases: ["pull-ups overhand"] },
+  { name: "Tractions supination",       category: "pull", aliases: ["chin-ups", "chin ups"] },
+  { name: "Tractions neutres",          category: "pull", aliases: ["neutral grip pull-ups"] },
+  { name: "Australian pull-up",         category: "pull", aliases: ["inverted row", "bodyweight row"] },
+  { name: "Rowing barre",               category: "pull", aliases: ["barbell row", "bent over row", "pendlay row"] },
+  { name: "Rowing T-bar",               category: "pull", aliases: ["t-bar row", "t bar row"] },
+  { name: "Rowing haltère",             category: "pull", aliases: ["dumbbell row", "db row", "one arm row"] },
+  { name: "Tirage horizontal poulie",   category: "pull", aliases: ["seated cable row", "cable row"] },
+  { name: "Tirage vertical poulie",     category: "pull", aliases: ["lat pulldown", "pulldown"] },
+  { name: "Face pull",                  category: "pull", aliases: ["face pulls"] },
+  { name: "Soulevé de terre",           category: "pull", aliases: ["deadlift", "conventional deadlift"] },
+  { name: "Soulevé de terre roumain",   category: "pull", aliases: ["romanian deadlift", "rdl"] },
+  { name: "Shrugs (haussements)",       category: "pull", aliases: ["shrugs", "barbell shrugs", "dumbbell shrugs"] },
+  { name: "Curl barre",                 category: "pull", aliases: ["barbell curl"] },
+  { name: "Curl haltères",              category: "pull", aliases: ["dumbbell curl", "db curl", "bicep curl"] },
+  { name: "Curl marteau",               category: "pull", aliases: ["hammer curl"] },
+  { name: "Curl pupitre",               category: "pull", aliases: ["preacher curl"] },
+  { name: "Curl à la poulie",           category: "pull", aliases: ["cable curl"] },
+  // Legs
+  { name: "Squat",                      category: "legs", aliases: ["back squat", "barbell squat"] },
+  { name: "Squat avant (front squat)",  category: "legs", aliases: ["front squat"] },
+  { name: "Squat bulgare",              category: "legs", aliases: ["bulgarian split squat", "bss"] },
+  { name: "Hack squat",                 category: "legs", aliases: ["hack squat"] },
+  { name: "Presse à cuisses",           category: "legs", aliases: ["leg press"] },
+  { name: "Fentes",                     category: "legs", aliases: ["lunges"] },
+  { name: "Fentes marchées",            category: "legs", aliases: ["walking lunges"] },
+  { name: "Leg extension",              category: "legs", aliases: ["leg extension", "quad extension"] },
+  { name: "Leg curl",                   category: "legs", aliases: ["leg curl", "hamstring curl"] },
+  { name: "Soulevé de terre jambes tendues", category: "legs", aliases: ["stiff leg deadlift", "sldl"] },
+  { name: "Hip thrust",                 category: "legs", aliases: ["hip thrust", "barbell hip thrust"] },
+  { name: "Good morning",               category: "legs", aliases: ["good morning"] },
+  { name: "Mollets debout",             category: "legs", aliases: ["standing calf raise"] },
+  { name: "Mollets assis",              category: "legs", aliases: ["seated calf raise"] },
+  { name: "Step-up",                    category: "legs", aliases: ["step-up", "step ups"] },
+  { name: "Box jumps",                  category: "legs", aliases: ["box jumps"] },
+  // Core
+  { name: "Crunchs",                    category: "core", aliases: ["crunches", "ab crunch"] },
+  { name: "Sit-ups",                    category: "core", aliases: ["sit ups", "situps"] },
+  { name: "Relevé de jambes",           category: "core", aliases: ["leg raises", "lying leg raise"] },
+  { name: "Relevé de jambes suspendu",  category: "core", aliases: ["hanging leg raise"] },
+  { name: "Planche",                    category: "core", aliases: ["plank"] },
+  { name: "Planche latérale",           category: "core", aliases: ["side plank"] },
+  { name: "Russian twist",              category: "core", aliases: ["russian twist"] },
+  { name: "Mountain climbers",          category: "core", aliases: ["mountain climbers"] },
+  { name: "Hollow body hold",           category: "core", aliases: ["hollow hold", "hollow body"] },
+  { name: "Roue abdominale",            category: "core", aliases: ["ab wheel", "ab rollout"] },
+  { name: "L-sit",                      category: "core", aliases: ["l sit", "l-sit"] },
+  { name: "Dragon flag",                category: "core", aliases: ["dragon flag"] },
+  // Full body / functional
+  { name: "Burpees",                    category: "full_body", aliases: ["burpees"] },
+  { name: "Clean & jerk",               category: "full_body", aliases: ["clean and jerk", "clean jerk"] },
+  { name: "Snatch",                     category: "full_body", aliases: ["snatch"] },
+  { name: "Thruster",                   category: "full_body", aliases: ["thrusters"] },
+  { name: "Kettlebell swing",           category: "full_body", aliases: ["kb swing", "kettlebell swing"] },
+  { name: "Turkish get-up",             category: "full_body", aliases: ["turkish get up", "tgu"] },
+  { name: "Farmer walk",                category: "full_body", aliases: ["farmer carry", "farmer's walk"] },
+  { name: "Muscle-up",                  category: "full_body", aliases: ["muscle up"] },
+  { name: "Pistol squat",               category: "legs", aliases: ["pistol squat"] },
+  { name: "Handstand push-up",          category: "push", aliases: ["handstand push up", "hspu"] },
+  // Calisthénie / street workout
+  { name: "Front lever",                category: "pull", aliases: ["front lever"] },
+  { name: "Front lever raises",         category: "pull", aliases: ["front lever raises"] },
+  { name: "Back lever",                 category: "pull", aliases: ["back lever"] },
+  { name: "Planche",                    category: "push", aliases: ["planche", "full planche"] },
+  { name: "Tuck planche",               category: "push", aliases: ["tuck planche"] },
+  { name: "Straddle planche",           category: "push", aliases: ["straddle planche"] },
+  { name: "Pseudo planche push-up",     category: "push", aliases: ["pseudo planche push up", "ppp"] },
+  { name: "Planche lean",               category: "push", aliases: ["planche lean"] },
+  { name: "Handstand",                  category: "push", aliases: ["handstand", "equilibre"] },
+  { name: "Hand-to-hand",               category: "push", aliases: ["hand to hand"] },
+  { name: "Archer pull-up",             category: "pull", aliases: ["archer pull-up", "archer pullup"] },
+  { name: "Archer push-up",             category: "push", aliases: ["archer push-up", "archer pushup"] },
+  { name: "One arm pull-up",            category: "pull", aliases: ["one arm pull-up", "oapu"] },
+  { name: "One arm push-up",            category: "push", aliases: ["one arm push-up"] },
+  { name: "Typewriter pull-up",         category: "pull", aliases: ["typewriter pull-up"] },
+  { name: "Wide pull-up",               category: "pull", aliases: ["wide grip pull-up"] },
+  { name: "Commando pull-up",           category: "pull", aliases: ["commando pull-up"] },
+  { name: "Korean dips",                category: "push", aliases: ["korean dips"] },
+  { name: "Ring dips",                  category: "push", aliases: ["ring dips"] },
+  { name: "Ring muscle-up",             category: "full_body", aliases: ["ring muscle up", "rmu"] },
+  { name: "Bar muscle-up",              category: "full_body", aliases: ["bar muscle up", "bmu"] },
+  { name: "Skin the cat",               category: "full_body", aliases: ["skin the cat"] },
+  { name: "German hang",                category: "pull", aliases: ["german hang"] },
+  { name: "Tuck front lever",           category: "pull", aliases: ["tuck front lever"] },
+  { name: "Pike push-up",               category: "push", aliases: ["pike push-up"] },
+  { name: "Hindu push-up",              category: "push", aliases: ["hindu push-up"] },
+  { name: "Spiderman push-up",          category: "push", aliases: ["spiderman push-up"] },
+  { name: "Clap push-up",               category: "push", aliases: ["clap push-up"] },
+  { name: "Explosive pull-up",          category: "pull", aliases: ["explosive pull-up"] },
+  { name: "Pull-up négatif",            category: "pull", aliases: ["negative pull-up", "eccentric pull-up"] },
+  { name: "Squat sauté",                category: "legs", aliases: ["jump squat"] },
+  { name: "Sissy squat",                category: "legs", aliases: ["sissy squat"] },
+  { name: "Nordic curl",                category: "legs", aliases: ["nordic curl", "nordic hamstring"] },
+  { name: "Shrimp squat",               category: "legs", aliases: ["shrimp squat"] },
+  // Cardio
+  { name: "Course à pied",              category: "cardio", aliases: ["running", "run"] },
+  { name: "Sprint",                     category: "cardio", aliases: ["sprint", "sprints"] },
+  { name: "Vélo",                       category: "cardio", aliases: ["cycling", "bike"] },
+  { name: "Vélo elliptique",            category: "cardio", aliases: ["elliptical"] },
+  { name: "Rameur",                     category: "cardio", aliases: ["rowing", "rower"] },
+  { name: "Corde à sauter",             category: "cardio", aliases: ["jump rope", "skipping"] },
+  { name: "Natation",                   category: "cardio", aliases: ["swimming"] },
+  { name: "Marche rapide",              category: "cardio", aliases: ["brisk walking", "walking"] },
+  { name: "Stairmaster",                category: "cardio", aliases: ["stairmaster", "stair climber"] },
+  { name: "HIIT",                       category: "cardio", aliases: ["hiit", "interval training"] },
+];
+
 const todayISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -52,6 +186,13 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function SportPage() {
   const [sessions, setSessions] = useCloudState("tr4de_sport_sessions", "sport_sessions", []);
+  // Bibliothèque personnalisable :
+  // - customExercises : exercices ajoutés par l'utilisateur ({ name, category })
+  // - hiddenExercises : noms (de la lib intégrée OU custom) que l'utilisateur a masqués
+  // - favoriteExercises : noms en favoris (affichés en haut)
+  const [customExercises, setCustomExercises] = useCloudState("tr4de_sport_custom_exercises", "sport_custom_exercises", []);
+  const [hiddenExercises, setHiddenExercises] = useCloudState("tr4de_sport_hidden_exercises", "sport_hidden_exercises", []);
+  const [favoriteExercises, setFavoriteExercises] = useCloudState("tr4de_sport_favorite_exercises", "sport_favorite_exercises", []);
 
   const [filterDiscipline, setFilterDiscipline] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -74,30 +215,30 @@ export default function SportPage() {
   const openCreate = () => { setForm(emptyForm()); setEditingId(null); setShowForm(true); };
   const openEdit = (s) => { setForm({ ...s }); setEditingId(s.id); setShowForm(true); };
   const close = () => { setShowForm(false); setEditingId(null); };
+  const buildData = (f) => ({
+    date: f.date,
+    discipline: f.discipline,
+    duration: parseFloat(f.duration) || 0,
+    notes: (f.notes || "").trim(),
+    exercises: (f.exercises || [])
+      .filter(e => (e.name || "").trim())
+      .map(e => ({
+        id: e.id,
+        name: e.name.trim(),
+        category: e.category || "full_body",
+        sets: (e.sets || []).filter(set => set.reps !== "" || set.weight !== "" || set.distance !== "" || set.time !== "")
+          .map(set => ({
+            id: set.id,
+            reps: parseFloat(set.reps) || null,
+            weight: parseFloat(set.weight) || null,
+            distance: parseFloat(set.distance) || null,
+            time: parseFloat(set.time) || null,
+          })),
+      })),
+  });
   const save = () => {
     if (!form.date) return;
-    const data = {
-      date: form.date,
-      discipline: form.discipline,
-      duration: parseFloat(form.duration) || 0,
-      notes: (form.notes || "").trim(),
-      exercises: (form.exercises || [])
-        .filter(e => (e.name || "").trim())
-        .map(e => ({
-          id: e.id,
-          name: e.name.trim(),
-          category: e.category || "full_body",
-          sets: (e.sets || []).filter(set => set.reps !== "" || set.weight !== "" || set.distance !== "" || set.time !== "")
-            .map(set => ({
-              id: set.id,
-              reps: parseFloat(set.reps) || null,
-              weight: parseFloat(set.weight) || null,
-              distance: parseFloat(set.distance) || null,
-              time: parseFloat(set.time) || null,
-              rpe: parseFloat(set.rpe) || null,
-            })),
-        })),
-    };
+    const data = buildData(form);
     if (editingId) {
       setSessions(prev => (prev || []).map(s => s.id === editingId ? { ...s, ...data } : s));
     } else {
@@ -106,6 +247,16 @@ export default function SportPage() {
     }
     close();
   };
+  // Autosave en mode édition : applique chaque changement après un court delai
+  // (debounce) sans fermer la modale.
+  useEffect(() => {
+    if (!showForm || !editingId || !form?.date) return;
+    const handle = setTimeout(() => {
+      const data = buildData(form);
+      setSessions(prev => (prev || []).map(s => s.id === editingId ? { ...s, ...data } : s));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [form, editingId, showForm]);
   const remove = (id) => setSessions(prev => (prev || []).filter(s => s.id !== id));
 
   /* ─── Stats agrégées ──────────────────────────────────────────── */
@@ -255,18 +406,25 @@ export default function SportPage() {
         </div>
       </div>
 
-      {/* Filtres */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <FilterPills
-          value={filterDiscipline}
-          onChange={setFilterDiscipline}
-          options={[{ id: "all", label: "Toutes" }, ...DISCIPLINES.map(d => ({ id: d.id, label: d.label }))]}
-        />
-        <FilterPills
-          value={filterCategory}
-          onChange={setFilterCategory}
-          options={[{ id: "all", label: "Toutes catégories" }, ...CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color }))]}
-        />
+      {/* Filtres : discipline et catégorie sur des lignes distinctes,
+          précédés d'un libellé pour clarifier ce qu'on filtre. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut, minWidth: 80 }}>Discipline</span>
+          <FilterPills
+            value={filterDiscipline}
+            onChange={setFilterDiscipline}
+            options={[{ id: "all", label: "Toutes" }, ...DISCIPLINES.map(d => ({ id: d.id, label: d.label }))]}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut, minWidth: 80 }}>Catégorie</span>
+          <FilterPills
+            value={filterCategory}
+            onChange={setFilterCategory}
+            options={[{ id: "all", label: "Toutes" }, ...CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color }))]}
+          />
+        </div>
       </div>
 
       {/* Layout en 2 colonnes : sessions à gauche, PR + chart à droite */}
@@ -274,7 +432,7 @@ export default function SportPage() {
 
         {/* Colonne gauche : historique */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: T.textSub, paddingLeft: 4 }}>Historique des séances</div>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Historique des séances</h2>
           {filteredSessions.length === 0 ? (
             <div style={{
               border: `1px dashed ${T.border}`, borderRadius: 12, padding: 28,
@@ -296,19 +454,46 @@ export default function SportPage() {
 
         {/* Colonne droite : PRs + chart */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <PRsCard prs={prs} />
-          <ProgressChart
-            allExerciseNames={allExerciseNames}
-            selected={chartExerciseName}
-            onChangeSelected={setChartExerciseName}
-            data={chartData}
-          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Records personnels</h2>
+            <PRsCard prs={prs} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Progression</h2>
+              {allExerciseNames.length > 0 && (
+                <select
+                  value={chartExerciseName}
+                  onChange={(e) => setChartExerciseName(e.target.value)}
+                  style={{
+                    padding: "3px 8px", borderRadius: 6,
+                    border: `1px solid ${T.border}`, background: T.white,
+                    fontSize: 11, color: T.text, fontFamily: "inherit", cursor: "pointer",
+                    maxWidth: 160,
+                  }}
+                >
+                  {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              )}
+            </div>
+            <ProgressChart
+              allExerciseNames={allExerciseNames}
+              selected={chartExerciseName}
+              onChangeSelected={setChartExerciseName}
+              data={chartData}
+            />
+          </div>
         </div>
       </div>
 
       {/* Modal de création / édition */}
       {showForm && typeof document !== "undefined" && ReactDOM.createPortal(
-        <SessionForm form={form} setForm={setForm} editingId={editingId} onClose={close} onSave={save} />,
+        <SessionForm
+          form={form} setForm={setForm} editingId={editingId} onClose={close} onSave={save}
+          customExercises={customExercises} setCustomExercises={setCustomExercises}
+          hiddenExercises={hiddenExercises} setHiddenExercises={setHiddenExercises}
+          favoriteExercises={favoriteExercises} setFavoriteExercises={setFavoriteExercises}
+        />,
         document.body
       )}
     </div>
@@ -372,6 +557,26 @@ function SessionCard({ session: s, onEdit, onDelete }) {
   const totalVolume = (s.exercises || []).reduce((sum, e) =>
     sum + (e.sets || []).reduce((vs, set) => vs + ((set.weight || 0) * (set.reps || 0)), 0), 0);
 
+  // Catégorie de la séance = moyenne pondérée par le nombre de séries.
+  // On somme les sets par catégorie d'exo, puis on prend la catégorie dominante.
+  // Tie ou 3+ catégories à poids comparables → "Full body".
+  const sessionCategory = (() => {
+    const weights = {};
+    for (const ex of (s.exercises || [])) {
+      if (!ex.category) continue;
+      const w = Math.max(1, (ex.sets || []).length);
+      weights[ex.category] = (weights[ex.category] || 0) + w;
+    }
+    const keys = Object.keys(weights);
+    if (keys.length === 0) return null;
+    keys.sort((a, b) => weights[b] - weights[a]);
+    const total = keys.reduce((s, k) => s + weights[k], 0);
+    const top = weights[keys[0]];
+    // Si la catégorie dominante représente moins de 50%, considère la séance Full body
+    if (keys.length >= 3 && top / total < 0.5) return CATEGORIES.find(c => c.id === "full_body");
+    return CATEGORIES.find(c => c.id === keys[0]) || null;
+  })();
+
   return (
     <div style={{
       background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
@@ -398,6 +603,13 @@ function SessionCard({ session: s, onEdit, onDelete }) {
             <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
               {fmtDate(s.date)}
             </span>
+            {sessionCategory && (
+              <span style={{
+                fontSize: 10, fontWeight: 600,
+                color: sessionCategory.color, background: `${sessionCategory.color}18`,
+                padding: "1px 7px", borderRadius: 999, alignSelf: "center",
+              }}>{sessionCategory.label}</span>
+            )}
             <span style={{ fontSize: 11, color: T.textSub, textTransform: "capitalize" }}>{disc.label}</span>
             {s.duration > 0 && (
               <span style={{ fontSize: 11, color: T.textMut, display: "inline-flex", alignItems: "center", gap: 3 }}>
@@ -438,16 +650,10 @@ function SessionCard({ session: s, onEdit, onDelete }) {
       {open && (
         <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${T.border}` }}>
           {(s.exercises || []).map((ex, i) => {
-            const cat = CATEGORIES.find(c => c.id === ex.category) || CATEGORIES[4];
             return (
               <div key={ex.id || i} style={{ paddingTop: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{ex.name}</span>
-                  <span style={{
-                    fontSize: 10, fontWeight: 600,
-                    color: cat.color, background: `${cat.color}18`,
-                    padding: "1px 7px", borderRadius: 999,
-                  }}>{cat.label}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {(ex.sets || []).map((set, si) => (
@@ -457,7 +663,6 @@ function SessionCard({ session: s, onEdit, onDelete }) {
                       {set.weight != null && <span> · {set.weight} kg</span>}
                       {set.distance != null && <span> · {set.distance} km</span>}
                       {set.time != null && <span> · {set.time} min</span>}
-                      {set.rpe != null && <span style={{ color: T.textMut }}> · RPE {set.rpe}</span>}
                     </div>
                   ))}
                 </div>
@@ -488,10 +693,6 @@ function iconBtn() {
 function PRsCard({ prs }) {
   return (
     <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-      <div style={{ padding: "12px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-        <Trophy size={13} strokeWidth={1.75} color={T.amber} />
-        <div style={{ fontSize: 12, fontWeight: 600, color: T.text, letterSpacing: -0.05 }}>Records personnels</div>
-      </div>
       {prs.length === 0 ? (
         <div style={{ padding: "24px 18px", textAlign: "center", color: T.textMut, fontSize: 12 }}>
           Aucun PR. Logge tes séries avec charges pour voir tes records.
@@ -544,25 +745,6 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
 
   return (
     <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-      <div style={{ padding: "12px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-        <TrendingUp size={13} strokeWidth={1.75} color={T.green} />
-        <div style={{ fontSize: 12, fontWeight: 600, color: T.text, letterSpacing: -0.05 }}>Progression</div>
-        {allExerciseNames.length > 0 && (
-          <select
-            value={selected}
-            onChange={(e) => onChangeSelected(e.target.value)}
-            style={{
-              marginLeft: "auto",
-              padding: "3px 8px", borderRadius: 6,
-              border: `1px solid ${T.border}`, background: T.white,
-              fontSize: 11, color: T.text, fontFamily: "inherit", cursor: "pointer",
-              maxWidth: 160,
-            }}
-          >
-            {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        )}
-      </div>
       {data.length === 0 ? (
         <div style={{ padding: "32px 18px", textAlign: "center", color: T.textMut, fontSize: 12 }}>
           {allExerciseNames.length === 0
@@ -594,7 +776,7 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
 }
 
 /* ─── Modal du formulaire de séance ─────────────────────────────── */
-function SessionForm({ form, setForm, editingId, onClose, onSave }) {
+function SessionForm({ form, setForm, editingId, onClose, onSave, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises }) {
   const addExercise = () => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setForm(prev => ({
@@ -617,9 +799,21 @@ function SessionForm({ form, setForm, editingId, onClose, onSave }) {
   const addSet = (eid) => {
     setForm(prev => ({
       ...prev,
-      exercises: (prev.exercises || []).map(e => e.id === eid
-        ? { ...e, sets: [...(e.sets || []), { id: Date.now() + Math.floor(Math.random() * 1000), reps: "", weight: "" }] }
-        : e),
+      exercises: (prev.exercises || []).map(e => {
+        if (e.id !== eid) return e;
+        const sets = e.sets || [];
+        const last = sets[sets.length - 1];
+        // Pré-remplit la nouvelle série avec les valeurs de la précédente
+        // (kilos, distance, temps) pour aller plus vite. Reps reste vide.
+        const newSet = {
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          reps: "",
+          weight: last?.weight ?? "",
+          distance: last?.distance ?? "",
+          time: last?.time ?? "",
+        };
+        return { ...e, sets: [...sets, newSet] };
+      }),
     }));
   };
   const updateSet = (eid, sid, patch) => {
@@ -642,7 +836,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave }) {
   const isCardio = form.discipline === "cardio";
 
   return (
-    <div onClick={onClose}
+    <div {...backdropDismiss(onClose)}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
         style={{ width: "min(640px, 100%)", maxHeight: "min(88vh, 820px)", display: "flex", flexDirection: "column", background: T.white, borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
@@ -725,19 +919,19 @@ function SessionForm({ form, setForm, editingId, onClose, onSave }) {
               {(form.exercises || []).map((ex) => (
                 <div key={ex.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                    <input
-                      type="text" value={ex.name}
-                      onChange={(e) => updateExercise(ex.id, { name: e.target.value })}
-                      placeholder="Ex. Développé couché"
-                      style={{ flex: 1, ...input(), padding: "6px 10px", fontWeight: 500 }}
+                    <ExerciseNameCombobox
+                      value={ex.name}
+                      onChange={(name) => updateExercise(ex.id, { name })}
+                      onPick={(item) => updateExercise(ex.id, { name: item.name, category: item.category })}
+                      customExercises={customExercises}
+                      setCustomExercises={setCustomExercises}
+                      hiddenExercises={hiddenExercises}
+                      setHiddenExercises={setHiddenExercises}
+                      favoriteExercises={favoriteExercises}
+                      setFavoriteExercises={setFavoriteExercises}
+                      defaultCategory={isCardio ? "cardio" : (ex.category && ex.category !== "cardio" ? ex.category : "full_body")}
+                      isCardio={isCardio}
                     />
-                    <select
-                      value={ex.category}
-                      onChange={(e) => updateExercise(ex.id, { category: e.target.value })}
-                      style={{ padding: "6px 8px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.white, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}
-                    >
-                      {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
                     <button type="button" onClick={() => removeExercise(ex.id)} aria-label="Supprimer l'exercice"
                       style={iconBtn()}
                       onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
@@ -761,7 +955,6 @@ function SessionForm({ form, setForm, editingId, onClose, onSave }) {
                             <SetInput value={set.weight} onChange={(v) => updateSet(ex.id, set.id, { weight: v })} placeholder="kg" />
                           </>
                         )}
-                        <SetInput value={set.rpe} onChange={(v) => updateSet(ex.id, set.id, { rpe: v })} placeholder="RPE" small />
                         <button type="button" onClick={() => removeSet(ex.id, set.id)} aria-label="Supprimer la série"
                           style={{ ...iconBtn(), width: 22, height: 22 }}
                           onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
@@ -797,24 +990,38 @@ function SessionForm({ form, setForm, editingId, onClose, onSave }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "12px 18px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose}
-            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "transparent", color: T.textSub, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-            Annuler
-          </button>
-          <button onClick={onSave}
-            disabled={!form.date}
-            style={{
-              padding: "8px 16px", borderRadius: 8, border: "none",
-              background: form.date ? T.text : "#F0F0F0",
-              color: form.date ? T.white : T.textMut,
-              fontSize: 13, fontWeight: 600,
-              cursor: form.date ? "pointer" : "not-allowed",
-              fontFamily: "inherit",
-              display: "inline-flex", alignItems: "center", gap: 6,
-            }}>
-            <Check size={13} strokeWidth={2} /> {editingId ? "Enregistrer" : "Créer"}
-          </button>
+        <div style={{ padding: "12px 18px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+          {editingId ? (
+            <>
+              <span style={{ marginRight: "auto", fontSize: 11, color: T.textMut, fontFamily: "inherit" }}>
+                Modifications enregistrées automatiquement
+              </span>
+              <button onClick={onClose}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: T.text, color: T.white, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Fermer
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={onClose}
+                style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "transparent", color: T.textSub, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+              <button onClick={onSave}
+                disabled={!form.date}
+                style={{
+                  padding: "8px 16px", borderRadius: 8, border: "none",
+                  background: form.date ? T.text : "#F0F0F0",
+                  color: form.date ? T.white : T.textMut,
+                  fontSize: 13, fontWeight: 600,
+                  cursor: form.date ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                }}>
+                <Check size={13} strokeWidth={2} /> Créer
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -835,6 +1042,283 @@ function input() {
     border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit",
     outline: "none", color: T.text, background: T.white,
   };
+}
+
+/* ─── Combobox pour la saisie d'un exercice ───────────────────────
+   - Recherche dans la lib intégrée + exercices custom de l'utilisateur
+   - Favoris affichés en premier
+   - Bouton étoile pour ajouter/retirer des favoris
+   - Bouton œil-barré pour masquer un exercice intégré
+   - Bouton corbeille pour supprimer un exercice custom
+   - Si la recherche ne renvoie rien → bouton "Ajouter <query>" comme nouvel exo */
+function ExerciseNameCombobox({
+  value, onChange, onPick,
+  customExercises = [], setCustomExercises,
+  hiddenExercises = [], setHiddenExercises,
+  favoriteExercises = [], setFavoriteExercises,
+  defaultCategory = "full_body",
+  isCardio = false,
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const wrapRef = React.useRef(null);
+
+  const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const q = norm((value || "").trim());
+
+  // Liste fusionnée : custom + intégrés - masqués (les custom remplacent l'intégré
+  // s'il y a collision sur le nom).
+  const allItems = useMemo(() => {
+    const customNames = new Set((customExercises || []).map(c => norm(c.name)));
+    const builtin = EXERCISE_LIBRARY.filter(e => !customNames.has(norm(e.name)));
+    const merged = [...(customExercises || []).map(c => ({ ...c, custom: true })), ...builtin];
+    const hiddenSet = new Set((hiddenExercises || []).map(n => norm(n)));
+    return merged
+      .filter(e => !hiddenSet.has(norm(e.name)))
+      .filter(e => isCardio ? e.category === "cardio" : e.category !== "cardio")
+      .sort((a, b) => norm(a.name).localeCompare(norm(b.name)));
+  }, [customExercises, hiddenExercises, isCardio]);
+
+  const favSet = useMemo(
+    () => new Set((favoriteExercises || []).map(n => norm(n))),
+    [favoriteExercises]
+  );
+
+  const matches = useMemo(() => {
+    let list = allItems;
+    if (q) {
+      const tokens = q.split(/\s+/).filter(Boolean);
+      list = list.filter(e => {
+        const haystack = norm([e.name, ...((e.aliases || []))].join(" "));
+        return tokens.every(t => haystack.includes(t));
+      });
+    }
+    // Favoris d'abord, puis ordre original
+    return list
+      .map((e, idx) => ({ ...e, _fav: favSet.has(norm(e.name)), _idx: idx }))
+      .sort((a, b) => (b._fav ? 1 : 0) - (a._fav ? 1 : 0) || a._idx - b._idx)
+      .slice(0, 60);
+  }, [allItems, favSet, q]);
+
+  // Une suggestion "ajouter" est dispo si la query ne matche aucun item exact
+  const exactMatch = useMemo(() => {
+    if (!q) return null;
+    return allItems.find(e => norm(e.name) === q) || null;
+  }, [allItems, q]);
+
+  useEffect(() => { setActiveIdx(0); }, [q]);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const pick = (item) => {
+    onPick?.(item);
+    setOpen(false);
+  };
+
+  const toggleFav = (name) => {
+    setFavoriteExercises?.(prev => {
+      const arr = prev || [];
+      const key = norm(name);
+      return arr.some(n => norm(n) === key)
+        ? arr.filter(n => norm(n) !== key)
+        : [...arr, name];
+    });
+  };
+
+  const hideItem = (name) => {
+    setHiddenExercises?.(prev => {
+      const arr = prev || [];
+      const key = norm(name);
+      return arr.some(n => norm(n) === key) ? arr : [...arr, name];
+    });
+  };
+
+  const deleteCustom = (name) => {
+    const key = norm(name);
+    setCustomExercises?.(prev => (prev || []).filter(c => norm(c.name) !== key));
+  };
+
+  const addCustom = (name, category) => {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return;
+    const key = norm(trimmed);
+    setCustomExercises?.(prev => {
+      const arr = prev || [];
+      if (arr.some(c => norm(c.name) === key)) return arr;
+      return [...arr, { name: trimmed, category: category || defaultCategory }];
+    });
+    pick({ name: trimmed, category: category || defaultCategory });
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActiveIdx(i => Math.min(matches.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(0, i - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (matches[activeIdx]) pick(matches[activeIdx]);
+      else if (q && !exactMatch) addCustom(value, defaultCategory);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  const showAddRow = !!q && !exactMatch;
+
+  return (
+    <div ref={wrapRef} style={{ flex: 1, position: "relative" }}>
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
+        placeholder="Rechercher un exercice…"
+        style={{ ...input(), padding: "6px 10px", fontWeight: 500, width: "100%" }}
+      />
+      {open && (matches.length > 0 || showAddRow) && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+            background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 100,
+            maxHeight: 280, overflowY: "auto", padding: 4, fontFamily: "var(--font-sans)",
+          }}
+        >
+          {matches.map((m, i) => {
+            const cat = CATEGORIES.find(c => c.id === m.category) || CATEGORIES[4];
+            const active = i === activeIdx;
+            const isFav = m._fav;
+            return (
+              <div
+                key={m.name}
+                role="option"
+                aria-selected={active}
+                onMouseEnter={() => setActiveIdx(i)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  width: "100%", padding: "4px 6px 4px 8px", borderRadius: 8,
+                  background: active ? T.accentBg : "transparent",
+                }}
+              >
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); pick({ name: m.name, category: m.category }); }}
+                  style={{
+                    flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8,
+                    padding: "4px 4px", border: "none", background: "transparent",
+                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                    color: T.text, fontSize: 12,
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.name}
+                    {m.custom && <span style={{ color: T.textMut, fontSize: 10, marginLeft: 6, fontWeight: 400 }}>(perso)</span>}
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600,
+                    color: cat.color, background: `${cat.color}18`,
+                    padding: "1px 7px", borderRadius: 999, flexShrink: 0,
+                  }}>{cat.label}</span>
+                </button>
+                <button
+                  type="button"
+                  title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+                  onMouseDown={(e) => { e.preventDefault(); toggleFav(m.name); }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    width: 22, height: 22, border: "none", background: "transparent",
+                    cursor: "pointer", borderRadius: 4, flexShrink: 0,
+                    color: isFav ? "#F59E0B" : T.textMut,
+                  }}
+                >
+                  <Star size={12} strokeWidth={1.75} fill={isFav ? "#F59E0B" : "none"} />
+                </button>
+                {m.custom ? (
+                  <button
+                    type="button"
+                    title="Supprimer cet exercice"
+                    onMouseDown={(e) => { e.preventDefault(); deleteCustom(m.name); }}
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 22, height: 22, border: "none", background: "transparent",
+                      cursor: "pointer", borderRadius: 4, flexShrink: 0, color: T.textMut,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = T.red; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; }}
+                  >
+                    <Trash2 size={12} strokeWidth={1.75} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    title="Masquer cet exercice"
+                    onMouseDown={(e) => { e.preventDefault(); hideItem(m.name); }}
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 22, height: 22, border: "none", background: "transparent",
+                      cursor: "pointer", borderRadius: 4, flexShrink: 0, color: T.textMut,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; }}
+                  >
+                    <EyeOff size={12} strokeWidth={1.75} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {showAddRow && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); addCustom(value, defaultCategory); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                width: "100%", padding: "6px 10px", marginTop: matches.length > 0 ? 4 : 0,
+                borderTop: matches.length > 0 ? `1px solid ${T.border}` : "none",
+                border: matches.length > 0 ? "none" : "none",
+                background: "transparent", cursor: "pointer", borderRadius: 8,
+                color: T.text, fontSize: 12, fontFamily: "inherit", textAlign: "left",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <Plus size={12} strokeWidth={2} />
+              Ajouter « {value} » comme nouvel exercice
+            </button>
+          )}
+          {(hiddenExercises || []).length > 0 && (
+            <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 4, padding: "6px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: T.textMut }}>
+              <span>{(hiddenExercises || []).length} masqué{(hiddenExercises || []).length > 1 ? "s" : ""}</span>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); setHiddenExercises?.([]); }}
+                style={{
+                  border: "none", background: "transparent", cursor: "pointer",
+                  color: T.textSub, fontSize: 11, fontWeight: 500, fontFamily: "inherit",
+                  padding: "2px 6px", borderRadius: 4,
+                }}
+              >
+                Tout réafficher
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SetInput({ value, onChange, placeholder, small }) {

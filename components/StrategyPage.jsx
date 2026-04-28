@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Pencil, Trash2, Plus, X, Target } from "lucide-react";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { parseCSV, calculateStats } from "@/lib/csvParsers";
 import { t, useLang } from "@/lib/i18n";
@@ -765,7 +766,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
       {/* ─── MODALE DE CRÉATION/ÉDITION ─── */}
       {showStrategyForm && ReactDOM.createPortal(
-        <div onClick={handleCancelEdit} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)"}}>
+        <div {...backdropDismiss(handleCancelEdit)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)"}}>
           <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:14,maxWidth:560,width:"92%",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.18)",border:`1px solid ${T.border}`,overflow:"hidden"}}>
 
             {/* Header */}

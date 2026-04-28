@@ -4,6 +4,7 @@ import React from "react";
 import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -321,7 +322,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
 /* ============== SCALING SIMULATOR ============== */
 function ScalingSimulator({ accounts = [] }) {
   const [sim, setSim] = useCloudState("tr4de_scaling_sim", "scaling_sim", { capitalSize: 100000, pctMonthly: 5, accountsTarget: 3, weeksPerEval: 7 });
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = useCloudState("tr4de_scaling_sim_open", "scaling_sim_open", true);
 
   // Comptes "financés" = ceux dont le type est funded dans la liste de comptes existante.
   const fundedAccounts = (accounts || []).filter(a => (a.account_type || "live") === "funded");
@@ -976,7 +977,7 @@ function AccountPlans({ accounts, trades }) {
 
       {/* Modal de création / édition */}
       {showForm && typeof document !== "undefined" && ReactDOM.createPortal(
-        <div onClick={close}
+        <div {...backdropDismiss(close)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
             style={{ width: "min(560px, 100%)", maxHeight: "min(85vh, 760px)", display: "flex", flexDirection: "column", background: "#FFFFFF", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>

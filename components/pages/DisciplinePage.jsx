@@ -21,6 +21,7 @@ import { useUndo } from "@/lib/contexts/UndoContext";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getLocalDateString } from "@/lib/dateUtils";
 import { getCurrencySymbol } from "@/lib/userPrefs";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import RiskCalculator from "@/components/RiskCalculator";
 
 function reorder(arr, from, to) {
@@ -61,7 +62,7 @@ function EditListModal({ open, title, accent, items, isCheckList, onClose, onSav
   return ReactDOM.createPortal(
     <>
       {/* Backdrop avec slide-in fade */}
-      <div onClick={onClose} style={{
+      <div {...backdropDismiss(onClose)} style={{
         position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:9998,
         animation:"tr4de-drawer-fade 180ms ease both",
       }}/>
@@ -1232,7 +1233,7 @@ export default function DisciplinePage({ trades = [] }) {
 
       {/* MODAL MODIFIER REGLES */}
       {showRulesModal && (
-        <div onClick={() => setShowRulesModal(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,fontFamily:"var(--font-sans)",padding:24}}>
+        <div {...backdropDismiss(() => setShowRulesModal(false))} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,fontFamily:"var(--font-sans)",padding:24}}>
           <div onClick={(e) => e.stopPropagation()} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:16,maxWidth:480,width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 64px rgba(0,0,0,0.18)"}}>
             {/* HEADER */}
             <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ArrowRight, ChevronUp, ChevronDown, CornerDownLeft } from "lucide-react";
 import { useApp } from "@/lib/contexts/AppContext";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 export interface Command {
   id: string;
@@ -124,7 +125,7 @@ export default function CommandPalette() {
       role="dialog"
       aria-modal="true"
       aria-label="Palette de commandes"
-      onClick={() => setOpen(false)}
+      {...backdropDismiss(() => setOpen(false))}
       style={{
         position: "fixed", inset: 0,
         background: "rgba(0,0,0,0.4)",

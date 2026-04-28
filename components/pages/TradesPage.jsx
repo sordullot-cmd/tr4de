@@ -25,6 +25,7 @@ import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { useTradeScreenshots } from "@/lib/hooks/useTradeScreenshots";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmotionTags";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades, embedded = false }) {
   const { user } = useAuth();
@@ -560,7 +561,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       {/* MODAL CONFIG COLONNES — apparaît centrée devant l'écran avec backdrop. */}
       {columnsMenuOpen && typeof document !== "undefined" && ReactDOM.createPortal(
         <div
-          onClick={() => setColumnsMenuOpen(false)}
+          {...backdropDismiss(() => setColumnsMenuOpen(false))}
           style={{
             position: "fixed", inset: 0, zIndex: 1000,
             background: "rgba(0,0,0,0.45)",
@@ -1595,7 +1596,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       {/* CONFIRM DELETE MODAL */}
       {confirmDeleteOpen && typeof document !== "undefined" && ReactDOM.createPortal(
         <div
-          onClick={() => !isDeletingTrades && setConfirmDeleteOpen(false)}
+          {...backdropDismiss(() => !isDeletingTrades && setConfirmDeleteOpen(false))}
           style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}
         >
           <div
@@ -1747,7 +1748,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
       {lightboxUrl && typeof document !== "undefined" && ReactDOM.createPortal(
         <div
-          onClick={() => setLightboxUrl(null)}
+          {...backdropDismiss(() => setLightboxUrl(null))}
           style={{position:"fixed",top:0,left:0,right:0,bottom:0,width:"100vw",height:"100vh",background:"rgba(0,0,0,0.2)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",cursor:"zoom-out"}}>
           <div onClick={(e)=>e.stopPropagation()} style={{position:"relative",display:"inline-block",lineHeight:0}}>
             <img src={lightboxUrl} alt="Trade screenshot"

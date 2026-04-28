@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { getLocalDateString } from "@/lib/dateUtils";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 const INITIAL_TRADES = [
   {
@@ -949,7 +950,7 @@ export default function Strategies({ trades: propTrades = [], tradeStrategies = 
 
       {/* Modal - Ajouter/Éditer une Stratégie */}
       {showForm && (
-        <div className="form-overlay" onClick={() => setShowForm(false)}>
+        <div className="form-overlay" {...backdropDismiss(() => setShowForm(false))}>
           <div className="form-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Nouvelle Stratégie</h2>
 
@@ -1095,10 +1096,10 @@ export default function Strategies({ trades: propTrades = [], tradeStrategies = 
 
       {/* Modal - Ajouter/Éditer un Trade */}
       {showTradeForm && (
-        <div className="form-overlay" onClick={() => {
+        <div className="form-overlay" {...backdropDismiss(() => {
           setShowTradeForm(false);
           setEditingTradeId(null);
-        }}>
+        })}>
           <div className="form-modal" onClick={(e) => e.stopPropagation()}>
             <h2>{editingTradeId ? "Modifier Trade" : "Nouveau Trade"}</h2>
 

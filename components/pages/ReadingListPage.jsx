@@ -6,6 +6,7 @@ import { Plus, BookOpen, Check, Trash2, Pencil, X, BookMarked, FileText, Library
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { Stat } from "@/components/ui/Stat";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -139,7 +140,7 @@ export default function ReadingListPage() {
       </div>
 
       {showForm && typeof document !== "undefined" && createPortal(
-        <div onClick={cancel}
+        <div {...backdropDismiss(cancel)}
           style={{ position: "fixed", inset: 0, background: "rgba(13,13,13,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()}
             style={{ width: "100%", maxWidth: 480, background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 40px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column", maxHeight: "85vh" }}>

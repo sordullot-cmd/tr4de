@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
 import {
@@ -312,7 +313,7 @@ export default function DailyPlannerPage() {
           {/* Formulaire ajout/edit */}
           {habitFormOpen && typeof document !== "undefined" && ReactDOM.createPortal(
             <div
-              onClick={closeHabitForm}
+              {...backdropDismiss(closeHabitForm)}
               style={{
                 position: "fixed", inset: 0,
                 background: "rgba(0,0,0,0.45)",
