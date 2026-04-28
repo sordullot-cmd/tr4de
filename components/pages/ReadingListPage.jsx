@@ -130,12 +130,12 @@ export default function ReadingListPage() {
         </button>
       )}
 
-      {/* Header stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-        <Stat icon={BookMarked} label="En cours"   value={counts.reading} subtext={counts.reading > 1 ? "livres" : "livre"} size="sm" />
-        <Stat icon={Check}      label="Terminés"   value={counts.done}    subtext={counts.done > 1 ? "livres" : "livre"} size="sm" positive={counts.done > 0} />
-        <Stat icon={FileText}   label="Pages lues" value={pagesRead}      subtext="cumulées" size="sm" />
-        <Stat icon={Library}    label="À lire"     value={counts.toRead}  subtext={counts.toRead > 1 ? "à découvrir" : "à découvrir"} size="sm" />
+      {/* Header stats — strip collé style page Objectifs */}
+      <div style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", fontFamily: "var(--font-sans)" }}>
+        <ReadingStatCell icon={BookMarked} label="En cours"   value={counts.reading} subLabel={counts.reading > 1 ? "livres en lecture" : "livre en lecture"} />
+        <ReadingStatCell icon={Check}      label="Terminés"   value={counts.done}    subLabel={counts.done > 1 ? "livres lus" : "livre lu"} />
+        <ReadingStatCell icon={FileText}   label="Pages lues" value={pagesRead}      subLabel="pages cumulées" />
+        <ReadingStatCell icon={Library}    label="À lire"     value={counts.toRead}  subLabel="à découvrir" isLast />
       </div>
 
       {showForm && typeof document !== "undefined" && createPortal(
@@ -378,6 +378,25 @@ function PrettySelect({ value, onChange, options }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// Cellule type "StatCell" de la page Objectifs : icône en bulle gris clair,
+// label, gros chiffre, sous-texte. Séparées par bordures verticales.
+function ReadingStatCell({ icon: Icon, label, subLabel, value, isLast }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, padding: 16, borderRight: isLast ? "none" : `1px solid ${T.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        {Icon && (
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: T.accentBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon size={14} strokeWidth={1.75} color={T.text} />
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 600, color: T.text, letterSpacing: -0.2, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subLabel}</div>
     </div>
   );
 }

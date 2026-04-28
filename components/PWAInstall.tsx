@@ -108,7 +108,7 @@ export default function PWAInstall() {
           alt="tao"
           width={36}
           height={36}
-          style={{ flexShrink: 0, borderRadius: 8 }}
+          style={{ flexShrink: 0, borderRadius: "50%", objectFit: "cover" }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#0D0D0D", marginBottom: 2 }}>

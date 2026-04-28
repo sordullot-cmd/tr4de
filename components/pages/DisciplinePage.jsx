@@ -516,9 +516,17 @@ export default function DisciplinePage({ trades = [] }) {
   // ✅ disciplineData (depuis Supabase) est la source de vérité.
   //    setRuleCompleted fait un optimistic update synchrone, donc cet effet
   //    reflète toujours soit Supabase, soit la dernière action utilisateur.
+  //    On re-dérive aussi `journal` à partir des notes du jour pour éviter
+  //    qu'il "blinke" (décoché/recoché) à chaque mise à jour Supabase.
   React.useEffect(() => {
     const fromSupabase = (disciplineData && disciplineData[today]) || {};
-    setCheckedRuleIds(fromSupabase);
+    let hasNote = false;
+    try {
+      const dailyNotesData = JSON.parse(localStorage.getItem("tr4de_daily_notes") || "{}");
+      const note = dailyNotesData[today];
+      hasNote = !!(note && String(note).trim().length > 0);
+    } catch {}
+    setCheckedRuleIds(hasNote ? { ...fromSupabase, journal: true } : fromSupabase);
   }, [today, disciplineData]);
 
   // Auto-update journal rule when daily notes change

@@ -24,6 +24,7 @@ import StrategyDetailPage from "@/components/StrategyDetailPage";
 import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
 import FocusTimerPage from "@/components/pages/FocusTimerPage";
+import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
 import CalendarPage from "@/components/pages/CalendarPage";
@@ -81,6 +82,7 @@ import {
   BookOpen as LucideBookOpen,
   Menu as LucideMenu,
   Wallet as LucideWallet,
+  Dumbbell as LucideDumbbell,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -631,6 +633,7 @@ export default function App() {
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
+        { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
       ],
     },
   ];
@@ -662,6 +665,7 @@ export default function App() {
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     focus: <FocusTimerPage />,
+    sport: <SportPage />,
     reading: <ReadingListPage />,
     notes: <NotesPage />,
     agent: (() => {

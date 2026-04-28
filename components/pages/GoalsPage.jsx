@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import {
-  Plus, Target, Trash2, Pencil, Copy, Check, X, TrendingUp, Heart,
+  Plus, Target, Trash2, Pencil, Copy, Pin, Check, X, TrendingUp, Heart,
   ChevronDown, ChevronRight, Calendar, AlertCircle, Flag, Sparkles,
   Dumbbell, BookOpen, Users, GraduationCap, Wallet, Briefcase, Activity, Code,
   Clock, Trophy,
@@ -312,6 +312,23 @@ export default function GoalsPage() {
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, showForm, editingId]);
+  // Bascule l'état "épinglé" d'un objectif. Un goal épinglé persiste son
+  // état ouvert/fermé entre les rechargements (le clic sur la ligne reste
+  // libre de toggle l'expansion comme d'habitude).
+  const togglePin = (id) => {
+    setGoals(prev => updateGoalById(prev, id, g => ({
+      ...g,
+      pinned: !g.pinned,
+      // Quand on épingle, on initialise pinnedOpen à true par défaut
+      // (utile : on pin généralement parce qu'on veut garder ouvert).
+      pinnedOpen: g.pinned ? g.pinnedOpen : true,
+    })));
+  };
+  // Met à jour l'état ouvert persisté d'un goal épinglé.
+  const setGoalPinnedOpen = (id, open) => {
+    setGoals(prev => updateGoalById(prev, id, g => ({ ...g, pinnedOpen: open })));
+  };
+
   const remove = (id) => {
     const snap = goals;
     const after = removeGoalById(goals, id);
@@ -554,7 +571,8 @@ export default function GoalsPage() {
                 {onGoing.length > 0 && (
                   <TimelineSection title="En cours" rows={onGoing}
                     compute={compute} unitOf={unitOf} fmtVal={fmtVal}
-                    onEdit={openEdit} onDelete={remove} onDuplicate={duplicate}
+                    onEdit={openEdit} onDelete={remove} onDuplicate={duplicate} onTogglePin={togglePin}
+                    onSetPinnedOpen={setGoalPinnedOpen}
                     onAdjustManual={adjustManual}
                     onSubtasksChange={setSubtasksFor}
                     drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
@@ -584,7 +602,7 @@ export default function GoalsPage() {
                     {showDone && (
                       <TimelineSection title="Terminés" rows={done}
                         compute={compute} unitOf={unitOf} fmtVal={fmtVal}
-                        onEdit={openEdit} onDelete={remove} onDuplicate={duplicate}
+                        onEdit={openEdit} onDelete={remove} onDuplicate={duplicate} onTogglePin={togglePin}
                         onAdjustManual={adjustManual}
                         onSubtasksChange={setSubtasksFor}
                         drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
@@ -938,7 +956,7 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, drawerOpen }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, drawerOpen }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
@@ -948,6 +966,8 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
           onEdit={onEdit}
           onDelete={onDelete}
           onDuplicate={onDuplicate}
+          onTogglePin={onTogglePin}
+          onSetPinnedOpen={onSetPinnedOpen}
           onAdjustManual={onAdjustManual}
           onSubtasksChange={onSubtasksChange}
           doneSection={doneSection}
@@ -959,7 +979,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -983,7 +1003,15 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
     : "—";
 
   const [hover, setHover] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [openLocal, setOpenLocal] = useState(false);
+  // Quand le goal est épinglé, l'état ouvert/fermé est lu et persisté sur
+  // l'objet goal (`pinnedOpen`). Sinon on garde un state local éphémère.
+  const open = g.pinned ? !!g.pinnedOpen : openLocal;
+  const setOpen = (val) => {
+    const next = typeof val === "function" ? val(open) : val;
+    if (g.pinned) onSetPinnedOpen?.(g.id, next);
+    else setOpenLocal(next);
+  };
   const [armed, setArmed] = useState(false);
   const prevSubCount = useRef((g.subtasks || []).length);
   useEffect(() => {
@@ -1074,10 +1102,9 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
         onMouseLeave={() => setHover(false)}
         onClick={(e) => {
           if (armed || drag?.sourceId) { e.preventDefault(); return; }
-          // Comportement de base : déplier/replier les sous-objectifs.
+          // Toggle l'expansion (persisté si épinglé, transient sinon).
           setOpen(v => !v);
-          // En plus, si le drawer d'édition est ouvert, on bascule l'objectif
-          // édité vers celui qu'on vient de cliquer.
+          // Si le drawer d'édition est ouvert, on bascule l'objectif édité.
           if (drawerOpen) onEdit(g);
         }}
         style={{
@@ -1192,7 +1219,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
               opacity: subtasks.length > 0 || hover ? 1 : 0,
             }}
           />
-          <div style={{ display: "flex", gap: 2, opacity: hover ? 1 : 0, transition: "opacity .12s ease" }}>
+          <div style={{ display: "flex", gap: 2, opacity: (hover || g.pinned) ? 1 : 0, transition: "opacity .12s ease" }}>
           <button onClick={(e) => { e.stopPropagation(); onEdit(g); }}
             aria-label="Modifier"
             style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease, color .12s ease" }}
@@ -1208,6 +1235,23 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
               onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
               <Copy size={11} strokeWidth={1.75} />
+            </button>
+          )}
+          {onTogglePin && (
+            <button onClick={(e) => { e.stopPropagation(); onTogglePin(g.id); }}
+              aria-label={g.pinned ? "Désépingler" : "Épingler"}
+              title={g.pinned ? "Désépingler" : "Épingler"}
+              style={{
+                width: 24, height: 24, borderRadius: 6, border: "none",
+                background: g.pinned ? T.accentBg : "transparent",
+                color: g.pinned ? T.text : T.textMut,
+                cursor: "pointer",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                transition: "background .15s ease, color .12s ease",
+              }}
+              onMouseEnter={(e) => { if (!g.pinned) { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; } }}
+              onMouseLeave={(e) => { if (!g.pinned) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; } }}>
+              <Pin size={11} strokeWidth={1.75} style={{ transform: g.pinned ? "rotate(-30deg)" : "none", transition: "transform .15s ease" }} />
             </button>
           )}
           <button onClick={(e) => { e.stopPropagation(); onDelete(g.id); }}
@@ -1249,6 +1293,8 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onDuplicate={onDuplicate}
+                      onTogglePin={onTogglePin}
+                      onSetPinnedOpen={onSetPinnedOpen}
                       onAdjustManual={onAdjustManual}
                       onSubtasksChange={onSubtasksChange}
                       drag={drag} setDrag={setDrag} onDrop={onDrop}
