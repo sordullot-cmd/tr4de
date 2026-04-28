@@ -145,60 +145,22 @@ const extractTime = (dateString: string | null | undefined): string => {
  * Extract date from timestamp string and convert to ISO format (YYYY-MM-DD)
  * Handles formats like: "04/14/2026 14:30:00", "2026-04-14 14:30:00", etc.
  */
-// Détermine si une date donnée est en heure d'été US (CDT) ou d'hiver (CST).
-// Règle US : 2e dimanche de mars → 1er dimanche de novembre.
-const isUSDST = (year: number, month: number /* 1-12 */, day: number): boolean => {
-  const dstStart = new Date(year, 2, 1); // 1er mars
-  while (dstStart.getDay() !== 0) dstStart.setDate(dstStart.getDate() + 1);
-  dstStart.setDate(dstStart.getDate() + 7); // 2e dimanche
-  const dstEnd = new Date(year, 10, 1); // 1er novembre
-  while (dstEnd.getDay() !== 0) dstEnd.setDate(dstEnd.getDate() + 1);
-  const d = new Date(year, month - 1, day);
-  return d >= dstStart && d < dstEnd;
-};
-
-// Extrait "HH:MM:SS" depuis "MM/DD/YYYY HH:MM:SS" (Tradovate Fill Time, en CST/CDT
-// Chicago) et le convertit dans le fuseau horaire de l'utilisateur (lu depuis
-// localStorage), avec gestion automatique de l'heure d'été US.
+// Extrait "HH:MM:SS" tel quel depuis le Fill Time du CSV ("MM/DD/YYYY HH:MM:SS"
+// ou simplement "HH:MM[:SS]"). On ne convertit PAS le fuseau : l'heure inscrite
+// dans le fichier est déjà l'heure locale du compte broker — c'est elle qu'on
+// affiche.
 const extractTimeHHMMSS = (fillTimeStr: string | null | undefined): string => {
   if (!fillTimeStr) return '';
   const m = String(fillTimeStr).match(
-    /(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
+    /(\d{1,2})\/(\d{1,2})\/\d{2,4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/
   );
-  if (!m) {
-    // Pas de date dans la string → fallback sur l'heure brute
-    const t = String(fillTimeStr).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-    if (!t) return '';
-    return `${String(t[1]).padStart(2,'0')}:${t[2]}:${(t[3]||'00').padStart(2,'0')}`;
+  if (m) {
+    const [, , , HH, MIN, SS] = m;
+    return `${String(HH).padStart(2,'0')}:${MIN}:${(SS||'00').padStart(2,'0')}`;
   }
-  const [, MM, DD, YY, HH, MIN, SS] = m;
-  const year = YY.length === 2 ? '20' + YY : YY;
-  const monthNum = parseInt(MM, 10);
-  const dayNum = parseInt(DD, 10);
-  const yearNum = parseInt(year, 10);
-  const dst = isUSDST(yearNum, monthNum, dayNum);
-  const offset = dst ? '-05:00' : '-06:00'; // CDT / CST
-  const iso = `${year}-${String(monthNum).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}T` +
-              `${String(HH).padStart(2,'0')}:${MIN}:${(SS||'00').padStart(2,'0')}${offset}`;
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return '';
-  // Lecture du fuseau utilisateur (localStorage) côté navigateur
-  let userTz = 'America/Chicago';
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      userTz = window.localStorage.getItem('tr4de_timezone') ||
-        Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago';
-    }
-  } catch {}
-  try {
-    return new Intl.DateTimeFormat('fr-FR', {
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
-      timeZone: userTz,
-    }).format(date);
-  } catch {
-    return `${HH.padStart(2,'0')}:${MIN}:${(SS||'00').padStart(2,'0')}`;
-  }
+  const t = String(fillTimeStr).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!t) return '';
+  return `${String(t[1]).padStart(2,'0')}:${t[2]}:${(t[3]||'00').padStart(2,'0')}`;
 };
 
 // Backward-compat

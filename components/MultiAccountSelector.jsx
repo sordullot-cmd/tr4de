@@ -17,13 +17,17 @@ export default function MultiAccountSelector({
 
   useEffect(() => {
     function handleClickOutside(event) {
+      // Si la modale de confirmation est ouverte, on ne ferme pas le dropdown
+      // (sinon la modale est unmount avant que l'utilisateur ne clique sur
+      // Annuler / Supprimer). La modale gère sa propre fermeture.
+      if (confirmDelete) return;
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [confirmDelete]);
 
   const handleToggleAccount = (accountId) => {
     let updatedIds;
@@ -217,46 +221,6 @@ export default function MultiAccountSelector({
             </div>
           )}
 
-          {/* Modale de confirmation suppression compte */}
-          {confirmDelete && typeof document !== "undefined" && ReactDOM.createPortal(
-            <div onClick={()=>!deleting && setConfirmDelete(null)}
-              style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}>
-              <div onClick={(e)=>e.stopPropagation()}
-                style={{background:"#FFFFFF",borderRadius:14,maxWidth:420,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.22)",border:"1px solid #E5E5E5",overflow:"hidden"}}>
-                <div style={{padding:"20px 24px 8px",display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:36,height:36,borderRadius:10,background:"#FEF2F2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <Trash2 size={16} strokeWidth={1.75} color="#EF4444"/>
-                  </div>
-                  <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
-                    Supprimer le compte « {confirmDelete.name} » ?
-                  </h3>
-                </div>
-                <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
-                  Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Tous les trades associés à ce compte seront aussi supprimés et ne pourront pas être récupérés.
-                </div>
-                <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
-                  <button onClick={()=>setConfirmDelete(null)} disabled={deleting}
-                    style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.5 : 1}}>
-                    Annuler
-                  </button>
-                  <button
-                    onClick={async ()=>{
-                      if (!onDeleteAccount) return;
-                      setDeleting(true);
-                      try { await onDeleteAccount(confirmDelete.id); }
-                      catch (e) { console.error("delete account failed:", e); }
-                      finally { setDeleting(false); setConfirmDelete(null); setIsOpen(false); }
-                    }}
-                    disabled={deleting}
-                    style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.7 : 1}}>
-                    {deleting ? "Suppression..." : "Supprimer"}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
-
           {/* Footer : Creation de compte */}
           {onCreateAccount && (
             <>
@@ -288,6 +252,48 @@ export default function MultiAccountSelector({
             </>
           )}
         </div>
+      )}
+
+      {/* Modale de confirmation suppression — rendue au root du composant
+          (et non dans le dropdown) pour ne pas être unmount quand le
+          dropdown se ferme. */}
+      {confirmDelete && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div onClick={()=>!deleting && setConfirmDelete(null)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--font-sans)",padding:"24px"}}>
+          <div onClick={(e)=>e.stopPropagation()}
+            style={{background:"#FFFFFF",borderRadius:14,maxWidth:420,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.22)",border:"1px solid #E5E5E5",overflow:"hidden"}}>
+            <div style={{padding:"20px 24px 8px",display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:10,background:"#FEF2F2",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Trash2 size={16} strokeWidth={1.75} color="#EF4444"/>
+              </div>
+              <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
+                Supprimer le compte « {confirmDelete.name} » ?
+              </h3>
+            </div>
+            <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
+              Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Tous les trades associés à ce compte seront aussi supprimés et ne pourront pas être récupérés.
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
+              <button onClick={()=>setConfirmDelete(null)} disabled={deleting}
+                style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.5 : 1}}>
+                Annuler
+              </button>
+              <button
+                onClick={async ()=>{
+                  if (!onDeleteAccount) return;
+                  setDeleting(true);
+                  try { await onDeleteAccount(confirmDelete.id); }
+                  catch (e) { console.error("delete account failed:", e); }
+                  finally { setDeleting(false); setConfirmDelete(null); setIsOpen(false); }
+                }}
+                disabled={deleting}
+                style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.7 : 1}}>
+                {deleting ? "Suppression..." : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

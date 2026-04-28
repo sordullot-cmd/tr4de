@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
-import { getCurrencySymbol } from "@/lib/userPrefs";
+import { getCurrencySymbol, rMultiple, fmtR } from "@/lib/userPrefs";
+import TradesPage from "@/components/pages/TradesPage";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -1026,6 +1027,13 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             style={{padding:"10px 20px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}
           >Aller aux trades</button>
         </div>
+      )}
+
+      {/* TABLEAU DES TRADES DE LA STRATÉGIE — réutilise la TradesPage
+          complète avec les mêmes fonctionnalités (config colonnes, drag,
+          panneau latéral détail, sélection multiple, etc.). */}
+      {filteredTrades.length > 0 && (
+        <TradesPage trades={filteredTrades} strategies={strategies} />
       )}
     </div>
   );
