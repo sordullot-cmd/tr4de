@@ -8,7 +8,7 @@ import {
   Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight,
   TrendingUp, Trophy, Flame, Calendar, Clock,
   Dumbbell, Activity, Bike, Footprints, Heart,
-  Star, EyeOff,
+  Star, EyeOff, Save, BookOpen,
 } from "lucide-react";
 
 const T = {
@@ -193,6 +193,7 @@ export default function SportPage() {
   const [customExercises, setCustomExercises] = useCloudState("tr4de_sport_custom_exercises", "sport_custom_exercises", []);
   const [hiddenExercises, setHiddenExercises] = useCloudState("tr4de_sport_hidden_exercises", "sport_hidden_exercises", []);
   const [favoriteExercises, setFavoriteExercises] = useCloudState("tr4de_sport_favorite_exercises", "sport_favorite_exercises", []);
+  const [customPresets, setCustomPresets] = useCloudState("tr4de_sport_custom_presets", "sport_custom_presets", []);
 
   const [filterDiscipline, setFilterDiscipline] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -441,14 +442,16 @@ export default function SportPage() {
               Aucune séance pour le moment. Crée ta première séance pour commencer à suivre ta progression.
             </div>
           ) : (
-            filteredSessions.map(s => (
-              <SessionCard
-                key={s.id}
-                session={s}
-                onEdit={() => openEdit(s)}
-                onDelete={() => remove(s.id)}
-              />
-            ))
+            <div className="anim-stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {filteredSessions.map(s => (
+                <SessionCard
+                  key={s.id}
+                  session={s}
+                  onEdit={() => openEdit(s)}
+                  onDelete={() => remove(s.id)}
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -493,6 +496,7 @@ export default function SportPage() {
           customExercises={customExercises} setCustomExercises={setCustomExercises}
           hiddenExercises={hiddenExercises} setHiddenExercises={setHiddenExercises}
           favoriteExercises={favoriteExercises} setFavoriteExercises={setFavoriteExercises}
+          customPresets={customPresets} setCustomPresets={setCustomPresets}
         />,
         document.body
       )}
@@ -578,7 +582,7 @@ function SessionCard({ session: s, onEdit, onDelete }) {
   })();
 
   return (
-    <div style={{
+    <div data-card style={{
       background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
       overflow: "hidden",
     }}>
@@ -776,7 +780,53 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
 }
 
 /* ─── Modal du formulaire de séance ─────────────────────────────── */
-function SessionForm({ form, setForm, editingId, onClose, onSave, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises }) {
+function SessionForm({ form, setForm, editingId, onClose, onSave, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises, customPresets = [], setCustomPresets }) {
+  const [showPresets, setShowPresets] = useState(false);
+  const [presetNamePrompt, setPresetNamePrompt] = useState(null); // null | string
+
+  const allPresets = useMemo(
+    () => (customPresets || []).map(p => ({ ...p, custom: true })),
+    [customPresets]
+  );
+
+  const applyPreset = (preset) => {
+    const baseId = Date.now();
+    setForm(prev => ({
+      ...prev,
+      discipline: preset.discipline || prev.discipline,
+      exercises: (preset.exercises || []).map((ex, i) => ({
+        id: baseId + i * 1000,
+        name: ex.name,
+        category: ex.category || "full_body",
+        sets: (ex.sets && ex.sets.length > 0)
+          ? ex.sets.map((s, j) => ({ id: baseId + i * 1000 + j + 1, reps: s.reps ?? "", weight: s.weight ?? "", distance: s.distance ?? "", time: s.time ?? "" }))
+          : [{ id: baseId + i * 1000 + 1, reps: "", weight: "" }],
+      })),
+    }));
+    setShowPresets(false);
+  };
+
+  const openSaveAsPreset = () => setPresetNamePrompt("");
+  const confirmSaveAsPreset = () => {
+    const name = (presetNamePrompt || "").trim();
+    if (!name) return;
+    const preset = {
+      id: `custom-${Date.now()}`,
+      name,
+      discipline: form.discipline,
+      exercises: (form.exercises || [])
+        .filter(e => (e.name || "").trim())
+        .map(e => ({ name: e.name.trim(), category: e.category || "full_body" })),
+    };
+    if (preset.exercises.length === 0) { setPresetNamePrompt(null); return; }
+    setCustomPresets?.(prev => [...(prev || []), preset]);
+    setPresetNamePrompt(null);
+  };
+
+  const deleteCustomPreset = (id) => {
+    setCustomPresets?.(prev => (prev || []).filter(p => p.id !== id));
+  };
+
   const addExercise = () => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
     setForm(prev => ({
@@ -855,6 +905,83 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
 
         {/* Body */}
         <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+          {/* Modèles de séance */}
+          {!editingId && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <Label>Modèle de séance</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowPresets(v => !v)}
+                  style={{
+                    marginLeft: "auto", marginBottom: 6,
+                    padding: "4px 10px", borderRadius: 999,
+                    border: `1px solid ${T.border}`, background: T.white,
+                    color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer",
+                    fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 4,
+                  }}>
+                  <BookOpen size={11} strokeWidth={1.75} />
+                  {showPresets ? "Masquer" : "Choisir un modèle"}
+                </button>
+              </div>
+              {showPresets && (
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gap: 6, padding: 10,
+                  background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10,
+                  maxHeight: 220, overflowY: "auto",
+                }}>
+                  {allPresets.length === 0 && (
+                    <div style={{ gridColumn: "1 / -1", textAlign: "center", color: T.textMut, fontSize: 12, padding: "8px 0" }}>
+                      Aucun modèle.
+                    </div>
+                  )}
+                  {allPresets.map(p => {
+                    const disc = DISCIPLINES.find(d => d.id === p.discipline) || DISCIPLINES[0];
+                    return (
+                      <div key={p.id} style={{
+                        position: "relative",
+                        background: T.white, border: `1px solid ${T.border}`, borderRadius: 8,
+                        padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4,
+                      }}>
+                        <button type="button" onClick={() => applyPreset(p)}
+                          style={{
+                            border: "none", background: "transparent", padding: 0, textAlign: "left",
+                            cursor: "pointer", fontFamily: "inherit", color: T.text,
+                            display: "flex", flexDirection: "column", gap: 4,
+                          }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: disc.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {p.name}
+                            </span>
+                            {p.custom && <span style={{ fontSize: 9, color: T.textMut, fontWeight: 500 }}>(perso)</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: T.textMut }}>
+                            {(p.exercises || []).length} exercice{(p.exercises || []).length > 1 ? "s" : ""}
+                          </div>
+                        </button>
+                        {p.custom && (
+                          <button type="button" onClick={() => deleteCustomPreset(p.id)} aria-label="Supprimer le modèle"
+                            style={{
+                              position: "absolute", top: 4, right: 4,
+                              width: 20, height: 20, borderRadius: 4, border: "none",
+                              background: "transparent", color: T.textMut, cursor: "pointer",
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                            <Trash2 size={10} strokeWidth={1.75} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Discipline */}
           <div>
             <Label>Discipline</Label>
@@ -989,11 +1116,60 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
           </label>
         </div>
 
+        {/* Inline prompt pour nommer un nouveau modèle */}
+        {presetNamePrompt !== null && (
+          <div style={{ padding: "10px 18px", borderTop: `1px solid ${T.border}`, background: T.bg, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut, whiteSpace: "nowrap" }}>Nom du modèle</span>
+            <input
+              autoFocus
+              type="text"
+              value={presetNamePrompt}
+              onChange={(e) => setPresetNamePrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); confirmSaveAsPreset(); }
+                else if (e.key === "Escape") { e.preventDefault(); setPresetNamePrompt(null); }
+              }}
+              placeholder="Ex : Push lourd"
+              style={{ ...input(), padding: "6px 10px", fontSize: 12 }}
+            />
+            <button type="button" onClick={() => setPresetNamePrompt(null)}
+              style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "transparent", color: T.textSub, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              Annuler
+            </button>
+            <button type="button" onClick={confirmSaveAsPreset}
+              disabled={!(presetNamePrompt || "").trim()}
+              style={{
+                padding: "6px 12px", borderRadius: 8, border: "none",
+                background: (presetNamePrompt || "").trim() ? T.text : "#F0F0F0",
+                color: (presetNamePrompt || "").trim() ? T.white : T.textMut,
+                fontSize: 12, fontWeight: 600,
+                cursor: (presetNamePrompt || "").trim() ? "pointer" : "not-allowed",
+                fontFamily: "inherit",
+              }}>
+              Enregistrer
+            </button>
+          </div>
+        )}
+
         {/* Footer */}
-        <div style={{ padding: "12px 18px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+        <div style={{ padding: "12px 18px", borderTop: `1px solid ${T.border}`, display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+          <button type="button" onClick={openSaveAsPreset}
+            disabled={!(form.exercises || []).some(e => (e.name || "").trim())}
+            title="Enregistrer la composition de cette séance comme modèle réutilisable"
+            style={{
+              marginRight: "auto",
+              padding: "7px 12px", borderRadius: 999,
+              border: `1px solid ${T.border}`, background: T.white,
+              color: T.textSub, fontSize: 11, fontWeight: 500,
+              cursor: (form.exercises || []).some(e => (e.name || "").trim()) ? "pointer" : "not-allowed",
+              opacity: (form.exercises || []).some(e => (e.name || "").trim()) ? 1 : 0.5,
+              fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5,
+            }}>
+            <Save size={11} strokeWidth={1.75} /> Sauver comme modèle
+          </button>
           {editingId ? (
             <>
-              <span style={{ marginRight: "auto", fontSize: 11, color: T.textMut, fontFamily: "inherit" }}>
+              <span style={{ fontSize: 11, color: T.textMut, fontFamily: "inherit" }}>
                 Modifications enregistrées automatiquement
               </span>
               <button onClick={onClose}
@@ -1325,7 +1501,7 @@ function SetInput({ value, onChange, placeholder, small }) {
   return (
     <input
       type="number" inputMode="decimal" step="any"
-      value={value}
+      value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{

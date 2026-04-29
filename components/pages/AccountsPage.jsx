@@ -185,7 +185,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           </p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <div className="anim-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
           {[...visibleAccounts].sort((a, b) => {
             const sa = stats.get(a.id) || { trades: 0, pnl: 0 };
             const sb = stats.get(b.id) || { trades: 0, pnl: 0 };
@@ -211,6 +211,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
             return (
               <div
                 key={acc.id}
+                data-card
                 onClick={() => onOpenDetail(acc.id)}
                 style={{
                   border: `1px solid ${T.border}`,

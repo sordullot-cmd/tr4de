@@ -347,21 +347,75 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
 }
 
 /* === Animations utilitaires === */
+
+/* Custom easing curves : plus punch que les courbes CSS standard.
+   ease-out pour entrées/feedback, ease-in-out pour mouvements,
+   drawer pour les éléments coulissants (iOS-like). */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.anim-fade-up { animation: fadeUp 220ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+.anim-fade-up { animation: fadeUp 280ms var(--ease-out) both; }
 
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.anim-fade-in { animation: fadeIn 180ms ease both; }
+.anim-fade-in { animation: fadeIn 200ms var(--ease-out) both; }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* === Press feedback : tous les boutons réagissent au clic ===
+   Donne un sentiment de tactilité — l'UI écoute. Désactivé via
+   `data-no-press` (ex. boutons icône inline qu'on ne veut pas faire bouger). */
+button:not([data-no-press]):not(:disabled) {
+  transition: transform 160ms var(--ease-out);
+}
+button:not([data-no-press]):not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* === Hover lift sur les cartes ===
+   Une carte (data-card) se soulève légèrement au survol — uniquement
+   sur les pointeurs précis (pas le tactile, qui déclenche hover au tap). */
+[data-card] {
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-card]:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* === Stagger : enfants apparaissent en cascade (50ms entre chaque) === */
+.anim-stagger > * { opacity: 0; animation: fadeUp 320ms var(--ease-out) both; }
+.anim-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.anim-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+.anim-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+.anim-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+.anim-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+.anim-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+.anim-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+.anim-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+.anim-stagger > *:nth-child(n+9) { animation-delay: 320ms; }
+
+/* Reduced motion : on garde la fade (compréhension) mais on retire les
+   mouvements et scales — évite les motion sickness. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .anim-stagger > * {
+    animation: fadeIn 180ms ease both !important;
+  }
+  button:not([data-no-press]):not(:disabled):active { transform: none !important; }
+  [data-card]:hover { transform: none !important; }
 }
 
 /* === Sidebar nav : scrollbar masquée === */

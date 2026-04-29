@@ -381,7 +381,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
       {/* STRATEGIES LIST - VERTICAL */}
       {strategies && Array.isArray(strategies) && strategies.length > 0 && (
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div className="anim-stagger" style={{display:"flex",flexDirection:"column",gap:12}}>
           {trades.length === 0 && (
             <div style={{padding:"20px",background:"#fff3cd",borderRadius:8,borderLeft:"4px solid #ffc107"}}>
               <strong>⚠️ Aucun trade chargé</strong><br/>
@@ -596,6 +596,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             return (
               <div
                 key={strategy.id}
+                data-card
                 style={{
                   position:"relative",
                   display:"grid",
@@ -605,7 +606,6 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   background:T.white,
                   border:`1px solid ${T.border}`,
                   borderRadius: 12,
-                  transition:"border-color .15s ease, box-shadow .15s ease",
                   cursor:"pointer",
                   minHeight:200,
                   alignItems:"stretch"

@@ -51,7 +51,7 @@ export default function ReadingListPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [filter, setFilter] = useState("all"); // all | toRead | reading | done
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useCloudState("tr4de_reading_show_intro", "reading_show_intro", true);
 
 
   const save = () => {
@@ -252,7 +252,7 @@ export default function ReadingListPage() {
           <div style={{ fontSize: 12, color: T.textSub }}>Ajoute ton premier livre pour construire ta bibliothèque</div>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
+        <div className="anim-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
           {shown.map(b => {
             const total = b.totalPages || 0;
             const current = b.currentPage || 0;
@@ -262,7 +262,7 @@ export default function ReadingListPage() {
             const pri = PRIORITIES.find(p => p.id === (b.priority || "normal"));
             const isOpen = expandedId === b.id;
             return (
-              <div key={b.id} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div key={b.id} data-card style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
