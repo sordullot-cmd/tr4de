@@ -50,6 +50,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [filterEndDate, setFilterEndDate] = useState(() => getInitWeekRange().end);
   // Selection multiple via checkbox
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  // Index de la dernière case cochée pour permettre Shift+Clic = sélectionner la plage
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeletingTrades, setIsDeletingTrades] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
@@ -870,7 +872,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                         background: isOpen ? openBg : (isChecked ? selectedBg : (isHovered ? hoverBg : T.white)),
                         boxShadow: isOpen ? `inset 3px 0 0 0 ${T.text}` : "none",
                         cursor:"pointer",
-                        transition:"background .12s ease, box-shadow .12s ease",
+                        transition:"box-shadow .12s ease",
                       }}
                       onClick={()=>{
                         const isSelectedDetail = selectedTrade && tradeKey(selectedTrade) === tKey;
@@ -890,18 +892,41 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={(e) => {
+                              onChange={() => {}}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const shouldCheck = !isChecked;
                                 const next = new Set(selectedIds);
-                                if (isGroupParent && groupChildKeys) {
-                                  // Cocher / décocher TOUS les trades du lot
-                                  if (e.target.checked) groupChildKeys.forEach(k => next.add(k));
+                                // Shift+clic : applique la même action (coche / décoche)
+                                // sur toutes les lignes entre la dernière sélection et celle-ci.
+                                if (e.shiftKey && lastSelectedIndex != null && lastSelectedIndex !== i) {
+                                  const lo = Math.min(lastSelectedIndex, i);
+                                  const hi = Math.max(lastSelectedIndex, i);
+                                  for (let k = lo; k <= hi; k++) {
+                                    const r = rows[k];
+                                    if (!r || r.isChild) continue;
+                                    const rt = r.trade;
+                                    const rChildKeys = r.isGroupParent && Array.isArray(rt._children)
+                                      ? rt._children.map(c => tradeKey(c))
+                                      : null;
+                                    if (rChildKeys) {
+                                      if (shouldCheck) rChildKeys.forEach(kk => next.add(kk));
+                                      else rChildKeys.forEach(kk => next.delete(kk));
+                                    } else {
+                                      const rKey = tradeKey(rt);
+                                      if (shouldCheck) next.add(rKey); else next.delete(rKey);
+                                    }
+                                  }
+                                } else if (isGroupParent && groupChildKeys) {
+                                  if (shouldCheck) groupChildKeys.forEach(k => next.add(k));
                                   else groupChildKeys.forEach(k => next.delete(k));
                                 } else {
-                                  if (e.target.checked) next.add(tKey); else next.delete(tKey);
+                                  if (shouldCheck) next.add(tKey); else next.delete(tKey);
                                 }
                                 setSelectedIds(next);
+                                setLastSelectedIndex(i);
                               }}
-                              onClick={(e) => e.stopPropagation()}
                               style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
                             />
                           )}

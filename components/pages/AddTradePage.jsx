@@ -824,6 +824,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 { id: "live",   label: t("addTrade.live") },
                 { id: "eval",   label: t("addTrade.eval") },
                 { id: "funded", label: t("addTrade.funded") },
+                { id: "demo",   label: "Démo" },
               ].map((opt) => {
                 const active = accountType === opt.id;
                 return (
@@ -873,7 +874,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 />
               </div>
             )}
-            {accountType === "live" && (
+            {(accountType === "live" || accountType === "demo") && (
               <div style={{ marginTop: "12px" }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
                   Balance initiale

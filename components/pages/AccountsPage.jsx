@@ -5,6 +5,7 @@ import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import { createClient } from "@/lib/supabase/client";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -47,6 +48,29 @@ const getBrokerLogo = (broker) => {
   return BROKER_LOGOS[String(broker).trim().toLowerCase()] || null;
 };
 
+/* ─── Métadonnées funded (localStorage uniquement, pas de migration DB) ──
+   Stocke par account.id : date de passage funded + paramètres (target, DD, payout).
+   Permet de "remettre le PnL à 0" en n'agrégeant que les trades datés après
+   funded_at, et d'afficher DD restant + payout dispo sur la carte. */
+const FUNDED_META_KEY = "tr4de_accounts_funded_meta";
+const readFundedMeta = () => {
+  try { return JSON.parse(localStorage.getItem(FUNDED_META_KEY) || "{}"); } catch { return {}; }
+};
+const writeFundedMeta = (m) => {
+  try { localStorage.setItem(FUNDED_META_KEY, JSON.stringify(m)); } catch {}
+};
+
+// Cible/DD inférés depuis la taille du compte. Fallback : 6% target / 5% DD.
+const inferEvalParams = (capital) => {
+  const c = Number(capital) || 0;
+  if (!c) return { profitTarget: 0, maxDD: 0, payoutMin: 0 };
+  return {
+    profitTarget: Math.round(c * 0.06),
+    maxDD: Math.round(c * 0.05),
+    payoutMin: 0,
+  };
+};
+
 const parseEvalSize = (size) => {
   if (size == null) return null;
   const m = String(size).match(/(\d+(?:\.\d+)?)\s*([kKmM])?/);
@@ -58,8 +82,57 @@ const parseEvalSize = (size) => {
   return num;
 };
 
-export default function AccountsPage({ accounts = [], trades = [], setPage, selectedAccountIds = [], setSelectedAccountIds, setSelectedAccountDetailId }) {
+export default function AccountsPage({ accounts = [], trades = [], setPage, selectedAccountIds = [], setSelectedAccountIds, setSelectedAccountDetailId, setAccounts }) {
   const visibleAccounts = (accounts || []).filter((a) => !isPlaceholderAccount(a.id));
+  const [fundedMeta, setFundedMeta] = React.useState(() => readFundedMeta());
+
+  // Met le compte en "funded" : passe account_type=funded en base, mémorise
+  // funded_at et les paramètres (target dépassée, DD max, payout min). Les
+  // trades antérieurs restent visibles mais le PnL "funded" repart de 0.
+  const markFunded = async (acc) => {
+    if (!acc) return;
+    const capital = parseEvalSize(acc.eval_account_size) || 0;
+    const inferred = inferEvalParams(capital);
+    const meta = {
+      funded_at: new Date().toISOString(),
+      eval_profit_target: inferred.profitTarget,
+      funded_max_dd: inferred.maxDD,
+      funded_payout_min: inferred.payoutMin,
+    };
+    const nextMeta = { ...fundedMeta, [acc.id]: meta };
+    writeFundedMeta(nextMeta);
+    setFundedMeta(nextMeta);
+    try {
+      const sb = createClient();
+      const { error } = await sb
+        .from("trading_accounts")
+        .update({ account_type: "funded" })
+        .eq("id", acc.id);
+      if (error) console.error("⚠️ Update funded failed:", error);
+    } catch (e) {
+      console.error("⚠️ Update funded exception:", e);
+    }
+    // MAJ locale immédiate
+    if (setAccounts) {
+      setAccounts(prev => (prev || []).map(a => a.id === acc.id ? { ...a, account_type: "funded" } : a));
+    }
+  };
+
+  // Repasser un funded en eval (au cas où l'utilisateur a cliqué par erreur).
+  const undoFunded = async (acc) => {
+    if (!acc) return;
+    const nextMeta = { ...fundedMeta };
+    delete nextMeta[acc.id];
+    writeFundedMeta(nextMeta);
+    setFundedMeta(nextMeta);
+    try {
+      const sb = createClient();
+      await sb.from("trading_accounts").update({ account_type: "eval" }).eq("id", acc.id);
+    } catch (e) { console.error(e); }
+    if (setAccounts) {
+      setAccounts(prev => (prev || []).map(a => a.id === acc.id ? { ...a, account_type: "eval" } : a));
+    }
+  };
 
   // Taille de compte partagée avec la roadmap (même clé Supabase).
   const [simState, setSimState] = useCloudState("tr4de_scaling_sim", "scaling_sim", {
@@ -73,22 +146,54 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     for (const acc of visibleAccounts) {
-      map.set(acc.id, { trades: 0, wins: 0, losses: 0, pnl: 0, monthlyPnl: 0 });
+      map.set(acc.id, {
+        trades: 0, wins: 0, losses: 0, pnl: 0, monthlyPnl: 0,
+        peak: 0, maxDD: 0,
+        // Stats spécifiques à la période funded (depuis funded_at)
+        fundedTrades: 0, fundedWins: 0, fundedLosses: 0, fundedPnl: 0, fundedPeak: 0, fundedDD: 0,
+      });
     }
-    for (const tr of trades || []) {
+    // Pré-trie les trades par date pour calculer le drawdown funded correctement
+    const sortedTrades = [...(trades || [])].sort((a, b) => {
+      const da = new Date(a.date || a.entry_time || 0).getTime();
+      const db = new Date(b.date || b.entry_time || 0).getTime();
+      return da - db;
+    });
+    // Index des comptes funded pour savoir si on doit alimenter les stats funded.
+    // Si funded_at n'existe pas (compte créé directement en funded), on
+    // compte tous les trades — sinon uniquement ceux après funded_at.
+    const accById = new Map(visibleAccounts.map(a => [a.id, a]));
+    for (const tr of sortedTrades) {
       const s = map.get(tr.account_id);
       if (!s) continue;
       const pnl = Number(tr.pnl) || 0;
       s.trades += 1;
       s.pnl += pnl;
+      if (s.pnl > s.peak) s.peak = s.pnl;
+      const gdd = s.peak - s.pnl;
+      if (gdd > s.maxDD) s.maxDD = gdd;
       if (pnl > 0) s.wins += 1;
       else if (pnl < 0) s.losses += 1;
-      // P&L du mois courant (pour l'objectif mensuel des comptes live/funded)
       const td = new Date(tr.date || 0).getTime();
       if (!isNaN(td) && td >= monthStart) s.monthlyPnl += pnl;
+      // Stats funded — actives dès que account_type === "funded"
+      const acc = accById.get(tr.account_id);
+      if (acc && (acc.account_type || "live") === "funded") {
+        const meta = fundedMeta[tr.account_id];
+        const fundedAt = meta?.funded_at ? new Date(meta.funded_at).getTime() : 0;
+        if (!isNaN(td) && td >= fundedAt) {
+          s.fundedTrades += 1;
+          s.fundedPnl += pnl;
+          if (pnl > 0) s.fundedWins += 1;
+          else if (pnl < 0) s.fundedLosses += 1;
+          if (s.fundedPnl > s.fundedPeak) s.fundedPeak = s.fundedPnl;
+          const dd = s.fundedPeak - s.fundedPnl;
+          if (dd > s.fundedDD) s.fundedDD = dd;
+        }
+      }
     }
     return map;
-  }, [visibleAccounts, trades]);
+  }, [visibleAccounts, trades, fundedMeta]);
 
   const totals = React.useMemo(() => {
     let trades = 0, pnl = 0, wins = 0, capital = 0;
@@ -192,21 +297,42 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
             if (sb.trades !== sa.trades) return sb.trades - sa.trades;
             return sb.pnl - sa.pnl;
           }).map((acc) => {
-            const s = stats.get(acc.id) || { trades: 0, wins: 0, losses: 0, pnl: 0 };
+            const s = stats.get(acc.id) || { trades: 0, wins: 0, losses: 0, pnl: 0, fundedTrades: 0, fundedWins: 0, fundedLosses: 0, fundedPnl: 0 };
             const winRate = s.trades > 0 ? (s.wins / s.trades) * 100 : 0;
+            const fundedWinRate = s.fundedTrades > 0 ? (s.fundedWins / s.fundedTrades) * 100 : 0;
             const isActive = selectedAccountIds.length === 1 && selectedAccountIds[0] === acc.id;
             const type = acc.account_type || "live";
-            const dotColor = type === "eval" ? T.amber : type === "funded" ? "#2563EB" : T.green;
+            const dotColor = type === "eval" ? T.amber
+              : type === "funded" ? "#2563EB"
+              : type === "demo" ? "#8B5CF6"
+              : T.green;
             const typeLabel = type === "eval"
               ? `Eval${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
               : type === "funded"
                 ? `Funded${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
-                : "Live";
+                : type === "demo"
+                  ? "Démo"
+                  : "Live";
             const capital = parseEvalSize(acc.eval_account_size);
             const hasBalance = capital !== null;
-            const balance = hasBalance ? capital + s.pnl : null;
-            const pnlColor = s.pnl > 0 ? T.green : s.pnl < 0 ? T.red : T.textSub;
-            const pnlPct = capital ? (s.pnl / capital) * 100 : null;
+            const meta = fundedMeta[acc.id];
+            // Vue funded dès que account_type === "funded", avec ou sans meta.
+            // Si pas de funded_at → on considère tous les trades comme funded.
+            const isFundedView = type === "funded";
+            // En vue funded, le PnL/balance affichés repartent de funded_at.
+            const displayPnl = isFundedView ? s.fundedPnl : s.pnl;
+            const displayTrades = isFundedView ? s.fundedTrades : s.trades;
+            const balance = hasBalance ? capital + displayPnl : null;
+            const pnlColor = displayPnl > 0 ? T.green : displayPnl < 0 ? T.red : T.textSub;
+            const pnlPct = capital ? (displayPnl / capital) * 100 : null;
+            // Pour eval : seuils inférés (target, DD)
+            const evalParams = capital ? inferEvalParams(capital) : null;
+            const canPassFunded = type === "eval" && evalParams && s.pnl >= evalParams.profitTarget && evalParams.profitTarget > 0;
+            // Pour funded : DD restant / payout dispo
+            const fundedMaxDD = meta?.funded_max_dd || (capital ? Math.round(capital * 0.05) : 0);
+            const ddRemaining = Math.max(0, fundedMaxDD - (s.fundedDD || 0));
+            const ddPct = fundedMaxDD > 0 ? Math.min(100, ((s.fundedDD || 0) / fundedMaxDD) * 100) : 0;
+            const payoutAvail = isFundedView ? Math.max(0, s.fundedPnl - (meta?.funded_payout_min || 0)) : 0;
 
             return (
               <div
@@ -279,14 +405,14 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                       fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
                       fontVariantNumeric: "tabular-nums",
                     }}>
-                      {hasBalance ? fmtNoCents(balance) : (s.trades > 0 ? fmt(s.pnl, true) : "—")}
+                      {hasBalance ? fmtNoCents(balance) : (displayTrades > 0 ? fmt(displayPnl, true) : "—")}
                     </span>
                     {hasBalance && (
                       <span style={{
                         fontSize: 12, fontWeight: 500, color: pnlColor,
                         fontVariantNumeric: "tabular-nums",
                       }}>
-                        {s.pnl >= 0 ? "+" : ""}{fmtNoCents(s.pnl)}
+                        {displayPnl >= 0 ? "+" : ""}{fmtNoCents(displayPnl)}
                         {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
                       </span>
                     )}
@@ -298,15 +424,50 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                     fontVariantNumeric: "tabular-nums",
                     flexShrink: 0,
                   }}>
-                    <span>{s.trades} trade{s.trades > 1 ? "s" : ""}</span>
-                    <span>{s.trades > 0 ? `${winRate.toFixed(1)}% wr` : "—% wr"}</span>
+                    <span>{(isFundedView ? s.fundedTrades : s.trades)} trade{(isFundedView ? s.fundedTrades : s.trades) > 1 ? "s" : ""}</span>
+                    <span>{(isFundedView ? s.fundedTrades : s.trades) > 0 ? `${(isFundedView ? fundedWinRate : winRate).toFixed(1)}% wr` : "—% wr"}</span>
                     <span>
-                      <span style={{ color: T.green }}>{s.wins}W</span>
+                      <span style={{ color: T.green }}>{isFundedView ? s.fundedWins : s.wins}W</span>
                       <span style={{ color: T.textMut }}> / </span>
-                      <span style={{ color: T.red }}>{s.losses}L</span>
+                      <span style={{ color: T.red }}>{isFundedView ? s.fundedLosses : s.losses}L</span>
                     </span>
                   </div>
                 </div>
+
+                {/* Bandeau "Objectif atteint" : visible uniquement en eval lorsque
+                    le PnL cumulé dépasse la target inférée. Cliquer transforme
+                    le compte en funded. */}
+                {canPassFunded && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 12px", borderRadius: 10,
+                      background: "#ECFDF5", border: `1px solid #A7F3D0`,
+                    }}>
+                    <Trophy size={14} strokeWidth={1.75} color={T.green} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: T.green }}>
+                        Objectif atteint ({fmtNoCents(evalParams.profitTarget)})
+                      </div>
+                      <div style={{ fontSize: 11, color: T.textSub }}>
+                        Passe le compte en funded — les trades sont gardés, le PnL repart de 0.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); markFunded(acc); }}
+                      style={{
+                        padding: "6px 12px", borderRadius: 999,
+                        border: "none", background: T.green, color: "#fff",
+                        fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                        whiteSpace: "nowrap",
+                      }}>
+                      Valider en Funded
+                    </button>
+                  </div>
+                )}
+
 
               </div>
             );

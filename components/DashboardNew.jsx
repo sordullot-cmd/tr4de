@@ -511,10 +511,98 @@ export default function App() {
     }
     const snapshot = { ...trade };
     await deleteTrade(trade.id);
+    await cleanupTradeRelatedData(trade);
     pushUndo({
       label: "Suppression du trade",
       undo: async () => { try { await addTrade(snapshot); } catch (e) { console.error("undo add trade failed:", e); } },
     });
+  };
+
+  // Purge toutes les données liées à un trade : assignations de stratégies,
+  // notes, règles cochées (côté Supabase ET localStorage). Empêche les
+  // résidus d'apparaître sur la page Stratégies après suppression.
+  const cleanupTradeRelatedData = async (trade) => {
+    if (!trade) return;
+    const tid = trade.id != null ? String(trade.id) : null;
+
+    // --- Supabase ---
+    try {
+      const sb = createClient();
+      const uid = user?.id;
+      if (uid && tid) {
+        await Promise.all([
+          sb.from("trade_strategies").delete().eq("user_id", uid).eq("trade_id", tid),
+          sb.from("trade_details").delete().eq("user_id", uid).eq("trade_id", tid),
+        ]);
+      }
+    } catch (err) {
+      console.error("⚠️ Erreur nettoyage Supabase trade lié:", err);
+    }
+
+    // --- localStorage : tradeStrategies ---
+    try {
+      const raw = localStorage.getItem("tr4de_trade_strategies");
+      if (raw) {
+        const map = JSON.parse(raw);
+        const keysToDelete = new Set();
+        if (tid) keysToDelete.add(`id:${tid}`);
+        // ancien format : composite avec date/symbol/entry/...
+        const composite = `${trade.date}_${trade.symbol}_${trade.entry}_${trade.exit ?? ''}_${trade.direction ?? ''}_${trade.entryTime || ''}_${trade.exitTime || ''}_${trade.pnl ?? ''}`;
+        keysToDelete.add(composite);
+        // ancien format DashboardPage : sans underscores entre certains champs
+        if (trade.date && trade.symbol && trade.entry != null) {
+          keysToDelete.add(`${trade.date}${trade.symbol}${trade.entry}`);
+          keysToDelete.add(`${trade.date}${trade.symbol}${parseFloat(trade.entry).toFixed(2)}`);
+        }
+        let changed = false;
+        for (const k of Object.keys(map)) {
+          if (keysToDelete.has(k)) { delete map[k]; changed = true; }
+        }
+        if (changed) localStorage.setItem("tr4de_trade_strategies", JSON.stringify(map));
+      }
+    } catch (err) {
+      console.error("⚠️ Erreur nettoyage local tradeStrategies:", err);
+    }
+
+    // --- localStorage : trade_notes ---
+    try {
+      const raw = localStorage.getItem("tr4de_trade_notes");
+      if (raw && tid) {
+        const map = JSON.parse(raw);
+        if (map[tid] !== undefined) {
+          delete map[tid];
+          localStorage.setItem("tr4de_trade_notes", JSON.stringify(map));
+        }
+      }
+    } catch (err) {
+      console.error("⚠️ Erreur nettoyage local trade_notes:", err);
+    }
+
+    // --- localStorage : checked_rules ---
+    // Clé = `${date}_${symbol}_${entry}_${exit}_${direction}_${stratId}_${ruleId}`
+    // (variantes : exit "none" / direction "long")
+    try {
+      const raw = localStorage.getItem("tr4de_checked_rules");
+      if (raw) {
+        const map = JSON.parse(raw);
+        const prefixes = [
+          `${trade.date}_${trade.symbol}_${trade.entry}_${trade.exit ?? ''}_${trade.direction ?? ''}_`,
+          `${trade.date}_${trade.symbol}_${trade.entry}_${trade.exit || 'none'}_${trade.direction || 'long'}_`,
+        ];
+        let changed = false;
+        for (const k of Object.keys(map)) {
+          if (prefixes.some(p => k.startsWith(p))) { delete map[k]; changed = true; }
+        }
+        if (changed) {
+          localStorage.setItem("tr4de_checked_rules", JSON.stringify(map));
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("tr4de:checked-rules-changed"));
+          }
+        }
+      }
+    } catch (err) {
+      console.error("⚠️ Erreur nettoyage local checked_rules:", err);
+    }
   };
 
   const handleDeleteAccount = async (accountId) => {
@@ -660,7 +748,7 @@ export default function App() {
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
     backtest: <BacktestPage />,
     brokers: <BrokersPage />,
-    accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} />,
+    accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} setAccounts={setAccounts} />,
     "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} strategies={strategies} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,

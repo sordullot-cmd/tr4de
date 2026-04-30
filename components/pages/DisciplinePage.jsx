@@ -395,6 +395,8 @@ export default function DisciplinePage({ trades = [] }) {
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [heatmapVersion, setHeatmapVersion] = useState(0);
+  // Mémorise la dernière règle cochée pour gérer Shift+clic (sélection plage)
+  const [lastClickedRuleId, setLastClickedRuleId] = useState(null);
   const [checkedRuleIds, setCheckedRuleIds] = useState(() => {
     try {
       const todayKey = getLocalDateString();
@@ -590,16 +592,50 @@ export default function DisciplinePage({ trades = [] }) {
     setCheckedRuleIds(prev => {
       const updated = { ...prev, [ruleId]: !prev[ruleId] };
       localStorage.setItem(`tr4de_checked_rules_${today}`, JSON.stringify(updated));
-      
+
       // ✅ Sauvegarder dans Supabase via le hook
       const newStatus = !prev[ruleId];
       setRuleCompleted(today, ruleId, newStatus).catch(err => {
         console.error("❌ Erreur sauvegarde discipline Supabase:", err);
       });
-      
+
       return updated;
     });
     setHeatmapVersion(v => v + 1);
+  };
+
+  // Coche/décoche une plage de règles (utilisé par Shift+clic).
+  // `orderedIds` doit refléter l'ordre visible des règles dans le bloc cliqué.
+  const setRulesRange = (orderedIds, fromId, toId, value) => {
+    if (!orderedIds || !orderedIds.length) return;
+    const ai = orderedIds.indexOf(fromId);
+    const bi = orderedIds.indexOf(toId);
+    if (ai === -1 || bi === -1) return;
+    const lo = Math.min(ai, bi);
+    const hi = Math.max(ai, bi);
+    const ids = orderedIds.slice(lo, hi + 1);
+    setCheckedRuleIds(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => { updated[id] = value; });
+      localStorage.setItem(`tr4de_checked_rules_${today}`, JSON.stringify(updated));
+      ids.forEach(id => {
+        setRuleCompleted(today, id, value).catch(err => console.error("❌ Erreur sauvegarde discipline Supabase:", err));
+      });
+      return updated;
+    });
+    setHeatmapVersion(v => v + 1);
+  };
+
+  const handleRuleClick = (e, ruleId, orderedIds) => {
+    if (e.shiftKey && lastClickedRuleId && lastClickedRuleId !== ruleId && orderedIds.includes(lastClickedRuleId)) {
+      e.preventDefault();
+      const newValue = !checkedRuleIds[ruleId];
+      setRulesRange(orderedIds, lastClickedRuleId, ruleId, newValue);
+      setLastClickedRuleId(ruleId);
+      return;
+    }
+    // Toggle normal — laisse onChange faire son travail
+    setLastClickedRuleId(ruleId);
   };
 
   const ruleDescriptions = {
@@ -1259,11 +1295,15 @@ export default function DisciplinePage({ trades = [] }) {
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>Règles journalières</div>
                 <div style={{borderRadius:12,overflow:"hidden",background:T.white}}>
-                  {allRules.filter(r => ["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map((rule, idx, arr) => (
+                  {(() => {
+                    const dailyArr = allRules.filter(r => ["premarket", "biais", "news", "followall", "journal"].includes(r.id));
+                    const dailyIds = dailyArr.map(r => r.id);
+                    return dailyArr.map((rule, idx, arr) => (
                     <label key={rule.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 14px",cursor:"pointer",borderBottom:idx<arr.length-1?`1px solid ${T.border}`:"none"}}>
                       <input
                         type="checkbox"
                         checked={checkedRuleIds[rule.id] || false}
+                        onClick={(e) => handleRuleClick(e, rule.id, dailyIds)}
                         onChange={() => toggleRule(rule.id, allRules)}
                         style={{marginTop:2,width:16,height:16,accentColor:T.text,cursor:"pointer",flexShrink:0}}
                       />
@@ -1272,7 +1312,8 @@ export default function DisciplinePage({ trades = [] }) {
                         <div style={{fontSize:11,color:T.textSub,lineHeight:1.4}}>{ruleDescriptions[rule.id]}</div>
                       </div>
                     </label>
-                  ))}
+                  ));
+                  })()}
                 </div>
               </div>
 
@@ -1280,11 +1321,15 @@ export default function DisciplinePage({ trades = [] }) {
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>{t("disc.personalRules")}</div>
                 <div style={{borderRadius:12,overflow:"hidden",background:T.white}}>
-                  {allRules.filter(r => !["premarket", "biais", "news", "followall", "journal"].includes(r.id)).map((rule, idx, arr) => (
+                  {(() => {
+                    const personalArr = allRules.filter(r => !["premarket", "biais", "news", "followall", "journal"].includes(r.id));
+                    const personalIds = personalArr.map(r => r.id);
+                    return personalArr.map((rule, idx, arr) => (
                     <div key={rule.id} style={{display:"flex",alignItems:"center",gap:12,padding:"16px 14px",borderBottom:idx<arr.length-1?`1px solid ${T.border}`:"none"}}>
                       <input
                         type="checkbox"
                         checked={checkedRuleIds[rule.id] || false}
+                        onClick={(e) => handleRuleClick(e, rule.id, personalIds)}
                         onChange={() => toggleRule(rule.id, allRules)}
                         style={{width:16,height:16,accentColor:T.text,cursor:"pointer",flexShrink:0}}
                       />
@@ -1301,7 +1346,8 @@ export default function DisciplinePage({ trades = [] }) {
                         <LucideTrash2 size={12} strokeWidth={1.75}/>
                       </button>
                     </div>
-                  ))}
+                  ));
+                  })()}
                   {/* ADD ROW intégrée à la catégorie */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px"}}>
                     <input
