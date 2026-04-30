@@ -6,7 +6,7 @@ import {
   Plus, Target, Trash2, Pencil, Copy, Pin, Check, X, TrendingUp, Heart,
   ChevronDown, ChevronRight, Calendar, AlertCircle, Flag, Sparkles,
   Dumbbell, BookOpen, Users, GraduationCap, Wallet, Briefcase, Activity, Code,
-  Clock, Trophy,
+  Clock, Trophy, Footprints,
 } from "lucide-react";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
@@ -48,6 +48,7 @@ const UNITS = [
   { id: "minutes", label: "Minutes",   suffix: " min" },
   { id: "pages",   label: "Pages",     suffix: " pages" },
   { id: "times",   label: "Fois",      suffix: "×" },
+  { id: "steps",   label: "Pas",       suffix: " pas" },
   { id: "custom",  label: "Autre…",    suffix: "", isCustom: true },
 ];
 const CATEGORIES = [
@@ -58,6 +59,7 @@ const CATEGORIES = [
   { id: "relations", label: "Relations",     color: "#EC4899", icon: Users },
   { id: "learning",  label: "Apprentissage", color: "#3B82F6", icon: GraduationCap },
   { id: "health",    label: "Santé",         color: "#06B6D4", icon: Activity },
+  { id: "steps",     label: "Pas journalier", color: "#10B981", icon: Footprints },
   { id: "finance",   label: "Finances",      color: "#059669", icon: Wallet },
   { id: "work",      label: "Travail",       color: "#64748B", icon: Briefcase },
   { id: "code",      label: "Dev",           color: "#6366F1", icon: Code },
