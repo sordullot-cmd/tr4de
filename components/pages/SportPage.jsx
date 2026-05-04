@@ -1014,9 +1014,8 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <label>
               <Label>Date</Label>
-              <input type="date" value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                style={input()} />
+              <DateField value={form.date}
+                onChange={(v) => setForm({ ...form, date: v })} />
             </label>
             <label>
               <Label>Durée (min)</Label>
@@ -1493,6 +1492,165 @@ function ExerciseNameCombobox({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function DateField({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = React.useRef(null);
+  const popRef = React.useRef(null);
+  const [rect, setRect] = useState(null);
+  const [viewDate, setViewDate] = useState(() => {
+    const d = value ? new Date(value + "T00:00:00") : new Date();
+    return isNaN(d.getTime()) ? new Date() : d;
+  });
+
+  useEffect(() => {
+    if (!open) { setRect(null); return; }
+    const update = () => { if (btnRef.current) setRect(btnRef.current.getBoundingClientRect()); };
+    update();
+    const onDoc = (e) => {
+      if ((popRef.current && popRef.current.contains(e.target)) ||
+          (btnRef.current && btnRef.current.contains(e.target))) return;
+      setOpen(false);
+    };
+    const onScroll = (e) => {
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", update);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  const label = value
+    ? new Date(value + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : "Choisir…";
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          ...input(),
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          cursor: "pointer",
+          textAlign: "left",
+          color: value ? T.text : T.textMut,
+          background: open ? T.accentBg : T.white,
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        <Calendar size={13} strokeWidth={1.75} color={T.textSub} />
+      </button>
+      {open && rect && typeof document !== "undefined" && ReactDOM.createPortal(
+        (() => {
+          const POPOVER_H = 320;
+          const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+          const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+          const wouldOverflow = rect.bottom + POPOVER_H + 12 > vh;
+          const top = wouldOverflow ? Math.max(4, vh - POPOVER_H - 4) : rect.bottom + 6;
+          return (
+            <div ref={popRef} style={{ position: "fixed", top, left: Math.max(8, Math.min(rect.left, vw - 296)), zIndex: 10000 }}>
+              <MiniCalendar
+                value={value}
+                viewDate={viewDate}
+                setViewDate={setViewDate}
+                onPick={(iso) => { onChange(iso); setOpen(false); }}
+              />
+            </div>
+          );
+        })(),
+        document.body
+      )}
+    </div>
+  );
+}
+
+function MiniCalendar({ value, viewDate, setViewDate, onPick }) {
+  const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+  const WD = ["L", "M", "M", "J", "V", "S", "D"];
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const first = new Date(year, month, 1);
+  const dow = first.getDay();
+  const lead = dow === 0 ? 6 : dow - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const selected = value ? new Date(value + "T00:00:00") : null;
+  const todayISO = (() => { const d = new Date(); return toISO(d); })();
+
+  const goPrev = () => setViewDate(new Date(year, month - 1, 1));
+  const goNext = () => setViewDate(new Date(year, month + 1, 1));
+
+  return (
+    <div style={{
+      width: 280, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+      boxShadow: "0 12px 32px rgba(0,0,0,0.10)", padding: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button type="button" onClick={goPrev}
+          style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <ChevronDown size={14} style={{ transform: "rotate(90deg)" }} />
+        </button>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{MONTHS[month]} {year}</div>
+        <button type="button" onClick={goNext}
+          style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <ChevronDown size={14} style={{ transform: "rotate(-90deg)" }} />
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {WD.map((w, i) => (
+          <div key={i} style={{ fontSize: 10, color: T.textMut, textAlign: "center", padding: "4px 0", fontWeight: 500 }}>{w}</div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const iso = toISO(d);
+          const isSel = selected && toISO(selected) === iso;
+          const isToday = iso === todayISO;
+          return (
+            <button key={i} type="button" onClick={() => onPick(iso)}
+              style={{
+                width: "100%", aspectRatio: "1 / 1",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: isSel ? 600 : 500,
+                color: isSel ? "#fff" : T.text,
+                background: isSel ? T.text : "transparent",
+                border: isToday && !isSel ? `1px solid ${T.border}` : "none",
+                borderRadius: 6, cursor: "pointer", fontFamily: "inherit",
+                transition: "background .1s ease",
+              }}
+              onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = "transparent"; }}>
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
