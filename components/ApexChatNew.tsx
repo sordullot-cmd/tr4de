@@ -211,6 +211,27 @@ export default function ApexChatNew({
     setInput("");
   };
 
+  // Lit les notes de la page Productivité (clé "tr4de_notes") au moment de
+  // construire le payload. On garde le contenu textuel + tags, on retire les
+  // images data URLs (trop lourdes pour le LLM) — seul leur compte est envoyé.
+  const readProductivityNotes = () => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("tr4de_notes");
+      const arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) return [];
+      return arr.map((n: any) => ({
+        id: cleanString(n?.id),
+        content: cleanString(n?.content || ""),
+        imageCount: Array.isArray(n?.images) ? n.images.length : 0,
+        createdAt: cleanString(n?.createdAt || ""),
+        updatedAt: cleanString(n?.updatedAt || ""),
+      }));
+    } catch {
+      return [];
+    }
+  };
+
   const buildPayload = (msgs: Message[]) => {
     const cleanTrades = (trades || []).map((t: any) => ({
       id: cleanString(t?.id),
@@ -309,16 +330,19 @@ export default function ApexChatNew({
       monthlyStats: cleanPeriods(monthlyStats),
       disciplineSummary: cleanDiscipline,
       psychEvents: cleanPsychEvents,
+      productivityNotes: readProductivityNotes(),
     };
   };
 
   useEffect(() => {
     if (contextSent || !historyLoaded) return;
+    const productivityCount = readProductivityNotes().length;
     const hasAny =
       trades.length > 0 ||
       journalNotes.length > 0 ||
       strategies.length > 0 ||
-      Object.keys(dailyNotes || {}).length > 0;
+      Object.keys(dailyNotes || {}).length > 0 ||
+      productivityCount > 0;
     if (!hasAny) return;
 
     const init = async () => {
@@ -327,7 +351,7 @@ export default function ApexChatNew({
           ...buildPayload([
             {
               role: "user",
-              content: `Contexte: ${trades.length} trades, ${strategies.length} stratégies, ${journalNotes.length} notes de trade, ${Object.keys(dailyNotes).length} notes journalières.`,
+              content: `Contexte: ${trades.length} trades, ${strategies.length} stratégies, ${journalNotes.length} notes de trade, ${Object.keys(dailyNotes).length} notes journalières, ${productivityCount} notes productivité.`,
             },
           ]),
           persist: false,

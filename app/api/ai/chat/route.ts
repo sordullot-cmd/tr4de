@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       weeklyStats = [],
       monthlyStats = [],
       disciplineSummary = [],
-      psychEvents = []
+      psychEvents = [],
+      productivityNotes = []
     } = await request.json();
 
     const supabase = await createClient();
@@ -143,6 +144,31 @@ export async function POST(request: NextRequest) {
       disciplineSummary.slice(0, 10).forEach((d: any) => {
         const violated = d.violated?.length ? ` — violé: ${d.violated.join(', ')}` : '';
         contextData += `  • ${d.date}: ${d.respected}/${d.total} règles (${d.score}%)${violated}\n`;
+      });
+    }
+
+    if (productivityNotes && productivityNotes.length > 0) {
+      const TAG_RE = /#([a-zA-Z][a-zA-Z0-9_-]*)/g;
+      const sorted = [...productivityNotes].sort((a: any, b: any) => {
+        const da = new Date(a?.updatedAt || 0).getTime();
+        const db = new Date(b?.updatedAt || 0).getTime();
+        return db - da;
+      });
+      contextData += `\n🗒️ NOTES PRODUCTIVITÉ (page Notes — ${productivityNotes.length} au total, ${sorted.length > 20 ? "20 plus récentes affichées" : "toutes affichées"}):\n`;
+      sorted.slice(0, 20).forEach((n: any, i: number) => {
+        const content = String(n?.content || "").trim();
+        if (!content && !n?.imageCount) return;
+        const tagsArr: string[] = [];
+        let m;
+        TAG_RE.lastIndex = 0;
+        while ((m = TAG_RE.exec(content)) !== null) tagsArr.push(m[1].toLowerCase());
+        const uniqueTags = Array.from(new Set(tagsArr));
+        const date = n?.updatedAt ? String(n.updatedAt).slice(0, 10) : "";
+        const imgInfo = n?.imageCount > 0 ? ` [+${n.imageCount} image${n.imageCount > 1 ? "s" : ""}]` : "";
+        const tagInfo = uniqueTags.length > 0 ? ` [tags: ${uniqueTags.map(t => "#" + t).join(", ")}]` : "";
+        // Limite la taille de chaque note pour ne pas exploser le contexte.
+        const trimmed = content.length > 600 ? content.slice(0, 600) + "…" : content;
+        contextData += `  ${i + 1}. ${date}${imgInfo}${tagInfo}\n     ${trimmed.replace(/\n/g, "\n     ")}\n`;
       });
     }
 
