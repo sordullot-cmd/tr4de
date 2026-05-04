@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X } from "lucide-react";
+import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
 
@@ -26,6 +26,33 @@ function parseTags(text) {
 
 function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Compresse une image (File ou Blob) en data URL JPEG, max 1200px de large.
+async function fileToCompressedDataUrl(file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = dataUrl;
+  });
+  const MAX = 1200;
+  let { width, height } = img;
+  if (width > MAX) { height = Math.round(height * (MAX / width)); width = MAX; }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+  // PNG si déjà PNG et petit, sinon JPEG q=0.85
+  const isPng = file.type === "image/png" && width <= 800;
+  return canvas.toDataURL(isPng ? "image/png" : "image/jpeg", 0.85);
 }
 
 function renderHighlighted(text) {
@@ -53,10 +80,13 @@ export default function NotesPage() {
   const [draft, setDraft] = useState("");
 
   const createNote = () => {
+    // Flush la note courante AVANT toute autre mise à jour, sinon le batching
+    // de React peut déclencher l'update de draftRef avant l'effet sur
+    // selectedId, et la note précédente serait sauvegardée vide.
+    if (selectedIdRef.current) flushSave(selectedIdRef.current, draftRef.current);
     const note = { id: Date.now() + Math.random(), content: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     setNotes(prev => [note, ...prev]);
     setSelectedId(note.id);
-    setDraft("");
   };
 
   const selected = notes.find(n => n.id === selectedId);
@@ -70,6 +100,33 @@ export default function NotesPage() {
   const flushSave = (id, content) => {
     if (!id) return;
     setNotes(prev => prev.map(n => n.id === id ? { ...n, content, updatedAt: new Date().toISOString() } : n));
+  };
+
+  const fileInputRef = useRef(null);
+
+  const addImagesToSelected = async (files) => {
+    if (!selectedId || !files || files.length === 0) return;
+    const imgs = [];
+    for (const f of files) {
+      if (!f.type || !f.type.startsWith("image/")) continue;
+      try {
+        const url = await fileToCompressedDataUrl(f);
+        imgs.push({ id: Date.now() + Math.random(), src: url, addedAt: new Date().toISOString() });
+      } catch (e) {
+        console.warn("Image upload failed:", e);
+      }
+    }
+    if (imgs.length === 0) return;
+    setNotes(prev => prev.map(n => n.id === selectedId
+      ? { ...n, images: [...(n.images || []), ...imgs], updatedAt: new Date().toISOString() }
+      : n));
+  };
+
+  const removeImage = (imgId) => {
+    if (!selectedId) return;
+    setNotes(prev => prev.map(n => n.id === selectedId
+      ? { ...n, images: (n.images || []).filter(im => im.id !== imgId), updatedAt: new Date().toISOString() }
+      : n));
   };
 
   // Sync draft <-> selected (loaded from picked note) + flush previous note
@@ -237,17 +294,50 @@ export default function NotesPage() {
         <div className="tr4de-notes-editor" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: selected ? 0 : 20, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {selected ? (
             <>
-              <div style={{ padding: "10px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ padding: "10px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                 <div style={{ fontSize: 11, color: T.textMut }}>Mis à jour {new Date(selected.updatedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-                <button onClick={() => removeNote(selected.id)}
-                  style={{ width: 28, height: 28, background: "transparent", border: "none", color: T.textMut, cursor: "pointer", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
-                  title="Supprimer"
-                >
-                  <Trash2 size={14} strokeWidth={1.75} />
-                </button>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => { addImagesToSelected(Array.from(e.target.files || [])); e.target.value = ""; }}
+                  />
+                  <button onClick={() => fileInputRef.current?.click()}
+                    title="Ajouter une image (ou colle-la directement)"
+                    style={{ width: 28, height: 28, background: "transparent", border: "none", color: T.textMut, cursor: "pointer", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+                  >
+                    <ImagePlus size={14} strokeWidth={1.75} />
+                  </button>
+                  <button onClick={() => removeNote(selected.id)}
+                    style={{ width: 28, height: 28, background: "transparent", border: "none", color: T.textMut, cursor: "pointer", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+                    title="Supprimer"
+                  >
+                    <Trash2 size={14} strokeWidth={1.75} />
+                  </button>
+                </div>
               </div>
+              {(selected.images || []).length > 0 && (
+                <div style={{ padding: "10px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(selected.images || []).map(img => (
+                    <div key={img.id} style={{ position: "relative", width: 96, height: 96, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, background: "#FAFAFA" }}>
+                      <img src={img.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }}
+                        onClick={() => window.open(img.src, "_blank")} />
+                      <button onClick={() => removeImage(img.id)}
+                        title="Retirer l'image"
+                        style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", border: "none", background: "rgba(13,13,13,0.72)", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                        <X size={12} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
                 <div
                   aria-hidden
@@ -264,6 +354,17 @@ export default function NotesPage() {
                 autoFocus
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                onPaste={(e) => {
+                  const items = Array.from(e.clipboardData?.items || []);
+                  const imgFiles = items
+                    .filter(it => it.kind === "file" && it.type.startsWith("image/"))
+                    .map(it => it.getAsFile())
+                    .filter(Boolean);
+                  if (imgFiles.length > 0) {
+                    e.preventDefault();
+                    addImagesToSelected(imgFiles);
+                  }
+                }}
                 onScroll={(e) => { if (highlightRef.current) { highlightRef.current.scrollTop = e.currentTarget.scrollTop; highlightRef.current.scrollLeft = e.currentTarget.scrollLeft; } }}
                 onKeyDown={(e) => {
                   if (e.key === "Tab") {

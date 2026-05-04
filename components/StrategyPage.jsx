@@ -302,7 +302,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         <div id="tr4de-page-header-slot" />
       </div>
 
-      {/* KPI BLOCKS */}
+      {/* KPI BLOCKS — 8 KPIs (2 rangées de 4), agrégés sur tous les trades qui ont au moins une stratégie assignée */}
       {strategies && Array.isArray(strategies) && strategies.length > 0 && (() => {
         const getStrategyIdsForTrade = (trade) => {
           let ids = tradeStrategiesData[trade.id] || [];
@@ -317,64 +317,70 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           return ids.map(String);
         };
 
-        const stats = strategies.map(s => {
-          const stratTrades = trades.filter(t => getStrategyIdsForTrade(t).includes(String(s.id)));
-          const pnl = stratTrades.reduce((acc, t) => acc + (typeof t.pnl === "number" ? t.pnl : 0), 0);
-          const wins = stratTrades.filter(t => (t.pnl || 0) > 0).length;
-          const losses = stratTrades.filter(t => (t.pnl || 0) < 0).length;
-          const wr = (wins + losses) > 0 ? (wins / (wins + losses)) * 100 : 0;
-          return { strategy: s, count: stratTrades.length, pnl, wr };
-        }).filter(x => x.count > 0);
+        const trackedTrades = trades.filter(tr => getStrategyIdsForTrade(tr).length > 0);
+        const total = trackedTrades.length;
+        const totalPnL = trackedTrades.reduce((s, t) => s + (typeof t.pnl === "number" ? t.pnl : 0), 0);
+        const winsArr = trackedTrades.filter(t => (t.pnl || 0) > 0);
+        const lossesArr = trackedTrades.filter(t => (t.pnl || 0) < 0);
+        const winCount = winsArr.length;
+        const lossCount = lossesArr.length;
+        const winRate = (winCount + lossCount) > 0 ? (winCount / (winCount + lossCount)) * 100 : 0;
+        const sumWins = winsArr.reduce((s, t) => s + (t.pnl || 0), 0);
+        const sumLosses = Math.abs(lossesArr.reduce((s, t) => s + (t.pnl || 0), 0));
+        const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
+        const expectancy = total > 0 ? totalPnL / total : 0;
+        const avgWin = winCount > 0 ? sumWins / winCount : 0;
+        const avgLoss = lossCount > 0 ? sumLosses / lossCount : 0;
+        const sorted = [...trackedTrades].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+        let peak = 0, cum = 0, mdd = 0;
+        for (const tr of sorted) {
+          cum += (tr.pnl || 0);
+          if (cum > peak) peak = cum;
+          if (peak - cum > mdd) mdd = peak - cum;
+        }
+        const maxDD = mdd;
+        const maxWin = trackedTrades.length ? Math.max(...trackedTrades.map(t => t.pnl || 0)) : 0;
+        const maxLoss = trackedTrades.length ? Math.min(...trackedTrades.map(t => t.pnl || 0)) : 0;
 
-        const best = stats.length ? stats.reduce((a, b) => b.pnl > a.pnl ? b : a) : null;
-        const worst = stats.length ? stats.reduce((a, b) => b.pnl < a.pnl ? b : a) : null;
-        const bestWr = stats.length ? stats.reduce((a, b) => b.wr > a.wr ? b : a) : null;
-        const mostActive = stats.length ? stats.reduce((a, b) => b.count > a.count ? b : a) : null;
-
-        const Block = ({ label, item, valueFn, valueColor, isLast }) => {
-          return (
-            <div
-              style={{
-                flex: 1, padding: 16, background: T.white,
-                borderRight: isLast ? "none" : `1px solid ${T.border}`,
-                display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
-              }}
-            >
-              <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
-              {item ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.strategy.color, flexShrink: 0 }} />
-                    <div style={{ fontSize: 13, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.strategy.name}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 20, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2 }}>
-                      {valueFn(item)}
-                    </div>
-                    <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>
-                      {item.count} trade{item.count > 1 ? "s" : ""}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize: 13, color: T.textMut }}>—</div>
-              )}
+        const Cell = ({ label, value, sub, valueColor, last }) => (
+          <div style={{
+            padding: "16px 20px",
+            borderRight: last ? "none" : `1px solid ${T.border}`,
+            display: "flex", flexDirection: "column", gap: 6, minWidth: 0,
+          }}>
+            <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {value}
             </div>
-          );
-        };
+            {sub !== undefined && <div style={{ fontSize: 11, color: T.textMut }}>{sub}</div>}
+          </div>
+        );
 
         return (
-          <div className="tr4de-kpi-row" style={{ display: "flex", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <Block label={t("strat.bestPerf")} item={best}
-              valueFn={(x) => fmt(x.pnl, true)} valueColor={best && best.pnl >= 0 ? T.green : T.red} />
-            <Block label={t("strat.worstPerf")} item={worst}
-              valueFn={(x) => fmt(x.pnl, true)} valueColor={worst && worst.pnl >= 0 ? T.green : T.red} />
-            <Block label={t("strat.bestWr")} item={bestWr}
-              valueFn={(x) => `${x.wr.toFixed(1)}%`} />
-            <Block label={t("strat.mostActive")} item={mostActive}
-              valueFn={(x) => `${x.count} trades`} isLast />
+          <div className="tr4de-kpi-row" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+            {/* Row 1 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+              <Cell label="P&L Net" value={fmt(totalPnL, true)} sub={`${total} trade${total > 1 ? "s" : ""}`}
+                valueColor={totalPnL > 0 ? T.green : totalPnL < 0 ? T.red : T.text} />
+              <Cell label="Profit factor"
+                value={profitFactor === Infinity ? "∞" : (total > 0 ? profitFactor.toFixed(2) : "—")}
+                sub="Gain / Perte" />
+              <Cell label="Drawdown max"
+                value={maxDD > 0 ? `−${fmt(maxDD)}` : "—"}
+                sub="Pire baisse"
+                valueColor={maxDD > 0 ? T.red : T.text} />
+              <Cell label="Trades" value={String(total)} sub={`${winCount}W / ${lossCount}L`} last />
+            </div>
+            {/* Row 2 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: `1px solid ${T.border}` }}>
+              <Cell label="Taux de victoire" value={total > 0 ? `${winRate.toFixed(1)}%` : "—"} sub="Performance" />
+              <Cell label="Espérance / trade"
+                value={total > 0 ? fmt(expectancy, true) : "—"}
+                sub="Moyenne par trade"
+                valueColor={expectancy > 0 ? T.green : expectancy < 0 ? T.red : T.text} />
+              <Cell label="Meilleur trade" value={total > 0 ? fmt(maxWin) : "—"} sub="Plus haut gain" valueColor={T.green} />
+              <Cell label="Pire trade" value={total > 0 ? fmt(maxLoss) : "—"} sub="Plus grosse perte" valueColor={T.red} last />
+            </div>
           </div>
         );
       })()}

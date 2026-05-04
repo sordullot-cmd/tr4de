@@ -36,12 +36,18 @@ export function useCloudState<T>(
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydrated = useRef(false);
+  const dirty = useRef(false);
+  const saving = useRef(false);
 
   // Fetch depuis Supabase au mount + sur focus
   useEffect(() => {
     if (!user?.id) { hydrated.current = true; return; }
     let cancelled = false;
     const fetchCloud = async () => {
+      // Ne jamais écraser des modifications locales non encore persistées
+      // (debounce en cours ou save en vol). Sinon un refetch sur focus peut
+      // perdre les changements qui viennent juste d'être tapés.
+      if (dirty.current || saving.current) return;
       try {
         const { data, error } = await supabase
           .from("user_productivity")
@@ -56,6 +62,7 @@ export function useCloudState<T>(
           return;
         }
         if (cancelled) return;
+        if (dirty.current || saving.current) return;
         if (data && data.value !== null && data.value !== undefined) {
           setLocalValue(data.value as T);
           try { localStorage.setItem(storageKey, JSON.stringify(data.value)); } catch {}
@@ -79,8 +86,11 @@ export function useCloudState<T>(
       const next = typeof updater === "function" ? (updater as (p: T) => T)(prev) : updater;
       try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
       if (user?.id) {
+        dirty.current = true;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(async () => {
+          saving.current = true;
+          dirty.current = false;
           try {
             const { error } = await supabase
               .from("user_productivity")
@@ -93,6 +103,8 @@ export function useCloudState<T>(
             }
           } catch (e: any) {
             console.warn(`[useCloudState:${cloudKey}] save failed:`, e?.message || e);
+          } finally {
+            saving.current = false;
           }
         }, 500);
       }

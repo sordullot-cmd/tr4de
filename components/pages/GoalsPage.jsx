@@ -122,18 +122,16 @@ function daysLeft(deadline) {
 // via drag d'un objectif sur un autre) ont les mêmes opérations que les goals
 // top-level (édition, ajustement manuel, mutation des sous-objectifs).
 function updateGoalById(goals, id, updater) {
-  return goals.map(g => {
-    if (g.id === id) return updater(g);
+  let changed = false;
+  const out = goals.map(g => {
+    if (g.id === id) { changed = true; return updater(g); }
     if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
-      let changed = false;
-      const next = g.subtasks.map(s => {
-        if (s.id === id) { changed = true; return updater(s); }
-        return s;
-      });
-      if (changed) return { ...g, subtasks: next };
+      const nextSubs = updateGoalById(g.subtasks, id, updater);
+      if (nextSubs !== g.subtasks) { changed = true; return { ...g, subtasks: nextSubs }; }
     }
     return g;
   });
+  return changed ? out : goals;
 }
 // Retire récursivement le goal d'id `id` de l'arbre et renvoie l'arbre allégé
 // + le goal extrait. Utilisé par le drag & drop pour pouvoir le ré-insérer.
@@ -199,12 +197,15 @@ function insertGoalAtTarget(goals, source, targetId, mode) {
 
 function removeGoalById(goals, id) {
   if (goals.some(g => g.id === id)) return goals.filter(g => g.id !== id);
-  return goals.map(g => {
-    if (Array.isArray(g.subtasks) && g.subtasks.some(s => s.id === id)) {
-      return { ...g, subtasks: g.subtasks.filter(s => s.id !== id) };
+  let changed = false;
+  const out = goals.map(g => {
+    if (Array.isArray(g.subtasks) && g.subtasks.length > 0) {
+      const nextSubs = removeGoalById(g.subtasks, id);
+      if (nextSubs !== g.subtasks) { changed = true; return { ...g, subtasks: nextSubs }; }
     }
     return g;
   });
+  return changed ? out : goals;
 }
 
 function defaultGoals() {

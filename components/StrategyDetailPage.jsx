@@ -613,10 +613,11 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         </div>
       </div>
 
-      {/* CARD 1 : 4 KPIs collés dans une seule card */}
+      {/* CARD 1 : 8 KPIs en 2 rangées */}
       {filteredTrades.length > 0 && (
-        <div className="tr4de-kpi-row" style={{display:"flex",background:T.white,border:`1px solid ${T.border}`,borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden"}}>
-
+        <div className="tr4de-kpi-row" style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"12px 12px 0 0",borderBottom:"none",overflow:"hidden"}}>
+          {/* ROW 1 - 4 KPIs */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)"}}>
             {/* 1. P&L Net */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
               <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>P&L Net</div>
@@ -626,52 +627,72 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
               <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length} trades</div>
             </div>
 
-            {/* 2. Taux de Victoire */}
+            {/* 2. Profit factor */}
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Profit factor</div>
+              <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {profitFactor === Infinity ? "∞" : (filteredTrades.length > 0 ? profitFactor : "—")}
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>Gain / Perte</div>
+            </div>
+
+            {/* 3. Drawdown max */}
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Drawdown max</div>
+              <div style={{fontSize:20,fontWeight:600,color:T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                −{fmt(Math.max(...filteredTrades.map(t=>t.pnl||0),0), false)}
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>Pire baisse</div>
+            </div>
+
+            {/* 4. Trades */}
+            <div style={{flex:1,padding:"16px 20px"}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Trades</div>
+              <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {filteredTrades.length}
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>{winCount}W / {lossCount}L</div>
+            </div>
+          </div>
+
+          {/* ROW 2 - 4 KPIs - séparateur */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",borderTop:`1px solid ${T.border}`}}>
+            {/* 5. Taux de victoire */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
               <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Taux de victoire</div>
               <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {winRate}%
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>{winCount}W · {lossCount}L</div>
+              <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length > 0 ? "Performance" : "—"}</div>
             </div>
 
-            {/* 3. Meilleur vs Pire (compact) */}
+            {/* 6. Espérance/trade */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Meilleur vs pire</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
-                <span style={{fontSize:18,fontWeight:600,color:T.green,letterSpacing:-0.2}}>{fmt(maxWin)}</span>
-                <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>/</span>
-                <span style={{fontSize:18,fontWeight:600,color:T.red,letterSpacing:-0.2}}>{fmt(maxLoss)}</span>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Espérance/trade</div>
+              <div style={{fontSize:20,fontWeight:600,color:totalPnL/filteredTrades.length >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {filteredTrades.length > 0 ? fmt(totalPnL/filteredTrades.length, true) : "—"}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Plus haut / plus bas</div>
+              <div style={{fontSize:11,color:T.textMut}}>Moyenne par trade</div>
             </div>
 
-            {/* 4. Suivi Regles (ou stat de fallback) */}
-            {hasRules ? (
-              <div style={{flex:1,padding:"16px 20px"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontSize:12,color:T.textSub,fontWeight:500}}>Suivi des règles</div>
-                  <span style={{fontSize:10,fontWeight:600,color:impactColor,padding:"2px 6px",borderRadius:999,background:impactColor+"15"}}>
-                    {rulesImpact > 0 ? "+" : ""}{rulesImpact}%
-                  </span>
-                </div>
-                <div style={{display:"flex",alignItems:"baseline",gap:6,lineHeight:1.1,marginBottom:6}}>
-                  <span style={{fontSize:18,fontWeight:600,color:T.text,letterSpacing:-0.2}}>{statsAllChecked.winRate}%</span>
-                  <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>vs</span>
-                  <span style={{fontSize:18,fontWeight:600,color:T.textSub,letterSpacing:-0.2}}>{statsNone.winRate}%</span>
-                </div>
-                <div style={{fontSize:11,color:T.textMut}}>Avec règles / sans règles</div>
+            {/* 7. Meilleur trade */}
+            <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Meilleur trade</div>
+              <div style={{fontSize:20,fontWeight:600,color:T.green,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {fmt(maxWin)}
               </div>
-            ) : (
-              <div style={{flex:1,padding:"16px 20px"}}>
-                <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Volume</div>
-                <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
-                  {filteredTrades.length}
-                </div>
-                <div style={{fontSize:11,color:T.textMut}}>trades exécutés</div>
-              </div>
-            )}
+              <div style={{fontSize:11,color:T.textMut}}>Plus haut gain</div>
+            </div>
 
+            {/* 8. Pire trade */}
+            <div style={{flex:1,padding:"16px 20px"}}>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Pire trade</div>
+              <div style={{fontSize:20,fontWeight:600,color:T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
+                {fmt(maxLoss)}
+              </div>
+              <div style={{fontSize:11,color:T.textMut}}>Plus grosse perte</div>
+            </div>
+          </div>
         </div>
       )}
 
