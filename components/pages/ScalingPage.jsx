@@ -5,6 +5,7 @@ import { ChevronDown, Plus, Check, ArrowRight, Trash2 } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import { t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5", text: "#0D0D0D",
@@ -39,6 +40,7 @@ const sizeToUsd = (s) => {
 };
 
 export default function ScalingPage({ onGeneratePlan }) {
+  useLang();
   const [accounts, setAccounts] = useCloudState(STORAGE_KEY, "prop_firm_accounts", []);
   const [sim, setSim] = useCloudState(STORAGE_SIM_KEY, "scaling_sim", { capitalSize: 50000, pctMonthly: 5, accountsTarget: 3, weeksPerEval: 7 });
   const [expanded, setExpanded] = useState({});
@@ -311,7 +313,7 @@ function AccountForm({ onClose, onSave }) {
         </div>
         <div style={{ padding: "12px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "flex-end", gap: 8, background: T.bg }}>
           <button onClick={onClose} style={{ padding: "8px 16px", height: 34, borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
-          <button onClick={submit} style={{ padding: "8px 18px", height: 34, borderRadius: 999, border: `1px solid ${T.text}`, background: T.text, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Créer</button>
+          <button onClick={submit} style={{ padding: "8px 18px", height: 34, borderRadius: 999, border: `1px solid ${T.text}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Créer</button>
         </div>
       </div>
     </div>
@@ -354,6 +356,7 @@ function Toggle({ label, checked, onChange }) {
 }
 
 export function RoadmapSection({ accounts, sim, glued }) {
+  useLang();
   const fundedCount = accounts.filter(a => a.status === "funded").length;
   const total = accounts.length;
   // Taille de compte persistée — partage le même cloud-state que le
@@ -455,10 +458,10 @@ export function RoadmapSection({ accounts, sim, glued }) {
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>Roadmap de scaling</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>{t("scaling.roadmapTitle")}</div>
           <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>
-            Plan en {steps.length} étapes — adapté à la taille de compte choisie
-            {doneCount > 0 && ` · ${doneCount}/${steps.length} fait${doneCount > 1 ? "s" : ""}`}
+            {t("scaling.roadmapSubtitle").replace("{n}", String(steps.length))}
+            {doneCount > 0 && ` · ${t("scaling.roadmapDone").replace("{c}", String(doneCount)).replace("{t}", String(steps.length)).replace("{s}", doneCount > 1 ? "s" : "")}`}
           </div>
         </div>
         {/* Sélecteur Taille du compte juste à côté du bouton "Déployer" */}
@@ -487,7 +490,7 @@ export function RoadmapSection({ accounts, sim, glued }) {
           fontSize: 11, color: T.textSub, fontWeight: 500,
           display: "inline-flex", alignItems: "center", gap: 4,
         }}>
-          {open ? "Replier" : "Déployer"}
+          {open ? t("scaling.collapse") : t("scaling.expand")}
           <ArrowRight size={12} strokeWidth={2}
             style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform .15s ease" }} />
         </span>
@@ -554,7 +557,7 @@ export function RoadmapSection({ accounts, sim, glued }) {
                           color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
                         }}>
                         <ArrowRight size={11} strokeWidth={2} style={{ transform: "rotate(180deg)" }} />
-                        Étape précédente
+                        {t("scaling.prevStep")}
                       </button>
                     )}
                     {!isLast && (
@@ -567,7 +570,7 @@ export function RoadmapSection({ accounts, sim, glued }) {
                           border: "none", background: T.blue, color: "#FFFFFF",
                           fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                         }}>
-                        <Check size={11} strokeWidth={2.5} /> Marquer comme fait
+                        <Check size={11} strokeWidth={2.5} /> {t("scaling.markDone")}
                       </button>
                     )}
                     {isLast && (
@@ -580,7 +583,7 @@ export function RoadmapSection({ accounts, sim, glued }) {
                           border: "none", background: T.green, color: "#FFFFFF",
                           fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                         }}>
-                        <Check size={11} strokeWidth={2.5} /> Roadmap terminée
+                        <Check size={11} strokeWidth={2.5} /> {t("scaling.roadmapDoneBtn")}
                       </button>
                     )}
                   </div>
@@ -717,7 +720,7 @@ export function SimulatorSection({ sim, setSim, accounts, onGeneratePlan }) {
           style={{
             alignSelf: "flex-start",
             padding: "8px 18px", height: 34, borderRadius: 999,
-            border: `1px solid ${T.text}`, background: T.text, color: "#fff",
+            border: `1px solid ${T.text}`, background: T.white, color: T.text,
             fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
             marginTop: 4,
           }}

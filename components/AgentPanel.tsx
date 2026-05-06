@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
+import { t, useLang } from "@/lib/i18n";
 
 // Tokens charte OpenAI (alignes sur lib/design/tokens.ts)
 const T = {
@@ -52,6 +53,7 @@ interface AgentPanelProps {
 type TabId = "chat" | "reports" | "insights" | "profile";
 
 export default function AgentPanel(props: AgentPanelProps) {
+  useLang();
   const [tab, setTab] = useState<TabId>("chat");
 
   return (
@@ -83,10 +85,10 @@ export default function AgentPanel(props: AgentPanelProps) {
 
 function TabsBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
   const tabs = [
-    { id: "chat" as TabId,     Icon: MessageCircle, label: "Chat" },
-    { id: "reports" as TabId,  Icon: FileText,      label: "Rapports" },
-    { id: "insights" as TabId, Icon: Brain,         label: "Pattern" },
-    { id: "profile" as TabId,  Icon: Dna,           label: "Profil" },
+    { id: "chat" as TabId,     Icon: MessageCircle, label: t("agent.tab.chat") },
+    { id: "reports" as TabId,  Icon: FileText,      label: t("agent.tab.reports") },
+    { id: "insights" as TabId, Icon: Brain,         label: t("agent.tab.insights") },
+    { id: "profile" as TabId,  Icon: Dna,           label: t("agent.tab.profile") },
   ];
   return (
     <div style={{ display: "flex", gap: 2, padding: "8px 20px 0", borderBottom: `1px solid ${T.border}`, background: T.bg, justifyContent: "center" }}>
@@ -232,12 +234,12 @@ function ReportsPanel({ trades }: { trades: any[] }) {
          <Loader2 size={14} strokeWidth={2} className="anim-fade-in" style={{ animation: "spin 1s linear infinite" }} />}
       </span>
       <span style={{ flex: 1 }}>
-        {status.kind === "generating" ? "Génération en cours..." : "message" in status ? status.message : ""}
+        {status.kind === "generating" ? t("agent.reports.generatingFull") : "message" in status ? status.message : ""}
       </span>
       <button
         onClick={clearStatus}
         style={{ background: "transparent", border: "none", cursor: "pointer", color: "inherit", padding: 0, lineHeight: 1, display: "inline-flex" }}
-        aria-label="Fermer"
+        aria-label={t("agent.close")}
       ><X size={14} /></button>
     </div>
   ) : null;
@@ -249,7 +251,7 @@ function ReportsPanel({ trades }: { trades: any[] }) {
         {statusBanner}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>
-            Rapports {unreadCount > 0 && <span style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 999, background: T.accent, color: "#fff", fontSize: 11 }}>{unreadCount}</span>}
+            {t("agent.reports.title")} {unreadCount > 0 && <span style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 999, background: T.accent, color: "#fff", fontSize: 11 }}>{unreadCount}</span>}
           </div>
         </div>
 
@@ -270,7 +272,7 @@ function ReportsPanel({ trades }: { trades: any[] }) {
                 fontFamily: "inherit",
               }}
             >
-              {f === "all" ? "Tous" : f === "daily" ? "Jour" : "Semaine"}
+              {f === "all" ? t("agent.reports.filterAll") : f === "daily" ? t("agent.reports.filterDaily") : t("agent.reports.filterWeekly")}
             </button>
           ))}
         </div>
@@ -284,7 +286,7 @@ function ReportsPanel({ trades }: { trades: any[] }) {
             onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; }}
           >
             <Plus size={14} strokeWidth={2} />
-            {generating ? "Génération..." : "Rapport du jour"}
+            {generating ? t("agent.reports.generating") : t("agent.reports.dailyReport")}
           </button>
           <button
             onClick={handleGenerateThisWeek}
@@ -294,16 +296,16 @@ function ReportsPanel({ trades }: { trades: any[] }) {
             onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; }}
           >
             <Plus size={14} strokeWidth={2} />
-            {generating ? "Génération..." : "Rapport de la semaine"}
+            {generating ? t("agent.reports.generating") : t("agent.reports.weeklyReport")}
           </button>
         </div>
 
         {loading ? (
-          <div style={{ color: T.textMut, fontSize: 13, padding: 12 }}>Chargement...</div>
+          <div style={{ color: T.textMut, fontSize: 13, padding: 12 }}>{t("agent.reports.loading")}</div>
         ) : filtered.length === 0 ? (
           <div style={{ color: T.textMut, fontSize: 13, padding: 12, textAlign: "center" }}>
-            Aucun rapport.<br />
-            Ajoute des trades pour que l&apos;IA en génère.
+            {t("agent.reports.empty")}<br />
+            {t("agent.reports.emptySub")}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -318,7 +320,7 @@ function ReportsPanel({ trades }: { trades: any[] }) {
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px", background: T.bg }}>
         {selected ? <ReportDetail report={selected} /> : (
           <div style={{ color: T.textMut, fontSize: 14, textAlign: "center", marginTop: 48 }}>
-            Sélectionnez un rapport pour le consulter
+            {t("agent.reports.selectOne")}
           </div>
         )}
       </div>
@@ -347,7 +349,7 @@ function ReportCard({ report, selected, onClick }: { report: AIReport; selected:
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
         <span style={{ padding: "2px 8px", borderRadius: 999, background: report.report_type === "daily" ? "#E3ECFB" : "#F5EAE0", color: report.report_type === "daily" ? T.accent : "#9D8555", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>
-          {report.report_type === "daily" ? "Jour" : "Semaine"}
+          {report.report_type === "daily" ? t("agent.reports.daily") : t("agent.reports.weekly")}
         </span>
         {!report.is_read && <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.accent }} />}
       </div>
@@ -369,7 +371,7 @@ function ReportDetail({ report }: { report: AIReport }) {
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: T.textMut, marginBottom: 4 }}>
-          Généré le {d.toLocaleString("fr-FR")}
+          {t("agent.reports.generatedAt")} {d.toLocaleString()}
         </div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: 0 }}>{report.title}</h2>
       </div>
@@ -493,14 +495,14 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
 
   const typeMeta = (t: string): { label: string; Icon: any } => {
     const map: Record<string, { label: string; Icon: any }> = {
-      revenge_trading: { label: "Revenge trading", Icon: AlertTriangle },
-      overtrading: { label: "Overtrading", Icon: AlertTriangle },
-      losing_streak: { label: "Séries perdantes", Icon: AlertTriangle },
-      best_setup: { label: "Meilleur setup", Icon: CheckCircle2 },
-      worst_setup: { label: "Pire setup", Icon: AlertTriangle },
-      best_hour: { label: "Meilleure heure", Icon: CheckCircle2 },
-      worst_hour: { label: "Pire heure", Icon: AlertTriangle },
-      emotion_impact: { label: "Impact émotionnel", Icon: Brain },
+      revenge_trading: { label: t("agent.pattern.revenge_trading"), Icon: AlertTriangle },
+      overtrading: { label: t("agent.pattern.overtrading"), Icon: AlertTriangle },
+      losing_streak: { label: t("agent.pattern.losing_streak"), Icon: AlertTriangle },
+      best_setup: { label: t("agent.pattern.best_setup"), Icon: CheckCircle2 },
+      worst_setup: { label: t("agent.pattern.worst_setup"), Icon: AlertTriangle },
+      best_hour: { label: t("agent.pattern.best_hour"), Icon: CheckCircle2 },
+      worst_hour: { label: t("agent.pattern.worst_hour"), Icon: AlertTriangle },
+      emotion_impact: { label: t("agent.pattern.emotion_impact"), Icon: Brain },
     };
     return map[t] || { label: t, Icon: Info };
   };
@@ -512,10 +514,10 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
             <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, display: "inline-flex", alignItems: "center", gap: 4 }}>
-              Pattern <span style={{ color: T.textMut, fontWeight: 500 }}>›</span>
+              {t("agent.insights.title")} <span style={{ color: T.textMut, fontWeight: 500 }}>›</span>
             </h1>
             <p style={{ fontSize: 12, color: T.textMut, margin: "2px 0 0" }}>
-              Comportements et tendances détectés automatiquement
+              {t("agent.insights.subtitle")}
             </p>
           </div>
           <button
@@ -532,7 +534,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
             onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; }}
           >
             {analyzing && <Loader2 size={13} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />}
-            {analyzing ? "Analyse..." : "Analyser"}
+            {analyzing ? t("agent.insights.analyzing") : t("agent.insights.analyze")}
           </button>
         </div>
 
@@ -560,7 +562,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
 
         {/* Contenu */}
         {loading ? (
-          <div style={{ color: T.textMut, padding: 16, fontSize: 12 }}>Chargement…</div>
+          <div style={{ color: T.textMut, padding: 16, fontSize: 12 }}>{t("agent.insights.loading")}</div>
         ) : patterns.length === 0 ? (
           // Empty state style site (icone ronde + texte + bouton)
           <div style={{ padding: "48px 24px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 14 }}>
@@ -572,7 +574,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
               <Brain size={20} strokeWidth={1.5} color="#5C5C5C" />
             </div>
             <div style={{ fontSize: 13, color: T.textSub, maxWidth: 320, lineHeight: 1.4 }}>
-              Aucun pattern détecté pour l&apos;instant. Ajoute plus de trades, puis lance une analyse.
+              {t("agent.insights.empty")}
             </div>
           </div>
         ) : (
@@ -616,7 +618,7 @@ function InsightsPanel({ trades = [] }: { trades?: any[] }) {
                       {p.pattern_data?.detail || p.pattern_data?.description || "—"}
                     </div>
                     <div style={{ display: "flex", gap: 10, fontSize: 11, color: T.textMut, alignItems: "center" }}>
-                      <span>{p.occurrences} occurrence{p.occurrences > 1 ? "s" : ""}</span>
+                      <span>{p.occurrences} {p.occurrences > 1 ? t("agent.occurrences") : t("agent.occurrence")}</span>
                       {p.avg_pnl_impact != null && (
                         <>
                           <span>·</span>
@@ -750,7 +752,7 @@ function ProfilePanel() {
   };
 
   const reset = async () => {
-    if (!confirm("Reinitialiser entierement le profil ? L'IA repartira de zero.")) return;
+    if (!confirm(t("agent.profile.resetConfirm"))) return;
     setSaving(true);
     try {
       const res = await fetch("/api/ai/memory", { method: "DELETE", credentials: "include" });
@@ -766,8 +768,8 @@ function ProfilePanel() {
     }
   };
 
-  if (loading) return <div style={{ padding: 32, color: T.textMut, fontFamily: "var(--font-sans)" }}>Chargement du profil...</div>;
-  if (!memory || !draft) return <div style={{ padding: 32, color: T.textMut, fontFamily: "var(--font-sans)" }}>Aucun profil disponible.</div>;
+  if (loading) return <div style={{ padding: 32, color: T.textMut, fontFamily: "var(--font-sans)" }}>{t("agent.profile.loading")}</div>;
+  if (!memory || !draft) return <div style={{ padding: 32, color: T.textMut, fontFamily: "var(--font-sans)" }}>{t("agent.profile.empty")}</div>;
 
   const view = editing ? draft : memory;
 
@@ -776,9 +778,9 @@ function ProfilePanel() {
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
           <div>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: 0 }}>Profil IA — ce que le coach sait de toi</h2>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: 0 }}>{t("agent.profile.title")}</h2>
             <p style={{ fontSize: 13, color: T.textSub, margin: "4px 0 0" }}>
-              Distille a partir de tes conversations. Plus tu discutes, plus le profil s&apos;enrichit.
+              {t("agent.profile.subtitle")}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -791,7 +793,7 @@ function ProfilePanel() {
                   onMouseEnter={e => { if (!updating) e.currentTarget.style.background = "#262626"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "#0D0D0D"; }}
                 >
-                  {updating ? "Mise à jour..." : "Mettre à jour"}
+                  {updating ? t("agent.profile.updating") : t("agent.profile.update")}
                 </button>
                 <button
                   onClick={() => setEditing(true)}
@@ -799,7 +801,7 @@ function ProfilePanel() {
                   onMouseEnter={e => { e.currentTarget.style.background = T.panelHover; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; }}
                 >
-                  Éditer
+                  {t("agent.profile.edit")}
                 </button>
               </>
             ) : (
@@ -811,7 +813,7 @@ function ProfilePanel() {
                   onMouseEnter={e => { if (!saving) e.currentTarget.style.background = "#262626"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "#0D0D0D"; }}
                 >
-                  {saving ? "Enregistrement..." : "Enregistrer"}
+                  {saving ? t("agent.profile.saving") : t("agent.profile.save")}
                 </button>
                 <button
                   onClick={() => { setDraft(memory); setEditing(false); }}
@@ -819,7 +821,7 @@ function ProfilePanel() {
                   onMouseEnter={e => { e.currentTarget.style.background = T.panelHover; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; }}
                 >
-                  Annuler
+                  {t("agent.profile.cancel")}
                 </button>
               </>
             )}
@@ -828,7 +830,7 @@ function ProfilePanel() {
 
         {memory.last_updated_at && (
           <div style={{ fontSize: 11, color: T.textMut, marginBottom: 16 }}>
-            Derniere mise a jour : {new Date(memory.last_updated_at).toLocaleString("fr-FR")} — {memory.messages_processed} messages analyses
+            {t("agent.profile.lastUpdate")} {new Date(memory.last_updated_at).toLocaleString()} — {t("agent.profile.messagesAnalyzed").replace("{n}", String(memory.messages_processed))}
           </div>
         )}
 
@@ -849,54 +851,54 @@ function ProfilePanel() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Field
-            label="Style de trading"
+            label={t("agent.profile.style")}
             kind="text"
             value={view.trading_style || ""}
             editing={editing}
             onChange={v => setDraft({ ...draft, trading_style: v as string })}
-            placeholder="Pas encore renseigne"
-            helper="1-2 phrases qui te decrivent (instruments, timeframe, approche)"
+            placeholder={t("agent.profile.stylePh")}
+            helper={t("agent.profile.styleHelper")}
           />
           <Field
-            label="Erreurs recurrentes"
+            label={t("agent.profile.errors")}
             kind="list"
             value={view.recurring_errors}
             editing={editing}
             onChange={v => setDraft({ ...draft, recurring_errors: v as string[] })}
-            placeholder="Ex: revenge trade apres une perte"
+            placeholder={t("agent.profile.errorsPh")}
           />
           <Field
-            label="Forces"
+            label={t("agent.profile.strengths")}
             kind="list"
             value={view.strengths}
             editing={editing}
             onChange={v => setDraft({ ...draft, strengths: v as string[] })}
-            placeholder="Ex: discipline les lundis"
+            placeholder={t("agent.profile.strengthsPh")}
           />
           <Field
-            label="Patterns emotionnels"
+            label={t("agent.profile.emotions")}
             kind="list"
             value={view.emotional_patterns}
             editing={editing}
             onChange={v => setDraft({ ...draft, emotional_patterns: v as string[] })}
-            placeholder="Ex: FOMO en fin de journee"
+            placeholder={t("agent.profile.emotionsPh")}
           />
           <Field
-            label="Objectifs"
+            label={t("agent.profile.goals")}
             kind="list"
             value={view.goals}
             editing={editing}
             onChange={v => setDraft({ ...draft, goals: v as string[] })}
-            placeholder="Ex: passer en funded 50k"
+            placeholder={t("agent.profile.goalsPh")}
           />
           <Field
-            label="Notes du coach"
+            label={t("agent.profile.coachNotes")}
             kind="textarea"
             value={view.coach_notes || ""}
             editing={editing}
             onChange={v => setDraft({ ...draft, coach_notes: v as string })}
-            placeholder="Observations libres du coach"
-            helper="Ce que le coach a remarque sur ta personnalite, ton etat d'esprit, ta sensibilite"
+            placeholder={t("agent.profile.coachNotesPh")}
+            helper={t("agent.profile.coachNotesHelper")}
           />
         </div>
 
@@ -906,7 +908,7 @@ function ProfilePanel() {
             disabled={saving}
             style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${T.red}`, background: "transparent", color: T.red, fontSize: 11, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}
           >
-            Reinitialiser le profil
+            {t("agent.profile.reset")}
           </button>
         </div>
       </div>
@@ -981,7 +983,7 @@ function ListEditor({ items, editing, onChange, placeholder }: { items: string[]
   const safeItems = Array.isArray(items) ? items : [];
 
   if (!editing) {
-    if (safeItems.length === 0) return <div style={{ fontSize: 14, color: T.textMut }}>Aucun element</div>;
+    if (safeItems.length === 0) return <div style={{ fontSize: 14, color: T.textMut }}>{t("agent.profile.noElement")}</div>;
     return (
       <ul style={{ margin: 0, paddingLeft: 16, listStyle: "disc", display: "flex", flexDirection: "column", gap: 4 }}>
         {safeItems.map((item, i) => (
@@ -1017,7 +1019,7 @@ function ListEditor({ items, editing, onChange, placeholder }: { items: string[]
               onClick={() => onChange(safeItems.filter((_, j) => j !== i))}
               style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.panel, color: T.red, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
             >
-              Suppr
+              {t("agent.profile.delete")}
             </button>
           </div>
         ))}
@@ -1028,14 +1030,14 @@ function ListEditor({ items, editing, onChange, placeholder }: { items: string[]
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-          placeholder={placeholder || "Ajouter un element"}
+          placeholder={placeholder || t("agent.profile.addElementPh")}
           style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg, fontSize: 13, color: T.text, fontFamily: "inherit", outline: "none" }}
         />
         <button
           onClick={add}
           style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.accent}`, background: T.accent, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
         >
-          + Ajouter
+          {t("agent.profile.addBtn")}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import { t, useLang } from "@/lib/i18n";
 
 export default function MultiAccountSelector({
   accounts = [],
@@ -11,6 +12,7 @@ export default function MultiAccountSelector({
   onCreateAccount,
   T = {},
 }) {
+  useLang(); // re-render on language change
   const [isOpen, setIsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // account object ou null
   const [deleting, setDeleting] = useState(false);
@@ -51,12 +53,12 @@ export default function MultiAccountSelector({
   const allSelected = accounts.length > 0 && selectedAccountIds.length === accounts.length;
   const displayText =
     selectedAccountIds.length === 0
-      ? "Aucun compte"
+      ? t("accounts.noAccount")
       : allSelected
-      ? `Tous les comptes (${accounts.length})`
+      ? t("accounts.allAccountsCount").replace("{n}", String(accounts.length))
       : selectedAccountIds.length === 1
-      ? accounts.find((a) => a.id === selectedAccountIds[0])?.name || "1 compte"
-      : `${selectedAccountIds.length} comptes`;
+      ? accounts.find((a) => a.id === selectedAccountIds[0])?.name || t("accounts.singular")
+      : t("accounts.multiple").replace("{n}", String(selectedAccountIds.length));
 
   return (
     <div style={{ position: "relative", minWidth: 180, fontFamily: "var(--font-sans)" }} ref={menuRef}>
@@ -135,7 +137,7 @@ export default function MultiAccountSelector({
                 onChange={handleSelectAll}
                 style={{ width: 14, height: 14, accentColor: "#0D0D0D", cursor: "pointer", margin: 0, flexShrink: 0 }}
               />
-              <span style={{ flex: 1 }}>Tous les comptes</span>
+              <span style={{ flex: 1 }}>{t("accounts.allAccounts")}</span>
             </label>
           )}
 
@@ -154,7 +156,7 @@ export default function MultiAccountSelector({
                 fontWeight: 500,
               }}
             >
-              Mes comptes
+              {t("accounts.myAccounts")}
             </div>
           )}
 
@@ -195,7 +197,7 @@ export default function MultiAccountSelector({
                       data-del-btn
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setConfirmDelete(account); }}
-                      title="Supprimer ce compte"
+                      title={t("accounts.deleteTip")}
                       style={{
                         display: "inline-flex", alignItems: "center", justifyContent: "center",
                         width: 22, height: 22, border: "none", background: "transparent",
@@ -218,7 +220,7 @@ export default function MultiAccountSelector({
 
           {accounts.length === 0 && (
             <div style={{ padding: "12px", textAlign: "center", fontSize: 12, color: "#8E8E8E" }}>
-              Aucun compte
+              {t("accounts.noAccount")}
             </div>
           )}
 
@@ -248,7 +250,7 @@ export default function MultiAccountSelector({
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 <Plus size={14} strokeWidth={2} />
-                Créer un compte
+                {t("accounts.createNew")}
               </button>
             </>
           )}
@@ -268,16 +270,16 @@ export default function MultiAccountSelector({
                 <Trash2 size={16} strokeWidth={1.75} color="#EF4444"/>
               </div>
               <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>
-                Supprimer le compte « {confirmDelete.name} » ?
+                {t("accounts.confirmDeleteTitle").replace("{name}", confirmDelete.name)}
               </h3>
             </div>
             <div style={{padding:"4px 24px 20px",fontSize:13,color:"#5C5C5C",lineHeight:1.5}}>
-              Cette action est <strong style={{color:"#0D0D0D"}}>définitive</strong>. Tous les trades associés à ce compte seront aussi supprimés et ne pourront pas être récupérés.
+              {t("accounts.confirmDeletePart1")} <strong style={{color:"#0D0D0D"}}>{t("accounts.confirmDeletePart2")}</strong>{t("accounts.confirmDeletePart3")}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:"1px solid #F0F0F0",background:"#FAFAFA"}}>
               <button onClick={()=>setConfirmDelete(null)} disabled={deleting}
                 style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.5 : 1}}>
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 onClick={async ()=>{
@@ -289,7 +291,7 @@ export default function MultiAccountSelector({
                 }}
                 disabled={deleting}
                 style={{padding:"0 16px",height:36,borderRadius:8,border:"1px solid #EF4444",background:"#EF4444",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor: deleting ? "not-allowed" : "pointer",fontFamily:"inherit",opacity: deleting ? 0.7 : 1}}>
-                {deleting ? "Suppression..." : "Supprimer"}
+                {deleting ? t("accounts.deleting") : t("common.delete")}
               </button>
             </div>
           </div>

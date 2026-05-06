@@ -345,7 +345,7 @@ export default function DateRangePicker({ value, onChange, width }: Props) {
                   type="button"
                   onClick={apply}
                   disabled={!draftStart}
-                  style={{ padding: "6px 16px", border: "1px solid #0D0D0D", background: "#0D0D0D", color: "#FFFFFF", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: draftStart ? "pointer" : "not-allowed", opacity: draftStart ? 1 : 0.5, fontFamily: "inherit" }}
+                  style={{ padding: "6px 16px", border: "1px solid #0D0D0D", background: "#FFFFFF", color: "#0D0D0D", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: draftStart ? "pointer" : "not-allowed", opacity: draftStart ? 1 : 0.5, fontFamily: "inherit" }}
                 >
                   Apply
                 </button>

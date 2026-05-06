@@ -16,7 +16,7 @@ import {
   Image as LucideImage,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { rMultiple, fmtR } from "@/lib/userPrefs";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
@@ -28,6 +28,7 @@ import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmot
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 
 export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades, embedded = false }) {
+  useLang();
   const { user } = useAuth();
   const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
   const { urls: screenshotUrls, uploadScreenshot, removeScreenshot } = useTradeScreenshots();
@@ -554,7 +555,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
           <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
-            <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
+            <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#FFFFFF",border:"1px solid #0D0D0D",color:"#0D0D0D",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
           </div>
           <div id="tr4de-page-header-slot" />
         </div>
@@ -1098,7 +1099,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   );
                 })}
               </div>
-              <button onClick={()=>setSelectedTrade(null)} aria-label="Fermer" style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center"}}>
+              <button onClick={()=>setSelectedTrade(null)} aria-label={t("trades.detail.close")} style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center"}}>
                 <LucideX size={16} strokeWidth={2} />
               </button>
             </div>
@@ -1113,13 +1114,13 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 <>
                   {/* INFO ROW - DIRECTION */}
                   <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Direction</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.direction")}</div>
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
                   </div>
 
                   {/* INFO ROW - HEURE D'OUVERTURE */}
                   <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure d'ouverture</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.openTime")}</div>
                     <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
                       const v = selectedTrade.entryTime || selectedTrade.entry_time;
                       if (!v) return "—";
@@ -1131,7 +1132,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* INFO ROW - HEURE DE FERMETURE */}
                   <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Heure de fermeture</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.closeTime")}</div>
                     <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
                       const v = selectedTrade.exitTime || selectedTrade.exit_time;
                       if (!v) return "—";
@@ -1155,7 +1156,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* EMOTION TAGS */}
                   <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Tags Émotionnels</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.emotionTags")}</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allEmotionTags.map(tag=>{
                         const tradeId = selectedTrade.id;
@@ -1203,7 +1204,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* ERROR TAGS */}
                   <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`error-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Erreurs</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.errors")}</div>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {allErrorTags.map(tag=>{
                         const tradeId = selectedTrade.id;
@@ -1278,7 +1279,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             <div style={{display:"inline-flex",alignItems:"center",gap:4}}>
                               <label
                                 style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.text,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
-                                Modifier
+                                {t("trades.detail.modify")}
                                 <input type="file" accept="image/*" disabled={screenshotBusy}
                                   onChange={async (e) => {
                                     const f = e.target.files?.[0]; if (!f) { return; }
@@ -1291,7 +1292,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               <button type="button" onClick={async () => { setScreenshotBusy(true); try { await removeScreenshot(tradeId); } finally { setScreenshotBusy(false); } }}
                                 disabled={screenshotBusy}
                                 style={{padding:"4px 8px",fontSize:11,fontWeight:500,color:T.red,background:"transparent",border:"none",cursor:screenshotBusy?"not-allowed":"pointer",fontFamily:"inherit"}}>
-                                Supprimer
+                                {t("trades.detail.delete")}
                               </button>
                             </div>
                           )}
@@ -1327,7 +1328,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background=T.bg}}>
                             <LucideImage size={22} strokeWidth={1.5} color={T.textMut} />
-                            <span>{screenshotBusy ? "Upload en cours…" : "Glisser une image"}</span>
+                            <span>{screenshotBusy ? t("trades.detail.uploading") : t("trades.detail.dragImage")}</span>
                             <input type="file" accept="image/*" disabled={screenshotBusy}
                               onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; await handleFile(f); e.target.value = ""; }}
                               style={{display:"none"}} />
@@ -1339,7 +1340,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* NOTES */}
                   <div style={{padding:"16px 16px",flex:1,display:"flex",flexDirection:"column"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>Notes</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.notes")}</div>
                     <textarea
                       placeholder={t("trades.notePlaceholder")}
                       value={tradeNotes[selectedTrade.id] || ""}
@@ -1415,7 +1416,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             <LucideTarget size={20} strokeWidth={1.5} color="#5C5C5C" />
                           </div>
                           <div style={{fontSize:13,color:"#5C5C5C",textAlign:"center",maxWidth:240,lineHeight:1.4}}>
-                            Ajoute une stratégie à ton trade et suis ce qui fonctionne
+                            {t("trades.detail.addStrategyEmpty")}
                           </div>
                         </div>
                         <div style={{position:"relative",width:"100%",display:"flex",justifyContent:"center",marginTop:4}}>
@@ -1440,7 +1441,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             onMouseEnter={(e)=>{e.currentTarget.style.background="#FAFAFA"}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background="#FFFFFF"}}
                           >
-                            Ajouter une stratégie
+                            {t("trades.detail.addStrategy")}
                             <LucideChevronDown size={14} strokeWidth={1.75} />
                           </button>
                           
@@ -1461,7 +1462,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               overflowY:"auto"
                             }}>
                               {loadedStrategies.length === 0 ? (
-                                <div style={{padding:12,textAlign:"center",fontSize:11,color:T.textSub}}>Aucune stratégie créée</div>
+                                <div style={{padding:12,textAlign:"center",fontSize:11,color:T.textSub}}>{t("trades.detail.noStrategy")}</div>
                               ) : (
                                 loadedStrategies.map(strat=>{
                                   const isSelected = selectedIds.includes(strat.id);
@@ -1480,7 +1481,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                       setShowStrategyDropdown(false);
                                     }} style={{width:"100%",padding:"8px 12px",borderBottom:`1px solid ${T.border}`,background:isSelected?T.accentBg:T.white,border:"none",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:6,transition:"all .2s"}}>
                                     <div style={{width:10,height:10,borderRadius:3,background:strat.color}}/>
-                                    <div style={{flex:1}}><div style={{fontSize:11,fontWeight:600,color:T.text}}>{strat.name}</div><div style={{fontSize:9,color:T.textSub}}>{strat.groups?.length || 0} groupe</div></div>
+                                    <div style={{flex:1}}><div style={{fontSize:11,fontWeight:600,color:T.text}}>{strat.name}</div><div style={{fontSize:9,color:T.textSub}}>{t("trades.detail.groupCount").replace("{n}", String(strat.groups?.length || 0))}</div></div>
                                     {isSelected && <span style={{fontSize:12}}>✓</span>}
                                     </button>
                                   );

@@ -296,13 +296,14 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
         <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("strat.title")}</h1>
-        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 16px",height:34,borderRadius:999,background:T.text,border:`1px solid ${T.text}`,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
+        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 16px",height:34,borderRadius:999,background:T.white,border:`1px solid ${T.text}`,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
           <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
         </button>
         <div id="tr4de-page-header-slot" />
       </div>
 
-      {/* KPI BLOCKS — 8 KPIs (2 rangées de 4), agrégés sur tous les trades qui ont au moins une stratégie assignée */}
+      {/* TOP-STRATEGY LEADERBOARD — 4 blocs : meilleure performance, meilleure
+          espérance, meilleur win rate, meilleur profit factor (par stratégie) */}
       {strategies && Array.isArray(strategies) && strategies.length > 0 && (() => {
         const getStrategyIdsForTrade = (trade) => {
           let ids = tradeStrategiesData[trade.id] || [];
@@ -317,69 +318,75 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           return ids.map(String);
         };
 
-        const trackedTrades = trades.filter(tr => getStrategyIdsForTrade(tr).length > 0);
-        const total = trackedTrades.length;
-        const totalPnL = trackedTrades.reduce((s, t) => s + (typeof t.pnl === "number" ? t.pnl : 0), 0);
-        const winsArr = trackedTrades.filter(t => (t.pnl || 0) > 0);
-        const lossesArr = trackedTrades.filter(t => (t.pnl || 0) < 0);
-        const winCount = winsArr.length;
-        const lossCount = lossesArr.length;
-        const winRate = (winCount + lossCount) > 0 ? (winCount / (winCount + lossCount)) * 100 : 0;
-        const sumWins = winsArr.reduce((s, t) => s + (t.pnl || 0), 0);
-        const sumLosses = Math.abs(lossesArr.reduce((s, t) => s + (t.pnl || 0), 0));
-        const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
-        const expectancy = total > 0 ? totalPnL / total : 0;
-        const avgWin = winCount > 0 ? sumWins / winCount : 0;
-        const avgLoss = lossCount > 0 ? sumLosses / lossCount : 0;
-        const sorted = [...trackedTrades].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-        let peak = 0, cum = 0, mdd = 0;
-        for (const tr of sorted) {
-          cum += (tr.pnl || 0);
-          if (cum > peak) peak = cum;
-          if (peak - cum > mdd) mdd = peak - cum;
-        }
-        const maxDD = mdd;
-        const maxWin = trackedTrades.length ? Math.max(...trackedTrades.map(t => t.pnl || 0)) : 0;
-        const maxLoss = trackedTrades.length ? Math.min(...trackedTrades.map(t => t.pnl || 0)) : 0;
+        const perStrat = strategies.map(s => {
+          const sId = String(s.id);
+          const sTrades = trades.filter(tr => getStrategyIdsForTrade(tr).includes(sId));
+          const total = sTrades.length;
+          const pnl = sTrades.reduce((acc, tr) => acc + (typeof tr.pnl === "number" ? tr.pnl : 0), 0);
+          const wins = sTrades.filter(tr => (tr.pnl || 0) > 0);
+          const losses = sTrades.filter(tr => (tr.pnl || 0) < 0);
+          const winRate = (wins.length + losses.length) > 0 ? (wins.length / (wins.length + losses.length)) * 100 : 0;
+          const sumWins = wins.reduce((a, tr) => a + (tr.pnl || 0), 0);
+          const sumLosses = Math.abs(losses.reduce((a, tr) => a + (tr.pnl || 0), 0));
+          const profitFactor = sumLosses > 0 ? sumWins / sumLosses : (sumWins > 0 ? Infinity : 0);
+          const expectancy = total > 0 ? pnl / total : 0;
+          return { strategy: s, total, pnl, winRate, profitFactor, expectancy };
+        }).filter(x => x.total > 0);
 
-        const Cell = ({ label, value, sub, valueColor, last }) => (
+        const pickBest = (metric) => {
+          if (perStrat.length === 0) return null;
+          return perStrat.reduce((best, cur) => (cur[metric] > best[metric] ? cur : best), perStrat[0]);
+        };
+
+        const bestPnl = pickBest("pnl");
+        const bestExp = pickBest("expectancy");
+        const bestWR  = pickBest("winRate");
+        const bestPF  = pickBest("profitFactor");
+
+        const Cell = ({ label, strat, value, valueColor, last }) => (
           <div style={{
             padding: "16px 20px",
             borderRight: last ? "none" : `1px solid ${T.border}`,
             display: "flex", flexDirection: "column", gap: 6, minWidth: 0,
           }}>
             <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{label}</div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.2, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {value}
+            <div style={{ fontSize: 17, fontWeight: 600, color: T.text, letterSpacing: -0.2, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 8 }}>
+              {strat ? (
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{strat.strategy.name}</span>
+              ) : "—"}
             </div>
-            {sub !== undefined && <div style={{ fontSize: 11, color: T.textMut }}>{sub}</div>}
+            <div style={{ fontSize: 13, fontWeight: 600, color: valueColor || T.textSub, fontVariantNumeric: "tabular-nums" }}>{value}</div>
           </div>
         );
 
         return (
           <div className="tr4de-kpi-row" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            {/* Row 1 */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-              <Cell label="P&L Net" value={fmt(totalPnL, true)} sub={`${total} trade${total > 1 ? "s" : ""}`}
-                valueColor={totalPnL > 0 ? T.green : totalPnL < 0 ? T.red : T.text} />
-              <Cell label="Profit factor"
-                value={profitFactor === Infinity ? "∞" : (total > 0 ? profitFactor.toFixed(2) : "—")}
-                sub="Gain / Perte" />
-              <Cell label="Drawdown max"
-                value={maxDD > 0 ? `−${fmt(maxDD)}` : "—"}
-                sub="Pire baisse"
-                valueColor={maxDD > 0 ? T.red : T.text} />
-              <Cell label="Trades" value={String(total)} sub={`${winCount}W / ${lossCount}L`} last />
-            </div>
-            {/* Row 2 */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: `1px solid ${T.border}` }}>
-              <Cell label="Taux de victoire" value={total > 0 ? `${winRate.toFixed(1)}%` : "—"} sub="Performance" />
-              <Cell label="Espérance / trade"
-                value={total > 0 ? fmt(expectancy, true) : "—"}
-                sub="Moyenne par trade"
-                valueColor={expectancy > 0 ? T.green : expectancy < 0 ? T.red : T.text} />
-              <Cell label="Meilleur trade" value={total > 0 ? fmt(maxWin) : "—"} sub="Plus haut gain" valueColor={T.green} />
-              <Cell label="Pire trade" value={total > 0 ? fmt(maxLoss) : "—"} sub="Plus grosse perte" valueColor={T.red} last />
+              <Cell
+                label="Meilleure performance"
+                strat={bestPnl}
+                value={bestPnl ? fmt(bestPnl.pnl, true) : "—"}
+                valueColor={bestPnl && bestPnl.pnl > 0 ? T.green : bestPnl && bestPnl.pnl < 0 ? T.red : T.textSub}
+              />
+              <Cell
+                label="Meilleure espérance"
+                strat={bestExp}
+                value={bestExp ? `${fmt(bestExp.expectancy, true)} / trade` : "—"}
+                valueColor={bestExp && bestExp.expectancy > 0 ? T.green : bestExp && bestExp.expectancy < 0 ? T.red : T.textSub}
+              />
+              <Cell
+                label="Plus haut win rate"
+                strat={bestWR}
+                value={bestWR ? `${bestWR.winRate.toFixed(1)}%` : "—"}
+                valueColor={T.text}
+              />
+              <Cell
+                label="Plus haut profit factor"
+                strat={bestPF}
+                value={bestPF ? (bestPF.profitFactor === Infinity ? "∞" : bestPF.profitFactor.toFixed(2)) : "—"}
+                valueColor={T.text}
+                last
+              />
             </div>
           </div>
         );
@@ -390,8 +397,8 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
         <div className="anim-stagger" style={{display:"flex",flexDirection:"column",gap:12}}>
           {trades.length === 0 && (
             <div style={{padding:"20px",background:"#fff3cd",borderRadius:8,borderLeft:"4px solid #ffc107"}}>
-              <strong>⚠️ Aucun trade chargé</strong><br/>
-              Les trades ne sont pas disponibles. Vérifiez que vous avez importé des trades dans l'onglet Dashboard.
+              <strong>{t("strat.noTradesLoaded")}</strong><br/>
+              {t("strat.noTradesLoadedSub")}
             </div>
           )}
           
@@ -534,7 +541,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
             // ✅ Fonction helper pour créer un Area Chart
             const AreaChart = ({ trades, width = 280, height = 110 }) => {
               if (trades.length === 0) {
-                return <div style={{width:"100%", height: 110, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: T.textMut}}>Pas de données</div>;
+                return <div style={{width:"100%", height: 110, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: T.textMut}}>{t("strat.noData")}</div>;
               }
 
               // Cumulative P&L par trade (ordre chronologique)
@@ -666,7 +673,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 <div style={{position:"absolute",top:12,right:12,display:"flex",gap:2,zIndex:2}}>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleEditStrategy(strategy); }}
-                    title="Modifier"
+                    title={t("strat.editTip")}
                     style={{
                       width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",
                       borderRadius:6,border:"none",background:"transparent",
@@ -679,7 +686,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteStrategy(strategy.id); }}
-                    title="Supprimer"
+                    title={t("strat.deleteTip")}
                     style={{
                       width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",
                       borderRadius:6,border:"none",background:"transparent",
@@ -711,14 +718,14 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                             <div key={rule.id} style={{display:"flex",alignItems:"center",gap:8}}>
                               <div style={{width:3,height:3,borderRadius:"50%",background:T.textMut,flexShrink:0}}/>
                               <div style={{fontSize:12,color:T.text,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                                {rule.text || `Règle ${idx+1}`}
+                                {rule.text || t("strat.ruleFallback").replace("{n}", String(idx+1))}
                               </div>
                             </div>
                           ))}
                         </div>
                       ))
                     ) : (
-                      <div style={{fontSize:12,color:T.textMut}}>Aucune règle</div>
+                      <div style={{fontSize:12,color:T.textMut}}>{t("strat.noRules")}</div>
                     )}
                   </div>
                 </div>
@@ -737,7 +744,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
           </div>
           <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>{t("strat.empty")}</div>
           <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>{t("strat.emptySub")}</div>
-          <button onClick={()=>setShowStrategyForm(true)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:999,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",border:"none",fontFamily:"var(--font-sans)"}}>
+          <button onClick={()=>setShowStrategyForm(true)} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:999,background:T.white,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",border:`1px solid ${T.text}`,fontFamily:"var(--font-sans)"}}>
             <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
           </button>
         </div>
@@ -795,7 +802,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               {/* Nom */}
               <div>
                 <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.name")}</label>
-                <input type="text" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} placeholder="ex. Scalp 5min FVG"
+                <input type="text" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} placeholder={t("strat.namePh")}
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:T.text,background:T.white}}
                   onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
               </div>
@@ -803,7 +810,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               {/* Description */}
               <div>
                 <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.description")}</label>
-                <textarea value={formData.description} onChange={(e)=>setFormData({...formData,description:e.target.value})} placeholder="Décrivez votre stratégie en quelques mots..."
+                <textarea value={formData.description} onChange={(e)=>setFormData({...formData,description:e.target.value})} placeholder={t("strat.descPh")}
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",resize:"vertical",minHeight:64,fontFamily:"inherit",color:T.text,background:T.white,lineHeight:1.5}}
                   onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
               </div>
@@ -825,10 +832,10 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
               {/* Groupes de règles */}
               <div>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <label style={{fontSize:12,fontWeight:500,color:T.textSub}}>Règles</label>
+                  <label style={{fontSize:12,fontWeight:500,color:T.textSub}}>{t("strat.rules")}</label>
                   <button onClick={addGroup} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:12,color:T.text,background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6,fontFamily:"inherit",fontWeight:500}}
                     onMouseEnter={(e)=>{e.currentTarget.style.background=T.accentBg}} onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
-                    <Plus size={13} strokeWidth={2}/> Ajouter un groupe
+                    <Plus size={13} strokeWidth={2}/> {t("strat.addGroup")}
                   </button>
                 </div>
 
@@ -836,10 +843,10 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                   {formData.groups && formData.groups.map((group)=>(
                     <div key={group.id} style={{padding:12,border:`1px solid ${T.border}`,borderRadius:10,background:T.white}}>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <input type="text" placeholder="Nom du groupe (ex. Conditions d'entrée)" value={group.name} onChange={(e)=>updateGroup(group.id,"name",e.target.value)}
+                        <input type="text" placeholder={t("strat.groupNamePh")} value={group.name} onChange={(e)=>updateGroup(group.id,"name",e.target.value)}
                           style={{flex:1,padding:"6px 8px",border:"none",fontSize:12,fontWeight:600,outline:"none",color:T.text,background:"transparent",fontFamily:"inherit",letterSpacing:0.2}}/>
                         {formData.groups.length > 1 && (
-                          <button onClick={()=>removeGroup(group.id)} title="Supprimer le groupe"
+                          <button onClick={()=>removeGroup(group.id)} title={t("strat.removeGroupTip")}
                             style={{display:"flex",alignItems:"center",justifyContent:"center",width:24,height:24,background:"transparent",border:"none",cursor:"pointer",color:T.textMut,borderRadius:6}}
                             onMouseEnter={(e)=>{e.currentTarget.style.background=T.redBg;e.currentTarget.style.color=T.red}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textMut}}>
@@ -855,7 +862,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                             onMouseEnter={(e)=>{e.currentTarget.style.background=T.accentBg}}
                             onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}>
                             <div style={{width:4,height:4,borderRadius:"50%",background:T.textMut,flexShrink:0}}/>
-                            <input type="text" placeholder="ex. FVG 5m" value={rule.text} onChange={(e)=>updateRule(group.id,rule.id,e.target.value)}
+                            <input type="text" placeholder={t("strat.rulePh")} value={rule.text} onChange={(e)=>updateRule(group.id,rule.id,e.target.value)}
                               style={{flex:1,padding:"4px 0",border:"none",fontSize:12,outline:"none",color:T.text,background:"transparent",fontFamily:"inherit"}}/>
                             {group.rules.length > 1 && (
                               <button onClick={()=>removeRule(group.id,rule.id)}
@@ -869,7 +876,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                         <button onClick={()=>addRule(group.id)} style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,fontSize:12,color:T.textSub,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:"4px 8px",borderRadius:6,fontFamily:"inherit",alignSelf:"flex-start"}}
                           onMouseEnter={(e)=>{e.currentTarget.style.background=T.accentBg;e.currentTarget.style.color=T.text}}
                           onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textSub}}>
-                          <Plus size={11} strokeWidth={2}/> Ajouter une règle
+                          <Plus size={11} strokeWidth={2}/> {t("strat.addRule")}
                         </button>
                       </div>
                     </div>
@@ -880,10 +887,10 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
 
             {/* Footer */}
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",padding:"14px 24px",borderTop:`1px solid ${T.border}`,background:T.bg}}>
-              <button onClick={handleCancelEdit} style={{padding:"8px 18px",height:34,borderRadius:999,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,fontFamily:"var(--font-sans)"}}>Annuler</button>
+              <button onClick={handleCancelEdit} style={{padding:"8px 18px",height:34,borderRadius:999,border:`1px solid ${T.border}`,background:T.white,fontSize:13,fontWeight:600,cursor:"pointer",color:T.text,fontFamily:"var(--font-sans)"}}>{t("common.cancel")}</button>
               <button onClick={handleCreateStrategy} disabled={!formData.name.trim()}
                 style={{padding:"8px 18px",height:34,borderRadius:999,border:`1px solid ${T.text}`,background:T.text,color:"#fff",fontSize:13,fontWeight:600,cursor:formData.name.trim()?"pointer":"not-allowed",opacity:formData.name.trim()?1:0.5,fontFamily:"var(--font-sans)"}}>
-                {editingStrategyId ? "Enregistrer" : "Créer la stratégie"}
+                {editingStrategyId ? t("common.save") : t("strat.createBtn2")}
               </button>
             </div>
 

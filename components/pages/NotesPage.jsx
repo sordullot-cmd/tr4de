@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
+import { t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -72,6 +73,7 @@ function renderHighlighted(text) {
 }
 
 export default function NotesPage() {
+  useLang();
   const [notes, setNotes] = useCloudState(STORAGE_KEY, "notes", []);
   const { pushUndo } = useUndo();
   const [query, setQuery] = useState("");
@@ -171,11 +173,79 @@ export default function NotesPage() {
     }
   };
 
-  const allTags = useMemo(() => {
-    const set = new Set();
-    notes.forEach(n => parseTags(n.content).forEach(t => set.add(t)));
-    return Array.from(set).sort();
+  // Compte le nb d'usage de chaque tag (pour trier les suggestions du plus
+  // utilisé au moins utilisé).
+  const tagCounts = useMemo(() => {
+    const counts = {};
+    notes.forEach(n => parseTags(n.content).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    return counts;
   }, [notes]);
+
+  const allTags = useMemo(() => {
+    return Object.keys(tagCounts).sort((a, b) => (tagCounts[b] - tagCounts[a]) || a.localeCompare(b));
+  }, [tagCounts]);
+
+  // Détecte si le curseur est en train d'écrire un tag, et renvoie {prefix, start}
+  // ou null. `start` est l'index du `#`, `prefix` le mot tapé après (sans #).
+  const detectTagAtCursor = (text, caret) => {
+    if (caret == null) return null;
+    let i = caret - 1;
+    while (i >= 0) {
+      const c = text[i];
+      if (c === "#") {
+        // Vérifie que le # est en début de ligne ou précédé d'un espace.
+        const prev = i > 0 ? text[i - 1] : " ";
+        if (prev !== " " && prev !== "\n" && prev !== "\t") return null;
+        const prefix = text.slice(i + 1, caret);
+        if (prefix.length === 0) return { prefix: "", start: i };
+        if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(prefix)) return null;
+        return { prefix, start: i };
+      }
+      if (!/[a-zA-Z0-9_-]/.test(c)) return null;
+      i--;
+    }
+    return null;
+  };
+
+  const [tagSuggest, setTagSuggest] = useState(null); // { prefix, start, candidates: [tag] }
+  const textareaRef = useRef(null);
+
+  const updateTagSuggest = (text, caret) => {
+    const det = detectTagAtCursor(text, caret);
+    if (!det) { setTagSuggest(null); return; }
+    const lower = det.prefix.toLowerCase();
+    // candidates : tags existants commençant par le préfixe (insensible à la casse),
+    // triés par nb d'usage desc puis alpha. On exclut le tag exactement égal au
+    // préfixe (rien à compléter).
+    const cand = allTags
+      .filter(t => t.startsWith(lower) && t !== lower)
+      .sort((a, b) => (tagCounts[b] || 0) - (tagCounts[a] || 0) || a.localeCompare(b))
+      .slice(0, 5);
+    if (cand.length === 0) { setTagSuggest(null); return; }
+    setTagSuggest({ prefix: det.prefix, start: det.start, candidates: cand });
+  };
+
+  const acceptTagSuggestion = () => {
+    if (!tagSuggest || tagSuggest.candidates.length === 0) return false;
+    const ta = textareaRef.current;
+    if (!ta) return false;
+    const tag = tagSuggest.candidates[0];
+    const caret = ta.selectionStart;
+    const before = draft.slice(0, tagSuggest.start);
+    const after = draft.slice(caret);
+    const insertion = `#${tag} `;
+    const next = before + insertion + after;
+    setDraft(next);
+    const pos = (before + insertion).length;
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = pos;
+        textareaRef.current.selectionEnd = pos;
+      }
+    });
+    setTagSuggest(null);
+    return true;
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -216,9 +286,9 @@ export default function NotesPage() {
         }
       `}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Notes & Idées</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("notes.pageTitle")}</h1>
         <button onClick={createNote}
-          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.white, border: `1px solid ${T.text}`, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> <span className="tr4de-notes-newbtn-label">Nouvelle note</span>
         </button>
         <div id="tr4de-page-header-slot" />
@@ -351,9 +421,22 @@ export default function NotesPage() {
                   dangerouslySetInnerHTML={{ __html: draft ? renderHighlighted(draft) : `<span style="color:${T.textMut}">Commence à écrire... utilise #tag pour catégoriser.</span>` }}
                 />
               <textarea
+                ref={textareaRef}
                 autoFocus
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  // Recalcule les suggestions de tag après cette frappe.
+                  // selectionStart de target n'est pas fiable dans onChange selon
+                  // le browser ; on utilise requestAnimationFrame pour lire après.
+                  const next = e.target.value;
+                  requestAnimationFrame(() => {
+                    const ta = textareaRef.current;
+                    if (ta) updateTagSuggest(next, ta.selectionStart);
+                  });
+                }}
+                onSelect={(e) => updateTagSuggest(e.currentTarget.value, e.currentTarget.selectionStart)}
+                onBlur={() => setTimeout(() => setTagSuggest(null), 100)}
                 onPaste={(e) => {
                   const items = Array.from(e.clipboardData?.items || []);
                   const imgFiles = items
@@ -367,6 +450,20 @@ export default function NotesPage() {
                 }}
                 onScroll={(e) => { if (highlightRef.current) { highlightRef.current.scrollTop = e.currentTarget.scrollTop; highlightRef.current.scrollLeft = e.currentTarget.scrollLeft; } }}
                 onKeyDown={(e) => {
+                  // Autocomplete de tag : Entrée ou Tab insère la suggestion
+                  // courante. Échap masque les suggestions.
+                  if (tagSuggest && tagSuggest.candidates.length > 0) {
+                    if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                      e.preventDefault();
+                      acceptTagSuggestion();
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setTagSuggest(null);
+                      return;
+                    }
+                  }
                   if (e.key === "Tab") {
                     e.preventDefault();
                     const ta = e.currentTarget;
@@ -408,6 +505,56 @@ export default function NotesPage() {
                   WebkitTextFillColor: "transparent",
                 }}
               />
+              {tagSuggest && tagSuggest.candidates.length > 0 && (
+                <div style={{
+                  position: "absolute", left: 12, right: 12, bottom: 10,
+                  background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                  padding: "6px 8px",
+                  display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6,
+                  fontSize: 12, fontFamily: "inherit", zIndex: 5,
+                }}
+                onMouseDown={(e) => e.preventDefault()}>
+                  <span style={{ color: T.textMut, fontSize: 11, marginRight: 2 }}>↩ pour compléter</span>
+                  {tagSuggest.candidates.map((tag, i) => (
+                    <button key={tag} type="button"
+                      onClick={() => {
+                        // Permet aussi de cliquer une suggestion (pas que la 1ʳᵉ).
+                        const ta = textareaRef.current;
+                        if (!ta) return;
+                        const caret = ta.selectionStart;
+                        const before = draft.slice(0, tagSuggest.start);
+                        const after = draft.slice(caret);
+                        const insertion = `#${tag} `;
+                        const next = before + insertion + after;
+                        setDraft(next);
+                        const pos = (before + insertion).length;
+                        requestAnimationFrame(() => {
+                          if (textareaRef.current) {
+                            textareaRef.current.focus();
+                            textareaRef.current.selectionStart = pos;
+                            textareaRef.current.selectionEnd = pos;
+                          }
+                        });
+                        setTagSuggest(null);
+                      }}
+                      style={{
+                        padding: "3px 10px", borderRadius: 999,
+                        border: `1px solid ${i === 0 ? T.text : T.border}`,
+                        background: i === 0 ? T.text : T.white,
+                        color: i === 0 ? "#fff" : T.blue,
+                        fontWeight: 600, fontSize: 11, cursor: "pointer",
+                        fontFamily: "inherit",
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                      }}>
+                      #{tag}
+                      <span style={{ fontSize: 9, opacity: 0.7, fontWeight: 500 }}>
+                        {tagCounts[tag] || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
               </div>
             </>
           ) : (

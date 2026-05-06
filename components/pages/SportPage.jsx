@@ -8,8 +8,9 @@ import {
   Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight,
   TrendingUp, Trophy, Flame, Calendar, Clock,
   Dumbbell, Activity, Bike, Footprints, Heart,
-  Star, EyeOff, Save, BookOpen,
+  Star, EyeOff, Save, BookOpen, GripVertical,
 } from "lucide-react";
+import { t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5", text: "#0D0D0D",
@@ -36,136 +37,135 @@ const CATEGORIES = [
   { id: "cardio",    label: "Cardio",    color: "#06B6D4" },
 ];
 
-/* Bibliothèque d'exercices populaires avec catégorie par défaut + alias EN.
-   Les alias permettent de retrouver un exo en tapant son nom anglais. */
+/* Bibliothèque d'exercices populaires avec catégorie par défaut. */
 const EXERCISE_LIBRARY = [
   // Push
-  { name: "Développé couché",           category: "push", aliases: ["bench press", "flat bench"] },
-  { name: "Développé incliné",          category: "push", aliases: ["incline bench press", "incline press"] },
-  { name: "Développé décliné",          category: "push", aliases: ["decline bench press", "decline press"] },
-  { name: "Développé militaire",        category: "push", aliases: ["overhead press", "ohp", "military press", "shoulder press"] },
-  { name: "Développé haltères",         category: "push", aliases: ["dumbbell press", "db press"] },
-  { name: "Développé Arnold",           category: "push", aliases: ["arnold press"] },
-  { name: "Élévations latérales",       category: "push", aliases: ["lateral raises", "side raises"] },
-  { name: "Élévations frontales",       category: "push", aliases: ["front raises"] },
-  { name: "Oiseau (rear delt)",         category: "push", aliases: ["rear delt fly", "reverse fly", "rear delts"] },
-  { name: "Dips",                       category: "push", aliases: ["chest dips", "tricep dips"] },
-  { name: "Pompes",                     category: "push", aliases: ["push-ups", "push ups"] },
-  { name: "Pompes diamant",             category: "push", aliases: ["diamond push-ups"] },
-  { name: "Pompes inclinées",           category: "push", aliases: ["incline push-ups"] },
-  { name: "Écarté couché (haltères)",   category: "push", aliases: ["dumbbell flyes", "chest fly", "db fly"] },
-  { name: "Écarté à la poulie",         category: "push", aliases: ["cable fly", "cable crossover"] },
-  { name: "Extensions triceps poulie",  category: "push", aliases: ["tricep pushdown", "cable pushdown"] },
-  { name: "Triceps barre EZ",           category: "push", aliases: ["skull crushers", "lying tricep extension"] },
-  { name: "Triceps haltère nuque",      category: "push", aliases: ["overhead tricep extension"] },
-  { name: "Pull-over",                  category: "push", aliases: ["pullover", "dumbbell pullover"] },
+  { name: "Développé couché",           category: "push" },
+  { name: "Développé incliné",          category: "push" },
+  { name: "Développé décliné",          category: "push" },
+  { name: "Développé militaire",        category: "push" },
+  { name: "Développé haltères",         category: "push" },
+  { name: "Développé Arnold",           category: "push" },
+  { name: "Élévations latérales",       category: "push" },
+  { name: "Élévations frontales",       category: "push" },
+  { name: "Oiseau (rear delt)",         category: "push" },
+  { name: "Dips",                       category: "push" },
+  { name: "Pompes",                     category: "push" },
+  { name: "Pompes diamant",             category: "push" },
+  { name: "Pompes inclinées",           category: "push" },
+  { name: "Écarté couché (haltères)",   category: "push" },
+  { name: "Écarté à la poulie",         category: "push" },
+  { name: "Extensions triceps poulie",  category: "push" },
+  { name: "Triceps barre EZ",           category: "push" },
+  { name: "Triceps haltère nuque",      category: "push" },
+  { name: "Pull-over",                  category: "push" },
   // Pull
-  { name: "Tractions",                  category: "pull", aliases: ["pull-ups", "pull ups"] },
-  { name: "Tractions pronation",        category: "pull", aliases: ["pull-ups overhand"] },
-  { name: "Tractions supination",       category: "pull", aliases: ["chin-ups", "chin ups"] },
-  { name: "Tractions neutres",          category: "pull", aliases: ["neutral grip pull-ups"] },
-  { name: "Australian pull-up",         category: "pull", aliases: ["inverted row", "bodyweight row"] },
-  { name: "Rowing barre",               category: "pull", aliases: ["barbell row", "bent over row", "pendlay row"] },
-  { name: "Rowing T-bar",               category: "pull", aliases: ["t-bar row", "t bar row"] },
-  { name: "Rowing haltère",             category: "pull", aliases: ["dumbbell row", "db row", "one arm row"] },
-  { name: "Tirage horizontal poulie",   category: "pull", aliases: ["seated cable row", "cable row"] },
-  { name: "Tirage vertical poulie",     category: "pull", aliases: ["lat pulldown", "pulldown"] },
-  { name: "Face pull",                  category: "pull", aliases: ["face pulls"] },
-  { name: "Soulevé de terre",           category: "pull", aliases: ["deadlift", "conventional deadlift"] },
-  { name: "Soulevé de terre roumain",   category: "pull", aliases: ["romanian deadlift", "rdl"] },
-  { name: "Shrugs (haussements)",       category: "pull", aliases: ["shrugs", "barbell shrugs", "dumbbell shrugs"] },
-  { name: "Curl barre",                 category: "pull", aliases: ["barbell curl"] },
-  { name: "Curl haltères",              category: "pull", aliases: ["dumbbell curl", "db curl", "bicep curl"] },
-  { name: "Curl marteau",               category: "pull", aliases: ["hammer curl"] },
-  { name: "Curl pupitre",               category: "pull", aliases: ["preacher curl"] },
-  { name: "Curl à la poulie",           category: "pull", aliases: ["cable curl"] },
+  { name: "Tractions",                  category: "pull" },
+  { name: "Tractions pronation",        category: "pull" },
+  { name: "Tractions supination",       category: "pull" },
+  { name: "Tractions neutres",          category: "pull" },
+  { name: "Australian pull-up",         category: "pull" },
+  { name: "Rowing barre",               category: "pull" },
+  { name: "Rowing T-bar",               category: "pull" },
+  { name: "Rowing haltère",             category: "pull" },
+  { name: "Tirage horizontal poulie",   category: "pull" },
+  { name: "Tirage vertical poulie",     category: "pull" },
+  { name: "Face pull",                  category: "pull" },
+  { name: "Soulevé de terre",           category: "pull" },
+  { name: "Soulevé de terre roumain",   category: "pull" },
+  { name: "Shrugs (haussements)",       category: "pull" },
+  { name: "Curl barre",                 category: "pull" },
+  { name: "Curl haltères",              category: "pull" },
+  { name: "Curl marteau",               category: "pull" },
+  { name: "Curl pupitre",               category: "pull" },
+  { name: "Curl à la poulie",           category: "pull" },
   // Legs
-  { name: "Squat",                      category: "legs", aliases: ["back squat", "barbell squat"] },
-  { name: "Squat avant (front squat)",  category: "legs", aliases: ["front squat"] },
-  { name: "Squat bulgare",              category: "legs", aliases: ["bulgarian split squat", "bss"] },
-  { name: "Hack squat",                 category: "legs", aliases: ["hack squat"] },
-  { name: "Presse à cuisses",           category: "legs", aliases: ["leg press"] },
-  { name: "Fentes",                     category: "legs", aliases: ["lunges"] },
-  { name: "Fentes marchées",            category: "legs", aliases: ["walking lunges"] },
-  { name: "Leg extension",              category: "legs", aliases: ["leg extension", "quad extension"] },
-  { name: "Leg curl",                   category: "legs", aliases: ["leg curl", "hamstring curl"] },
-  { name: "Soulevé de terre jambes tendues", category: "legs", aliases: ["stiff leg deadlift", "sldl"] },
-  { name: "Hip thrust",                 category: "legs", aliases: ["hip thrust", "barbell hip thrust"] },
-  { name: "Good morning",               category: "legs", aliases: ["good morning"] },
-  { name: "Mollets debout",             category: "legs", aliases: ["standing calf raise"] },
-  { name: "Mollets assis",              category: "legs", aliases: ["seated calf raise"] },
-  { name: "Step-up",                    category: "legs", aliases: ["step-up", "step ups"] },
-  { name: "Box jumps",                  category: "legs", aliases: ["box jumps"] },
+  { name: "Squat",                      category: "legs" },
+  { name: "Squat avant (front squat)",  category: "legs" },
+  { name: "Squat bulgare",              category: "legs" },
+  { name: "Hack squat",                 category: "legs" },
+  { name: "Presse à cuisses",           category: "legs" },
+  { name: "Fentes",                     category: "legs" },
+  { name: "Fentes marchées",            category: "legs" },
+  { name: "Leg extension",              category: "legs" },
+  { name: "Leg curl",                   category: "legs" },
+  { name: "Soulevé de terre jambes tendues", category: "legs" },
+  { name: "Hip thrust",                 category: "legs" },
+  { name: "Good morning",               category: "legs" },
+  { name: "Mollets debout",             category: "legs" },
+  { name: "Mollets assis",              category: "legs" },
+  { name: "Step-up",                    category: "legs" },
+  { name: "Box jumps",                  category: "legs" },
   // Core
-  { name: "Crunchs",                    category: "core", aliases: ["crunches", "ab crunch"] },
-  { name: "Sit-ups",                    category: "core", aliases: ["sit ups", "situps"] },
-  { name: "Relevé de jambes",           category: "core", aliases: ["leg raises", "lying leg raise"] },
-  { name: "Relevé de jambes suspendu",  category: "core", aliases: ["hanging leg raise"] },
-  { name: "Planche",                    category: "core", aliases: ["plank"] },
-  { name: "Planche latérale",           category: "core", aliases: ["side plank"] },
-  { name: "Russian twist",              category: "core", aliases: ["russian twist"] },
-  { name: "Mountain climbers",          category: "core", aliases: ["mountain climbers"] },
-  { name: "Hollow body hold",           category: "core", aliases: ["hollow hold", "hollow body"] },
-  { name: "Roue abdominale",            category: "core", aliases: ["ab wheel", "ab rollout"] },
-  { name: "L-sit",                      category: "core", aliases: ["l sit", "l-sit"] },
-  { name: "Dragon flag",                category: "core", aliases: ["dragon flag"] },
+  { name: "Crunchs",                    category: "core" },
+  { name: "Sit-ups",                    category: "core" },
+  { name: "Relevé de jambes",           category: "core" },
+  { name: "Relevé de jambes suspendu",  category: "core" },
+  { name: "Planche",                    category: "core" },
+  { name: "Planche latérale",           category: "core" },
+  { name: "Russian twist",              category: "core" },
+  { name: "Mountain climbers",          category: "core" },
+  { name: "Hollow body hold",           category: "core" },
+  { name: "Roue abdominale",            category: "core" },
+  { name: "L-sit",                      category: "core" },
+  { name: "Dragon flag",                category: "core" },
   // Full body / functional
-  { name: "Burpees",                    category: "full_body", aliases: ["burpees"] },
-  { name: "Clean & jerk",               category: "full_body", aliases: ["clean and jerk", "clean jerk"] },
-  { name: "Snatch",                     category: "full_body", aliases: ["snatch"] },
-  { name: "Thruster",                   category: "full_body", aliases: ["thrusters"] },
-  { name: "Kettlebell swing",           category: "full_body", aliases: ["kb swing", "kettlebell swing"] },
-  { name: "Turkish get-up",             category: "full_body", aliases: ["turkish get up", "tgu"] },
-  { name: "Farmer walk",                category: "full_body", aliases: ["farmer carry", "farmer's walk"] },
-  { name: "Muscle-up",                  category: "full_body", aliases: ["muscle up"] },
-  { name: "Pistol squat",               category: "legs", aliases: ["pistol squat"] },
-  { name: "Handstand push-up",          category: "push", aliases: ["handstand push up", "hspu"] },
+  { name: "Burpees",                    category: "full_body" },
+  { name: "Clean & jerk",               category: "full_body" },
+  { name: "Snatch",                     category: "full_body" },
+  { name: "Thruster",                   category: "full_body" },
+  { name: "Kettlebell swing",           category: "full_body" },
+  { name: "Turkish get-up",             category: "full_body" },
+  { name: "Farmer walk",                category: "full_body" },
+  { name: "Muscle-up",                  category: "full_body" },
+  { name: "Pistol squat",               category: "legs" },
+  { name: "Handstand push-up",          category: "push" },
   // Calisthénie / street workout
-  { name: "Front lever",                category: "pull", aliases: ["front lever"] },
-  { name: "Front lever raises",         category: "pull", aliases: ["front lever raises"] },
-  { name: "Back lever",                 category: "pull", aliases: ["back lever"] },
-  { name: "Planche",                    category: "push", aliases: ["planche", "full planche"] },
-  { name: "Tuck planche",               category: "push", aliases: ["tuck planche"] },
-  { name: "Straddle planche",           category: "push", aliases: ["straddle planche"] },
-  { name: "Pseudo planche push-up",     category: "push", aliases: ["pseudo planche push up", "ppp"] },
-  { name: "Planche lean",               category: "push", aliases: ["planche lean"] },
-  { name: "Handstand",                  category: "push", aliases: ["handstand", "equilibre"] },
-  { name: "Hand-to-hand",               category: "push", aliases: ["hand to hand"] },
-  { name: "Archer pull-up",             category: "pull", aliases: ["archer pull-up", "archer pullup"] },
-  { name: "Archer push-up",             category: "push", aliases: ["archer push-up", "archer pushup"] },
-  { name: "One arm pull-up",            category: "pull", aliases: ["one arm pull-up", "oapu"] },
-  { name: "One arm push-up",            category: "push", aliases: ["one arm push-up"] },
-  { name: "Typewriter pull-up",         category: "pull", aliases: ["typewriter pull-up"] },
-  { name: "Wide pull-up",               category: "pull", aliases: ["wide grip pull-up"] },
-  { name: "Commando pull-up",           category: "pull", aliases: ["commando pull-up"] },
-  { name: "Korean dips",                category: "push", aliases: ["korean dips"] },
-  { name: "Ring dips",                  category: "push", aliases: ["ring dips"] },
-  { name: "Ring muscle-up",             category: "full_body", aliases: ["ring muscle up", "rmu"] },
-  { name: "Bar muscle-up",              category: "full_body", aliases: ["bar muscle up", "bmu"] },
-  { name: "Skin the cat",               category: "full_body", aliases: ["skin the cat"] },
-  { name: "German hang",                category: "pull", aliases: ["german hang"] },
-  { name: "Tuck front lever",           category: "pull", aliases: ["tuck front lever"] },
-  { name: "Pike push-up",               category: "push", aliases: ["pike push-up"] },
-  { name: "Hindu push-up",              category: "push", aliases: ["hindu push-up"] },
-  { name: "Spiderman push-up",          category: "push", aliases: ["spiderman push-up"] },
-  { name: "Clap push-up",               category: "push", aliases: ["clap push-up"] },
-  { name: "Explosive pull-up",          category: "pull", aliases: ["explosive pull-up"] },
-  { name: "Pull-up négatif",            category: "pull", aliases: ["negative pull-up", "eccentric pull-up"] },
-  { name: "Squat sauté",                category: "legs", aliases: ["jump squat"] },
-  { name: "Sissy squat",                category: "legs", aliases: ["sissy squat"] },
-  { name: "Nordic curl",                category: "legs", aliases: ["nordic curl", "nordic hamstring"] },
-  { name: "Shrimp squat",               category: "legs", aliases: ["shrimp squat"] },
+  { name: "Front lever",                category: "pull" },
+  { name: "Front lever raises",         category: "pull" },
+  { name: "Back lever",                 category: "pull" },
+  { name: "Planche",                    category: "push" },
+  { name: "Tuck planche",               category: "push" },
+  { name: "Straddle planche",           category: "push" },
+  { name: "Pseudo planche push-up",     category: "push" },
+  { name: "Planche lean",               category: "push" },
+  { name: "Handstand",                  category: "push" },
+  { name: "Hand-to-hand",               category: "push" },
+  { name: "Archer pull-up",             category: "pull" },
+  { name: "Archer push-up",             category: "push" },
+  { name: "One arm pull-up",            category: "pull" },
+  { name: "One arm push-up",            category: "push" },
+  { name: "Typewriter pull-up",         category: "pull" },
+  { name: "Wide pull-up",               category: "pull" },
+  { name: "Commando pull-up",           category: "pull" },
+  { name: "Korean dips",                category: "push" },
+  { name: "Ring dips",                  category: "push" },
+  { name: "Ring muscle-up",             category: "full_body" },
+  { name: "Bar muscle-up",              category: "full_body" },
+  { name: "Skin the cat",               category: "full_body" },
+  { name: "German hang",                category: "pull" },
+  { name: "Tuck front lever",           category: "pull" },
+  { name: "Pike push-up",               category: "push" },
+  { name: "Hindu push-up",              category: "push" },
+  { name: "Spiderman push-up",          category: "push" },
+  { name: "Clap push-up",               category: "push" },
+  { name: "Explosive pull-up",          category: "pull" },
+  { name: "Pull-up négatif",            category: "pull" },
+  { name: "Squat sauté",                category: "legs" },
+  { name: "Sissy squat",                category: "legs" },
+  { name: "Nordic curl",                category: "legs" },
+  { name: "Shrimp squat",               category: "legs" },
   // Cardio
-  { name: "Course à pied",              category: "cardio", aliases: ["running", "run"] },
-  { name: "Sprint",                     category: "cardio", aliases: ["sprint", "sprints"] },
-  { name: "Vélo",                       category: "cardio", aliases: ["cycling", "bike"] },
-  { name: "Vélo elliptique",            category: "cardio", aliases: ["elliptical"] },
-  { name: "Rameur",                     category: "cardio", aliases: ["rowing", "rower"] },
-  { name: "Corde à sauter",             category: "cardio", aliases: ["jump rope", "skipping"] },
-  { name: "Natation",                   category: "cardio", aliases: ["swimming"] },
-  { name: "Marche rapide",              category: "cardio", aliases: ["brisk walking", "walking"] },
-  { name: "Stairmaster",                category: "cardio", aliases: ["stairmaster", "stair climber"] },
-  { name: "HIIT",                       category: "cardio", aliases: ["hiit", "interval training"] },
+  { name: "Course à pied",              category: "cardio" },
+  { name: "Sprint",                     category: "cardio" },
+  { name: "Vélo",                       category: "cardio" },
+  { name: "Vélo elliptique",            category: "cardio" },
+  { name: "Rameur",                     category: "cardio" },
+  { name: "Corde à sauter",             category: "cardio" },
+  { name: "Natation",                   category: "cardio" },
+  { name: "Marche rapide",              category: "cardio" },
+  { name: "Stairmaster",                category: "cardio" },
+  { name: "HIIT",                       category: "cardio" },
 ];
 
 const todayISO = () => {
@@ -185,6 +185,7 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 /* ─── Page ────────────────────────────────────────────────────────── */
 
 export default function SportPage() {
+  useLang();
   const [sessions, setSessions] = useCloudState("tr4de_sport_sessions", "sport_sessions", []);
   // Bibliothèque personnalisable :
   // - customExercises : exercices ajoutés par l'utilisateur ({ name, category })
@@ -387,10 +388,10 @@ export default function SportPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>
-          Suivi sportif
+          {t("sport.pageTitle")}
         </h1>
         <button onClick={openCreate}
-          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.white, border: `1px solid ${T.text}`, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Nouvelle séance
         </button>
         <div id="tr4de-page-header-slot" />
@@ -783,6 +784,8 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
 function SessionForm({ form, setForm, editingId, onClose, onSave, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises, customPresets = [], setCustomPresets }) {
   const [showPresets, setShowPresets] = useState(false);
   const [presetNamePrompt, setPresetNamePrompt] = useState(null); // null | string
+  const [draggedExId, setDraggedExId] = useState(null);
+  const [dragOverExId, setDragOverExId] = useState(null);
 
   const allPresets = useMemo(
     () => (customPresets || []).map(p => ({ ...p, custom: true })),
@@ -845,6 +848,18 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
       ...prev,
       exercises: (prev.exercises || []).map(e => e.id === eid ? { ...e, ...patch } : e),
     }));
+  };
+  const moveExercise = (fromId, toId) => {
+    if (fromId === toId) return;
+    setForm(prev => {
+      const list = [...(prev.exercises || [])];
+      const from = list.findIndex(e => e.id === fromId);
+      const to = list.findIndex(e => e.id === toId);
+      if (from < 0 || to < 0) return prev;
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return { ...prev, exercises: list };
+    });
   };
   const addSet = (eid) => {
     setForm(prev => ({
@@ -1043,8 +1058,34 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {(form.exercises || []).map((ex) => (
-                <div key={ex.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px" }}>
+                <div key={ex.id}
+                  onDragOver={(e) => { if (draggedExId != null && draggedExId !== ex.id) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOverExId !== ex.id) setDragOverExId(ex.id); } }}
+                  onDragLeave={() => { if (dragOverExId === ex.id) setDragOverExId(null); }}
+                  onDrop={(e) => { e.preventDefault(); if (draggedExId != null) moveExercise(draggedExId, ex.id); setDraggedExId(null); setDragOverExId(null); }}
+                  style={{
+                    background: T.bg,
+                    border: `1px solid ${dragOverExId === ex.id ? T.accent : T.border}`,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    opacity: draggedExId === ex.id ? 0.5 : 1,
+                    transition: "border-color 120ms, opacity 120ms",
+                  }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <span
+                      draggable
+                      onDragStart={(e) => { setDraggedExId(ex.id); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(ex.id)); } catch {} }}
+                      onDragEnd={() => { setDraggedExId(null); setDragOverExId(null); }}
+                      title="Glisser pour réordonner"
+                      aria-label="Réordonner l'exercice"
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 18, height: 22, color: T.textMut, cursor: "grab", flexShrink: 0,
+                        marginLeft: -4,
+                      }}
+                      onMouseDown={(e) => { e.currentTarget.style.cursor = "grabbing"; }}
+                      onMouseUp={(e) => { e.currentTarget.style.cursor = "grab"; }}>
+                      <GripVertical size={13} strokeWidth={1.75} />
+                    </span>
                     <ExerciseNameCombobox
                       value={ex.name}
                       onChange={(name) => updateExercise(ex.id, { name })}
@@ -1172,7 +1213,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                 Modifications enregistrées automatiquement
               </span>
               <button onClick={onClose}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: T.text, color: T.white, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.text}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Fermer
               </button>
             </>

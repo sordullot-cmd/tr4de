@@ -7,13 +7,14 @@ import {
   Star,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang, getLang } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { parseCSV } from "@/lib/csvParsers";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import QuickAccountSelector from "@/components/QuickAccountSelector";
 
 export default function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, accountType, setAccountType, selectedEvalAccount, setSelectedEvalAccount, accounts = [], selectedAccountIds = [], addTrade, addStrategy, strategies = [], user }) {
+  useLang();
   const [accountName, setAccountName] = useState("");
   const [selectedBroker, setSelectedBroker] = useState("tradovate");
 
@@ -114,7 +115,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         } catch (err) {
           const errMsg = err?.message || JSON.stringify(err) || "Unknown error";
           console.error("❌ Failed to create strategy:", errMsg);
-          alert(`❌ Erreur lors de la création de la stratégie: ${errMsg}`);
+          alert(t("addTrade.err.createStrategy").replace("{msg}", errMsg));
         }
       }
     }
@@ -187,7 +188,148 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     const iconPath = broker?.iconPath || "/trado.png";
     const name = broker?.name || "Broker";
 
-    const map = {
+    const isEN = getLang() === "en";
+    const map = isEN ? {
+      tradovate: {
+        subtext: "Assets: Futures (CME, ICE, Eurex)",
+        steps: [
+          "1. Open the Account tab in Tradovate",
+          "2. Go to Settings → Orders",
+          "3. Select the date range and click Go",
+          "4. Click Download Report (CSV export)",
+          "5. Upload the CSV file here"
+        ]
+      },
+      rithmic: {
+        subtext: "Assets: Futures (multi-exchange)",
+        steps: [
+          "1. Open Rithmic R|Trader Pro",
+          "2. Reports menu → Order History (or Trade History)",
+          "3. Choose the date range then Run Report",
+          "4. Save / Export button → CSV format",
+          "5. Upload the CSV file here"
+        ]
+      },
+      ninjatrader: {
+        subtext: "Assets: Futures, Forex, Stocks",
+        steps: [
+          "1. Open NinjaTrader Control Center",
+          "2. Account menu → Account Performance (or Trade Performance)",
+          "3. Filter by account and period",
+          "4. Right-click on the Trades table → Export → CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      topstep: {
+        subtext: "Futures prop firm – TopstepX platform",
+        steps: [
+          "1. Log in to the TopstepX dashboard",
+          "2. Performance / Trade History tab",
+          "3. Filter by account and date range",
+          "4. Export button → CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      ftmo: {
+        subtext: "Forex / CFD prop firm – via MetaTrader",
+        steps: [
+          "1. Open MetaTrader 4/5 connected to the FTMO account",
+          "2. Toolbox tab → History",
+          "3. Right-click → Custom Period and pick the range",
+          "4. Right-click again → Save as Report (HTML)",
+          "5. Upload the HTML file here"
+        ]
+      },
+      tradingview: {
+        subtext: "Charts + connected brokers",
+        steps: [
+          "1. Open the Trading panel at the bottom of TradingView",
+          "2. Orders or Trades History tab",
+          "3. Export button or ⋯ → Download CSV",
+          "4. Upload the CSV file here"
+        ]
+      },
+      mt5: {
+        subtext: "Forex, Stocks, Indices, Crypto",
+        steps: [
+          "1. Open the MetaTrader 5 terminal",
+          "2. Toolbox tab → History",
+          "3. Right-click → Custom Period and pick the range",
+          "4. Right-click again → Report → Open XML (HTML)",
+          "5. Upload the HTML file here"
+        ]
+      },
+      mt4: {
+        subtext: "Forex, CFD",
+        steps: [
+          "1. Open the MetaTrader 4 terminal",
+          "2. Terminal tab → Account History",
+          "3. Right-click → All History (or custom period)",
+          "4. Right-click again → Save as Detailed Report (HTML)",
+          "5. Upload the HTML file here"
+        ]
+      },
+      thinkorswim: {
+        subtext: "Charles Schwab – Stocks, Options, Futures",
+        steps: [
+          "1. Open thinkorswim Desktop",
+          "2. Monitor tab → Account Statement",
+          "3. Select the date range",
+          "4. Menu button (⚙ icon) → Export to File → CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      wealthcharts: {
+        subtext: "Charting platform – Futures, Stocks, Indices",
+        steps: [
+          "1. Open WealthCharts Trading Platform",
+          "2. Go to Orders or History",
+          "3. Export to CSV",
+          "4. Make sure the file contains: order_id, qty_sent, qty_done, price_done",
+          "5. Upload the CSV file here"
+        ]
+      },
+      ibkr: {
+        subtext: "Stocks, Options, Futures, Forex (multi-market)",
+        steps: [
+          "1. Log in to the IBKR Client Portal",
+          "2. Performance & Reports → Statements or Flex Queries",
+          "3. Configure a Trades / Executions Flex Query",
+          "4. Run the query and download the CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      capitalcom: {
+        subtext: "CFD on Forex, Stocks, Indices, Crypto",
+        steps: [
+          "1. Log in to your Capital.com account (web)",
+          "2. My Account menu → Statements / Reports",
+          "3. Filter by period → Trades / Closed positions tab",
+          "4. Export button → CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      ig: {
+        subtext: "CFD, Spread Betting, Stocks",
+        steps: [
+          "1. Log in to My IG (Web)",
+          "2. History menu (Live Account)",
+          "3. Select the date range",
+          "4. Download button → CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+      webull: {
+        subtext: "Stocks, Options, Crypto (US)",
+        steps: [
+          "1. Open the Webull Desktop or Web app",
+          "2. Account menu → Statements (Activity Statements)",
+          "3. Choose the period and Trade Activity type",
+          "4. Export to CSV",
+          "5. Upload the CSV file here"
+        ]
+      },
+    } : {
       tradovate: {
         subtext: "Actifs : Futures (CME, ICE, Eurex)",
         steps: [
@@ -463,7 +605,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setFileContent(content);
       const trades = parseCSV(content, selectedBroker);
       if (trades.length === 0) {
-        setError("❌ Aucun trade trouvé dans le fichier. Vérifiez le format.");
+        setError(t("addTrade.err.noTradesFound"));
         setPreview([]);
         setLoading(false);
         return;
@@ -471,7 +613,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setPreview(trades.slice(0, 3));
       setError("");
     } catch (err) {
-      setError(`❌ Erreur: ${err.message}`);
+      setError(t("addTrade.err.generic").replace("{msg}", err.message));
       setPreview([]);
     }
     setLoading(false);
@@ -479,11 +621,11 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
 
   const handleImport = async () => {
     if (!accountName.trim()) {
-      setError("❌ Veuillez entrer un nom de compte");
+      setError(t("addTrade.err.noAccountName"));
       return;
     }
     if (!fileContent) {
-      setError("❌ Aucun fichier sélectionné");
+      setError(t("addTrade.err.noFile"));
       return;
     }
     
@@ -494,7 +636,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       const userId = user?.id;
       const importedTrades = parseCSV(fileContent, selectedBroker);
       if (importedTrades.length === 0) {
-        setError("❌ Aucun trade trouvé");
+        setError(t("addTrade.err.noTrades"));
         setLoading(false);
         return;
       }
@@ -532,13 +674,13 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         
         if (createError) {
           console.error("Error creating account:", createError);
-          setError("❌ Erreur lors de la création du compte: " + createError.message);
+          setError(t("addTrade.err.createAccount").replace("{msg}", createError.message));
           setLoading(false);
           return;
         }
-        
+
         if (!newAccount || newAccount.length === 0) {
-          setError("❌ Erreur: compte non créé");
+          setError(t("addTrade.err.accountNotCreated"));
           setLoading(false);
           return;
         }
@@ -561,7 +703,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       }));
 
       if (allTrades.length === 0) {
-        setError("❌ Aucun trade avec un P&L >= $50 trouvé");
+        setError(t("addTrade.err.minPnL"));
         setLoading(false);
         return;
       }
@@ -593,7 +735,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       }
 
       if (tradesToInsert.length === 0) {
-        setError(`ℹ️ Tous les trades importés (${allTrades.length}) sont déjà présents dans ce compte.`);
+        setError(t("addTrade.info.allDuplicates").replace("{n}", String(allTrades.length)));
         setLoading(false);
         return;
       }
@@ -604,7 +746,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       
       if (insertError) {
         console.error("Error inserting trades:", insertError);
-        setError("❌ Erreur lors de la sauvegarde des trades: " + insertError.message);
+        setError(t("addTrade.err.saveTrades").replace("{msg}", insertError.message));
         setLoading(false);
         return;
       }
@@ -719,7 +861,13 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setPreview([]);
       setSelectedBroker("tradovate");
       setSelectedImportStrategy("");
-      setError(duplicateCount > 0 ? `ℹ️ ${tradesToInsert.length} trade${tradesToInsert.length>1?"s":""} importé${tradesToInsert.length>1?"s":""} — ${duplicateCount} doublon${duplicateCount>1?"s":""} ignoré${duplicateCount>1?"s":""}.` : "");
+      setError(duplicateCount > 0
+        ? t("addTrade.info.imported")
+            .replace("{n}", String(tradesToInsert.length))
+            .replace("{d}", String(duplicateCount))
+            .replace(/\{s\}/g, tradesToInsert.length > 1 ? "s" : "")
+            .replace(/\{ds\}/g, duplicateCount > 1 ? "s" : "")
+        : "");
       setLoading(false);
       
       // Rediriger vers la page des trades après 1.5s
@@ -727,7 +875,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         setPage("trades");
       }, 1500);
     } catch (err) {
-      setError(`❌ Erreur d'import: ${err.message}`);
+      setError(t("addTrade.err.import").replace("{msg}", err.message));
       console.error("Import error:", err);
       setLoading(false);
     }
@@ -738,7 +886,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title") || "Importer des trades"}</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
       <div style={{ display: "flex", flexDirection: "row", gap: 16, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12 }}>
@@ -780,8 +928,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                     <span
                       role="button"
                       tabIndex={0}
-                      aria-label={isFav(b.id) ? "Retirer des favoris" : "Ajouter aux favoris"}
-                      title={isFav(b.id) ? "Retirer des favoris" : "Ajouter aux favoris"}
+                      aria-label={isFav(b.id) ? t("addTrade.removeFav") : t("addTrade.addFav")}
+                      title={isFav(b.id) ? t("addTrade.removeFav") : t("addTrade.addFav")}
                       onClick={() => toggleFavoriteBroker(b.id)}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleFavoriteBroker(b.id); } }}
                       style={{
@@ -802,8 +950,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                   ),
                 }));
               })()}
-              searchPlaceholder="Rechercher un courtier..."
-              emptyLabel="Aucun courtier"
+              searchPlaceholder={t("addTrade.searchBroker")}
+              emptyLabel={t("addTrade.noBroker")}
             />
           </div>
           {/* ACCOUNT TYPE — pill selector live/eval/funded */}
@@ -824,7 +972,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 { id: "live",   label: t("addTrade.live") },
                 { id: "eval",   label: t("addTrade.eval") },
                 { id: "funded", label: t("addTrade.funded") },
-                { id: "demo",   label: "Démo" },
+                { id: "demo",   label: t("addTrade.demo") },
               ].map((opt) => {
                 const active = accountType === opt.id;
                 return (
@@ -877,7 +1025,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             {(accountType === "live" || accountType === "demo") && (
               <div style={{ marginTop: "12px" }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
-                  Balance initiale
+                  {t("addTrade.initialBalance")}
                 </label>
                 <div style={{ position: "relative", width: "100%" }}>
                   <span style={{
@@ -912,7 +1060,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           {/* FILE */}
           <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
-              Fichier
+              {t("addTrade.file")}
             </label>
             <div
               style={{
@@ -941,7 +1089,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             >
               <input ref={fileInputRef} type="file" onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
               <button
-                aria-label="Importer un fichier"
+                aria-label={t("addTrade.importFileAria")}
                 onClick={() => fileInputRef.current?.click()}
                 style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: "100%", fontFamily: "var(--font-sans)" }}
               >
@@ -958,10 +1106,10 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 </span>
                 <div>
                   <div style={{ fontSize: 13, color: "#0D0D0D", fontWeight: 600, marginBottom: 4 }}>
-                    {fileName || "Glissez votre fichier ici"}
+                    {fileName || t("addTrade.dropFile")}
                   </div>
                   <div style={{ fontSize: 11, color: "#8E8E8E", fontWeight: 400 }}>
-                    {fileName ? "Fichier prêt à être importé" : <>ou <span style={{ color: "#0D0D0D", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 2 }}>parcourir</span> · CSV, TXT, HTML</>}
+                    {fileName ? t("addTrade.fileReady") : <>{t("addTrade.orBrowse2")} <span style={{ color: "#0D0D0D", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 2 }}>{t("addTrade.browse")}</span> · {t("addTrade.fileTypes")}</>}
                   </div>
                 </div>
               </button>
@@ -971,7 +1119,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           {preview.length > 0 && (
             <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
               <label style={{ display: "block", fontSize: "10px", fontWeight: "700", color: T.textMut, marginBottom: "12px", textTransform: "uppercase" }}>
-                Aperçu ({preview.length} trades)
+                {t("addTrade.preview")} ({preview.length} {t("addTrade.previewTrades")})
               </label>
               <div style={{ overflowX: "auto", background: T.bg, borderRadius: "6px", padding: "12px" }}>
                 <table style={{ width: "100%", fontSize: "10px" }}>
@@ -1010,9 +1158,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               width: "100%",
               padding: "12px 24px",
               borderRadius: "8px",
-              background: fileContent && accountName.trim() && !loading ? T.green : T.border2,
-              color: "#fff",
-              border: "none",
+              background: T.white,
+              color: fileContent && accountName.trim() && !loading ? T.text : T.textMut,
+              border: `1px solid ${fileContent && accountName.trim() && !loading ? T.text : T.border}`,
               cursor: fileContent && accountName.trim() && !loading ? "pointer" : "not-allowed",
               fontSize: "12px",
               fontWeight: "600",
@@ -1027,56 +1175,56 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             <div onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
               <div onClick={(e)=>e.stopPropagation()} style={{background:T.white,borderRadius:12,padding:40,maxWidth:600,width:"90%",maxHeight:"90vh",overflowY:"auto"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-                  <h2 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>Créer une stratégie</h2>
-                  <button aria-label="Fermer" onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{background:"transparent",border:"none",fontSize:24,cursor:"pointer",color:T.textMut}}>✕</button>
+                  <h2 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("addTrade.createStrategy")}</h2>
+                  <button aria-label={t("addTrade.closeAria")} onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{background:"transparent",border:"none",fontSize:24,cursor:"pointer",color:T.textMut}}>✕</button>
                 </div>
 
                 <div style={{marginBottom:16}}>
-                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:T.textMut}}>Nom de la stratégie</label>
-                  <input type="text" value={strategyFormData.name} onChange={(e)=>setStrategyFormData({...strategyFormData,name:e.target.value})} placeholder="ex. Scalp 5min FVG" style={{width:"100%",padding:"10px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:14,outline:"none"}}/>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:T.textMut}}>{t("addTrade.strategyName")}</label>
+                  <input type="text" value={strategyFormData.name} onChange={(e)=>setStrategyFormData({...strategyFormData,name:e.target.value})} placeholder={t("addTrade.strategyNamePh")} style={{width:"100%",padding:"10px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:14,outline:"none"}}/>
                 </div>
 
                 <div style={{marginBottom:16}}>
-                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:T.textMut}}>Description</label>
-                  <textarea value={strategyFormData.description} onChange={(e)=>setStrategyFormData({...strategyFormData,description:e.target.value})} placeholder="Décrivez votre stratégie..." style={{width:"100%",padding:"10px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:14,outline:"none",resize:"vertical",minHeight:60}}/>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:6,color:T.textMut}}>{t("addTrade.strategyDesc")}</label>
+                  <textarea value={strategyFormData.description} onChange={(e)=>setStrategyFormData({...strategyFormData,description:e.target.value})} placeholder={t("addTrade.strategyDescPh")} style={{width:"100%",padding:"10px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:14,outline:"none",resize:"vertical",minHeight:60}}/>
                 </div>
 
                 <div style={{marginBottom:20}}>
-                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8,color:T.textMut}}>Couleur</label>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8,color:T.textMut}}>{t("addTrade.strategyColor")}</label>
                   <div style={{display:"flex",gap:8}}>
                     {colors.map(color=>(
-                      <button key={color} aria-label={`Couleur ${color}`} aria-pressed={strategyFormData.color===color} onClick={()=>setStrategyFormData({...strategyFormData,color})} style={{width:32,height:32,borderRadius:8,background:color,border:strategyFormData.color===color?`3px solid ${T.text}`:"2px solid #ddd",cursor:"pointer"}}/>
+                      <button key={color} aria-label={t("addTrade.colorAria").replace("{c}", color)} aria-pressed={strategyFormData.color===color} onClick={()=>setStrategyFormData({...strategyFormData,color})} style={{width:32,height:32,borderRadius:8,background:color,border:strategyFormData.color===color?`3px solid ${T.text}`:"2px solid #ddd",cursor:"pointer"}}/>
                     ))}
                   </div>
                 </div>
 
                 <div style={{marginBottom:20}}>
-                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8,color:T.textMut}}>Groupes de règles</label>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8,color:T.textMut}}>{t("addTrade.ruleGroups")}</label>
                   {strategyFormData.groups && strategyFormData.groups.map((group,gIdx)=>(
                     <div key={group.id} style={{marginBottom:16,padding:12,border:`1px solid ${T.border}`,borderRadius:8,background:T.bg}}>
                       <div style={{display:"flex",gap:8,marginBottom:12}}>
-                        <input type="text" placeholder="Nom du groupe" value={group.name} onChange={(e)=>updateGroup(group.id,"name",e.target.value)} style={{flex:1,padding:"8px 10px",border:`1px solid ${T.border}`,borderRadius:6,fontSize:12,outline:"none"}}/>
-                        {strategyFormData.groups.length > 1 && <button aria-label="Supprimer le groupe" onClick={()=>removeGroup(group.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:16,color:T.red}}>✕</button>}
+                        <input type="text" placeholder={t("addTrade.groupName")} value={group.name} onChange={(e)=>updateGroup(group.id,"name",e.target.value)} style={{flex:1,padding:"8px 10px",border:`1px solid ${T.border}`,borderRadius:6,fontSize:12,outline:"none"}}/>
+                        {strategyFormData.groups.length > 1 && <button aria-label={t("addTrade.removeGroup")} onClick={()=>removeGroup(group.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:16,color:T.red}}>✕</button>}
                       </div>
 
                       <div style={{display:"flex",flexDirection:"column",gap:6,paddingLeft:20}}>
                         {group.rules && group.rules.map((rule,rIdx)=>(
                           <div key={rule.id} style={{display:"flex",alignItems:"center",gap:6}}>
                             <span style={{fontSize:10,color:T.textMut}}>•</span>
-                            <input type="text" placeholder="ex., FVG 5m" value={rule.text} onChange={(e)=>updateRule(group.id,rule.id,e.target.value)} style={{flex:1,padding:"6px 10px",borderRadius:4,border:`1px solid ${T.border}`,fontSize:11,outline:"none"}}/>
-                            {group.rules.length > 1 && <button aria-label="Supprimer la règle" onClick={()=>removeRule(group.id,rule.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,color:T.red}}>✕</button>}
+                            <input type="text" placeholder={t("addTrade.rulePh")} value={rule.text} onChange={(e)=>updateRule(group.id,rule.id,e.target.value)} style={{flex:1,padding:"6px 10px",borderRadius:4,border:`1px solid ${T.border}`,fontSize:11,outline:"none"}}/>
+                            {group.rules.length > 1 && <button aria-label={t("addTrade.removeRule")} onClick={()=>removeRule(group.id,rule.id)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:12,color:T.red}}>✕</button>}
                           </div>
                         ))}
-                        <button onClick={()=>addRule(group.id)} style={{marginTop:4,fontSize:11,color:T.accent,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>+ Ajouter une règle</button>
+                        <button onClick={()=>addRule(group.id)} style={{marginTop:4,fontSize:11,color:T.accent,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:0}}>{t("addTrade.addRule")}</button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={addGroup} style={{marginTop:12,fontSize:12,color:T.accent,background:"transparent",border:`1px dashed ${T.accent}`,cursor:"pointer",padding:"8px 12px",borderRadius:6,width:"100%"}}>+ Ajouter un groupe</button>
+                  <button onClick={addGroup} style={{marginTop:12,fontSize:12,color:T.accent,background:"transparent",border:`1px dashed ${T.accent}`,cursor:"pointer",padding:"8px 12px",borderRadius:6,width:"100%"}}>{t("addTrade.addGroup")}</button>
                 </div>
 
                 <div style={{display:"flex",gap:12,justifyContent:"flex-end",paddingTop:12,borderTop:`1px solid ${T.border}`}}>
-                  <button onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{padding:"10px 20px",borderRadius:6,border:`1px solid ${T.border}`,background:T.white,fontSize:12,fontWeight:600,cursor:"pointer"}}>Annuler</button>
-                  <button onClick={handleCreateStrategyFromForm} style={{padding:"10px 20px",borderRadius:6,border:"none",background:T.accent,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ Créer une stratégie</button>
+                  <button onClick={() => { setShowStrategyForm(false); setStrategyFormData(getDefaultStrategyFormData()); }} style={{padding:"10px 20px",borderRadius:6,border:`1px solid ${T.border}`,background:T.white,fontSize:12,fontWeight:600,cursor:"pointer"}}>{t("common.cancel")}</button>
+                  <button onClick={handleCreateStrategyFromForm} style={{padding:"10px 20px",borderRadius:6,border:`1px solid ${T.text}`,background:T.white,color:T.text,fontSize:12,fontWeight:600,cursor:"pointer"}}>{t("addTrade.createStrategyBtn")}</button>
                 </div>
               </div>
             </div>,
@@ -1092,7 +1240,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             <h3 style={{ fontSize: "14px", fontWeight: "700", color: T.text }}>{brokerInfo.name}</h3>
           </div>
           <div style={{ marginBottom: "16px" }}>
-            <p style={{ fontSize: "11px", color: T.textMut, marginBottom: "8px", fontWeight: "600" }}>Types d'actifs supportés:</p>
+            <p style={{ fontSize: "11px", color: T.textMut, marginBottom: "8px", fontWeight: "600" }}>{t("addTrade.supportedAssets")}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               {brokerInfo.subtext.replace("Types d'actifs supportés: ", "").split(", ").map((asset, idx) => (
                 <div key={idx} style={{ display: "inline-block", padding: "4px 10px", background: T.white, borderRadius: "6px", fontSize: "10px", color: T.textSub, fontWeight: "600", border: `1px solid ${T.border}` }}>
@@ -1102,7 +1250,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             </div>
           </div>
           <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: "16px" }}>
-            <p style={{ fontSize: "10px", fontWeight: "700", color: T.textMut, marginBottom: "12px", textTransform: "uppercase" }}>Comment exporter :</p>
+            <p style={{ fontSize: "10px", fontWeight: "700", color: T.textMut, marginBottom: "12px", textTransform: "uppercase" }}>{t("addTrade.howToExport")}</p>
             <ol style={{ padding: "0 0 0 16px", margin: 0, listStyleType: "decimal" }}>
               {brokerInfo.steps.map((step, idx) => (
                 <li key={idx} style={{ fontSize: "11px", color: T.textSub, marginBottom: "8px", lineHeight: "1.3" }}>

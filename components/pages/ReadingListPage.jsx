@@ -7,6 +7,7 @@ import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { Stat } from "@/components/ui/Stat";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import { t, useLang } from "@/lib/i18n";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5",
@@ -42,6 +43,7 @@ function defaultBooks() {
 }
 
 export default function ReadingListPage() {
+  useLang();
   const [books, setBooks] = useCloudState(STORAGE_KEY, "reading_list", defaultBooks());
   const { pushUndo } = useUndo();
   const [showForm, setShowForm] = useState(false);
@@ -99,9 +101,9 @@ export default function ReadingListPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Liste de lecture</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("nav.reading")}</h1>
         <button onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}
-          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.white, border: `1px solid ${T.text}`, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Ajouter un livre
         </button>
         <div id="tr4de-page-header-slot" />

@@ -43,7 +43,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   const iconSize = size === "sm" ? 13 : size === "md" ? 14 : 16;
 
   const variantStyles: Record<Variant, React.CSSProperties> = {
-    primary: { background: "#0D0D0D", color: "#FFFFFF", border: "1px solid #0D0D0D" },
+    primary: { background: "var(--color-card-bg, #FFFFFF)", color: "var(--color-text, #0D0D0D)", border: "1px solid var(--color-text, #0D0D0D)" },
     secondary: { background: "#FFFFFF", color: "#0D0D0D", border: "1px solid #E5E5E5" },
     ghost: { background: "transparent", color: "#0D0D0D", border: "1px solid transparent" },
     danger: { background: "#EF4444", color: "#FFFFFF", border: "1px solid #EF4444" },

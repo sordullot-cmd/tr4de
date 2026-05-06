@@ -976,7 +976,7 @@ export default function App() {
               const acc = accounts.find(a => a.id === selectedAccountIds[0]);
               if (acc) return { id: acc.id, name: acc.name || "Compte" };
             }
-            if (selectedAccountIds.length > 1) return { id: "multi", name: `${selectedAccountIds.length} comptes` };
+            if (selectedAccountIds.length > 1) return { id: "multi", name: t("accounts.multiple").replace("{n}", String(selectedAccountIds.length)) };
             return null;
           })()}
           workspaces={visibleAccounts.map(a => ({ id: a.id, name: a.name || "Compte" }))}
@@ -1043,7 +1043,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading", "sport", "notes"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

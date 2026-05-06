@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { t, useLang } from "@/lib/i18n";
 const TIMER_KEY = "tr4de_focus_timer_v1";
 const loadTimer = () => {
   if (typeof window === "undefined") return null;
@@ -61,6 +62,7 @@ const fmtDuration = (secs) => {
 };
 
 export default function FocusTimerPage() {
+  useLang();
   const [sessions, setSessions] = useCloudState(LOG_KEY, "focus_sessions", []);
 
   // Custom durations per mode (persisted)
@@ -264,7 +266,7 @@ export default function FocusTimerPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Minuteur Focus</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("nav.focus")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Download } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
@@ -11,6 +11,7 @@ import { exportJournalPdf } from "@/lib/export/journalPdf";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 
 export default function JournalPage({ trades = [] }) {
+  useLang();
   const { notes: tradeNotes, setNote: updateTradeNote } = useTradeNotes();
   const { notes: dailyNotes, setNote: updateDailyNote } = useDailySessionNotes();
 
@@ -77,7 +78,7 @@ export default function JournalPage({ trades = [] }) {
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("journal.title")}</h1>
         <button
           type="button"
-          aria-label="Exporter le journal en PDF"
+          aria-label={t("journal.exportAria")}
           disabled={trades.length === 0}
           onClick={() => exportJournalPdf({
             trades,
@@ -98,7 +99,7 @@ export default function JournalPage({ trades = [] }) {
             fontFamily: "inherit",
           }}
         >
-          <Download size={14} strokeWidth={1.75} /> Exporter PDF
+          <Download size={14} strokeWidth={1.75} /> {t("journal.exportPdf")}
         </button>
         <div id="tr4de-page-header-slot" />
       </div>
@@ -230,11 +231,11 @@ export default function JournalPage({ trades = [] }) {
                         <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{trades.length}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>Taux victoire</div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>{t("journal.winRateLabel")}</div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: T.green }}>{dayWinRate}%</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>PnL du jour</div>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: T.textMut, textTransform: "uppercase", marginBottom: 2 }}>{t("journal.dayPnL")}</div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: dayPnL >= 0 ? T.green : T.red }}>{dayPnL >= 0 ? "+" : ""}{fmt(dayPnL)}</div>
                       </div>
                     </div>
@@ -327,7 +328,7 @@ export default function JournalPage({ trades = [] }) {
                                         <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
                                           <td colSpan="6" style={{ padding: "12px 12px" }}>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                              <div style={{ fontSize: 11, color: T.textMut, textTransform: "uppercase" }}>Notes pour {trade.symbol}</div>
+                                              <div style={{ fontSize: 11, color: T.textMut, textTransform: "uppercase" }}>{t("journal.notesFor").replace("{symbol}", trade.symbol)}</div>
                                               <textarea
                                                 placeholder={t("journal.tradeNote")}
                                                 value={tradeNotes[tradeId] || ""}

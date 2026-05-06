@@ -6,6 +6,7 @@ import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { ArrowLeft, ArrowRight, TrendingUp as LucideTrendingUp } from "lucide-react";
 import TradesPage from "@/components/pages/TradesPage";
+import { t, useLang } from "@/lib/i18n";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -51,6 +52,7 @@ const BROKER_LOGOS = {
 const getBrokerLogo = (b) => b ? (BROKER_LOGOS[String(b).trim().toLowerCase()] || null) : null;
 
 export default function AccountDetailPage({ accountId, accounts = [], trades = [], strategies = [], setPage, setSelectedAccountIds }) {
+  useLang();
   const account = accounts.find(a => a.id === accountId);
   const accountTrades = (trades || []).filter(t => t.account_id === accountId);
 
@@ -208,7 +210,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       <div style={{ padding: 32, color: T.textSub }}>
         <button
           onClick={() => setPage?.("accounts")}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, padding: "6px 10px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", fontSize: 12 }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 16, padding: "6px 10px", borderRadius: 8, border: `1px solid ${T.border}`, background: "var(--color-card-bg, #fff)", cursor: "pointer", fontSize: 12 }}
         >
           <ArrowLeft size={13} /> Retour
         </button>
@@ -237,7 +239,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             type="button"
             onClick={() => setPage?.("accounts")}
             aria-label="Retour"
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 999, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.text, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 999, border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)", color: T.text, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
             onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; }}
           >
@@ -263,15 +265,15 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       <div style={{ height: 1, background: T.border }} />
 
       {/* KPIs principaux — collés au graphique en dessous */}
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "12px 12px 0 0", borderBottom: "none", overflow: "hidden" }}>
+      <div style={{ background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: "12px 12px 0 0", borderBottom: "none", overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
           <KpiCell
-            label="Account balance"
+            label={t("accountsPage.accountBalance")}
             value={balance !== null ? fmtNoCents(balance) : "—"}
             sub={capital !== null ? `/ ${fmtNoCents(capital)}` : undefined}
           />
           <KpiCell
-            label="P&L cumulé"
+            label={t("accountsPage.kpiPnL")}
             value={fmt(stats.pnl, true)}
             sub={pnlPct !== null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` : undefined}
             valueColor={stats.pnl > 0 ? T.green : stats.pnl < 0 ? T.red : T.text}
@@ -282,7 +284,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             sub={`${stats.wins} W / ${stats.losses} L`}
           />
           <KpiCell
-            label="Win rate"
+            label={t("accountsPage.winRateL")}
             value={stats.total > 0 ? `${stats.winRate.toFixed(1)}%` : "—"}
             last
           />
@@ -290,21 +292,21 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         {/* Row 2 — KPIs secondaires */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: `1px solid ${T.border}` }}>
           <KpiCell
-            label="Profit factor"
+            label={t("accountsPage.profitFactor")}
             value={stats.profitFactor === Infinity ? "∞" : (stats.total > 0 ? stats.profitFactor.toFixed(2) : "—")}
           />
           <KpiCell
-            label="Espérance / trade"
+            label={t("accountsPage.expectancyTrade")}
             value={stats.total > 0 ? fmt(stats.expectancy, true) : "—"}
             valueColor={stats.expectancy > 0 ? T.green : stats.expectancy < 0 ? T.red : T.text}
           />
           <KpiCell
-            label="Drawdown max"
+            label={t("accountsPage.maxDrawdown")}
             value={stats.maxDD > 0 ? `-${fmtNoCents(stats.maxDD)}` : "—"}
             valueColor={stats.maxDD > 0 ? T.red : T.text}
           />
           <KpiCell
-            label="Avg win / loss"
+            label={t("accountsPage.avgWinLoss")}
             value={stats.total > 0 ? `${fmtNoCents(stats.avgWin)} / -${fmtNoCents(stats.avgLoss)}` : "—"}
             last
           />
@@ -337,7 +339,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "14px 18px",
-          background: "#FFFFFF",
+          background: "var(--color-card-bg, #FFFFFF)",
           border: `1px solid ${T.border}`,
           borderRadius: "12px 12px 0 0",
           borderBottom: "none",
@@ -353,7 +355,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 999,
-              border: `1px solid ${T.border}`, background: "#FFFFFF",
+              border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)",
               color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer",
               fontFamily: "inherit",
             }}
@@ -367,7 +369,7 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
 
         {accountTrades.length === 0 ? (
           <div style={{
-            background: "#FFFFFF",
+            background: "var(--color-card-bg, #FFFFFF)",
             border: `1px solid ${T.border}`,
             borderRadius: "0 0 12px 12px",
             padding: "40px 24px", textAlign: "center", color: T.textSub, fontSize: 13,
@@ -526,51 +528,51 @@ function StatsTable({ stats }) {
 
   const cells = [
     // Row 1
-    { label: "Total trades", value: String(stats.total) },
-    { label: "Gagnants", value: String(stats.wins) },
-    { label: "Perdants", value: String(stats.losses) },
-    { label: "Neutres", value: String(stats.scratch) },
-    { label: "Durée moy. (gagnants)", value: fmtMin(stats.avgHoldWinMin) },
-    { label: "Durée moy. (perdants)", value: fmtMin(stats.avgHoldLossMin) },
+    { label: t("accountsPage.totalTradesL"), value: String(stats.total) },
+    { label: t("accountsPage.winners"), value: String(stats.wins) },
+    { label: t("accountsPage.losers"), value: String(stats.losses) },
+    { label: t("accountsPage.scratch"), value: String(stats.scratch) },
+    { label: t("accountsPage.avgHoldWin"), value: fmtMin(stats.avgHoldWinMin) },
+    { label: t("accountsPage.avgHoldLoss"), value: fmtMin(stats.avgHoldLossMin) },
     // Row 2
-    { label: "Série gagnante max", value: String(stats.maxWinStreak) },
-    { label: "Série perdante max", value: String(stats.maxLossStreak) },
-    { label: "Plus gros gain", value: stats.bestTrade ? fmtMoneyCents(stats.bestTrade.pnl) : "—" },
-    { label: "Plus grosse perte", value: stats.worstTrade ? fmtMoneyCents(stats.worstTrade.pnl) : "—" },
-    { label: "Total exécutions", value: String(stats.totalExecutions) },
-    { label: "Volume moy. / trade", value: stats.avgTradeVolume ? fmtNum(stats.avgTradeVolume, 1) : "—" },
+    { label: t("accountsPage.maxWinStreakL"), value: String(stats.maxWinStreak) },
+    { label: t("accountsPage.maxLossStreakL"), value: String(stats.maxLossStreak) },
+    { label: t("accountsPage.bestTrade"), value: stats.bestTrade ? fmtMoneyCents(stats.bestTrade.pnl) : "—" },
+    { label: t("accountsPage.worstTrade"), value: stats.worstTrade ? fmtMoneyCents(stats.worstTrade.pnl) : "—" },
+    { label: t("accountsPage.totalExecsL"), value: String(stats.totalExecutions) },
+    { label: t("accountsPage.avgTradeVolume"), value: stats.avgTradeVolume ? fmtNum(stats.avgTradeVolume, 1) : "—" },
     // Row 3
-    { label: "P&L total", value: fmtMoneyCents(stats.pnl) },
-    { label: "Trades longs", value: String(stats.longCount) },
-    { label: "Trades shorts", value: String(stats.shortCount) },
-    { label: "Taux de victoire", value: stats.total > 0 ? `${stats.winRate.toFixed(1)}%` : "—" },
-    { label: "Frais totaux", value: fmtMoneyCents(stats.totalFees) },
-    { label: "Positions ouvertes", value: String(stats.openPositions) },
+    { label: t("accountsPage.totalPnL"), value: fmtMoneyCents(stats.pnl) },
+    { label: t("accountsPage.longTrades"), value: String(stats.longCount) },
+    { label: t("accountsPage.shortTrades"), value: String(stats.shortCount) },
+    { label: t("accountsPage.winRateL"), value: stats.total > 0 ? `${stats.winRate.toFixed(1)}%` : "—" },
+    { label: t("accountsPage.totalFees"), value: fmtMoneyCents(stats.totalFees) },
+    { label: t("accountsPage.openPositions"), value: String(stats.openPositions) },
     // Row 4
-    { label: "P&L moy. / trade", value: stats.total > 0 ? fmtMoneyCents(stats.avgTradePnL) : "—" },
-    { label: "Gagnant moyen", value: stats.wins ? fmtMoneyCents(stats.avgWin) : "—" },
-    { label: "Perdant moyen", value: stats.losses ? `-${fmt(stats.avgLoss)}` : "—" },
-    { label: "Profit factor", value: stats.profitFactor === Infinity ? "∞" : (stats.total > 0 ? fmtNum(stats.profitFactor) : "—") },
-    { label: "K-Ratio", value: stats.curve.length > 2 ? fmtNum(stats.kRatio) : "—" },
-    { label: "Kelly %", value: stats.total > 0 ? `${stats.kellyPct.toFixed(1)}%` : "—" },
+    { label: t("accountsPage.avgTradePnl"), value: stats.total > 0 ? fmtMoneyCents(stats.avgTradePnL) : "—" },
+    { label: t("accountsPage.avgWinner"), value: stats.wins ? fmtMoneyCents(stats.avgWin) : "—" },
+    { label: t("accountsPage.avgLoser"), value: stats.losses ? `-${fmt(stats.avgLoss)}` : "—" },
+    { label: t("accountsPage.profitFactor"), value: stats.profitFactor === Infinity ? "∞" : (stats.total > 0 ? fmtNum(stats.profitFactor) : "—") },
+    { label: t("accountsPage.kRatio"), value: stats.curve.length > 2 ? fmtNum(stats.kRatio) : "—" },
+    { label: t("accountsPage.kellyPct"), value: stats.total > 0 ? `${stats.kellyPct.toFixed(1)}%` : "—" },
     // Row 5
-    { label: "Total jours tradés", value: String(stats.tradingDays) },
-    { label: "Jours gagnants", value: String(stats.winDays) },
-    { label: "Jours perdants", value: String(stats.loseDays) },
-    { label: "Drawdown max", value: stats.maxDD > 0 ? `-${fmtMoney(stats.maxDD)}` : "—" },
-    { label: "Volume quotidien moy.", value: stats.tradingDays ? fmtNum(stats.avgDailyVolume, 1) : "—" },
-    { label: "SQN", value: stats.pnlStdDev > 0 ? fmtNum(stats.sqn) : "—" },
+    { label: t("accountsPage.totalDaysL"), value: String(stats.tradingDays) },
+    { label: t("accountsPage.winDays"), value: String(stats.winDays) },
+    { label: t("accountsPage.loseDays"), value: String(stats.loseDays) },
+    { label: t("accountsPage.maxDrawdown"), value: stats.maxDD > 0 ? `-${fmtMoney(stats.maxDD)}` : "—" },
+    { label: t("accountsPage.avgDailyVolume"), value: stats.tradingDays ? fmtNum(stats.avgDailyVolume, 1) : "—" },
+    { label: t("accountsPage.sqn"), value: stats.pnlStdDev > 0 ? fmtNum(stats.sqn) : "—" },
     // Row 6
-    { label: "P&L quotidien moy.", value: stats.tradingDays ? fmtMoneyCents(stats.avgDailyPnL) : "—" },
-    { label: "P&L moy. jour gagnant", value: stats.winDays ? fmtMoneyCents(stats.avgWinDayPnL) : "—" },
-    { label: "P&L moy. jour perdant", value: stats.loseDays ? fmtMoneyCents(stats.avgLoseDayPnL) : "—" },
-    { label: "Écart-type P&L", value: stats.pnlStdDev > 0 ? fmtMoneyCents(stats.pnlStdDev) : "—" },
-    { label: "Espérance", value: stats.total > 0 ? fmtMoneyCents(stats.expectancy) : "—" },
-    { label: "Ratio d'espérance", value: stats.expectancyRatio > 0 ? fmtNum(stats.expectancyRatio) : "—" },
+    { label: t("accountsPage.avgDailyPnL"), value: stats.tradingDays ? fmtMoneyCents(stats.avgDailyPnL) : "—" },
+    { label: t("accountsPage.avgWinDayPnL"), value: stats.winDays ? fmtMoneyCents(stats.avgWinDayPnL) : "—" },
+    { label: t("accountsPage.avgLoseDayPnL"), value: stats.loseDays ? fmtMoneyCents(stats.avgLoseDayPnL) : "—" },
+    { label: t("accountsPage.pnlStdDevL"), value: stats.pnlStdDev > 0 ? fmtMoneyCents(stats.pnlStdDev) : "—" },
+    { label: t("accountsPage.expectancyL"), value: stats.total > 0 ? fmtMoneyCents(stats.expectancy) : "—" },
+    { label: t("accountsPage.expectancyRatioL"), value: stats.expectancyRatio > 0 ? fmtNum(stats.expectancyRatio) : "—" },
   ];
 
   return (
-    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))" }}>
         {cells.map((c, i) => {
           const col = i % 6;
@@ -603,11 +605,11 @@ const ACCOUNT_COLORS = ["#3B82F6", "#16A34A", "#F97316", "#A855F7", "#EAB308", "
 function ChartCard({ currentAccountId, currentName, trades, accounts, currentCurve, currentTotal }) {
   const [tab, setTab] = React.useState("self"); // "self" | "compare"
   const tabs = [
-    { id: "self", label: "Mon compte" },
-    { id: "compare", label: "Comparaison", disabled: (accounts || []).length < 2 },
+    { id: "self", label: t("accountsPage.myAccountTab") },
+    { id: "compare", label: t("accountsPage.compareTab"), disabled: (accounts || []).length < 2 },
   ];
   return (
-    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "visible", marginTop: -16, position: "relative", zIndex: 1 }}>
+    <div style={{ background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "visible", marginTop: -16, position: "relative", zIndex: 1 }}>
       <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Évolution du P&L</div>
@@ -645,7 +647,7 @@ function ChartCard({ currentAccountId, currentName, trades, accounts, currentCur
           </div>
         </div>
         <div style={{ fontSize: 11, color: T.textMut, marginBottom: 12 }}>
-          {tab === "self" ? `P&L cumulé jour par jour — ${currentTotal} trades` : "Comparaison des comptes — P&L cumulé"}
+          {tab === "self" ? t("accountsPage.cumulativeDailyPnl").replace("{n}", String(currentTotal)) : t("accountsPage.cumulativeAccountsCompare")}
         </div>
         {tab === "self"
           ? <EquityCurve curve={currentCurve} />
@@ -834,7 +836,7 @@ function EquityCompare({ trades, accounts, highlightId }) {
             left: `${tooltipPct}%`,
             top: `${topPct}%`,
             transform: `translateY(-100%) translateY(-12px) ${tooltipFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
-            background: "#FFFFFF",
+            background: "var(--color-card-bg, #FFFFFF)",
             color: T.text,
             border: `1px solid ${T.border}`,
             padding: "8px 10px",
@@ -867,7 +869,7 @@ function EquityCompare({ trades, accounts, highlightId }) {
 function HighlightCard({ label, value, sub, tone }) {
   const color = tone === "green" ? T.green : tone === "red" ? T.red : T.text;
   return (
-    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px" }}>
+    <div style={{ background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px" }}>
       <div style={{ fontSize: 11, color: T.textMut, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color, marginTop: 4 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: T.textSub, marginTop: 2 }}>{sub}</div>}
@@ -1018,7 +1020,7 @@ function EquityCurve({ curve }) {
             left: `${tooltipPct}%`,
             top: `${topPct}%`,
             transform: `translateY(-100%) translateY(-12px) ${tooltipFlip ? "translateX(-100%) translateX(-8px)" : "translateX(8px)"}`,
-            background: "#FFFFFF",
+            background: "var(--color-card-bg, #FFFFFF)",
             color: T.text,
             border: `1px solid ${T.border}`,
             padding: "8px 10px",

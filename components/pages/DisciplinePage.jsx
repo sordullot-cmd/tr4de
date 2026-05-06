@@ -12,7 +12,7 @@ import {
   Sun, Compass, Newspaper, ListChecks, NotebookPen, ShieldCheck,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
@@ -162,7 +162,7 @@ function EditListModal({ open, title, accent, items, isCheckList, onClose, onSav
           </span>
           <div style={{display:"flex",gap:8}}>
             <button onClick={onClose} style={{padding:"0 18px",height:34,borderRadius:999,border:"1px solid #E5E5E5",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
-            <button onClick={save} style={{padding:"0 18px",height:34,borderRadius:999,border:"1px solid #0D0D0D",background:"#0D0D0D",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
+            <button onClick={save} style={{padding:"0 18px",height:34,borderRadius:999,border:"1px solid #0D0D0D",background:"#FFFFFF",color:"#0D0D0D",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Enregistrer</button>
           </div>
         </div>
 
@@ -386,6 +386,7 @@ function EditableCheckList({ title, iconBg, icon, items, checkedRuleIds, onToggl
 }
 
 export default function DisciplinePage({ trades = [] }) {
+  useLang();
   // ✅ Utiliser les hooks Supabase
   const { user } = useAuth();
   const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules, disciplineData } = useDisciplineTracking();
@@ -412,26 +413,11 @@ export default function DisciplinePage({ trades = [] }) {
   const [disciplineRules, setDisciplineRules] = useCloudState("tr4de_discipline_rules_config", "discipline_rules_config", {});
   const [activeDays, setActiveDays] = useCloudState("tr4de_discipline_active_days", "discipline_active_days", {});
 
-  // Listes éditables pour Bias / Règles à suivre / Erreurs à éviter
-  const DEFAULT_BIAS = [
-    "Identifier le balayage de liquidité (HTF Liquidity Sweep)",
-    "Définir l'objectif de prix (Draw on Liquidity)",
-    "Vérifier les respects/discrédits (FVG/OB)",
-    "Comparer les divergences SMT (Corrélation d'actifs)",
-    "Appliquer les profils de session (Asie/Londres/New York)",
-  ];
-  const DEFAULT_PERSONAL = [
-    { id: "personal_sl_be",       label: "Ne pas bouger son SL en BE" },
-    { id: "personal_ifvg",        label: "Bien attendre le iFVG" },
-    { id: "personal_focus",       label: "Être attentif sur le marché" },
-    { id: "personal_no_hesitate", label: "Ne pas hésiter" },
-  ];
-  const DEFAULT_ERRORS = [
-    "FVG au-dessus du SL (sauf si trend forte)",
-    "Zone de liquidité juste au-dessus du SL (range, plus hauts, etc.)",
-    "Si la majeure sellside a été prise, ne pas prendre le premier setup, attendre un meilleur retracement",
-    "Rentrer sans confirmation",
-  ];
+  // Listes éditables pour Bias / Règles à suivre / Erreurs à éviter — vides
+  // par défaut pour que chaque utilisateur les remplisse lui-même.
+  const DEFAULT_BIAS = [];
+  const DEFAULT_PERSONAL = [];
+  const DEFAULT_ERRORS = [];
   const [biasItems, setBiasItems] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("tr4de_bias_items") || "null");
@@ -639,21 +625,21 @@ export default function DisciplinePage({ trades = [] }) {
   };
 
   const ruleDescriptions = {
-    premarket: "Effectuer votre routine matinale avant l'ouverture du marché pour une meilleure préparation",
-    biais: "Identifier et trader selon le biais dominant du marché du jour",
-    news: "Consulter les actualités importantes et identifier les niveaux clés du marché",
-    followall: "Vérifier que toutes les règles de discipline ont été respectées durant la session",
-    journal: "Consigner votre analyse et vos apprentissages après la fermeture du marché"
+    premarket: t("disc.ruleDesc.premarket"),
+    biais: t("disc.ruleDesc.biais"),
+    news: t("disc.ruleDesc.news"),
+    followall: t("disc.ruleDesc.followall"),
+    journal: t("disc.ruleDesc.journal"),
   };
 
   // Liste quotidienne uniquement (base + custom Supabase). Affichée dans la
   // section "Liste quotidienne".
   const dailyRules = [
-    { id: "premarket", label: "Routine pré-marché", uuid: null },
-    { id: "biais", label: "Biais journalier", uuid: null },
-    { id: "news", label: "News et niveaux clés", uuid: null },
-    { id: "followall", label: "Toutes les règles respectées", uuid: null },
-    { id: "journal", label: "Journal d'après-session", uuid: null },
+    { id: "premarket", label: t("disc.rule.premarket"), uuid: null },
+    { id: "biais", label: t("disc.rule.biais"), uuid: null },
+    { id: "news", label: t("disc.rule.news"), uuid: null },
+    { id: "followall", label: t("disc.rule.followall"), uuid: null },
+    { id: "journal", label: t("disc.rule.journal"), uuid: null },
     ...customRules.map(r => ({ id: r.rule_id, label: r.text, uuid: r.id })),
   ].map(r => ({ ...r, status: checkedRuleIds[r.id] || false }));
 
@@ -774,7 +760,7 @@ export default function DisciplinePage({ trades = [] }) {
                     {Math.round(completeProgress)}%
                   </text>
                 </svg>
-                <div style={{fontSize:10,fontWeight:500,color:T.textMut}}>{completedCount} sur {allRules.length} règles</div>
+                <div style={{fontSize:10,fontWeight:500,color:T.textMut}}>{t("disc.rulesCounter").replace("{c}", String(completedCount)).replace("{t}", String(allRules.length))}</div>
               </div>
             </div>
           </div>
@@ -782,7 +768,7 @@ export default function DisciplinePage({ trades = [] }) {
           {/* BIAS JOURNALIER */}
           <EditableTextList
             title={t("disc.biasDaily")}
-            iconBg="#EFF6FF"
+            iconBg="#EFEFEF"
             accent="#3B82F6"
             icon={<LucideTrendingUp size={13} strokeWidth={1.75} color="#3B82F6"/>}
             items={biasItems}
@@ -795,7 +781,7 @@ export default function DisciplinePage({ trades = [] }) {
           {/* REGLES A SUIVRE */}
           <EditableCheckList
             title={t("disc.rulesToFollow")}
-            iconBg="#F0FDF4"
+            iconBg="#EFEFEF"
             accent={T.green}
             icon={<LucideCheck size={13} strokeWidth={2} color={T.green}/>}
             items={personalRules}
@@ -807,7 +793,7 @@ export default function DisciplinePage({ trades = [] }) {
           {/* ERREURS A EVITER */}
           <EditableTextList
             title={t("disc.errorsToAvoid")}
-            iconBg="#FEF2F2"
+            iconBg="#EFEFEF"
             accent={T.red}
             icon={<LucideX size={13} strokeWidth={2} color={T.red}/>}
             items={errorItems}
@@ -908,7 +894,7 @@ export default function DisciplinePage({ trades = [] }) {
                 
                 return (
                   <div style={{fontSize:12,color:T.textSub,marginTop:6}}>
-                    {streak >= 2 ? `${streak} jours de suite` : 'Pas de streak active'}
+                    {streak >= 2 ? t("disc.streakDays").replace("{n}", String(streak)) : t("disc.noStreak")}
                   </div>
                 );
               })()}
@@ -1154,7 +1140,7 @@ export default function DisciplinePage({ trades = [] }) {
 
             {/* Legend */}
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:20,fontSize:11,color:T.textMut}}>
-              <span>Moins</span>
+              <span>{t("disc.legendLess")}</span>
               {[
                 '#DCFCE7',
                 '#86EFAC',
@@ -1173,7 +1159,7 @@ export default function DisciplinePage({ trades = [] }) {
                   }}
                 />
               ))}
-              <span>Plus</span>
+              <span>{t("disc.legendMore")}</span>
             </div>
           </div>
         </div>
@@ -1181,12 +1167,12 @@ export default function DisciplinePage({ trades = [] }) {
         {/* RULES TABLE */}
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:13,fontWeight:600,color:T.text,letterSpacing:-0.1}}>Règles</div>
+            <div style={{fontSize:13,fontWeight:600,color:T.text,letterSpacing:-0.1}}>{t("disc.rulesTitle")}</div>
             <button
               type="button"
               onClick={() => setShowRulesModal(true)}
-              aria-label="Modifier les règles"
-              title="Modifier les règles"
+              aria-label={t("disc.editRules")}
+              title={t("disc.editRules")}
               style={{
                 width:28, height:28,
                 display:"inline-flex", alignItems:"center", justifyContent:"center",
@@ -1258,7 +1244,7 @@ export default function DisciplinePage({ trades = [] }) {
               </tbody>
             </table>
           </div>
-          <div style={{padding:"10px 14px",borderTop:`1px solid ${T.border}`,fontSize:11,color:T.textSub}}>{allRules.length} rules</div>
+          <div style={{padding:"10px 14px",borderTop:`1px solid ${T.border}`,fontSize:11,color:T.textSub}}>{t("disc.rulesFooter").replace("{n}", String(allRules.length))}</div>
         </div>
       </div>
 
@@ -1274,13 +1260,13 @@ export default function DisciplinePage({ trades = [] }) {
             {/* HEADER */}
             <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
-                <div style={{fontSize:15,fontWeight:600,color:T.text,letterSpacing:-0.1}}>Modifier les règles</div>
-                <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Active ou ajoute des règles à suivre.</div>
+                <div style={{fontSize:15,fontWeight:600,color:T.text,letterSpacing:-0.1}}>{t("disc.editRules")}</div>
+                <div style={{fontSize:11,color:T.textMut,marginTop:2}}>{t("disc.editRulesSub")}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRulesModal(false)}
-                aria-label="Fermer"
+                aria-label={t("disc.closeAria")}
                 style={{width:28,height:28,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:999,color:T.textMut,cursor:"pointer",fontSize:16,fontFamily:"inherit"}}
                 onMouseEnter={(e)=>{e.currentTarget.style.background=T.bg;e.currentTarget.style.color=T.text;}}
                 onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textMut;}}
@@ -1293,7 +1279,7 @@ export default function DisciplinePage({ trades = [] }) {
             <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:20}}>
               {/* AUTOMATED */}
               <div>
-                <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>Règles journalières</div>
+                <div style={{fontSize:12,fontWeight:600,color:T.textSub,marginBottom:8}}>{t("disc.dailyRulesSection")}</div>
                 <div style={{borderRadius:12,overflow:"hidden",background:T.white}}>
                   {(() => {
                     const dailyArr = allRules.filter(r => ["premarket", "biais", "news", "followall", "journal"].includes(r.id));
@@ -1337,8 +1323,8 @@ export default function DisciplinePage({ trades = [] }) {
                       <button
                         type="button"
                         onClick={() => removeManualRule(rule.uuid || rule.id)}
-                        aria-label="Supprimer"
-                        title="Supprimer"
+                        aria-label={t("disc.removeAria")}
+                        title={t("disc.removeAria")}
                         style={{width:24,height:24,display:"inline-flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:6,color:T.textMut,cursor:"pointer",flexShrink:0}}
                         onMouseEnter={(e)=>{e.currentTarget.style.background="#FEF2F2";e.currentTarget.style.color=T.red;}}
                         onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.textMut;}}
@@ -1352,7 +1338,7 @@ export default function DisciplinePage({ trades = [] }) {
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px"}}>
                     <input
                       type="text"
-                      placeholder="Ajouter une règle…"
+                      placeholder={t("disc.addRulePlaceholder")}
                       value={newManualRule}
                       onChange={(e) => setNewManualRule(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter" && newManualRule.trim()) addManualRule(); }}
@@ -1362,8 +1348,8 @@ export default function DisciplinePage({ trades = [] }) {
                       type="button"
                       onClick={() => { if (newManualRule.trim()) addManualRule(); }}
                       disabled={!newManualRule.trim()}
-                      aria-label="Ajouter"
-                      title="Ajouter"
+                      aria-label={t("disc.addAria")}
+                      title={t("disc.addAria")}
                       style={{width:32,height:32,display:"inline-flex",alignItems:"center",justifyContent:"center",background:newManualRule.trim()?T.text:T.bg,color:newManualRule.trim()?"#fff":T.textMut,border:`1px solid ${newManualRule.trim()?T.text:T.border}`,borderRadius:999,cursor:newManualRule.trim()?"pointer":"not-allowed",fontFamily:"inherit",flexShrink:0}}
                     >
                       <Plus size={14} strokeWidth={2}/>
@@ -1377,9 +1363,9 @@ export default function DisciplinePage({ trades = [] }) {
             <div style={{padding:"12px 20px",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"flex-end",background:T.bg}}>
               <button
                 onClick={() => setShowRulesModal(false)}
-                style={{padding:"8px 20px",height:36,background:T.text,color:"#fff",border:`1px solid ${T.text}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                style={{padding:"8px 20px",height:36,background:T.white,color:T.text,border:`1px solid ${T.text}`,borderRadius:999,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
               >
-                Terminé
+                {t("disc.done")}
               </button>
             </div>
           </div>

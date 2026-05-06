@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getCurrencySymbol, rMultiple, fmtR } from "@/lib/userPrefs";
 import TradesPage from "@/components/pages/TradesPage";
 import LoadingScreen from "@/components/ui/LoadingScreen";
+import { t, useLang } from "@/lib/i18n";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
 const T = {
@@ -45,6 +46,7 @@ function Pill({ children, color="gray", small }) {
 }
 
 export default function StrategyDetailPage({ setPage = () => {} }) {
+  useLang();
   const [trades, setTrades] = useState([]);
   const [strategies, setStrategies] = useState([]);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
@@ -595,7 +597,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         <button
           type="button"
           onClick={() => setPage('strategies')}
-          aria-label="Retour"
+          aria-label={t("strat.detail.back")}
           style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:28,height:28,borderRadius:999,border:`1px solid ${T.border}`,background:"#FFFFFF",color:T.text,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}
           onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; }}
@@ -620,7 +622,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)"}}>
             {/* 1. P&L Net */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>P&L Net</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.netPnl")}</div>
               <div style={{fontSize:20,fontWeight:600,color:totalPnL >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {fmt(totalPnL,true)}
               </div>
@@ -629,20 +631,20 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
 
             {/* 2. Profit factor */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Profit factor</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.profitFactor")}</div>
               <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {profitFactor === Infinity ? "∞" : (filteredTrades.length > 0 ? profitFactor : "—")}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Gain / Perte</div>
+              <div style={{fontSize:11,color:T.textMut}}>{t("strat.kpi.profitFactorSub")}</div>
             </div>
 
             {/* 3. Drawdown max */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Drawdown max</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.maxDrawdown")}</div>
               <div style={{fontSize:20,fontWeight:600,color:T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 −{fmt(Math.max(...filteredTrades.map(t=>t.pnl||0),0), false)}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Pire baisse</div>
+              <div style={{fontSize:11,color:T.textMut}}>{t("strat.kpi.maxDrawdownSub")}</div>
             </div>
 
             {/* 4. Trades */}
@@ -659,38 +661,38 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",borderTop:`1px solid ${T.border}`}}>
             {/* 5. Taux de victoire */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Taux de victoire</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.winRate")}</div>
               <div style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {winRate}%
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length > 0 ? "Performance" : "—"}</div>
+              <div style={{fontSize:11,color:T.textMut}}>{filteredTrades.length > 0 ? t("strat.kpi.winRateSub") : "—"}</div>
             </div>
 
             {/* 6. Espérance/trade */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Espérance/trade</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.expectancy")}</div>
               <div style={{fontSize:20,fontWeight:600,color:totalPnL/filteredTrades.length >= 0 ? T.green : T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {filteredTrades.length > 0 ? fmt(totalPnL/filteredTrades.length, true) : "—"}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Moyenne par trade</div>
+              <div style={{fontSize:11,color:T.textMut}}>{t("strat.kpi.expectancySub")}</div>
             </div>
 
             {/* 7. Meilleur trade */}
             <div style={{flex:1,padding:"16px 20px",borderRight:`1px solid ${T.border}`}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Meilleur trade</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.bestTrade")}</div>
               <div style={{fontSize:20,fontWeight:600,color:T.green,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {fmt(maxWin)}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Plus haut gain</div>
+              <div style={{fontSize:11,color:T.textMut}}>{t("strat.kpi.bestTradeSub")}</div>
             </div>
 
             {/* 8. Pire trade */}
             <div style={{flex:1,padding:"16px 20px"}}>
-              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>Pire trade</div>
+              <div style={{fontSize:12,color:T.textSub,marginBottom:8,fontWeight:500}}>{t("strat.kpi.worstTrade")}</div>
               <div style={{fontSize:20,fontWeight:600,color:T.red,letterSpacing:-0.2,lineHeight:1.1,marginBottom:6}}>
                 {fmt(maxLoss)}
               </div>
-              <div style={{fontSize:11,color:T.textMut}}>Plus grosse perte</div>
+              <div style={{fontSize:11,color:T.textMut}}>{t("strat.kpi.worstTradeSub")}</div>
             </div>
           </div>
         </div>
@@ -806,8 +808,8 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         return (
           <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:"0 0 12px 12px",overflow:"visible",marginTop:-24,position:"relative",zIndex:1}}>
             <div style={{padding:"16px 20px"}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.text}}>Comparaison des performances</div>
-              <div style={{fontSize:11,color:T.textMut,marginTop:2}}>P&L cumulé jour par jour — toutes les stratégies, courante mise en avant</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("strat.detail.compareTitle")}</div>
+              <div style={{fontSize:11,color:T.textMut,marginTop:2}}>{t("strat.detail.compareSub")}</div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"180px 1fr"}}>
               {/* Légende — triée par P&L décroissant */}
@@ -958,24 +960,24 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
           <div style={{padding:"16px 20px",borderBottom:`1px solid ${T.border}`}}>
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
-              Condition probabilité <span style={{color:T.textMut,fontWeight:500}}>›</span>
+              {t("strat.detail.condProb")} <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
-            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Meilleurs et pires créneaux pour cette stratégie</div>
+            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>{t("strat.detail.condProbSub")}</div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr"}}>
             {/* BEST */}
             <div style={{padding:16,borderRight:`1px solid ${T.border}`}}>
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleur jour</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.bestDay")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestDay.day}</div>
                 </div>
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleure fenêtre</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.bestWindow")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestHour.hour}</div>
                 </div>
                 <div>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Meilleur asset</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.bestAsset")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{bestSymbol.symbol}</div>
                 </div>
               </div>
@@ -984,15 +986,15 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             <div style={{padding:16}}>
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire jour</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.worstDay")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstDay.day}</div>
                 </div>
                 <div style={{paddingBottom:14,borderBottom:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire fenêtre</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.worstWindow")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstHour.hour}</div>
                 </div>
                 <div>
-                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>Pire asset</div>
+                  <div style={{fontSize:11,color:T.textMut,marginBottom:6,fontWeight:500}}>{t("strat.detail.worstAsset")}</div>
                   <div style={{fontSize:15,fontWeight:600,color:T.text}}>{worstSymbol.symbol}</div>
                 </div>
               </div>
@@ -1006,7 +1008,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             <div style={{fontSize:13,fontWeight:600,color:T.text,display:"inline-flex",alignItems:"center",gap:4}}>
               tao score <span style={{color:T.textMut,fontWeight:500}}>›</span>
             </div>
-            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>Performance globale de la stratégie</div>
+            <div style={{fontSize:11,color:T.textMut,marginTop:2}}>{t("strat.detail.taoScoreSub")}</div>
           </div>
           <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:16}}>
             <div style={{display:"flex",justifyContent:"center"}}>
@@ -1018,10 +1020,10 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
                   <span style={{fontSize:20,fontWeight:600,color:T.text,letterSpacing:-0.2,lineHeight:1}}>{pentagonMetrics.overallScore}</span>
                   <span style={{fontSize:12,color:T.textMut,fontWeight:500}}>/ 100</span>
                 </div>
-                <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>Score global</span>
+                <span style={{fontSize:11,color:T.textMut,fontWeight:500}}>{t("strat.detail.overallScore")}</span>
               </div>
               <div style={{position:"relative",height:10,paddingTop:2}}>
-                <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
+                <div style={{position:"relative",height:6,background:"var(--color-hover-bg, #F0F0F0)",borderRadius:3,overflow:"hidden"}}>
                   <div
                     style={{
                       width:`${parseFloat(pentagonMetrics.overallScore)}%`,
@@ -1079,7 +1081,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
           borderBottom:"none",
           marginBottom:0,
         }}>
-          <div style={{fontSize:13,fontWeight:600,color:T.text}}>Trades récents</div>
+          <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("strat.detail.recentTrades")}</div>
           <button
             type="button"
             onClick={() => setPage?.("trades")}
@@ -1091,7 +1093,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
               fontFamily:"inherit",
             }}
           >
-            Tout voir <ArrowRight size={11} />
+            {t("strat.detail.viewAll")} <ArrowRight size={11} />
           </button>
         </div>
 
@@ -1105,7 +1107,7 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
             borderRadius:"0 0 12px 12px",
             padding:"40px 24px",textAlign:"center",color:T.textSub,fontSize:13,
           }}>
-            Aucun trade
+            {t("strat.detail.noTrade")}
           </div>
         ) : (
           <TradesPage trades={filteredTrades} strategies={strategies} embedded />

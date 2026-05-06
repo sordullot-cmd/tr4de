@@ -17,6 +17,9 @@ import {
   ExternalLink,
   Sparkles,
   Trash2,
+  Download,
+  Upload,
+  Database,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
@@ -38,35 +41,37 @@ const T = {
   red: "#EF4444",
 };
 
-const SECTIONS = [
+const buildSections = () => [
   {
-    label: "Utilisateur",
+    label: t("settings.section.user"),
     items: [
-      { id: "profile",      label: "Profil",      Icon: IconUser },
-      { id: "security",     label: "Sécurité",    Icon: IconShield },
-      { id: "subscription", label: "Abonnement",  Icon: IconCard },
+      { id: "profile",      label: t("settings.nav.profile"),      Icon: IconUser },
+      { id: "security",     label: t("settings.nav.security"),     Icon: IconShield },
+      { id: "subscription", label: t("settings.nav.subscription"), Icon: IconCard },
     ],
   },
   {
-    label: "Général",
+    label: t("settings.section.general"),
     items: [
-      { id: "accounts",     label: "Comptes",            Icon: IconBriefcase },
-      { id: "globals",      label: "Paramètres globaux", Icon: IconGlobe },
-      { id: "alerts",       label: "Alertes",            Icon: IconBell },
-      { id: "import",       label: "Historique d'import", Icon: IconFile },
+      { id: "accounts",     label: t("settings.nav.accounts"), Icon: IconBriefcase },
+      { id: "globals",      label: t("settings.nav.globals"),  Icon: IconGlobe },
+      { id: "alerts",       label: t("settings.nav.alerts"),   Icon: IconBell },
+      { id: "import",       label: t("settings.nav.import"),   Icon: IconFile },
+      { id: "data",         label: t("settings.nav.data"),     Icon: Database },
     ],
   },
 ];
 
 export default function SettingsPage({ user, onBack }) {
+  useLang();
   const [active, setActive] = useState("profile");
 
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto", fontFamily: "var(--font-sans)" }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>Paramètres</h1>
-        <p style={{ fontSize: 13, color: T.textSub, margin: "4px 0 0" }}>Gérez votre compte et vos préférences</p>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>{t("settings.title")}</h1>
+        <p style={{ fontSize: 13, color: T.textSub, margin: "4px 0 0" }}>{t("settings.subtitle")}</p>
       </div>
 
       <div className="tr4de-settings-grid" style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 32, alignItems: "start" }}>
@@ -82,6 +87,7 @@ export default function SettingsPage({ user, onBack }) {
           {active === "globals"      && <GlobalsSection />}
           {active === "alerts"       && <AlertsSection />}
           {active === "import"       && <ImportHistorySection />}
+          {active === "data"         && <DataExportSection />}
 
           <FooterHelp />
         </div>
@@ -91,6 +97,8 @@ export default function SettingsPage({ user, onBack }) {
 }
 
 function SettingsNav({ active, setActive }) {
+  useLang();
+  const SECTIONS = buildSections();
   return (
     <nav style={{ display: "flex", flexDirection: "column", gap: 4, position: "sticky", top: 16 }}>
       {SECTIONS.map((sec, i) => (
@@ -218,13 +226,14 @@ function ComingSoonBadge() {
       padding: "2px 8px", borderRadius: 999, background: "#F0F0F0",
       color: T.textSub, fontSize: 10, fontWeight: 500, marginLeft: 8,
     }}>
-      Bientôt
+      {t("settings.comingSoon")}
     </span>
   );
 }
 
 /* =================== PROFILE =================== */
 function ProfileSection({ user }) {
+  useLang();
   const supabase = createClient();
   const meta = user?.user_metadata || {};
   const fullNameSrc = meta.full_name || meta.name || "";
@@ -264,11 +273,11 @@ function ProfileSection({ user }) {
   }, []);
 
   const initials = (firstName?.[0] || user?.email?.[0] || "U").toUpperCase() + (lastName?.[0] || "").toUpperCase();
-  const fullName = [firstName, lastName].filter(Boolean).join(" ") || (user?.email?.split("@")[0] || "Utilisateur");
-  const timeStr = now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || (user?.email?.split("@")[0] || t("settings.userFallback"));
+  const timeStr = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
   const tzAbbr = (() => {
     try {
-      const parts = new Intl.DateTimeFormat("fr-FR", { timeZone: timezone, timeZoneName: "short" }).formatToParts(now);
+      const parts = new Intl.DateTimeFormat(undefined, { timeZone: timezone, timeZoneName: "short" }).formatToParts(now);
       return parts.find(p => p.type === "timeZoneName")?.value || timezone;
     } catch { return timezone; }
   })();
@@ -278,7 +287,7 @@ function ProfileSection({ user }) {
     setSavedMsg("");
     try {
       await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, full_name: fullName } });
-      setSavedMsg("Modifications enregistrées");
+      setSavedMsg(t("settings.saved"));
       setTimeout(() => setSavedMsg(""), 3000);
     } catch (e) {
       console.error(e);
@@ -313,26 +322,26 @@ function ProfileSection({ user }) {
 
       {/* Bloc 2 : informations personnelles */}
       <Card>
-        <CardHeader title="Informations personnelles" subtitle="Mettez à jour vos informations" />
+        <CardHeader title={t("settings.profile.cardTitle")} subtitle={t("settings.profile.cardSub")} />
         <div style={{ height: 1, background: T.border, margin: "0 -20px 16px" }} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Field label="Prénom">
+          <Field label={t("settings.profile.firstName")}>
             <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle()} />
           </Field>
-          <Field label="Nom">
+          <Field label={t("settings.profile.lastName")}>
             <input value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle()} />
           </Field>
           <div style={{ gridColumn: "1 / -1" }}>
-            <Field label="Adresse e-mail">
+            <Field label={t("settings.profile.email")}>
               <input value={user?.email || ""} disabled placeholder="email@exemple.com" style={{ ...inputStyle(), background: "#FAFAFA", color: T.textSub, cursor: "not-allowed" }} />
-              <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>L&apos;adresse e-mail ne peut pas être modifiée</div>
+              <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>{t("settings.profile.emailLocked")}</div>
             </Field>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18, alignItems: "center", gap: 12 }}>
           {savedMsg && <span style={{ fontSize: 12, color: T.green }}>{savedMsg}</span>}
           <PrimaryButton onClick={onSave} disabled={saving}>
-            {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+            {saving ? t("settings.saving") : t("settings.saveChanges")}
           </PrimaryButton>
         </div>
       </Card>
@@ -342,30 +351,31 @@ function ProfileSection({ user }) {
 
 /* =================== SECURITY =================== */
 function SecuritySection() {
+  useLang();
   return (
     <Card>
-      <CardHeader title="Sécurité" subtitle="Gérez la sécurité de votre compte" />
+      <CardHeader title={t("settings.security.cardTitle")} subtitle={t("settings.security.cardSub")} />
       <div style={{ height: 1, background: T.border, margin: "0 -20px 0" }} />
 
       <SecurityRow
         Icon={IconShield}
-        title="Mot de passe"
-        description="Connexion via Google. Mot de passe géré par Google."
-        action={<SecondaryButton icon={ExternalLink}>Gérer</SecondaryButton>}
+        title={t("settings.security.password")}
+        description={t("settings.security.passwordDesc")}
+        action={<SecondaryButton icon={ExternalLink}>{t("settings.security.manage")}</SecondaryButton>}
       />
       <SecurityRow
         Icon={Sparkles}
-        title="Authentification à deux facteurs"
+        title={t("settings.security.twoFA")}
         badge={<ComingSoonBadge />}
-        description="Ajoutez une couche de sécurité supplémentaire à votre compte"
-        action={<SecondaryButton>Activer</SecondaryButton>}
+        description={t("settings.security.twoFADesc")}
+        action={<SecondaryButton>{t("settings.security.activate")}</SecondaryButton>}
       />
       <SecurityRow
         Icon={IconGlobe}
-        title="Sessions actives"
+        title={t("settings.security.sessions")}
         badge={<ComingSoonBadge />}
-        description="Gérez vos sessions actives sur tous vos appareils"
-        action={<SecondaryButton>Voir tout</SecondaryButton>}
+        description={t("settings.security.sessionsDesc")}
+        action={<SecondaryButton>{t("settings.security.viewAll")}</SecondaryButton>}
         last
       />
     </Card>
@@ -397,9 +407,10 @@ function SecurityRow({ Icon, title, description, badge, action, last }) {
 
 /* =================== SUBSCRIPTION =================== */
 function SubscriptionSection({ user }) {
+  useLang();
   const memberSince = (() => {
     if (!user?.created_at) return "—";
-    return new Date(user.created_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+    return new Date(user.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   })();
   const accountId = user?.id ? `${user.id.slice(0, 8)}...` : "—";
 
@@ -407,8 +418,8 @@ function SubscriptionSection({ user }) {
     <>
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0 }}>Plan actuel</h2>
-          <PrimaryButton icon={Sparkles}>Passer Pro</PrimaryButton>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0 }}>{t("settings.sub.currentPlan")}</h2>
+          <PrimaryButton icon={Sparkles}>{t("settings.sub.goPro")}</PrimaryButton>
         </div>
         <div style={{
           padding: 16, borderRadius: 10, background: "#FAFAFA",
@@ -423,22 +434,22 @@ function SubscriptionSection({ user }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>Plan Gratuit</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{t("settings.sub.freePlan")}</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, background: "#FEF2F2", border: "1px solid #FECACA", color: "#991B1B", fontSize: 10, fontWeight: 500 }}>
                 <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF4444" }} />
-                Inactif
+                {t("settings.sub.inactive")}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Passez à un plan supérieur pour débloquer toutes les fonctionnalités</div>
+            <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>{t("settings.sub.upgradeMsg")}</div>
           </div>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="Informations du compte" />
+        <CardHeader title={t("settings.sub.accountInfo")} />
         <div style={{ height: 1, background: T.border, margin: "0 -20px 4px" }} />
-        <Row label="Membre depuis" value={memberSince} />
-        <Row label="ID du compte" value={
+        <Row label={t("settings.sub.memberSince")} value={memberSince} />
+        <Row label={t("settings.sub.accountId")} value={
           <span style={{ padding: "3px 8px", borderRadius: 6, background: "#F5F5F5", border: `1px solid ${T.border}`, fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{accountId}</span>
         } last />
       </Card>
@@ -460,6 +471,7 @@ function Row({ label, value, last }) {
 
 /* =================== ACCOUNTS =================== */
 function AccountsSection() {
+  useLang();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -504,17 +516,17 @@ function AccountsSection() {
     <Card>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0 }}>Comptes de trading</h2>
-          <p style={{ fontSize: 12, color: T.textMut, margin: "2px 0 0" }}>Gérez vos comptes de trading connectés</p>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0 }}>{t("settings.accounts.cardTitle")}</h2>
+          <p style={{ fontSize: 12, color: T.textMut, margin: "2px 0 0" }}>{t("settings.accounts.cardSub")}</p>
         </div>
-        <PrimaryButton>+ Ajouter un compte</PrimaryButton>
+        <PrimaryButton>{t("settings.accounts.add")}</PrimaryButton>
       </div>
       <div style={{ height: 1, background: T.border, margin: "0 -20px 0" }} />
 
       {loading ? (
-        <div style={{ padding: 16, color: T.textMut, fontSize: 12 }}>Chargement...</div>
+        <div style={{ padding: 16, color: T.textMut, fontSize: 12 }}>{t("settings.loading")}</div>
       ) : accounts.length === 0 ? (
-        <div style={{ padding: "32px 0", textAlign: "center", color: T.textMut, fontSize: 13 }}>Aucun compte connecté</div>
+        <div style={{ padding: "32px 0", textAlign: "center", color: T.textMut, fontSize: 13 }}>{t("settings.accounts.empty")}</div>
       ) : (
         accounts.map((acc, i) => {
           const logo = brokerLogo(acc.broker);
@@ -547,6 +559,7 @@ function AccountsSection() {
 
 /* =================== GLOBAL SETTINGS =================== */
 function GlobalsSection() {
+  useLang();
   const { user } = useAuth();
   const supabase = createClient();
   const [timezone, setTimezone] = useState(() => {
@@ -559,7 +572,7 @@ function GlobalsSection() {
     if (typeof window === "undefined") return "USD";
     return localStorage.getItem("tr4de_base_currency") || "USD";
   });
-  const [lang, setLangState] = useState(() => (typeof window === "undefined" ? "fr" : getLang()));
+  const [lang, setLangState] = useState(() => (typeof window === "undefined" ? "en" : getLang()));
   const [savedMsg, setSavedMsg] = useState("");
   const [loadedFromCloud, setLoadedFromCloud] = useState(false);
 
@@ -627,7 +640,7 @@ function GlobalsSection() {
           return;
         }
         console.log("✅ prefs sauvegardées en ligne:", data);
-        setSavedMsg("Sauvegardé");
+        setSavedMsg(t("settings.savedShort"));
         setTimeout(() => setSavedMsg(""), 1500);
       } catch (e) { console.error("❌ save preferences error:", e); }
     }, 400);
@@ -638,7 +651,7 @@ function GlobalsSection() {
     try {
       localStorage.setItem("tr4de_timezone", timezone);
       localStorage.setItem("tr4de_base_currency", currency);
-      setSavedMsg("Préférences enregistrées");
+      setSavedMsg(t("settings.prefsSaved"));
       setTimeout(() => setSavedMsg(""), 3000);
     } catch (e) { console.error(e); }
   };
@@ -654,38 +667,38 @@ function GlobalsSection() {
   ];
 
   const CURRENCY_OPTIONS = [
-    { id: "USD", label: "USD — Dollar américain" },
-    { id: "EUR", label: "EUR — Euro" },
-    { id: "GBP", label: "GBP — Livre sterling" },
-    { id: "JPY", label: "JPY — Yen japonais" },
-    { id: "CAD", label: "CAD — Dollar canadien" },
-    { id: "CHF", label: "CHF — Franc suisse" },
+    { id: "USD", label: t("settings.currency.usd") },
+    { id: "EUR", label: t("settings.currency.eur") },
+    { id: "GBP", label: t("settings.currency.gbp") },
+    { id: "JPY", label: t("settings.currency.jpy") },
+    { id: "CAD", label: t("settings.currency.cad") },
+    { id: "CHF", label: t("settings.currency.chf") },
   ];
 
   return (
     <Card>
-      <CardHeader title="Affichage et données" subtitle="Configurez le fuseau horaire et la devise par défaut" />
+      <CardHeader title={t("settings.globals.cardTitle")} subtitle={t("settings.globals.cardSub")} />
       <div style={{ height: 1, background: T.border, margin: "0 -20px 16px" }} />
 
-      <SectionLabel>Fuseau horaire</SectionLabel>
+      <SectionLabel>{t("settings.globals.timezone")}</SectionLabel>
       <SearchableSelect
         value={timezone}
         onChange={setTimezone}
         options={TIMEZONE_OPTIONS}
-        searchPlaceholder="Rechercher un fuseau horaire..."
+        searchPlaceholder={t("settings.globals.timezoneSearch")}
       />
-      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Utilisé pour l&apos;affichage des heures de trade et du calendrier</div>
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>{t("settings.globals.timezoneHint")}</div>
 
-      <SectionLabel mt={20}>Devise de base</SectionLabel>
+      <SectionLabel mt={20}>{t("settings.globals.currency")}</SectionLabel>
       <SearchableSelect
         value={currency}
         onChange={setCurrency}
         options={CURRENCY_OPTIONS}
         searchable={false}
       />
-      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Devise par défaut affichée dans toute l&apos;application</div>
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>{t("settings.globals.currencyHint")}</div>
 
-      <SectionLabel mt={20}>Risque par trade (R)</SectionLabel>
+      <SectionLabel mt={20}>{t("settings.globals.risk")}</SectionLabel>
       <input
         type="number"
         min={1}
@@ -697,9 +710,9 @@ function GlobalsSection() {
         }}
         style={{ width: "100%", padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: T.text, outline: "none", background: T.white }}
       />
-      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Montant de risque par défaut. Sert à calculer le R-multiple (R = P&L / risque).</div>
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>{t("settings.globals.riskHint")}</div>
 
-      <SectionLabel mt={20}>Langue</SectionLabel>
+      <SectionLabel mt={20}>{t("settings.globals.language")}</SectionLabel>
       <SearchableSelect
         value={lang}
         onChange={(v) => { setLangState(v); setLangPref(v); }}
@@ -709,11 +722,11 @@ function GlobalsSection() {
         ]}
         searchable={false}
       />
-      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Langue d&apos;affichage de l&apos;interface</div>
+      <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>{t("settings.globals.languageHint")}</div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 24, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
         {savedMsg && <span style={{ fontSize: 12, color: T.green }}>{savedMsg}</span>}
-        <PrimaryButton onClick={onSave}>Enregistrer les modifications</PrimaryButton>
+        <PrimaryButton onClick={onSave}>{t("settings.saveChanges")}</PrimaryButton>
       </div>
     </Card>
   );
@@ -732,9 +745,39 @@ function SectionLabel({ children, mt }) {
 
 /* =================== IMPORT HISTORY =================== */
 function ImportHistorySection() {
+  useLang();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
   const supabase = createClient();
+
+  const handleDelete = async (item) => {
+    if (!item?.id) return;
+    const tradeCount = item.count || 0;
+    const ok = window.confirm(
+      t("settings.import.confirmDeleteTrades").replace("{n}", String(tradeCount)).replace("{acc}", item.account || "")
+    );
+    if (!ok) return;
+    setDeletingId(item.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error(t("settings.import.notAuth"));
+      const { error } = await supabase
+        .from("apex_trades")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("account_id", item.id);
+      if (error) throw error;
+      setHistory((prev) => prev.filter((h) => h.id !== item.id));
+      // Notifie le reste de l'app pour rafraîchir trades / dashboards
+      try { window.dispatchEvent(new CustomEvent("tr4de:trades-changed")); } catch {}
+    } catch (e) {
+      console.error("[ImportHistory] delete failed", e);
+      alert(t("settings.import.deleteFailed") + (e?.message || t("settings.import.errUnknown")));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -759,13 +802,13 @@ function ImportHistorySection() {
 
   return (
     <Card>
-      <CardHeader title="Historique d'import" subtitle="Consultez et gérez vos imports passés" />
+      <CardHeader title={t("settings.import.cardTitle")} subtitle={t("settings.import.cardSub")} />
       <div style={{ height: 1, background: T.border, margin: "0 -20px 0" }} />
 
       {loading ? (
-        <div style={{ padding: 16, color: T.textMut, fontSize: 12 }}>Chargement...</div>
+        <div style={{ padding: 16, color: T.textMut, fontSize: 12 }}>{t("settings.loading")}</div>
       ) : history.length === 0 ? (
-        <div style={{ padding: "32px 0", textAlign: "center", color: T.textMut, fontSize: 13 }}>Aucun import effectué</div>
+        <div style={{ padding: "32px 0", textAlign: "center", color: T.textMut, fontSize: 13 }}>{t("settings.import.empty")}</div>
       ) : (
         history.map((h, i) => (
           <div key={h.id} style={{
@@ -776,7 +819,7 @@ function ImportHistorySection() {
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{h.name}</span>
                 <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 999, background: "#F0FDF4", border: "1px solid #86EFAC", color: "#0F8B6C", fontSize: 10, fontWeight: 500 }}>
-                  Succès
+                  {t("settings.import.success")}
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: T.textMut, marginTop: 4 }}>
@@ -786,17 +829,21 @@ function ImportHistorySection() {
                 <span>·</span>
                 <span>{h.count} trade{h.count !== 1 ? "s" : ""}</span>
                 <span>·</span>
-                <span>{new Date(h.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                <span>{new Date(h.date).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}</span>
               </div>
             </div>
             <button
-              aria-label="Supprimer"
+              aria-label={t("settings.import.deleteAria")}
+              onClick={() => handleDelete(h)}
+              disabled={deletingId === h.id}
               style={{
-                background: "transparent", border: "none", cursor: "pointer",
+                background: "transparent", border: "none",
+                cursor: deletingId === h.id ? "wait" : "pointer",
                 padding: 6, color: T.red, display: "inline-flex", alignItems: "center",
                 borderRadius: 6, transition: "background 120ms ease",
+                opacity: deletingId === h.id ? 0.5 : 1,
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#FEF2F2"; }}
+              onMouseEnter={e => { if (deletingId !== h.id) e.currentTarget.style.background = "#FEF2F2"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               <Trash2 size={14} strokeWidth={1.75} />
@@ -808,11 +855,196 @@ function ImportHistorySection() {
   );
 }
 
+/* =================== DATA EXPORT / IMPORT =================== */
+function DataExportSection() {
+  useLang();
+  const supabase = createClient();
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [msg, setMsg] = useState({ kind: "idle", text: "" });
+  const fileInputRef = React.useRef(null);
+
+  const TABLES = [
+    "trading_accounts",
+    "apex_trades",
+    "strategies",
+    "trade_strategies",
+    "trade_details",
+    "daily_session_notes",
+    "user_preferences",
+  ];
+
+  const handleExport = async () => {
+    setExporting(true);
+    setMsg({ kind: "idle", text: "" });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error(t("settings.import.notAuth"));
+
+      const payload = {
+        version: 1,
+        exported_at: new Date().toISOString(),
+        user_email: user.email || null,
+        data: {},
+      };
+
+      for (const table of TABLES) {
+        try {
+          const { data, error } = await supabase.from(table).select("*").eq("user_id", user.id);
+          if (error) {
+            console.warn(`⚠️ skip ${table}:`, error.message);
+            continue;
+          }
+          payload.data[table] = data || [];
+        } catch (e) {
+          console.warn(`⚠️ skip ${table}:`, e?.message);
+        }
+      }
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `tr4de-export-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setMsg({ kind: "success", text: t("settings.data.exportSuccess") });
+    } catch (e) {
+      console.error(e);
+      setMsg({ kind: "error", text: t("settings.import.deleteFailed") + (e?.message || t("settings.import.errUnknown")) });
+    } finally {
+      setExporting(false);
+      setTimeout(() => setMsg({ kind: "idle", text: "" }), 5000);
+    }
+  };
+
+  const handleImport = async (file) => {
+    if (!file) return;
+    setImporting(true);
+    setMsg({ kind: "idle", text: "" });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error(t("settings.import.notAuth"));
+
+      const text = await file.text();
+      let payload;
+      try { payload = JSON.parse(text); }
+      catch { throw new Error(t("settings.data.importInvalid")); }
+
+      if (!payload || typeof payload !== "object" || !payload.data) {
+        throw new Error(t("settings.data.importInvalid"));
+      }
+
+      let inserted = 0;
+      for (const table of TABLES) {
+        const rows = Array.isArray(payload.data[table]) ? payload.data[table] : [];
+        if (rows.length === 0) continue;
+        // Réécrire user_id pour pointer sur l'utilisateur courant
+        const rewritten = rows.map(r => ({ ...r, user_id: user.id }));
+        try {
+          const { error } = await supabase.from(table).upsert(rewritten, { onConflict: "id", ignoreDuplicates: true });
+          if (error) {
+            console.warn(`⚠️ import ${table}:`, error.message);
+            continue;
+          }
+          inserted += rewritten.length;
+        } catch (e) {
+          console.warn(`⚠️ import ${table}:`, e?.message);
+        }
+      }
+
+      try { window.dispatchEvent(new CustomEvent("tr4de:trades-changed")); } catch {}
+      try { window.dispatchEvent(new CustomEvent("tr4de:accounts-changed")); } catch {}
+
+      setMsg({ kind: "success", text: t("settings.data.importDone").replace("{n}", String(inserted)) });
+    } catch (e) {
+      console.error(e);
+      setMsg({ kind: "error", text: t("settings.data.importErr") + (e?.message || t("settings.import.errUnknown")) });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setTimeout(() => setMsg({ kind: "idle", text: "" }), 6000);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader title={t("settings.data.cardTitle")} subtitle={t("settings.data.cardSub")} />
+      <div style={{ height: 1, background: T.border, margin: "0 -20px 0" }} />
+
+      {/* Export */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 14, padding: "16px 0",
+        borderBottom: `1px solid ${T.border}`,
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, background: "#F5F5F5",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Download size={16} strokeWidth={1.75} color={T.text} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{t("settings.data.exportTitle")}</div>
+          <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>{t("settings.data.exportDesc")}</div>
+        </div>
+        <PrimaryButton onClick={handleExport} disabled={exporting} icon={Download}>
+          {exporting ? t("settings.data.exporting") : t("settings.data.exportBtn")}
+        </PrimaryButton>
+      </div>
+
+      {/* Import */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 14, padding: "16px 0",
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, background: "#F5F5F5",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Upload size={16} strokeWidth={1.75} color={T.text} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{t("settings.data.importTitle")}</div>
+          <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>{t("settings.data.importDesc")}</div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleImport(f);
+          }}
+        />
+        <SecondaryButton icon={Upload} onClick={() => fileInputRef.current?.click()}>
+          {importing ? t("settings.data.importing") : t("settings.data.importBtn")}
+        </SecondaryButton>
+      </div>
+
+      {msg.text && (
+        <div style={{
+          marginTop: 4, padding: "10px 12px", borderRadius: 8, fontSize: 12, fontWeight: 500,
+          background: msg.kind === "error" ? "#FEF2F2" : "#F0FDF4",
+          color: msg.kind === "error" ? "#991B1B" : "#166534",
+          border: `1px solid ${msg.kind === "error" ? "#FECACA" : "#BBF7D0"}`,
+        }}>
+          {msg.text}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* =================== HELPERS =================== */
 function FooterHelp() {
+  useLang();
   return (
     <div style={{ paddingTop: 8, paddingBottom: 16, fontSize: 12, color: T.textMut }}>
-      Besoin d&apos;aide avec vos paramètres ? <a href="mailto:support@taotrade.com" style={{ color: T.text, fontWeight: 500, textDecoration: "underline" }}>Contacter notre support</a>
+      {t("settings.helpFull")} <a href="mailto:support@taotrade.com" style={{ color: T.text, fontWeight: 500, textDecoration: "underline" }}>{t("settings.helpContact")}</a>
     </div>
   );
 }
@@ -855,6 +1087,7 @@ function selectStyle() {
 
 /* ── Alerts section ────────────────────────────────────────────────── */
 function AlertsSection() {
+  useLang();
   const [settings, setSettings] = useCloudState(
     "tr4de_alert_settings",
     "alert_settings",
@@ -876,10 +1109,10 @@ function AlertsSection() {
   const fireTest = () => {
     setTesting(true);
     window.dispatchEvent(new CustomEvent("tr4de:alert", {
-      detail: { title: "Alerte test", body: "Si tu vois ce toast, c'est que tout marche.", severity: "info" },
+      detail: { title: t("settings.alerts.testTitle"), body: t("settings.alerts.testBody"), severity: "info" },
     }));
     if (permission === "granted") {
-      try { new Notification("tao trade — Test", { body: "Alerte test depuis les Paramètres." }); } catch {}
+      try { new Notification("tao trade — Test", { body: t("settings.alerts.testNotifBody") }); } catch {}
     }
     setTimeout(() => setTesting(false), 1200);
   };
@@ -888,7 +1121,7 @@ function AlertsSection() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <CardHeader title="Alertes" subtitle="Reçois une notification quand certains seuils P&L sont atteints." />
+      <CardHeader title={t("settings.alerts.cardTitle")} subtitle={t("settings.alerts.cardSub")} />
 
       {/* Permission */}
       <div style={{
@@ -896,30 +1129,30 @@ function AlertsSection() {
         padding: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
       }}>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Notifications navigateur</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{t("settings.alerts.notifTitle")}</div>
           <div style={{ fontSize: 12, color: T.textSub, marginTop: 2 }}>
-            Statut : {permission === "granted" ? "✅ activées" : permission === "denied" ? "❌ refusées (à activer dans les paramètres du navigateur)" : "⚠️ pas encore demandées"}
+            {t("settings.alerts.statusLabel")} {permission === "granted" ? t("settings.alerts.statusGranted") : permission === "denied" ? t("settings.alerts.statusDenied") : t("settings.alerts.statusDefault")}
           </div>
         </div>
         {permission !== "granted" && permission !== "denied" && (
-          <button onClick={requestPermission} style={primaryBtn()}>Activer</button>
+          <button onClick={requestPermission} style={primaryBtn()}>{t("settings.alerts.activate")}</button>
         )}
         <button onClick={fireTest} disabled={testing} style={secondaryBtn(testing)}>
-          {testing ? "Envoyé !" : "Tester"}
+          {testing ? t("settings.alerts.tested") : t("settings.alerts.test")}
         </button>
       </div>
 
       {/* Master switch */}
-      <Field label="Surveillance active" hint="Désactive temporairement toutes les alertes sans perdre tes seuils.">
+      <Field label={t("settings.alerts.activeWatch")} hint={t("settings.alerts.activeWatchHint")}>
         <AlertSwitch
           checked={settings.enabled}
           onChange={v => update({ enabled: v })}
-          label={settings.enabled ? "Activée" : "Désactivée"}
+          label={settings.enabled ? t("settings.alerts.enabled") : t("settings.alerts.disabled")}
         />
       </Field>
 
       {/* Thresholds */}
-      <Field label="Take profit journalier" hint="Notification quand le P&L du jour dépasse ce seuil. 0 pour désactiver.">
+      <Field label={t("settings.alerts.takeProfit")} hint={t("settings.alerts.takeProfitHint")}>
         <NumberInput
           value={settings.dailyTakeProfit}
           onChange={v => update({ dailyTakeProfit: v })}
@@ -928,7 +1161,7 @@ function AlertsSection() {
         />
       </Field>
 
-      <Field label="Perte journalière maximale" hint="Notification 'STOP' quand la perte du jour atteint ce montant (en valeur absolue). 0 pour désactiver.">
+      <Field label={t("settings.alerts.maxLoss")} hint={t("settings.alerts.maxLossHint")}>
         <NumberInput
           value={settings.dailyMaxLoss}
           onChange={v => update({ dailyMaxLoss: v })}
@@ -937,11 +1170,11 @@ function AlertsSection() {
         />
       </Field>
 
-      <Field label="Série perdante" hint="Alerte après N pertes consécutives. 0 pour désactiver.">
+      <Field label={t("settings.alerts.losingStreak")} hint={t("settings.alerts.losingStreakHint")}>
         <NumberInput
           value={settings.losingStreak}
           onChange={v => update({ losingStreak: v })}
-          suffix="trades"
+          suffix={t("settings.alerts.tradesSuffix")}
           placeholder="3"
         />
       </Field>
@@ -999,8 +1232,8 @@ function NumberInput({ value, onChange, suffix, placeholder }) {
 
 function primaryBtn() {
   return {
-    padding: "8px 16px", borderRadius: 999, border: "none",
-    background: T.text, color: "#fff",
+    padding: "8px 16px", borderRadius: 999, border: `1px solid ${T.text}`,
+    background: T.white, color: T.text,
     fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { ChevronDown, ChevronUp, Search, Check, Plus, Pencil } from "lucide-react";
+import { t, useLang } from "@/lib/i18n";
 
 // Map id (lowercase) → chemin du logo. Utilisé pour afficher l'icône à gauche
 // du compte dans le dropdown.
@@ -33,6 +34,7 @@ export default function QuickAccountSelector({
   onAccountNameChange,
   T = {},
 }) {
+  useLang();
   const { user } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [open, setOpen] = useState(false);
@@ -159,7 +161,7 @@ export default function QuickAccountSelector({
             </span>
           </>
         ) : (
-          <span style={{ flex: 1 }}>{selectedAccountName || "Sélectionner un compte"}</span>
+          <span style={{ flex: 1 }}>{selectedAccountName || t("accounts.selectPlaceholder")}</span>
         )}
         {open ? <ChevronUp size={14} color="#8E8E8E"/> : <ChevronDown size={14} color="#8E8E8E"/>}
       </button>
@@ -183,7 +185,7 @@ export default function QuickAccountSelector({
                 type="text" autoFocus value={query}
                 onChange={(e)=>setQuery(e.target.value)}
                 onKeyDown={(e)=>{ if (e.key === "Enter" && showCreate) { e.preventDefault(); commitCreate(); } }}
-                placeholder="Rechercher ou taper le nom d'un nouveau compte..."
+                placeholder={t("accounts.searchPlaceholder")}
                 style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13, padding: "6px 0", color: "#0D0D0D", fontFamily: "inherit" }}
               />
             </div>
@@ -206,13 +208,13 @@ export default function QuickAccountSelector({
                 onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"}}
               >
                 <Plus size={14} strokeWidth={2}/>
-                <span>Créer « <strong>{queryTrim}</strong> »</span>
+                <span>{t("accounts.create")} « <strong>{queryTrim}</strong> »</span>
               </button>
             )}
 
             {filtered.length === 0 && !showCreate && (
               <div style={{ padding: "12px 14px", fontSize: 12, color: "#8E8E8E", textAlign: "center" }}>
-                Aucun compte
+                {t("accounts.noAccount")}
               </div>
             )}
 
@@ -273,7 +275,7 @@ export default function QuickAccountSelector({
                     <span
                       data-edit
                       role="button"
-                      title="Renommer"
+                      title={t("accounts.rename")}
                       onClick={(e)=>{ e.stopPropagation(); setEditingId(acc.id); setEditDraft(acc.name); }}
                       style={{
                         display: "inline-flex", alignItems: "center", justifyContent: "center",

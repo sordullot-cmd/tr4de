@@ -226,7 +226,7 @@ function btnStyle(disabled, variant) {
     opacity: disabled ? 0.5 : 1,
   };
   if (variant === "primary") {
-    return { ...base, background: T.text, color: "#fff", border: `1px solid ${T.text}` };
+    return { ...base, background: T.white, color: T.text, border: `1px solid ${T.text}` };
   }
   if (variant === "secondary") {
     return { ...base, background: T.white, color: T.text, border: `1px solid ${T.border}` };

@@ -30,6 +30,14 @@
   --color-danger: #EF4444;
   --color-info: #A855F7;
 
+  /* Pastel pills (badges P&L, status tints) */
+  --color-green-bg: #F0FDF4;
+  --color-green-bd: #86EFAC;
+  --color-red-bg:   #FEF2F2;
+  --color-red-bd:   #FECACA;
+  --color-amber-bg: #FFF4E6;
+  --color-blue-bg:  #EFF6FF;
+
   /* Typo */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -53,8 +61,16 @@
   --color-text-sub: #909090;
   --color-text-muted: #6B6B6B;
 
-  --color-border: #2E2E2E;
-  --color-border-strong: #3A3A3A;
+  --color-border: #3A3A3A;
+  --color-border-strong: #4A4A4A;
+
+  /* Pastel pills en dark mode : versions sombres tintées des couleurs status */
+  --color-green-bg: #1A3A2D;
+  --color-green-bd: #1F7A4E;
+  --color-red-bg:   #3A1E1E;
+  --color-red-bd:   #7A2D2D;
+  --color-amber-bg: #332818;
+  --color-blue-bg:  #1E2A3D;
 }
 
 :root[data-theme="dark"] body {
@@ -71,19 +87,83 @@
   color: #C8C8C8 !important;
 }
 
-/* Cards blanches deviennent gris foncé */
-:root[data-theme="dark"] [style*="background:#FFFFFF"],
-:root[data-theme="dark"] [style*="background: #FFFFFF"],
-:root[data-theme="dark"] [style*="background:#fff"],
+/* Cards blanches deviennent gris foncé.
+   On ratisse large : tous les blancs et off-whites utilisés en inline-style,
+   ainsi que `white` (mot-clé) et `rgba(255,255,255,*)`. */
+:root[data-theme="dark"] [style*="background:#FFFFFF" i],
+:root[data-theme="dark"] [style*="background: #FFFFFF" i],
+:root[data-theme="dark"] [style*="background:#fff" i],
+:root[data-theme="dark"] [style*="background: #fff" i],
+:root[data-theme="dark"] [style*="background:white" i],
+:root[data-theme="dark"] [style*="background: white" i],
 :root[data-theme="dark"] [style*="background:rgb(255,255,255)"],
 :root[data-theme="dark"] [style*="background: rgb(255, 255, 255)"],
-:root[data-theme="dark"] [style*="background:#FAFAFA"],
-:root[data-theme="dark"] [style*="background: #FAFAFA"],
-:root[data-theme="dark"] [style*="background:#F7F7F7"],
-:root[data-theme="dark"] [style*="background: #F7F7F7"],
-:root[data-theme="dark"] [style*="background:#F0F0F0"],
-:root[data-theme="dark"] [style*="background: #F0F0F0"] {
+:root[data-theme="dark"] [style*="background:rgba(255,255,255"],
+:root[data-theme="dark"] [style*="background: rgba(255, 255, 255"],
+:root[data-theme="dark"] [style*="background:#FAFAFA" i],
+:root[data-theme="dark"] [style*="background: #FAFAFA" i],
+:root[data-theme="dark"] [style*="background:#F8F8F8" i],
+:root[data-theme="dark"] [style*="background: #F8F8F8" i],
+:root[data-theme="dark"] [style*="background:#F9F9F9" i],
+:root[data-theme="dark"] [style*="background: #F9F9F9" i],
+:root[data-theme="dark"] [style*="background:#FBFBFB" i],
+:root[data-theme="dark"] [style*="background: #FBFBFB" i],
+:root[data-theme="dark"] [style*="background:#FCFCFC" i],
+:root[data-theme="dark"] [style*="background: #FCFCFC" i],
+:root[data-theme="dark"] [style*="background:#FDFDFD" i],
+:root[data-theme="dark"] [style*="background: #FDFDFD" i],
+:root[data-theme="dark"] [style*="background:#FEFEFE" i],
+:root[data-theme="dark"] [style*="background: #FEFEFE" i],
+:root[data-theme="dark"] [style*="background:#F7F7F7" i],
+:root[data-theme="dark"] [style*="background: #F7F7F7" i],
+:root[data-theme="dark"] [style*="background:#F0F0F0" i],
+:root[data-theme="dark"] [style*="background: #F0F0F0" i],
+:root[data-theme="dark"] [style*="backgroundColor:#FFFFFF" i],
+:root[data-theme="dark"] [style*="backgroundColor: #FFFFFF" i],
+:root[data-theme="dark"] [style*="backgroundColor:#fff" i],
+:root[data-theme="dark"] [style*="backgroundColor: #fff" i] {
   background: #1A1A1B !important;
+  background-color: #1A1A1B !important;
+}
+
+/* SVG / charts : surfaces blanches (recharts, custom) → fond sombre.
+   On laisse les fills colorés (séries, badges) intacts. */
+:root[data-theme="dark"] svg rect[fill="#fff"],
+:root[data-theme="dark"] svg rect[fill="#FFF"],
+:root[data-theme="dark"] svg rect[fill="#FFFFFF"],
+:root[data-theme="dark"] svg rect[fill="#ffffff"],
+:root[data-theme="dark"] svg rect[fill="white"],
+:root[data-theme="dark"] svg path[fill="#fff"],
+:root[data-theme="dark"] svg path[fill="#FFF"],
+:root[data-theme="dark"] svg path[fill="#FFFFFF"],
+:root[data-theme="dark"] svg path[fill="#ffffff"],
+:root[data-theme="dark"] svg path[fill="white"],
+:root[data-theme="dark"] svg circle[fill="#fff"],
+:root[data-theme="dark"] svg circle[fill="#FFF"],
+:root[data-theme="dark"] svg circle[fill="#FFFFFF"],
+:root[data-theme="dark"] svg circle[fill="#ffffff"],
+:root[data-theme="dark"] svg circle[fill="white"] {
+  fill: #1A1A1B !important;
+}
+
+/* Recharts wrappers / tooltips qui posent un fond blanc inline */
+:root[data-theme="dark"] .recharts-tooltip-wrapper,
+:root[data-theme="dark"] .recharts-default-tooltip {
+  background: #1A1A1B !important;
+  background-color: #1A1A1B !important;
+  border-color: #3A3A3A !important;
+}
+
+/* Sélection texte : fond sombre teinté (au lieu du gris clair par défaut) */
+:root[data-theme="dark"] ::selection {
+  background: rgba(200, 200, 200, 0.18) !important;
+  color: #ECECEC !important;
+}
+
+/* Highlight de recherche (mark) en clair → bg sombre teinté ambré */
+:root[data-theme="dark"] mark {
+  background: #4A3A18 !important;
+  color: #F5D78A !important;
 }
 
 /* Texte noir → gris clair, texte sub → gris moyen */
@@ -102,20 +182,46 @@
   color: #909090 !important;
 }
 
-/* Bordures claires → gris foncé (visibles mais discrètes) */
-:root[data-theme="dark"] [style*="#E5E5E5"],
+/* Bordures claires → gris foncé uniforme (#3A3A3A, visibles sur fond sombre).
+   On ratisse large : toutes les nuances de gris clair utilisées comme
+   border-color en inline-style ailleurs dans le code. */
+:root[data-theme="dark"] [style*="#E5E5E5" i],
 :root[data-theme="dark"] [style*="rgb(229, 229, 229)"],
 :root[data-theme="dark"] [style*="rgb(229,229,229)"],
-:root[data-theme="dark"] [style*="#F0F0F0"],
+:root[data-theme="dark"] [style*="#F0F0F0" i],
 :root[data-theme="dark"] [style*="rgb(240, 240, 240)"],
 :root[data-theme="dark"] [style*="rgb(240,240,240)"],
-:root[data-theme="dark"] [style*="#ECECEC"],
-:root[data-theme="dark"] [style*="#D4D4D4"],
+:root[data-theme="dark"] [style*="#ECECEC" i],
+:root[data-theme="dark"] [style*="#EAEAEA" i],
+:root[data-theme="dark"] [style*="#E8E9EF" i],
+:root[data-theme="dark"] [style*="#E5E7EB" i],
+:root[data-theme="dark"] [style*="#EEEEEE" i],
+:root[data-theme="dark"] [style*="#DDDDDD" i],
+:root[data-theme="dark"] [style*="#D4D4D4" i],
+:root[data-theme="dark"] [style*="#D4D6DF" i],
 :root[data-theme="dark"] [style*="rgb(212, 212, 212)"],
 :root[data-theme="dark"] [style*="rgb(212,212,212)"],
+:root[data-theme="dark"] [style*="rgba(0, 0, 0, 0.04)"],
+:root[data-theme="dark"] [style*="rgba(0,0,0,0.04)"],
 :root[data-theme="dark"] [style*="rgba(0, 0, 0, 0.06)"],
-:root[data-theme="dark"] [style*="rgba(0,0,0,0.06)"] {
-  border-color: #2E2E2E !important;
+:root[data-theme="dark"] [style*="rgba(0,0,0,0.06)"],
+:root[data-theme="dark"] [style*="rgba(0, 0, 0, 0.08)"],
+:root[data-theme="dark"] [style*="rgba(0,0,0,0.08)"],
+:root[data-theme="dark"] [style*="rgba(0, 0, 0, 0.1)"],
+:root[data-theme="dark"] [style*="rgba(0,0,0,0.1)"],
+:root[data-theme="dark"] [style*="rgba(0, 0, 0, 0.12)"],
+:root[data-theme="dark"] [style*="rgba(0,0,0,0.12)"] {
+  border-color: #3A3A3A !important;
+}
+
+/* Filet bas/haut des sections : table cells, hr, et `border-top/bottom`
+   inline qui ne sont pas attrapés par les règles ci-dessus parce qu'ils
+   référencent juste une couleur via var(--color-border) ou un mix. */
+:root[data-theme="dark"] hr,
+:root[data-theme="dark"] table,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] td {
+  border-color: #3A3A3A !important;
 }
 
 /* Boutons primaires noirs → gris foncé en dark mode */
@@ -140,8 +246,10 @@
 :root[data-theme="dark"] [style*="#EFF6FF" i],
 :root[data-theme="dark"] [style*="#F0FDF4" i],
 :root[data-theme="dark"] [style*="#FEF2F2" i],
-:root[data-theme="dark"] [style*="#FFF4E6" i] {
-  background: #242424 !important;
+:root[data-theme="dark"] [style*="#FFF4E6" i],
+:root[data-theme="dark"] [style*="background:#EFEFEF" i],
+:root[data-theme="dark"] [style*="background: #EFEFEF" i] {
+  background: #2E2E2E !important;
 }
 
 /* Heatmap : paliers verts clairs -> verts foncés (contrastent sur fond sombre) */

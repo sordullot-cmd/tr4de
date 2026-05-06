@@ -6,8 +6,8 @@ describe("i18n", () => {
     window.localStorage.removeItem("tr4de_lang");
   });
 
-  it("defaults to 'fr' when no value in localStorage", () => {
-    expect(getLang()).toBe("fr");
+  it("defaults to 'en' when no value in localStorage", () => {
+    expect(getLang()).toBe("en");
   });
 
   it("setLang persists to localStorage", () => {
@@ -19,7 +19,7 @@ describe("i18n", () => {
   it("setLang accepts only 'fr' or 'en'", () => {
     // @ts-expect-error — runtime check
     setLang("xx");
-    expect(getLang()).toBe("fr"); // still defaults: getLang only returns "en" if exact match
+    expect(getLang()).toBe("en"); // still defaults: getLang only returns "fr"/"en" if exact match
   });
 
   it("t() returns French label for known key in fr mode", () => {

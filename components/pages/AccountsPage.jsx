@@ -6,6 +6,7 @@ import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { createClient } from "@/lib/supabase/client";
+import { t, useLang } from "@/lib/i18n";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -83,6 +84,7 @@ const parseEvalSize = (size) => {
 };
 
 export default function AccountsPage({ accounts = [], trades = [], setPage, selectedAccountIds = [], setSelectedAccountIds, setSelectedAccountDetailId, setAccounts }) {
+  useLang();
   const visibleAccounts = (accounts || []).filter((a) => !isPlaceholderAccount(a.id));
   const [fundedMeta, setFundedMeta] = React.useState(() => readFundedMeta());
 
@@ -226,7 +228,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
       {/* Header — titre + bouton */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>
-          Mes comptes
+          {t("accountsPage.title")}
         </h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
         <button
@@ -234,49 +236,37 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "7px 14px", borderRadius: 999,
-            border: `1px solid ${T.text}`, background: T.text, color: "#FFFFFF",
+            border: `1px solid ${T.text}`, background: T.white, color: T.text,
             fontSize: 12, fontWeight: 600, cursor: "pointer",
             fontFamily: "inherit",
           }}
         >
-          <Plus size={13} strokeWidth={1.75} /> Nouveau compte
+          <Plus size={13} strokeWidth={1.75} /> {t("accountsPage.newAccount")}
         </button>
       </div>
 
-      {/* Totaux + Roadmap — collés ensemble (carte fusionnée) */}
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{
-          background: "#FFFFFF",
-          border: `1px solid ${T.border}`,
-          borderRadius: "12px 12px 0 0",
-          borderBottom: "none",
-          overflow: "hidden",
-        }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)" }}>
-            <KpiCell label="Comptes" value={String(totals.accounts)} />
-            <KpiCell label="Capital total géré" value={totals.capital > 0 ? fmtNoCents(totals.capital) : "—"} />
-            <KpiCell label="Trades total" value={String(totals.trades)} />
-            <KpiCell
-              label="P&L cumulé"
-              value={fmt(totals.pnl, true)}
-              valueColor={totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text}
-            />
-            <KpiCell
-              label="Win rate global"
-              value={totals.trades > 0 ? `${winRateGlobal.toFixed(1)}%` : "—"}
-              last
-            />
-          </div>
+      {/* Totaux */}
+      <div style={{
+        background: "var(--color-card-bg, #FFFFFF)",
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        overflow: "hidden",
+      }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <KpiCell label={t("accountsPage.kpiAccounts")} value={String(totals.accounts)} />
+          <KpiCell label={t("accountsPage.kpiCapital")} value={totals.capital > 0 ? fmtNoCents(totals.capital) : "—"} />
+          <KpiCell label={t("accountsPage.kpiTrades")} value={String(totals.trades)} />
+          <KpiCell
+            label={t("accountsPage.kpiPnL")}
+            value={fmt(totals.pnl, true)}
+            valueColor={totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text}
+          />
+          <KpiCell
+            label={t("accountsPage.kpiWR")}
+            value={totals.trades > 0 ? `${winRateGlobal.toFixed(1)}%` : "—"}
+            last
+          />
         </div>
-
-        {/* Roadmap de scaling — repliable, collée aux KPIs */}
-        <RoadmapSection
-          glued
-          accounts={visibleAccounts.map(a => ({ ...a, status: a.account_type === "funded" ? "funded" : (a.account_type === "eval" ? "phase1" : a.account_type) }))}
-          sim={{ capitalSize: visibleAccounts.length > 0
-            ? Math.max(50000, ...visibleAccounts.map(a => parseEvalSize(a.eval_account_size) || 0))
-            : 50000 }}
-        />
       </div>
 
       {/* Liste des comptes */}
@@ -286,7 +276,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           textAlign: "center", background: T.surface,
         }}>
           <p style={{ margin: 0, color: T.textSub, fontSize: 14 }}>
-            Aucun compte de trading. Ajoutez-en un depuis la page “Ajouter des trades”.
+            {t("accountsPage.empty")}
           </p>
         </div>
       ) : (
@@ -311,8 +301,8 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
               : type === "funded"
                 ? `Funded${acc.eval_account_size ? ` · ${acc.eval_account_size}` : ""}`
                 : type === "demo"
-                  ? "Démo"
-                  : "Live";
+                  ? t("accountsPage.demo")
+                  : t("accountsPage.live");
             const capital = parseEvalSize(acc.eval_account_size);
             const hasBalance = capital !== null;
             const meta = fundedMeta[acc.id];
@@ -334,116 +324,157 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
             const ddPct = fundedMaxDD > 0 ? Math.min(100, ((s.fundedDD || 0) / fundedMaxDD) * 100) : 0;
             const payoutAvail = isFundedView ? Math.max(0, s.fundedPnl - (meta?.funded_payout_min || 0)) : 0;
 
+            const tradesCount = isFundedView ? s.fundedTrades : s.trades;
+            const wrValue = isFundedView ? fundedWinRate : winRate;
+            const winsValue = isFundedView ? s.fundedWins : s.wins;
+            const lossesValue = isFundedView ? s.fundedLosses : s.losses;
+
+            // Donut win rate (style strategy card)
+            const DonutChart = ({ winRate: wr, size = 48 }) => {
+              const radius = size / 2 - 6;
+              const circumference = 2 * Math.PI * radius;
+              const offset = circumference - (wr / 100) * circumference;
+              const color = wr >= 50 ? T.green : T.red;
+              return (
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.05))" }}>
+                  <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={T.border} strokeWidth="5" />
+                  <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth="5"
+                    strokeDasharray={circumference} strokeDashoffset={offset}
+                    strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`} />
+                </svg>
+              );
+            };
+
             return (
               <div
                 key={acc.id}
                 data-card
                 onClick={() => onOpenDetail(acc.id)}
                 style={{
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 12,
-                  padding: 16,
-                  background: T.surface,
-                  cursor: "pointer",
+                  position: "relative",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 12,
-                  transition: "border-color .15s",
+                  gap: 8,
+                  padding: 20,
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  transition: "border-color .15s, box-shadow .15s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}
               >
-                {/* Top row: titre + sous-titre à gauche, type + broker pills
-                    en haut à droite, logo broker aligné avec le titre. */}
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {acc.name || "Compte"}
-                    </div>
+                {/* Nom du compte */}
+                <div style={{ paddingRight: 200, marginBottom: 6 /* respiration avant la ligne type · broker */ }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.3, letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {acc.name || "Compte"}
                   </div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", flexShrink: 0 }}>
-                    {/* Pills type + broker (avec logo à droite du nom) */}
+                </div>
+
+                {/* Pills type + broker — top-right absolu */}
+                <div style={{ position: "absolute", top: 16, right: 16, display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "2px 8px", borderRadius: 999,
+                    border: `1px solid ${T.border}`, background: T.white,
+                    fontSize: 11, color: T.textSub, fontWeight: 500,
+                    whiteSpace: "nowrap",
+                  }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                    {typeLabel}
+                  </span>
+                  {acc.broker && (
                     <span style={{
-                      display: "inline-flex", alignItems: "center", gap: 5,
+                      display: "inline-flex", alignItems: "center", gap: 6,
                       padding: "2px 8px", borderRadius: 999,
                       border: `1px solid ${T.border}`, background: T.white,
                       fontSize: 11, color: T.textSub, fontWeight: 500,
-                      whiteSpace: "nowrap",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
                     }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                      {typeLabel}
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{acc.broker}</span>
+                      {getBrokerLogo(acc.broker) && (
+                        <img
+                          src={getBrokerLogo(acc.broker)}
+                          alt=""
+                          style={{ height: 14, maxWidth: 48, objectFit: "contain", flexShrink: 0, opacity: 0.85 }}
+                        />
+                      )}
                     </span>
-                    {acc.broker && (
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 6,
-                        padding: "2px 8px", borderRadius: 999,
-                        border: `1px solid ${T.border}`, background: T.white,
-                        fontSize: 11, color: T.textSub, fontWeight: 500,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
-                      }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{acc.broker}</span>
-                        {getBrokerLogo(acc.broker) && (
-                          <img
-                            src={getBrokerLogo(acc.broker)}
-                            alt=""
-                            style={{ height: 14, maxWidth: 48, objectFit: "contain", flexShrink: 0, opacity: 0.85 }}
-                          />
-                        )}
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
 
-                {/* Séparateur entre l'en-tête (nom + pills) et les infos */}
-                <div style={{ height: 1, background: T.border, margin: "0 -16px" }} />
-
-                {/* Hero balance (gauche) + stats (droite) */}
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: 4 }}>
+                {/* Ligne P&L (gauche) | Win rate (centre) | Payout (droite, funded uniquement) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 16 }}>
+                  {/* P&L — gauche */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                    <span style={{
-                      fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: -0.6,
-                      fontVariantNumeric: "tabular-nums",
-                    }}>
+                    <div style={{ fontSize: 20, fontWeight: 600, color: hasBalance ? T.text : pnlColor, letterSpacing: -0.2, fontVariantNumeric: "tabular-nums" }}>
                       {hasBalance ? fmtNoCents(balance) : (displayTrades > 0 ? fmt(displayPnl, true) : "—")}
-                    </span>
+                    </div>
                     {hasBalance && (
-                      <span style={{
-                        fontSize: 12, fontWeight: 500, color: pnlColor,
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: pnlColor, fontVariantNumeric: "tabular-nums" }}>
                         {displayPnl >= 0 ? "+" : ""}{fmtNoCents(displayPnl)}
                         {pnlPct !== null && ` (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`}
-                      </span>
+                      </div>
                     )}
                   </div>
 
-                  <div style={{
-                    display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3,
-                    fontSize: 12, color: T.textSub, fontWeight: 400,
-                    fontVariantNumeric: "tabular-nums",
-                    flexShrink: 0,
-                  }}>
-                    <span>{(isFundedView ? s.fundedTrades : s.trades)} trade{(isFundedView ? s.fundedTrades : s.trades) > 1 ? "s" : ""}</span>
-                    <span>{(isFundedView ? s.fundedTrades : s.trades) > 0 ? `${(isFundedView ? fundedWinRate : winRate).toFixed(1)}% wr` : "—% wr"}</span>
-                    <span>
-                      <span style={{ color: T.green }}>{isFundedView ? s.fundedWins : s.wins}W</span>
-                      <span style={{ color: T.textMut }}> / </span>
-                      <span style={{ color: T.red }}>{isFundedView ? s.fundedLosses : s.losses}L</span>
-                    </span>
+                  {/* Win rate — centre */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, justifySelf: "center" }}>
+                    <DonutChart winRate={tradesCount > 0 ? Math.round(wrValue) : 0} size={48} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Win rate</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: T.text, fontVariantNumeric: "tabular-nums" }}>
+                        {tradesCount > 0 ? `${wrValue.toFixed(1)}%` : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloc droite — varie selon le type de compte */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, justifySelf: "end", textAlign: "right", minWidth: 0 }}>
+                    {isFundedView ? (
+                      <>
+                        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Payout dispo</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: payoutAvail > 0 ? T.green : T.textSub, letterSpacing: -0.1, fontVariantNumeric: "tabular-nums" }}>
+                          {fmtNoCents(payoutAvail)}
+                        </div>
+                      </>
+                    ) : type === "eval" && evalParams ? (
+                      <>
+                        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Cible</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.1, fontVariantNumeric: "tabular-nums" }}>
+                          <span style={{ color: T.text }}>
+                            {fmtNoCents(s.pnl)}
+                          </span>
+                          <span style={{ color: T.textMut, fontWeight: 400 }}> / </span>
+                          <span style={{ color: T.text }}>{fmtNoCents(evalParams.profitTarget)}</span>
+                        </div>
+                      </>
+                    ) : (type === "live" || type === "demo") ? (
+                      <>
+                        <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Trades</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: T.text, letterSpacing: -0.1, fontVariantNumeric: "tabular-nums" }}>
+                          {s.trades}
+                        </div>
+                        {hasBalance && (
+                          <div style={{ fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
+                            ROI {pnlPct !== null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
+                          </div>
+                        )}
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* Bandeau "Objectif atteint" : visible uniquement en eval lorsque
-                    le PnL cumulé dépasse la target inférée. Cliquer transforme
-                    le compte en funded. */}
+                {/* "Objectif atteint" : passe en funded — bandeau bas, pleine largeur */}
                 {canPassFunded && (
                   <div
                     onClick={(e) => e.stopPropagation()}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
                       padding: "10px 12px", borderRadius: 10,
-                      background: "#ECFDF5", border: `1px solid #A7F3D0`,
+                      background: T.greenBg, border: `1px solid ${T.greenBd || "#A7F3D0"}`,
+                      marginTop: 4,
                     }}>
                     <Trophy size={14} strokeWidth={1.75} color={T.green} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -459,7 +490,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                       onClick={(e) => { e.stopPropagation(); markFunded(acc); }}
                       style={{
                         padding: "6px 12px", borderRadius: 999,
-                        border: "none", background: T.green, color: "#fff",
+                        border: `1px solid ${T.green}`, background: T.white, color: T.green,
                         fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
                         whiteSpace: "nowrap",
                       }}>
@@ -467,8 +498,6 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                     </button>
                   </div>
                 )}
-
-
               </div>
             );
           })}
@@ -508,7 +537,7 @@ function ScalingSimulator({ accounts = [] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {/* Carte sliders (en haut) — titre + sous-titre cliquables pour replier */}
       <div style={{
-        background: "#FFFFFF",
+        background: "var(--color-card-bg, #FFFFFF)",
         border: `1px solid ${T.border}`,
         borderRadius: open ? "12px 12px 0 0" : 12,
         borderBottom: open ? "none" : `1px solid ${T.border}`,
@@ -529,8 +558,8 @@ function ScalingSimulator({ accounts = [] }) {
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>Simulateur de scaling</h2>
-            <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>Estime ton revenu et ton délai pour atteindre l'objectif</div>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>{t("accountsPage.simTitle")}</h2>
+            <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>{t("accountsPage.simSub")}</div>
           </div>
           <span style={{ display: "inline-flex", alignItems: "center", color: T.textSub }}>
             <ChevronDown size={14} strokeWidth={2}
@@ -539,22 +568,22 @@ function ScalingSimulator({ accounts = [] }) {
         </div>
         {open && (
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
-          <SimSlider label="Capital par compte" sub={`${fmtMoney(25000)} → ${fmtMoney(200000)}`} value={sim.capitalSize} min={25000} max={200000} step={25000} fmt={fmtMoney} onChange={(v) => setSim((p) => ({ ...p, capitalSize: v }))} />
-          <SimSlider label="% profit mensuel" sub="1 → 20 %" value={sim.pctMonthly} min={1} max={20} step={0.5} fmt={(v) => `${v}%`} onChange={(v) => setSim((p) => ({ ...p, pctMonthly: v }))} />
-          <SimSlider label="Nombre de comptes visés" sub="1 → 20" value={sim.accountsTarget} min={1} max={20} step={1} fmt={(v) => `${v}`} onChange={(v) => setSim((p) => ({ ...p, accountsTarget: v }))} />
-          <SimSlider label="Semaines par évaluation" sub="1 → 16 sem." value={sim.weeksPerEval ?? 7} min={1} max={16} step={1} fmt={(v) => `${v} sem.`} onChange={(v) => setSim((p) => ({ ...p, weeksPerEval: v }))} />
+          <SimSlider label={t("accountsPage.simCapital")} sub={`${fmtMoney(25000)} → ${fmtMoney(200000)}`} value={sim.capitalSize} min={25000} max={200000} step={25000} fmt={fmtMoney} onChange={(v) => setSim((p) => ({ ...p, capitalSize: v }))} />
+          <SimSlider label={t("accountsPage.simPctMonthly")} sub="1 → 20 %" value={sim.pctMonthly} min={1} max={20} step={0.5} fmt={(v) => `${v}%`} onChange={(v) => setSim((p) => ({ ...p, pctMonthly: v }))} />
+          <SimSlider label={t("accountsPage.accountsTarget")} sub="1 → 20" value={sim.accountsTarget} min={1} max={20} step={1} fmt={(v) => `${v}`} onChange={(v) => setSim((p) => ({ ...p, accountsTarget: v }))} />
+          <SimSlider label={t("accountsPage.weeksPerEval")} sub={`1 → 16 ${t("accountsPage.simWeeks")}`} value={sim.weeksPerEval ?? 7} min={1} max={16} step={1} fmt={(v) => `${v} ${t("accountsPage.simWeeks")}`} onChange={(v) => setSim((p) => ({ ...p, weeksPerEval: v }))} />
         </div>
         )}
       </div>
 
       {/* Carte KPIs + progression (rattachée en dessous, visible quand ouvert) */}
       {open && (
-      <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
+      <div style={{ background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <SimKpi label="Capital total géré" value={fmtMoney(totalCapital)} />
-          <SimKpi label="Revenu mensuel cible" value={fmtMoney(monthlyRevenue)} valueColor={T.green} />
-          <SimKpi label="Temps estimé" value={`${weeks} sem.`} sub={weeks >= 4 ? `≈ ${monthsEst} mois` : null} />
-          <SimKpi label="Évaluations à passer" value={`${challengesLeft}`} last />
+          <SimKpi label={t("accountsPage.kpiCapital")} value={fmtMoney(totalCapital)} />
+          <SimKpi label={t("accountsPage.simMonthlyRevenue")} value={fmtMoney(monthlyRevenue)} valueColor={T.green} />
+          <SimKpi label={t("accountsPage.estimatedTime")} value={`${weeks} ${t("accountsPage.simWeeks")}`} sub={weeks >= 4 ? `≈ ${monthsEst} ${t("accountsPage.simMonths")}` : null} />
+          <SimKpi label={t("accountsPage.evalsToPass")} value={`${challengesLeft}`} last />
         </div>
 
         {/* Stepper de progression — intégré dans la même carte */}
@@ -578,7 +607,7 @@ function ScalingSimulator({ accounts = [] }) {
                     / {accountsTarget}
                   </span>
                   <span style={{ fontSize: 11, color: T.textMut, marginLeft: 4 }}>
-                    compte{accountsTarget > 1 ? "s" : ""} financé{fundedCount > 1 ? "s" : ""}
+                    {accountsTarget > 1 ? t("accountsPage.simFundedAccounts") : t("accountsPage.simFundedAccount")}
                   </span>
                 </div>
                 <div style={{
@@ -631,10 +660,10 @@ function ScalingSimulator({ accounts = [] }) {
               {/* Sous-texte */}
               <div style={{ marginTop: 8, fontSize: 11, color: T.textMut }}>
                 {allDone
-                  ? "🎉 Objectif atteint — tu peux viser plus haut depuis le simulateur."
+                  ? t("accountsPage.simAllDone")
                   : remaining === 1
-                    ? "Encore 1 compte à financer pour boucler l'objectif."
-                    : `Encore ${remaining} comptes à financer pour boucler l'objectif.`}
+                    ? t("accountsPage.simAccountsLeft1")
+                    : t("accountsPage.simAccountsLeftN").replace("{n}", String(remaining))}
               </div>
             </div>
           );
@@ -1033,7 +1062,7 @@ function AccountPlans({ accounts, trades }) {
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "6px 12px", borderRadius: 999,
-            border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.text,
+            border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)", color: T.text,
             fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
           }}>
           <Plus size={12} strokeWidth={1.75} /> Nouveau plan
@@ -1041,7 +1070,7 @@ function AccountPlans({ accounts, trades }) {
       </div>
 
       {(plans || []).length === 0 ? (
-        <div style={{ border: `1px dashed ${T.border}`, borderRadius: 12, padding: 24, textAlign: "center", background: "#FFFFFF", color: "#8E8E8E", fontSize: 12 }}>
+        <div style={{ border: `1px dashed ${T.border}`, borderRadius: 12, padding: 24, textAlign: "center", background: "var(--color-card-bg, #FFFFFF)", color: "#8E8E8E", fontSize: 12 }}>
           Aucun plan. Crée ton premier plan pour suivre tes objectifs de progression sur tes comptes.
         </div>
       ) : (
@@ -1065,7 +1094,7 @@ function AccountPlans({ accounts, trades }) {
             return (
               <div key={p.id}
                 style={{
-                  background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12,
+                  background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: 12,
                   padding: 14, display: "flex", flexDirection: "column", gap: 10,
                 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -1125,9 +1154,9 @@ function AccountPlans({ accounts, trades }) {
                   {p.type === "custom" && (
                     <div style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
                       <button onClick={() => adjustManual(p.id, -1)} aria-label="−"
-                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>−</button>
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>−</button>
                       <button onClick={() => adjustManual(p.id, 1)} aria-label="+"
-                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>+</button>
+                        style={{ width: 22, height: 22, borderRadius: 6, border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, lineHeight: 1 }}>+</button>
                     </div>
                   )}
                 </div>
@@ -1142,7 +1171,7 @@ function AccountPlans({ accounts, trades }) {
         <div {...backdropDismiss(close)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
-            style={{ width: "min(560px, 100%)", maxHeight: "min(85vh, 760px)", display: "flex", flexDirection: "column", background: "#FFFFFF", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
+            style={{ width: "min(560px, 100%)", maxHeight: "min(85vh, 760px)", display: "flex", flexDirection: "column", background: "var(--color-card-bg, #FFFFFF)", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
                 {editingId ? "Modifier le plan" : "Nouveau plan"}
@@ -1222,7 +1251,7 @@ function AccountPlans({ accounts, trades }) {
                     const tpl = PLAN_TEMPLATES.find(t => t.id === form.templateId);
                     if (!tpl) return null;
                     return (
-                      <div style={{ background: "#FAFAFA", border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 12px" }}>
+                      <div style={{ background: "var(--color-bg, #FAFAFA)", border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 12px" }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: "#8E8E8E", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 8 }}>Règles des phases</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {tpl.phases.map((ph, i) => (
@@ -1281,13 +1310,13 @@ function AccountPlans({ accounts, trades }) {
                     <input type="text" value={form.title}
                       onChange={(e) => setForm({ ...form, title: e.target.value })}
                       placeholder="ex. Topstep 50k — passe Q1 2026"
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "#FFFFFF" }} />
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "var(--color-card-bg, #FFFFFF)" }} />
                   </label>
                   <label style={{ display: "block" }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: "#8E8E8E", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Échéance (optionnel)</div>
                     <input type="date" value={form.deadline}
                       onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "#FFFFFF" }} />
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "var(--color-card-bg, #FFFFFF)" }} />
                   </label>
                 </>
               ) : (
@@ -1327,7 +1356,7 @@ function AccountPlans({ accounts, trades }) {
                     <input type="text" value={form.title}
                       onChange={(e) => setForm({ ...form, title: e.target.value })}
                       placeholder="ex. Passer 3 évals 50k cette année"
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "#FFFFFF" }} />
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "var(--color-card-bg, #FFFFFF)" }} />
                   </label>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <label>
@@ -1335,13 +1364,13 @@ function AccountPlans({ accounts, trades }) {
                       <input type="number" value={form.target}
                         onChange={(e) => setForm({ ...form, target: e.target.value })}
                         placeholder="3"
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "#FFFFFF" }} />
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "var(--color-card-bg, #FFFFFF)" }} />
                     </label>
                     <label>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "#8E8E8E", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Échéance</div>
                       <input type="date" value={form.deadline}
                         onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "#FFFFFF" }} />
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit", outline: "none", color: T.text, background: "var(--color-card-bg, #FFFFFF)" }} />
                     </label>
                   </div>
                 </>
@@ -1409,7 +1438,7 @@ function TemplatePlanCard({ plan, accounts, trades, onEdit, onDelete, onAdvance,
 
   return (
     <div style={{
-      background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12,
+      background: "var(--color-card-bg, #FFFFFF)", border: `1px solid ${T.border}`, borderRadius: 12,
       padding: 14, display: "flex", flexDirection: "column", gap: 12,
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -1519,7 +1548,7 @@ function TemplatePlanCard({ plan, accounts, trades, onEdit, onDelete, onAdvance,
             title="Recommencer la phase (reset de la progression à zéro)"
             style={{
               padding: "4px 10px", borderRadius: 999,
-              border: `1px solid ${T.border}`, background: "#FFFFFF",
+              border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)",
               color: T.textSub, fontSize: 10, fontWeight: 500, cursor: "pointer",
               fontFamily: "inherit",
             }}>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
@@ -10,6 +10,7 @@ import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/contexts/AppContext";
 
 export default function DashboardPage({ trades = [], allTrades = [], accounts = [], selectedAccountIds = [], strategies = [], setPage, setDateRangesByPage }) {
+  useLang();
   const goToTradesForDate = (iso) => {
     if (typeof setDateRangesByPage === "function") {
       setDateRangesByPage(prev => ({ ...(prev || {}), trades: { start: iso, end: iso } }));
@@ -496,13 +497,13 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         <div style={{padding:"16px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
           {/* Titre + onglets de sélection du graphique sur la même ligne */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:4,flexWrap:"wrap"}}>
-            <div style={{fontSize:13,fontWeight:600,color:T.text}}>Évolution du P&L</div>
+            <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("dash.pnlEvolution")}</div>
             <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
               {(() => {
                 const opts = [
                   { id: "cumulative", label: t("dash.cumulativePnL") },
-                  { id: "byAccount",  label: "P&L par compte" },
-                  { id: "byStrategy", label: "P&L par stratégie" },
+                  { id: "byAccount",  label: t("dash.pnlByAccount") },
+                  { id: "byStrategy", label: t("dash.pnlByStrategy") },
                 ];
                 return opts.map((opt, i) => {
                   const active = chartView === opt.id;
@@ -539,10 +540,10 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           </div>
           <div style={{fontSize:11,color:"#8E8E8E",marginBottom:12}}>
             {chartView === "cumulative"
-              ? `Évolution du capital — ${new Date().toLocaleDateString('fr-FR',{year:'numeric',month:'long',day:'numeric'})}`
+              ? t("dash.capitalEvolution").replace("{date}", new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}))
               : chartView === "byAccount"
-              ? "Comparaison des comptes au fil du temps"
-              : "Comparaison des stratégies au fil du temps"}
+              ? t("dash.byAccountSub")
+              : t("dash.byStrategySub")}
           </div>
 
           {chartView === "cumulative" && pnlCurve.length > 1 ? (
@@ -756,7 +757,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
               if (seriesPerStrategy.length === 0) {
                 return (
-                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#EFEFEF",borderRadius:8,color:"#8E8E8E"}}>
                     Pas de stratégies liées
                   </div>
                 );
@@ -926,7 +927,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
               if (seriesPerAccount.length === 0) {
                 return (
-                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
+                  <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#EFEFEF",borderRadius:8,color:"#8E8E8E"}}>
                     Pas de données
                   </div>
                 );
@@ -1088,7 +1089,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               );
             })()
           ) : (
-            <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#F3F4F6",borderRadius:8,color:"#8E8E8E"}}>
+            <div style={{height:200,display:"flex",alignItems:"center",justifyContent:"center",background:"#EFEFEF",borderRadius:8,color:"#8E8E8E"}}>
               Pas de données
             </div>
           )}
@@ -1379,7 +1380,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 }
                 return days.map((idx) => {
                   const day = dayLabelsFull[idx];
-                  const dayLabels = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+                  const dayLabels = [t("wd.monday"),t("wd.tuesday"),t("wd.wednesday"),t("wd.thursday"),t("wd.friday"),t("wd.saturday"),t("wd.sunday")].map(s => s.charAt(0).toUpperCase() + s.slice(1));
                   const dayTrades = pnlByDay[idx] || [];
                   const dayPnL = dayTrades.reduce((s,t)=>s+t.pnl,0);
                   const dayWins = dayTrades.filter(t=>t.pnl>0).length;

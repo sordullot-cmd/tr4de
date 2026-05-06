@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { T } from "@/lib/ui/tokens";
-import { t } from "@/lib/i18n";
+import { t, useLang } from "@/lib/i18n";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 
 export default function CalendarPage({ trades = [], accountType = "live", evalAccountSize = "25k", accounts = [], selectedAccountIds = [], setPage, setDateRangesByPage }) {
+  useLang();
   const goToTradesForDate = (iso) => {
     if (typeof setDateRangesByPage === "function") {
       setDateRangesByPage(prev => ({ ...(prev || {}), trades: { start: iso, end: iso } }));
@@ -42,23 +43,31 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
     return usd ? Math.round(usd * 0.06) : 0;
   };
 
-  // Cumul des objectifs sur tous les comptes Eval/Funded actuellement sélectionnés
+  // Cumul des objectifs : uniquement sur les comptes Eval sélectionnés.
+  // Les comptes funded/live/demo ne contribuent ni à la cible ni au PnL
+  // affiché dans la barre de progression — ils ont leurs propres règles.
+  const evalAccountsSelected = (accounts || []).filter(
+    a => selectedAccountIds.includes(a.id) && a.account_type === "eval"
+  );
+  const evalAccountIds = new Set(evalAccountsSelected.map(a => a.id));
   const cumulativeObjective = (() => {
-    const selected = (accounts || []).filter(a => selectedAccountIds.includes(a.id));
-    const evalLikeAccounts = selected.filter(a => a.account_type === "eval" || a.account_type === "funded");
-    if (evalLikeAccounts.length > 0) {
-      return evalLikeAccounts.reduce((s, a) => s + objectiveForSize(a.eval_account_size), 0);
+    if (evalAccountsSelected.length > 0) {
+      return evalAccountsSelected.reduce((s, a) => s + objectiveForSize(a.eval_account_size), 0);
     }
     // Fallback : ancien comportement (compte unique avec taille passée en prop)
     return objectiveForSize(evalAccountSize);
   })();
   const cumulativeLabel = (() => {
-    const selected = (accounts || []).filter(a => selectedAccountIds.includes(a.id));
-    const evalLikeAccounts = selected.filter(a => a.account_type === "eval" || a.account_type === "funded");
-    if (evalLikeAccounts.length > 1) return `${evalLikeAccounts.length} comptes`;
-    if (evalLikeAccounts.length === 1) return `EVAL ${getCurrencySymbol()}${String(evalLikeAccounts[0].eval_account_size || "").toUpperCase()}`;
+    if (evalAccountsSelected.length > 1) return t("accounts.multiple").replace("{n}", String(evalAccountsSelected.length));
+    if (evalAccountsSelected.length === 1) return `EVAL ${getCurrencySymbol()}${String(evalAccountsSelected[0].eval_account_size || "").toUpperCase()}`;
     return `EVAL ${getCurrencySymbol()}${String(evalAccountSize).toUpperCase()}`;
   })();
+  // PnL cumulé restreint aux comptes eval — sert UNIQUEMENT à la barre
+  // d'avancement de la cible. Le reste de la page (calendrier mois,
+  // monthPnL des cellules) continue d'utiliser totalPnL/all trades.
+  const evalCumulativePnL = (trades || [])
+    .filter(tr => evalAccountIds.size === 0 || evalAccountIds.has(tr.account_id))
+    .reduce((s, tr) => s + (tr.pnl || 0), 0);
 
   const pnlByDate = {};
   const tradesByDate = {};
@@ -238,15 +247,15 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
               <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 160, alignItems: "flex-end" }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 500, color: T.textMut, marginBottom: 4 }}>{cumulativeLabel}</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: totalPnL >= cumulativeObjective ? T.green : T.text }}>
-                    {getCurrencySymbol()}{totalPnL.toFixed(2)} / {getCurrencySymbol()}{cumulativeObjective.toLocaleString("en-US")}
+                  <div style={{ fontSize: 14, fontWeight: 500, color: evalCumulativePnL >= cumulativeObjective ? T.green : T.text }}>
+                    {getCurrencySymbol()}{evalCumulativePnL.toFixed(2)} / {getCurrencySymbol()}{cumulativeObjective.toLocaleString("en-US")}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
                   <div style={{ flex: 1, height: 6, background: T.border, borderRadius: 3, overflow: "hidden", minWidth: 100 }}>
-                    <div style={{ height: "100%", background: totalPnL >= cumulativeObjective ? T.green : "#8E8E8E", width: `${Math.min(100, (totalPnL / cumulativeObjective) * 100)}%`, transition: "width 0.3s" }} />
+                    <div style={{ height: "100%", background: evalCumulativePnL >= cumulativeObjective ? T.green : "#8E8E8E", width: `${Math.min(100, (evalCumulativePnL / cumulativeObjective) * 100)}%`, transition: "width 0.3s" }} />
                   </div>
-                  <div style={{ fontSize: 11, color: T.textMut, minWidth: 35, textAlign: "right" }}>{((totalPnL / cumulativeObjective) * 100).toFixed(0)}%</div>
+                  <div style={{ fontSize: 11, color: T.textMut, minWidth: 35, textAlign: "right" }}>{((evalCumulativePnL / cumulativeObjective) * 100).toFixed(0)}%</div>
                 </div>
               </div>
             )}
@@ -312,7 +321,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
                             e.stopPropagation();
                             goToTradesForDate(dayIso);
                           }}
-                          title={clickable ? "Voir les trades du jour" : undefined}
+                          title={clickable ? t("cal.viewDayTrades") : undefined}
                           style={{
                             padding: "10px 12px", background: bg,
                             verticalAlign: "top", textAlign: "left",
@@ -332,7 +341,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
                       );
                     })}
                     <td style={{ padding: "10px 12px", background: T.white, verticalAlign: "top", textAlign: "left", borderLeft: `1px solid ${T.border}` }}>
-                      <div style={{ fontWeight: 400, color: T.text, fontSize: 13, marginBottom: 6 }}>Semaine {weekIdx + 1}</div>
+                      <div style={{ fontWeight: 400, color: T.text, fontSize: 13, marginBottom: 6 }}>{t("cal.weekN").replace("{n}", String(weekIdx + 1))}</div>
                       <div style={{ color: weekPnL >= 0 ? T.green : weekPnL < 0 ? T.red : T.textMut, fontWeight: 400, fontSize: 12, marginBottom: 2 }}>
                         {weekPnL >= 0 ? "+" : ""}{getCurrencySymbol()}{weekPnL.toFixed(0)}
                       </div>
@@ -357,11 +366,11 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
       {renderMonthDetail()}
 
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, fontFamily: "var(--font-sans)" }}>
-        <button onClick={() => setYear(year - 1)} aria-label="Année précédente" style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+        <button onClick={() => setYear(year - 1)} aria-label={t("cal.prevYear")} style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
           <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>‹</span>
         </button>
         <div style={{ fontSize: 15, fontWeight: 600, color: T.text, minWidth: 48, textAlign: "center" }}>{year}</div>
-        <button onClick={() => setYear(year + 1)} aria-label="Année suivante" style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+        <button onClick={() => setYear(year + 1)} aria-label={t("cal.nextYear")} style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
           <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>›</span>
         </button>
       </div>
