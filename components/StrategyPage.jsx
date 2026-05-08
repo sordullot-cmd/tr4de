@@ -296,7 +296,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
       {/* HEADER */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
         <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("strat.title")}</h1>
-        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 16px",height:34,borderRadius:999,background:T.white,border:`1px solid ${T.text}`,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
+        <button onClick={() => setShowStrategyForm(true)} style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:6,padding:"7px 16px",height:34,borderRadius:999,background:T.text,border:`1px solid ${T.text}`,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>
           <Plus size={14} strokeWidth={2}/> {t("strat.createBtn")}
         </button>
         <div id="tr4de-page-header-slot" />

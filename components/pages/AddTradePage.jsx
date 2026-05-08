@@ -889,7 +889,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "row", gap: 16, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12 }}>
+      <div style={{ display: "flex", flexDirection: "row", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
       <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: "0.7" }}>
           <div style={{ padding: 24 }}>
@@ -1056,9 +1056,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               </div>
             )}
           </div>
-          <div style={{ borderTop: `1px solid ${T.border}`, margin: "24px 0" }} />
           {/* FILE */}
-          <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ paddingBottom: 20, marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 8, color: "#5C5C5C" }}>
               {t("addTrade.file")}
             </label>
@@ -1156,15 +1155,21 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             disabled={!fileContent || !accountName.trim() || loading}
             style={{
               width: "100%",
-              padding: "12px 24px",
-              borderRadius: "8px",
-              background: T.white,
-              color: fileContent && accountName.trim() && !loading ? T.text : T.textMut,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "10px 18px",
+              borderRadius: 999,
+              background: fileContent && accountName.trim() && !loading ? T.text : "#FFFFFF",
+              color: fileContent && accountName.trim() && !loading ? "#FFFFFF" : T.textMut,
               border: `1px solid ${fileContent && accountName.trim() && !loading ? T.text : T.border}`,
               cursor: fileContent && accountName.trim() && !loading ? "pointer" : "not-allowed",
-              fontSize: "12px",
-              fontWeight: "600",
+              fontSize: 13,
+              fontWeight: 500,
               opacity: fileContent && accountName.trim() && !loading ? 1 : 0.6,
+              transition: "background 140ms ease, border-color 140ms ease, color 140ms ease",
+              fontFamily: "var(--font-sans)",
             }}
           >
             {loading ? t("addTrade.processing") : t("addTrade.importTrades")}

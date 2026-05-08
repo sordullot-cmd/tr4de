@@ -278,24 +278,29 @@ export default function SportPage() {
       return d >= monday && d <= sunday;
     }).length;
 
-    // Streak : jours consécutifs avec au moins 1 séance, en remontant depuis aujourd'hui
-    const dateSet = new Set(all.map(s => s.date));
+    // Streak : durée (en jours) de la période d'entraînement active courante.
+    // Les jours de repos comptent dans le streak tant qu'on ne dépasse pas
+    // REST_TOLERANCE jours de repos consécutifs entre deux séances.
+    const REST_TOLERANCE = 2;
+    const sortedDates = [...new Set(all.map(s => s.date))].sort();
     let streak = 0;
-    const cur = new Date();
-    cur.setHours(0, 0, 0, 0);
-    // Si pas de séance aujourd'hui, on tolère 1 jour de pause sans casser le streak.
-    let toleranceUsed = !dateSet.has(toISOLocal(cur));
-    while (true) {
-      const iso = toISOLocal(cur);
-      if (dateSet.has(iso)) {
-        streak++;
-        cur.setDate(cur.getDate() - 1);
-        toleranceUsed = false;
-      } else if (!toleranceUsed && streak > 0) {
-        toleranceUsed = true;
-        cur.setDate(cur.getDate() - 1);
-      } else {
-        break;
+    if (sortedDates.length) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const DAY = 86400000;
+      const last = new Date(sortedDates[sortedDates.length - 1] + "T00:00:00");
+      const daysSinceLast = Math.floor((today - last) / DAY);
+      if (daysSinceLast <= REST_TOLERANCE) {
+        let startIdx = sortedDates.length - 1;
+        for (let i = sortedDates.length - 1; i > 0; i--) {
+          const a = new Date(sortedDates[i] + "T00:00:00");
+          const b = new Date(sortedDates[i - 1] + "T00:00:00");
+          const gap = Math.floor((a - b) / DAY);
+          if (gap <= REST_TOLERANCE + 1) startIdx = i - 1;
+          else break;
+        }
+        const start = new Date(sortedDates[startIdx] + "T00:00:00");
+        streak = Math.floor((today - start) / DAY) + 1;
       }
     }
 
@@ -391,7 +396,7 @@ export default function SportPage() {
           {t("sport.pageTitle")}
         </h1>
         <button onClick={openCreate}
-          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.white, border: `1px solid ${T.text}`, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} strokeWidth={2} /> Nouvelle séance
         </button>
         <div id="tr4de-page-header-slot" />

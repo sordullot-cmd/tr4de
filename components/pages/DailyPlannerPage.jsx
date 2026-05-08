@@ -303,9 +303,7 @@ export default function DailyPlannerPage() {
               {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
             </span>
             <button onClick={openCreateHabit} title="Ajouter une habitude"
-              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.text, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
+              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}>
               <Plus size={13} strokeWidth={2} />
             </button>
           </div>
@@ -876,7 +874,7 @@ function AddInput({ value, onChange, onAdd, placeholder }) {
         onKeyDown={(e) => { if (e.key === "Enter") onAdd(); }}
         placeholder={placeholder}
         style={{ flex: 1, padding: "6px 10px", border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
-      <button onClick={onAdd} style={{ padding: "0 12px", height: 28, background: T.white, color: T.text, border: `1px solid ${T.text}`, borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+      <button onClick={onAdd} style={{ padding: "0 12px", height: 28, background: T.text, color: "#fff", border: `1px solid ${T.text}`, borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
         <Plus size={12} strokeWidth={2.5} />
       </button>
     </div>

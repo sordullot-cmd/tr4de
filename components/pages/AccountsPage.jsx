@@ -236,7 +236,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "7px 14px", borderRadius: 999,
-            border: `1px solid ${T.text}`, background: T.white, color: T.text,
+            border: `1px solid ${T.text}`, background: T.text, color: "#fff",
             fontSize: 12, fontWeight: 600, cursor: "pointer",
             fontFamily: "inherit",
           }}
