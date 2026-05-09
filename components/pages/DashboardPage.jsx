@@ -189,6 +189,74 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   const lossCount = losses.length;
   const winRate = ((winCount/(winCount+lossCount||1))*100).toFixed(1);
   const profitFactor = (wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0)||1)).toFixed(2);
+
+  // ===== Comparaison vs période équivalente précédente =====
+  // Détermine la période courante à partir de filteredTrades (ou du mois sélectionné
+  // si la liste est vide), puis prend la période immédiatement précédente de même
+  // longueur dans `allTrades` pour calculer le delta. Si la période antérieure est
+  // vide (cas par défaut "depuis le 1er trade"), on affiche "—" plutôt qu'un faux %.
+  const calcKpis = (arr) => {
+    const pnl = arr.reduce((s,t)=>s+t.pnl,0);
+    const w = arr.filter(t=>t.pnl>0);
+    const l = arr.filter(t=>t.pnl<0);
+    const wr = (w.length+l.length) ? (w.length/(w.length+l.length))*100 : 0;
+    const pf = l.length ? w.reduce((s,t)=>s+t.pnl,0) / Math.abs(l.reduce((s,t)=>s+t.pnl,0)) : 0;
+    return { pnl, wr, pf, n: arr.length };
+  };
+  const dayMs = 86400000;
+  const toDate = (t) => { try { const d = new Date(t.date); return isNaN(d.getTime()) ? null : d; } catch { return null; } };
+  let periodStart = null, periodEnd = null;
+  if (selectedDay !== null) {
+    // Filtre par jour de la semaine : pas de comparaison temporelle pertinente.
+    periodStart = null;
+  } else {
+    periodStart = new Date(selectedYear, selectedMonth, 1);
+    periodEnd = new Date(selectedYear, selectedMonth + 1, 0); // dernier jour du mois
+  }
+  const prevTrades = (() => {
+    if (!periodStart || !periodEnd) return [];
+    const len = Math.max(1, Math.round((periodEnd - periodStart) / dayMs) + 1);
+    const prevEnd = new Date(periodStart.getTime() - dayMs);
+    const prevStart = new Date(prevEnd.getTime() - (len - 1) * dayMs);
+    return (allTrades || []).filter(tr => {
+      const d = toDate(tr); if (!d) return false;
+      return d >= prevStart && d <= prevEnd;
+    });
+  })();
+  const cur = calcKpis(filteredTrades);
+  const prev = calcKpis(prevTrades);
+  const hasPrev = prev.n > 0;
+  // Formatte un delta avec flèche/couleur. `kind` = "pct" (variation %), "pp" (points
+  // de %, ex. winrate), "abs" (delta absolu, ex. profit factor).
+  const formatDelta = (curV, prevV, kind) => {
+    if (!hasPrev) return { text: "—", color: "#8E8E8E", arrow: "" };
+    if (kind === "pct") {
+      if (prevV === 0) return { text: curV === 0 ? "0%" : "—", color: "#8E8E8E", arrow: "" };
+      const d = ((curV - prevV) / Math.abs(prevV)) * 100;
+      const sign = d > 0 ? "+" : "";
+      return { text: `${sign}${d.toFixed(1)}%`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
+    }
+    if (kind === "pp") {
+      const d = curV - prevV;
+      const sign = d > 0 ? "+" : "";
+      return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
+    }
+    // abs
+    const d = curV - prevV;
+    const sign = d > 0 ? "+" : "";
+    return { text: `${sign}${d.toFixed(2)}`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
+  };
+  const dPnL = formatDelta(cur.pnl, prev.pnl, "pct");
+  const dWR  = formatDelta(cur.wr, prev.wr, "pp");
+  const dPF  = formatDelta(cur.pf, prev.pf, "abs");
+  // WR Today = délta vs WR de la période courante (ce qu'on est habitué à faire)
+  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+  const todayTrades = (allTrades || []).filter(tr => (tr.date || "").slice(0,10) === todayIso);
+  const todayKpi = calcKpis(todayTrades);
+  const dWRToday = todayKpi.n > 0
+    ? (() => { const d = todayKpi.wr - cur.wr; const sign = d > 0 ? "+" : ""; return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" }; })()
+    : { text: "—", color: "#8E8E8E", arrow: "" };
+  const wrToday = todayKpi.n > 0 ? todayKpi.wr.toFixed(1) : "0.0";
   const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
   const maxWin = filteredTrades.length ? Math.max(...filteredTrades.map(t=>t.pnl)) : 0;
@@ -465,31 +533,31 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         {/* ROW 1: 4 KPIs avec separateurs verticaux */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"1px solid #E5E5E5"}}>
           {/* NET P&L */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#16A34A"}}>↑ +12.4%</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasPrev ? `vs période précédente : ${fmt(prev.pnl,true)}` : "Pas de période antérieure de comparaison"}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dPnL.color}}>{dPnL.arrow} {dPnL.text}</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.totalPnL")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
           </div>
 
           {/* TRADE WIN */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#16A34A"}}>↑ +3.2%</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasPrev ? `vs période précédente : ${prev.wr.toFixed(1)}%` : "Pas de période antérieure de comparaison"}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWR.color}}>{dWR.arrow} {dWR.text}</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.winRate")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
           </div>
 
           {/* PROFIT FACTOR */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#A855F7"}}>↑ +0.3</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasPrev ? `vs période précédente : ${prev.pf.toFixed(2)}` : "Pas de période antérieure de comparaison"}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dPF.color}}>{dPF.arrow} {dPF.text}</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.profitFactor")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{profitFactor}</div>
           </div>
 
           {/* WIN RATE TODAY */}
-          <div style={{padding:"14px 18px",position:"relative"}}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:"#F97316"}}>↑ +2.1%</div>
+          <div style={{padding:"14px 18px",position:"relative"}} title={todayKpi.n > 0 ? `vs WR période : ${cur.wr.toFixed(1)}%` : "Aucun trade aujourd'hui"}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWRToday.color}}>{dWRToday.arrow} {dWRToday.text}</div>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>WR Today <span style={{color:"#8E8E8E"}}>›</span></div>
-            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{wrToday}%</div>
           </div>
         </div>
 

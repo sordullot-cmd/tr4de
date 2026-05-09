@@ -1033,8 +1033,8 @@ export default function App() {
               border: "1px solid rgba(0, 0, 0, 0.06)",
               borderRadius: 10,
               boxShadow: "none",
-              padding: page === "add-trade" ? "0" : "20px 24px",
-              display: page === "add-trade" ? "flex" : "block",
+              padding: (page === "add-trade" || page === "agent") ? "0" : "20px 24px",
+              display: (page === "add-trade" || page === "agent") ? "flex" : "block",
               width: "100%",
               flex: 1,
               overflowY: "auto",
@@ -1074,9 +1074,9 @@ export default function App() {
                 key={page}
                 style={{
                   width: "100%",
-                  flex: page === "add-trade" ? 1 : undefined,
+                  flex: (page === "add-trade" || page === "agent") ? 1 : undefined,
                   minWidth: 0,
-                  display: page === "add-trade" ? "flex" : undefined,
+                  display: (page === "add-trade" || page === "agent") ? "flex" : undefined,
                 }}
               >
                 {pages[page] || pages.dashboard}
