@@ -65,7 +65,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     fontFamily: "var(--font-sans)",
     cursor: isDisabled ? "not-allowed" : "pointer",
     opacity: isDisabled ? 0.55 : 1,
-    transition: "background 120ms ease, color 120ms ease, border-color 120ms ease",
+    transition:
+      "background 150ms cubic-bezier(0.23,1,0.32,1), color 150ms cubic-bezier(0.23,1,0.32,1), border-color 150ms cubic-bezier(0.23,1,0.32,1), transform 160ms cubic-bezier(0.23,1,0.32,1), box-shadow 150ms cubic-bezier(0.23,1,0.32,1)",
     width: fullWidth ? "100%" : undefined,
     whiteSpace: "nowrap",
     ...sizeStyles[size],
@@ -89,7 +90,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       {...rest}
     >
       {loading ? (
-        <Loader2 size={iconSize} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+        <Loader2 size={iconSize} strokeWidth={2} style={{ animation: "spin 0.8s linear infinite" }} />
       ) : (
         Icon && iconPosition === "left" && <Icon size={iconSize} strokeWidth={1.75} />
       )}

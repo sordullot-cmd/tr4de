@@ -199,7 +199,7 @@ export default function Sidebar(props: SidebarProps) {
                     background: active ? "var(--color-active-bg)" : "transparent",
                     color: "var(--color-text)", fontSize: 13,
                     fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-                    transition: "background 120ms ease",
+                    transition: "background 150ms cubic-bezier(0.23,1,0.32,1), color 150ms cubic-bezier(0.23,1,0.32,1), padding 200ms cubic-bezier(0.23,1,0.32,1)",
                     position: "relative",
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--color-hover-bg)"; }}

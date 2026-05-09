@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus } from "lucide-react";
+import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus, Folder, FolderPlus } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
 
@@ -14,6 +15,7 @@ const T = {
 };
 
 const STORAGE_KEY = "tr4de_notes";
+const FOLDERS_KEY = "tr4de_note_folders";
 
 const TAG_RE = /#([a-zA-Z][a-zA-Z0-9_-]*)/g;
 
@@ -75,20 +77,62 @@ function renderHighlighted(text) {
 export default function NotesPage() {
   useLang();
   const [notes, setNotes] = useCloudState(STORAGE_KEY, "notes", []);
+  const [folders, setFolders] = useCloudState(FOLDERS_KEY, "noteFolders", []);
   const { pushUndo } = useUndo();
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState("");
+  // null = tous les dossiers ; "unfiled" = notes sans dossier ; sinon = id dossier
+  const [selectedFolderId, setSelectedFolderId] = useState(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [folderDraft, setFolderDraft] = useState("");
 
   const createNote = () => {
     // Flush la note courante AVANT toute autre mise à jour, sinon le batching
     // de React peut déclencher l'update de draftRef avant l'effet sur
     // selectedId, et la note précédente serait sauvegardée vide.
     if (selectedIdRef.current) flushSave(selectedIdRef.current, draftRef.current);
-    const note = { id: Date.now() + Math.random(), content: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    // Si un vrai dossier est sélectionné, la nouvelle note y atterrit.
+    const folderId = selectedFolderId && selectedFolderId !== "unfiled" ? selectedFolderId : null;
+    const note = { id: Date.now() + Math.random(), content: "", folderId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     setNotes(prev => [note, ...prev]);
     setSelectedId(note.id);
+  };
+
+  const createFolder = () => {
+    const name = folderDraft.trim();
+    if (!name) { setCreatingFolder(false); setFolderDraft(""); return; }
+    const folder = { id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, name, createdAt: new Date().toISOString() };
+    setFolders(prev => [...prev, folder]);
+    setSelectedFolderId(folder.id);
+    setCreatingFolder(false);
+    setFolderDraft("");
+  };
+
+  const removeFolder = (id) => {
+    const snapshot = folders.find(f => f.id === id);
+    const movedNotes = notes.filter(n => n.folderId === id).map(n => n.id);
+    setFolders(prev => prev.filter(f => f.id !== id));
+    setNotes(prev => prev.map(n => n.folderId === id ? { ...n, folderId: null } : n));
+    if (selectedFolderId === id) setSelectedFolderId(null);
+    if (snapshot) {
+      pushUndo({
+        label: `Suppression du dossier "${snapshot.name}"`,
+        undo: async () => {
+          setFolders(prev => [...prev, snapshot]);
+          setNotes(prev => prev.map(n => movedNotes.includes(n.id) ? { ...n, folderId: snapshot.id } : n));
+        },
+        redo: async () => {
+          setFolders(prev => prev.filter(f => f.id !== snapshot.id));
+          setNotes(prev => prev.map(n => n.folderId === snapshot.id ? { ...n, folderId: null } : n));
+        },
+      });
+    }
+  };
+
+  const moveNoteToFolder = (noteId, folderId) => {
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, folderId: folderId || null, updatedAt: new Date().toISOString() } : n));
   };
 
   const selected = notes.find(n => n.id === selectedId);
@@ -250,12 +294,17 @@ export default function NotesPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return notes.filter(n => {
+      if (selectedFolderId === "unfiled") {
+        if (n.folderId) return false;
+      } else if (selectedFolderId) {
+        if (n.folderId !== selectedFolderId) return false;
+      }
       const tags = parseTags(n.content);
       if (activeTag && !tags.includes(activeTag)) return false;
       if (!q) return true;
       return n.content.toLowerCase().includes(q);
     });
-  }, [notes, query, activeTag]);
+  }, [notes, query, activeTag, selectedFolderId]);
 
   const firstLine = (content) => (content || "").split("\n").find(l => l.trim()) || "(Sans titre)";
 
@@ -297,6 +346,76 @@ export default function NotesPage() {
       <div className="tr4de-notes-layout" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 12, flex: 1, minHeight: 0 }}>
         {/* Left : list */}
         <div className="tr4de-notes-list" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
+          {/* Folders */}
+          <div style={{ padding: 10, borderBottom: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>Dossiers</span>
+              <button onClick={() => { setCreatingFolder(true); setFolderDraft(""); }}
+                title="Nouveau dossier"
+                style={{ width: 22, height: 22, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+              >
+                <FolderPlus size={13} strokeWidth={1.75} />
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {[
+                { id: null, name: "Toutes les notes", count: notes.length },
+                ...folders.map(f => ({ id: f.id, name: f.name, count: notes.filter(n => n.folderId === f.id).length, removable: true })),
+                { id: "unfiled", name: "Sans dossier", count: notes.filter(n => !n.folderId).length },
+              ].map(item => {
+                const active = selectedFolderId === item.id;
+                return (
+                  <div key={item.id ?? "all"}
+                    onClick={() => setSelectedFolderId(item.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "5px 8px", borderRadius: 6, cursor: "pointer",
+                      background: active ? T.accentBg : "transparent",
+                      color: active ? T.text : T.textSub,
+                      fontSize: 12, fontWeight: active ? 600 : 500,
+                    }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#FAFAFA"; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <Folder size={12} strokeWidth={1.75} style={{ flexShrink: 0, color: active ? T.text : T.textMut }} />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                    <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500 }}>{item.count}</span>
+                    {item.removable && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (confirm(`Supprimer le dossier "${item.name}" ? Les notes seront déplacées vers "Sans dossier".`)) removeFolder(item.id); }}
+                        title="Supprimer le dossier"
+                        style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
+                      >
+                        <X size={10} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {creatingFolder && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px" }}>
+                  <Folder size={12} strokeWidth={1.75} style={{ color: T.textMut, flexShrink: 0 }} />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={folderDraft}
+                    onChange={(e) => setFolderDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); createFolder(); }
+                      if (e.key === "Escape") { setCreatingFolder(false); setFolderDraft(""); }
+                    }}
+                    onBlur={() => createFolder()}
+                    placeholder="Nom du dossier"
+                    style={{ flex: 1, padding: "3px 6px", border: `1px solid ${T.border}`, borderRadius: 4, fontSize: 12, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, minWidth: 0 }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
           {/* Search */}
           <div style={{ padding: 10, borderBottom: `1px solid ${T.border}` }}>
             <div style={{ position: "relative" }}>
@@ -365,7 +484,23 @@ export default function NotesPage() {
           {selected ? (
             <>
               <div style={{ padding: "10px 14px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <div style={{ fontSize: 11, color: T.textMut }}>Mis à jour {new Date(selected.updatedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 11, color: T.textMut }}>Mis à jour {new Date(selected.updatedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                  <div style={{ width: 180 }}>
+                    <SearchableSelect
+                      small
+                      searchable={folders.length > 5}
+                      value={selected.folderId || "__none__"}
+                      onChange={(id) => moveNoteToFolder(selected.id, id === "__none__" ? null : id)}
+                      options={[
+                        { id: "__none__", label: "Sans dossier", iconNode: <Folder size={12} strokeWidth={1.75} color={T.textMut} /> },
+                        ...folders.map(f => ({ id: f.id, label: f.name, iconNode: <Folder size={12} strokeWidth={1.75} color={T.textMut} /> })),
+                      ]}
+                      placeholder="Dossier"
+                      searchPlaceholder="Rechercher..."
+                    />
+                  </div>
+                </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <input
                     ref={fileInputRef}

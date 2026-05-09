@@ -1,6 +1,6 @@
 import type { BrokerAdapter, BrokerId } from "@/lib/brokers/types";
 import { tradovate } from "@/lib/brokers/tradovate";
-import { parseMT5CSV, parseMT5HTML, parseWealthChartsCSV } from "@/lib/csvParsers";
+import { parseMT5CSV, parseMT5HTML, parseWealthChartsCSV, parseNinjaTraderCSV } from "@/lib/csvParsers";
 
 /**
  * Registry des brokers supportés. Pour ajouter un broker :
@@ -36,6 +36,19 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
         return parseMT5HTML(content);
       }
       return parseMT5CSV(content);
+    },
+  },
+  ninjatrader: {
+    meta: {
+      id: "ninjatrader",
+      name: "NinjaTrader",
+      description: "Futures (live & sim/démo). Export depuis Control Center → Trade Performance → Right-click → Export.",
+      features: { fileImport: true, apiSync: false },
+      color: "#F97316",
+      initial: "N",
+    },
+    parseFile(content: string) {
+      return parseNinjaTraderCSV(content);
     },
   },
   ibkr: {

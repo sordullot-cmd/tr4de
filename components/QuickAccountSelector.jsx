@@ -32,6 +32,9 @@ const BROKER_ICONS = {
 export default function QuickAccountSelector({
   selectedAccountName,
   onAccountNameChange,
+  multi = false,
+  selectedAccountNames = [],
+  onAccountNamesChange = () => {},
   T = {},
 }) {
   useLang();
@@ -109,8 +112,32 @@ export default function QuickAccountSelector({
 
   const selected = accounts.find(a => a.name === selectedAccountName);
 
-  const commitCreate = () => {
+  const isSelectedMulti = (name) => selectedAccountNames.includes(name);
+
+  const toggleMulti = (name) => {
+    if (!onAccountNamesChange) return;
+    const next = isSelectedMulti(name)
+      ? selectedAccountNames.filter((n) => n !== name)
+      : [...selectedAccountNames, name];
+    onAccountNamesChange(next);
+  };
+
+  const commitCreate = (e) => {
     if (!queryTrim) return;
+    const additive = !!(e && (e.ctrlKey || e.metaKey));
+    if (multi) {
+      if (additive) {
+        if (!isSelectedMulti(queryTrim) && onAccountNamesChange) {
+          onAccountNamesChange([...selectedAccountNames, queryTrim]);
+        }
+        setQuery("");
+        return;
+      }
+      if (onAccountNamesChange) onAccountNamesChange([queryTrim]);
+      setOpen(false);
+      setQuery("");
+      return;
+    }
     onAccountNameChange(queryTrim);
     setOpen(false);
     setQuery("");
@@ -128,6 +155,9 @@ export default function QuickAccountSelector({
       if (error) { console.error("rename failed:", error.message); return; }
       // Si le compte renommé est le compte sélectionné, mettre à jour le nom sélectionné
       if (selectedAccountName === acc.name) onAccountNameChange(newName);
+      if (multi && onAccountNamesChange && selectedAccountNames.includes(acc.name)) {
+        onAccountNamesChange(selectedAccountNames.map(n => n === acc.name ? newName : n));
+      }
       await loadAccounts();
     } catch (e) { console.error(e); }
     setEditingId(null);
@@ -137,34 +167,54 @@ export default function QuickAccountSelector({
 
   return (
     <div ref={containerRef} style={{ position: "relative", fontFamily: "var(--font-sans)" }}>
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "8px 12px", border: `1px solid ${open ? "#D4D4D4" : borderColor}`,
-          borderRadius: 8, background: "#FFFFFF",
-          color: selected ? "#0D0D0D" : "#8E8E8E",
-          fontSize: 13, fontWeight: 500, cursor: "pointer",
-          fontFamily: "inherit", textAlign: "left",
-          transition: "border-color 120ms ease",
-        }}
-      >
-        {selected ? (
-          <>
-            {resolveBrokerIcon(selected.broker) && (
-              <img src={resolveBrokerIcon(selected.broker)} alt="" style={{ width: 16, height: 16, objectFit: "contain", flexShrink: 0 }} />
+      {/* Trigger — identique au mode mono ; en multi, affiche le 1er compte + badge "+N" */}
+      {(() => {
+        const primaryName = multi
+          ? (selectedAccountNames[0] || "")
+          : selectedAccountName;
+        const primaryAccount = primaryName ? accounts.find(a => a.name === primaryName) : null;
+        const extraCount = multi ? Math.max(0, selectedAccountNames.length - 1) : 0;
+        const hasValue = !!primaryName;
+        return (
+          <button
+            type="button"
+            onClick={() => setOpen(v => !v)}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 12px", border: `1px solid ${open ? "#D4D4D4" : borderColor}`,
+              borderRadius: 8, background: "#FFFFFF",
+              color: hasValue ? "#0D0D0D" : "#8E8E8E",
+              fontSize: 13, fontWeight: 500, cursor: "pointer",
+              fontFamily: "inherit", textAlign: "left",
+              transition: "border-color 120ms ease",
+            }}
+          >
+            {primaryAccount ? (
+              <>
+                {resolveBrokerIcon(primaryAccount.broker) && (
+                  <img src={resolveBrokerIcon(primaryAccount.broker)} alt="" style={{ width: 16, height: 16, objectFit: "contain", flexShrink: 0 }} />
+                )}
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {primaryAccount.name}
+                </span>
+              </>
+            ) : (
+              <span style={{ flex: 1 }}>{primaryName || t("accounts.selectPlaceholder")}</span>
             )}
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {selected.name}
-            </span>
-          </>
-        ) : (
-          <span style={{ flex: 1 }}>{selectedAccountName || t("accounts.selectPlaceholder")}</span>
-        )}
-        {open ? <ChevronUp size={14} color="#8E8E8E"/> : <ChevronDown size={14} color="#8E8E8E"/>}
-      </button>
+            {extraCount > 0 && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                background: "#0D0D0D", color: "#FFFFFF", fontSize: 11, fontWeight: 600,
+                flexShrink: 0,
+              }}>
+                +{extraCount}
+              </span>
+            )}
+            {open ? <ChevronUp size={14} color="#8E8E8E"/> : <ChevronDown size={14} color="#8E8E8E"/>}
+          </button>
+        );
+      })()}
 
       {/* Dropdown */}
       {open && (
@@ -184,9 +234,19 @@ export default function QuickAccountSelector({
               <input
                 type="text" autoFocus value={query}
                 onChange={(e)=>setQuery(e.target.value)}
-                onKeyDown={(e)=>{ if (e.key === "Enter" && showCreate) { e.preventDefault(); commitCreate(); } }}
+                onKeyDown={(e)=>{ if (e.key === "Enter" && showCreate) { e.preventDefault(); commitCreate(e); } }}
                 placeholder={t("accounts.searchPlaceholder")}
-                style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13, padding: "6px 0", color: "#0D0D0D", fontFamily: "inherit" }}
+                spellCheck={false}
+                autoComplete="off"
+                style={{
+                  flex: 1, border: "none", background: "transparent",
+                  outline: "none", boxShadow: "none",
+                  fontSize: 13, padding: "6px 0",
+                  color: "#0D0D0D", fontFamily: "inherit",
+                  WebkitAppearance: "none", appearance: "none",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+                onFocus={(e)=>{ e.currentTarget.style.outline = "none"; e.currentTarget.style.boxShadow = "none"; }}
               />
             </div>
           </div>
@@ -219,7 +279,7 @@ export default function QuickAccountSelector({
             )}
 
             {filtered.map((acc) => {
-              const isSelected = acc.name === selectedAccountName;
+              const isSelected = multi ? isSelectedMulti(acc.name) : acc.name === selectedAccountName;
               const isEditing = editingId === acc.id;
               const icon = resolveBrokerIcon(acc.broker);
               return (
@@ -236,8 +296,20 @@ export default function QuickAccountSelector({
                 >
                   <button
                     type="button"
-                    onClick={()=>{
+                    title={multi ? "Ctrl/Cmd+clic pour sélectionner plusieurs comptes" : undefined}
+                    onClick={(e)=>{
                       if (isEditing) return;
+                      if (multi && (e.ctrlKey || e.metaKey)) {
+                        toggleMulti(acc.name);
+                        return;
+                      }
+                      if (multi) {
+                        // clic simple en mode multi = sélection unique (remplace)
+                        if (onAccountNamesChange) onAccountNamesChange([acc.name]);
+                        setOpen(false);
+                        setQuery("");
+                        return;
+                      }
                       onAccountNameChange(acc.name);
                       setOpen(false);
                       setQuery("");

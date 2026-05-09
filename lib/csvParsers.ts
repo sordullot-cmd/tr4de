@@ -669,6 +669,90 @@ export const parseMT5CSV = (csvText: string): ParsedTrade[] => {
 };
 
 /**
+ * Parse NinjaTrader Trade Performance export CSV.
+ * Format issu de Control Center → Trade Performance → Right-click → Export.
+ * Colonnes typiques : Account, Strategy, Market pos., Quantity, Entry price,
+ * Exit price, Entry time, Exit time, Profit, Commission, Instrument.
+ *
+ * Compatible avec les comptes Sim101 (démo) et live — même schéma de colonnes.
+ */
+export const parseNinjaTraderCSV = (csvText: string): ParsedTrade[] => {
+  const lines = csvText.trim().split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) return [];
+
+  const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[."']/g, '').trim());
+  const idx = (names: string[]): number => {
+    for (const n of names) {
+      const i = headers.findIndex(h => h === n || h.includes(n));
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+
+  const instrumentIdx = idx(['instrument', 'symbol']);
+  const posIdx        = idx(['market pos', 'pos', 'side']);
+  const qtyIdx        = idx(['quantity', 'qty']);
+  const entryIdx      = idx(['entry price']);
+  const exitIdx       = idx(['exit price']);
+  const entryTimeIdx  = idx(['entry time']);
+  const exitTimeIdx   = idx(['exit time']);
+  const profitIdx     = idx(['profit', 'p/l', 'pnl']);
+  const commissionIdx = idx(['commission']);
+
+  if (instrumentIdx === -1 || entryIdx === -1 || exitIdx === -1) return [];
+
+  const cleanNum = (s: string): number => {
+    if (!s) return 0;
+    const n = parseFloat(String(s).replace(/[$,()]/g, '').replace(/\s/g, ''));
+    return isNaN(n) ? 0 : (String(s).includes('(') ? -Math.abs(n) : n);
+  };
+
+  const trades: ParsedTrade[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const v = parseCSVLine(lines[i]);
+    if (v.length < 3) continue;
+
+    const instrumentRaw = (v[instrumentIdx] || '').trim();
+    if (!instrumentRaw) continue;
+    // Symbole : "ES 12-25" → "ES", "MNQ 12-25" → "MNQ"
+    const symbol = instrumentRaw.split(/[\s.]/)[0].toUpperCase();
+
+    const posRaw = (posIdx !== -1 ? v[posIdx] : '').trim().toLowerCase();
+    const direction: Direction = posRaw.startsWith('s') ? 'Short' : 'Long';
+
+    const quantity = qtyIdx !== -1 ? Math.abs(cleanNum(v[qtyIdx])) : 1;
+    const entry = cleanNum(v[entryIdx]);
+    const exit = cleanNum(v[exitIdx]);
+    if (!entry || !exit) continue;
+
+    const entryDateStr = entryTimeIdx !== -1 ? v[entryTimeIdx] : '';
+    const exitDateStr  = exitTimeIdx !== -1 ? v[exitTimeIdx] : '';
+    const date = extractDateISO(entryDateStr || exitDateStr);
+    const entryTime = extractTime(entryDateStr);
+    const exitTime  = extractTime(exitDateStr);
+
+    let pnl = profitIdx !== -1 ? cleanNum(v[profitIdx]) : 0;
+    if (commissionIdx !== -1) pnl -= Math.abs(cleanNum(v[commissionIdx]));
+
+    trades.push({
+      id: `nt_${date}_${symbol}_${entryTime}_${i}`,
+      date,
+      symbol,
+      direction,
+      entry,
+      exit,
+      pnl,
+      quantity,
+      entryTime,
+      exitTime,
+      broker: 'ninjatrader',
+      contract_type: detectContractType(symbol),
+    });
+  }
+  return trades;
+};
+
+/**
  * Parse generic CSV format
  * Expected columns: Date, Symbol, Direction (Long/Short/Buy/Sell), Entry, Exit, PnL
  */

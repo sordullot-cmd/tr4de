@@ -458,11 +458,19 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
 
 /* Custom easing curves : plus punch que les courbes CSS standard.
    ease-out pour entrées/feedback, ease-in-out pour mouvements,
-   drawer pour les éléments coulissants (iOS-like). */
+   drawer pour les éléments coulissants (iOS-like).
+   Durées : tokens uniformes pour l'ensemble du site. */
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-instant: 100ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --dur-modal: 220ms;
 }
 
 @keyframes fadeUp {
@@ -514,7 +522,197 @@ button:not([data-no-press]):not(:disabled):active {
 .anim-stagger > *:nth-child(6)  { animation-delay: 200ms; }
 .anim-stagger > *:nth-child(7)  { animation-delay: 240ms; }
 .anim-stagger > *:nth-child(8)  { animation-delay: 280ms; }
-.anim-stagger > *:nth-child(n+9) { animation-delay: 320ms; }
+.anim-stagger > *:nth-child(9)  { animation-delay: 320ms; }
+.anim-stagger > *:nth-child(10) { animation-delay: 360ms; }
+.anim-stagger > *:nth-child(11) { animation-delay: 400ms; }
+.anim-stagger > *:nth-child(12) { animation-delay: 440ms; }
+.anim-stagger > *:nth-child(n+13) { animation-delay: 480ms; }
+
+/* === Pop : popovers / dropdowns / menus contextuels ===
+   scale 0.96 + opacity → arrive depuis le déclencheur (origine ajustée par le caller). */
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.anim-pop { animation: pop var(--dur-fast) var(--ease-out) both; }
+
+/* === Modal entry : centré, scale subtil + fade === */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.anim-modal { animation: modalIn var(--dur-modal) var(--ease-out) both; }
+
+/* Backdrop modal : fade léger */
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.anim-backdrop { animation: backdropIn 180ms ease both; }
+
+/* === Drawer : translateY depuis le bas (mobile) ou translateX (latéral) === */
+@keyframes drawerUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.anim-drawer-up { animation: drawerUp 320ms var(--ease-drawer) both; }
+
+@keyframes drawerLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.anim-drawer-left { animation: drawerLeft 280ms var(--ease-drawer) both; }
+
+/* === Slide depuis la droite (toasts, side panels) === */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.anim-slide-right { animation: slideInRight var(--dur-base) var(--ease-out) both; }
+
+/* === Skeleton shimmer === */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.anim-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-subtle, #F5F5F5) 0%,
+    var(--color-hover-bg, #EEEEEE) 50%,
+    var(--color-bg-subtle, #F5F5F5) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* === Pulse subtil pour indicateurs live === */
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.anim-pulse { animation: pulseSoft 2s var(--ease-in-out) infinite; }
+
+/* === Chevron rotate : pour disclosure / accordion / select ouvert ===
+   Le caller met data-open="true" sur l'icône (ou un parent). */
+[data-chevron] {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+[data-chevron][data-open="true"],
+[data-open="true"] [data-chevron] {
+  transform: rotate(180deg);
+}
+
+/* === Hover lift utility (à appliquer librement) === */
+.hover-lift {
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover { transform: translateY(-1px); }
+}
+
+/* === Inputs / selects / textarea : transitions homogènes sur focus / hover ===
+   La majorité du codebase utilise des inline-styles avec border + background.
+   En appliquant la transition sur les éléments natifs, le passage focus/blur
+   et hover/leave devient fluide partout sans toucher chaque composant. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+textarea,
+select {
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+/* Focus ring custom : remplace l'outline brutal par un ring subtil
+   uniquement sur les contrôles formulaire (les autres gardent :focus-visible) */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 13, 13, 0.08);
+  border-color: var(--color-text, #0D0D0D) !important;
+}
+:root[data-theme="dark"] input:focus-visible,
+:root[data-theme="dark"] textarea:focus-visible,
+:root[data-theme="dark"] select:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  border-color: #C8C8C8 !important;
+}
+
+/* === Liens (<a>) : transition couleur fluide === */
+a {
+  transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+
+/* === Icônes lucide à l'intérieur d'un bouton : suivent le scale press ===
+   (rien à faire, transform sur button propage). En revanche on assure la
+   transition de couleur pour les changements d'état. */
+button svg, a svg {
+  transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+/* === Checkbox / radio : feedback de press subtil === */
+input[type="checkbox"], input[type="radio"] {
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+input[type="checkbox"]:active, input[type="radio"]:active {
+  transform: scale(0.92);
+}
+
+/* === Liens / boutons icône en <a> ou span[role="button"] : press feedback === */
+a:active:not([data-no-press]),
+[role="button"]:active:not([data-no-press]) {
+  transform: scale(0.97);
+}
+a, [role="button"] {
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+
+/* === Tabs / pills actifs (data-active) : transition de fond === */
+[data-tab], [data-pill] {
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+/* === Smooth content height transitions (accordion contents) ===
+   Optionnel : le caller ajoute `data-collapsible` et bascule la hauteur. */
+[data-collapsible] {
+  overflow: hidden;
+  transition: max-height var(--dur-slow) var(--ease-in-out), opacity var(--dur-base) var(--ease-out);
+}
+
+/* === Toast / notification : enter from top-right === */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.anim-toast { animation: toastIn var(--dur-base) var(--ease-out) both; transform-origin: top right; }
+
+/* === Image / chart load fade === */
+img, canvas {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* === Spinner uniforme : animation `spin` réutilisée === */
+.anim-spin { animation: spin 1s linear infinite; }
+
+/* === Reduced motion : étend les exclusions aux nouvelles animations === */
+@media (prefers-reduced-motion: reduce) {
+  .anim-pop, .anim-modal, .anim-drawer-up, .anim-drawer-left,
+  .anim-slide-right, .anim-toast {
+    animation: fadeIn 180ms ease both !important;
+  }
+  .anim-shimmer, .anim-pulse { animation: none !important; }
+  [data-chevron] { transition: none !important; }
+  a:active, [role="button"]:active { transform: none !important; }
+  input[type="checkbox"]:active, input[type="radio"]:active { transform: none !important; }
+}
 
 /* Reduced motion : on garde la fade (compréhension) mais on retire les
    mouvements et scales — évite les motion sickness. */

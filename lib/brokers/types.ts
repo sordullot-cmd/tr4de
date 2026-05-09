@@ -8,7 +8,7 @@
 
 import type { ParsedTrade } from "@/lib/types/trade";
 
-export type BrokerId = "tradovate" | "rithmic" | "mt5" | "ibkr" | "wealthcharts";
+export type BrokerId = "tradovate" | "rithmic" | "mt5" | "ibkr" | "wealthcharts" | "ninjatrader";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 

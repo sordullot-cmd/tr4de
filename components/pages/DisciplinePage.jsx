@@ -9,7 +9,7 @@ import {
   Pencil,
   Plus,
   GripVertical,
-  Sun, Compass, Newspaper, ListChecks, NotebookPen, ShieldCheck,
+  Sun, Compass, Newspaper, ListChecks, NotebookPen, ShieldCheck, Flame,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -23,6 +23,9 @@ import { getLocalDateString } from "@/lib/dateUtils";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import RiskCalculator from "@/components/RiskCalculator";
+import ComplianceModule, { ComplianceKpiRow, ComplianceInsights } from "@/components/discipline/ComplianceModule";
+import { useComplianceRules } from "@/lib/hooks/useComplianceData";
+import { describeRule, isRuleLive } from "@/lib/compliance";
 
 function reorder(arr, from, to) {
   const next = [...arr];
@@ -385,6 +388,71 @@ function EditableCheckList({ title, iconBg, icon, items, checkedRuleIds, onToggl
   );
 }
 
+function ComplianceRulesCard() {
+  const { rules, loaded } = useComplianceRules();
+  const liveRules = (rules || []).filter(r => isRuleLive(r));
+  const total = (rules || []).length;
+  const activeCount = liveRules.length;
+
+  return (
+    <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,overflow:"hidden"}}>
+      <div style={{padding:"14px 16px 12px",borderBottom:`1px solid #E5E5E5`,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:24,height:24,borderRadius:6,background:"#EFEFEF",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <ShieldCheck size={13} strokeWidth={1.75} color={T.green}/>
+        </div>
+        <div style={{fontSize:13,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.1,flex:1}}>Règles automatiques</div>
+        <div style={{fontSize:11,color:"#8E8E8E",fontVariantNumeric:"tabular-nums"}}>{activeCount}/{total}</div>
+      </div>
+
+      <div style={{padding:"12px 14px"}}>
+        {!loaded ? null : total === 0 ? (
+          <div style={{padding:"24px 14px",fontSize:13,color:T.textMut,textAlign:"center",lineHeight:1.6}}>
+            Aucune règle automatique.<br/>
+            <span style={{fontSize:12}}>Définis tes règles dans le moteur de compliance plus bas.</span>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column"}}>
+            {(rules || []).map((rule, i) => {
+              const live = isRuleLive(rule);
+              return (
+                <div key={rule.id} style={{
+                  display:"grid",
+                  gridTemplateColumns:"auto 1fr",
+                  gap:12, alignItems:"center",
+                  padding:"12px 12px",
+                  borderTop: i === 0 ? "none" : `1px solid ${T.border}`,
+                  opacity: rule.active ? 1 : 0.55,
+                }}>
+                  <ShieldCheck size={14} strokeWidth={1.75} color={live ? T.green : T.textMut}/>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                      title={describeRule(rule)}>
+                      {describeRule(rule)}
+                    </div>
+                    <div style={{fontSize:11,color:T.textMut,marginTop:2,display:"flex",alignItems:"center",gap:8}}>
+                      {live ? (
+                        <span style={{display:"inline-flex",alignItems:"center",gap:3,color:T.green}}>
+                          <span style={{width:6,height:6,borderRadius:"50%",background:T.green,display:"inline-block"}}/>
+                          active
+                        </span>
+                      ) : (
+                        <span style={{display:"inline-flex",alignItems:"center",gap:3,color:T.textMut}}>
+                          <span style={{width:6,height:6,borderRadius:"50%",background:"#D1D5DB",display:"inline-block"}}/>
+                          inactive
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DisciplinePage({ trades = [] }) {
   useLang();
   // ✅ Utiliser les hooks Supabase
@@ -726,180 +794,55 @@ export default function DisciplinePage({ trades = [] }) {
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("disc.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
-        {/* TOP SECTION - 4 COLUMNS */}
-        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:12}}>
-          {/* DATE */}
-          <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,display:"flex",flexDirection:"column",justifyContent:"space-between",height:"100%"}}>
-            <div style={{fontSize:12,color:T.textMut,fontWeight:600}}>{t("disc.todayProgress")}</div>
-            <div style={{display:"flex",justifyContent:"flex-start",alignItems:"flex-end",gap:12}}>
-              <div style={{display:"flex",gap:4,flex:1}}>
-                <div style={{fontSize:32,fontWeight:700,color:T.text}}>{currentMonth}</div>
-                <div style={{fontSize:28,fontWeight:700,color:T.text}}>{currentDay}</div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flex:1,justifyContent:"flex-end"}}>
-                <svg width="70" height="70" style={{transform:"rotate(-90deg)"}}>
-                  <circle cx="35" cy="35" r="30" fill="none" stroke={T.bg} strokeWidth="4"/>
-                  <circle
-                    cx="35" cy="35" r="30"
-                    fill="none"
-                    stroke={T.green}
-                    strokeWidth="4"
-                    strokeDasharray={`${30 * 2 * Math.PI}`}
-                    strokeDashoffset={`${30 * 2 * Math.PI * (1 - completeProgress / 100)}`}
-                    strokeLinecap="round"
-                    style={{transition:"stroke-dashoffset 0.3s"}}
-                  />
-                  <text
-                    x="35" y="40"
-                    textAnchor="middle"
-                    fontSize="18"
-                    fontWeight="700"
-                    fill={T.text}
-                    style={{transform:"rotate(90deg)",transformOrigin:"35px 35px"}}
-                  >
-                    {Math.round(completeProgress)}%
-                  </text>
-                </svg>
-                <div style={{fontSize:10,fontWeight:500,color:T.textMut}}>{t("disc.rulesCounter").replace("{c}", String(completedCount)).replace("{t}", String(allRules.length))}</div>
-              </div>
-            </div>
-          </div>
 
-          {/* BIAS JOURNALIER */}
-          <EditableTextList
-            title={t("disc.biasDaily")}
-            iconBg="#EFEFEF"
-            accent="#3B82F6"
-            icon={<LucideTrendingUp size={13} strokeWidth={1.75} color="#3B82F6"/>}
-            items={biasItems}
-            onSave={setBiasItems}
-            renderPrefix={(i)=>(
-              <div style={{minWidth:18,fontSize:11,color:T.textMut,fontVariantNumeric:"tabular-nums",marginTop:1}}>{i+1}.</div>
-            )}
-          />
+        {/* UNIFIED CARD — KPIs (4 cells) + Discipline quotidienne (heatmap, gauche) + Insights (droite) */}
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
+          {/* Row 1 : 4 KPIs */}
+          <ComplianceKpiRow trades={trades} flat />
 
-          {/* REGLES A SUIVRE */}
-          <EditableCheckList
-            title={t("disc.rulesToFollow")}
-            iconBg="#EFEFEF"
-            accent={T.green}
-            icon={<LucideCheck size={13} strokeWidth={2} color={T.green}/>}
-            items={personalRules}
-            checkedRuleIds={checkedRuleIds}
-            onToggleCheck={(id)=>toggleRule(id, allRules)}
-            onSave={setPersonalRules}
-          />
-
-          {/* ERREURS A EVITER */}
-          <EditableTextList
-            title={t("disc.errorsToAvoid")}
-            iconBg="#EFEFEF"
-            accent={T.red}
-            icon={<LucideX size={13} strokeWidth={2} color={T.red}/>}
-            items={errorItems}
-            onSave={setErrorItems}
-            renderPrefix={()=>(
-              <div style={{minWidth:18,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <LucideX size={11} strokeWidth={2.25} color={T.red}/>
-              </div>
-            )}
-          />
-        </div>
-
-        {/* MIDDLE SECTION - 2 COLUMNS */}
-        <div style={{display:"grid",gridTemplateColumns:"0.8fr 2.2fr",gap:12}}>
-          {/* DAILY CHECKLIST */}
-          <div style={{background:T.white,borderRadius:12}}>
-            <div style={{padding:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("disc.checklist")}</div>
-                <div style={{fontSize:11,color:T.textMut}}>{currentDay} {currentMonth.toLowerCase()}.</div>
-              </div>
-              <div style={{fontSize:11,color:T.textMut,background:T.bg,padding:"4px 8px",borderRadius:4}}>{dailyRules.filter(r=>r.status).length}/{dailyRules.length}</div>
-            </div>
-            <div style={{maxHeight:"none",overflowY:"visible",paddingTop:8}}>
-              {dailyRules.map(rule => {
-                return (
-                  <div
-                    key={rule.id}
-                    onClick={() => toggleRule(rule.id, allRules)}
-                    style={{
-                      display:"flex",
-                      alignItems:"center",
-                      gap:12,
-                      padding:"12px 16px",
-                      borderRadius:8,
-                      cursor:"pointer",
-                      transition:"background .12s ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "#FAFAFA"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  >
-                    {/* Checkbox — petit, contour épais, à gauche */}
-                    <div style={{
-                      width:18, height:18, borderRadius:5,
-                      border: rule.status ? "none" : `2px solid ${T.border2}`,
-                      background: rule.status ? T.green : T.white,
-                      display:"inline-flex", alignItems:"center", justifyContent:"center",
-                      flexShrink:0, transition:"all .15s ease",
-                    }}>
-                      {rule.status && <LucideCheck size={11} strokeWidth={3} color="#fff"/>}
-                    </div>
-
-                    {/* Label */}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,fontWeight:500,color:rule.status?T.textMut:T.text,textDecoration:rule.status?"line-through":"none"}}>
-                        {rule.label}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
+          {/* Row 2 : Heatmap (gauche) + Insights (droite), avec border-top et separateur vertical */}
+          <div style={{display:"grid",gridTemplateColumns:"2.2fr 1fr",borderTop:`1px solid ${T.border}`,alignItems:"stretch"}}>
           {/* HEATMAP CALENDAR - DISCIPLINE TRACKER */}
-          <div key={heatmapVersion} style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:28,minWidth:0,overflow:"hidden"}}>
-            <div style={{marginBottom:24}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{t("disc.progressTracker")}</div>
-              <div style={{fontSize:12,fontWeight:600,color:T.accent,marginTop:4}}>{dailyRules.filter(r => r.status).length}/{dailyRules.length}</div>
-              
-              {(() => {
-                // Calculer la streak de jours consécutifs (Supabase d'abord, localStorage en fallback)
-                let streak = 0;
-                const cursor = new Date();
-                while (true) {
-                  const dateStr = getLocalDateString(cursor);
-                  let checked = null;
-                  if (disciplineData && disciplineData[dateStr]) {
-                    checked = disciplineData[dateStr];
-                  } else {
-                    const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
-                    if (stored) {
-                      try { checked = JSON.parse(stored); } catch {}
-                    }
-                  }
-                  if (checked) {
-                    const hasAnyRule = Object.values(checked).some(v => v === true);
-                    if (hasAnyRule) {
-                      streak++;
-                      cursor.setDate(cursor.getDate() - 1);
-                    } else {
-                      break;
-                    }
-                  } else {
-                    break;
+          <div key={heatmapVersion} style={{minWidth:0,overflow:"hidden",borderRight:`1px solid ${T.border}`}}>
+            {(() => {
+              // Calculer la streak de jours consécutifs (Supabase d'abord, localStorage en fallback)
+              let streak = 0;
+              const cursor = new Date();
+              while (true) {
+                const dateStr = getLocalDateString(cursor);
+                let checked = null;
+                if (disciplineData && disciplineData[dateStr]) {
+                  checked = disciplineData[dateStr];
+                } else {
+                  const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
+                  if (stored) {
+                    try { checked = JSON.parse(stored); } catch {}
                   }
                 }
-                
-                return (
-                  <div style={{fontSize:12,color:T.textSub,marginTop:6}}>
-                    {streak >= 2 ? t("disc.streakDays").replace("{n}", String(streak)) : t("disc.noStreak")}
+                if (checked) {
+                  const hasAnyRule = Object.values(checked).some(v => v === true);
+                  if (hasAnyRule) {
+                    streak++;
+                    cursor.setDate(cursor.getDate() - 1);
+                  } else { break; }
+                } else { break; }
+              }
+              return (
+                <div style={{padding:"16px 20px 0",display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.text}}>Discipline quotidienne</div>
+                    <div style={{fontSize:11,color:"#8E8E8E",marginTop:2}}>
+                      {streak >= 2 ? t("disc.streakDays").replace("{n}", String(streak)) : t("disc.noStreak")}
+                    </div>
                   </div>
-                );
-              })()}
-            </div>
-            
+                  <div style={{fontSize:11,color:"#8E8E8E",fontVariantNumeric:"tabular-nums",marginTop:2}}>
+                    {dailyRules.filter(r => r.status).length}/{dailyRules.length}
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{padding:"18px 20px"}}>
+
             <div ref={heatmapScrollRef} style={{overflowX:"auto",paddingBottom:12,cursor:"grab"}}>
               <div style={{minWidth:"max-content"}}>
               {(() => {
@@ -933,16 +876,23 @@ export default function DisciplinePage({ trades = [] }) {
                  * - 81-100%: Vert Vif
                  */
                 const getColorByDiscipline = (percentage) => {
-                  if (percentage === 0) return null; // Pas de couleur = gris clair
-                  if (percentage <= 20) return '#DCFCE7'; // Vert très pâle (1-20%)
-                  if (percentage <= 40) return '#86EFAC'; // Vert pâle (21-40%)
-                  if (percentage <= 60) return '#4ADE80'; // Vert moyen (41-60%)
-                  if (percentage <= 80) return '#22C55E'; // Vert clair (61-80%)
-                  return '#16A34A';                       // Vert vif (81-100%)
+                  if (percentage === 0) return null;        // Pas de couleur = gris clair
+                  if (percentage < 100) {
+                    if (percentage <= 25) return '#DCFCE7'; // Vert très pâle
+                    if (percentage <= 50) return '#86EFAC'; // Vert pâle
+                    if (percentage <= 75) return '#4ADE80'; // Vert moyen
+                    return '#22C55E';                       // Vert clair (proche du 100%)
+                  }
+                  return '#16A34A';                         // Vert vif uniquement si 100%
                 };
                 
-                // Function to get daily completion data: prioritize Supabase (disciplineData), fallback to localStorage
+                // Le progress tracker / heatmap est lié aux "Règles à suivre" (personalRules).
+                // Total = nombre de règles perso ; respectées = celles cochées ce jour-là.
                 const getDailyData = (dateStr) => {
+                  const totalRules = personalRules.length;
+                  if (totalRules === 0) {
+                    return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0 };
+                  }
                   try {
                     let checked = null;
                     if (disciplineData && disciplineData[dateStr]) {
@@ -952,21 +902,12 @@ export default function DisciplinePage({ trades = [] }) {
                       if (stored) checked = JSON.parse(stored);
                     }
                     if (checked) {
-                      // On ne compte QUE les règles de la liste quotidienne
-                      // (les règles perso "Règles à suivre" sont exclues).
-                      const dailyIds = new Set([
-                        "premarket","biais","news","followall","journal",
-                        ...customRules.map(r => r.rule_id),
-                      ]);
-                      const checkedCount = Object.entries(checked)
-                        .filter(([id, v]) => v === true && dailyIds.has(id))
-                        .length;
-                      const totalRules = 5 + customRules.length;
-                      const percentage = Math.round((checkedCount / Math.max(totalRules, 1)) * 100);
+                      const checkedCount = personalRules.filter(r => checked[r.id] === true).length;
+                      const percentage = Math.round((checkedCount / totalRules) * 100);
                       return { percentage, hadTrading: true, rulesRespected: checkedCount, totalRules };
                     }
                   } catch (e) {}
-                  return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0 };
+                  return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules };
                 };
                 
                 // Build all weeks across all months
@@ -1162,95 +1103,16 @@ export default function DisciplinePage({ trades = [] }) {
               <span>{t("disc.legendMore")}</span>
             </div>
           </div>
+          </div>
+
+          {/* INSIGHTS — colonne droite */}
+          <ComplianceInsights trades={trades} flat />
+          </div>
         </div>
 
-        {/* RULES TABLE */}
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:13,fontWeight:600,color:T.text,letterSpacing:-0.1}}>{t("disc.rulesTitle")}</div>
-            <button
-              type="button"
-              onClick={() => setShowRulesModal(true)}
-              aria-label={t("disc.editRules")}
-              title={t("disc.editRules")}
-              style={{
-                width:28, height:28,
-                display:"inline-flex", alignItems:"center", justifyContent:"center",
-                background:"transparent",
-                border:"none",
-                color:T.textSub,
-                cursor:"pointer",
-                fontFamily:"inherit",
-                transition:"color .12s ease",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = T.text; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = T.textSub; }}
-            >
-              <Pencil size={14} strokeWidth={1.75}/>
-            </button>
-          </div>
-          <div className="tr4de-table-wrap" style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:1000}}>
-              <thead>
-                <tr style={{background:T.bg,borderBottom:`1px solid ${T.border}`}}>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colRule")}</th>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colType")}</th>
-                  <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colCondition")}</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colStreak")}</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colAvgPerf")}</th>
-                  <th style={{padding:"10px 12px",textAlign:"center",fontSize:10,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("disc.colFollowRate")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allRules.map((rule, i) => {
-                  const ruleData = {
-                    "journal": { type: "Auto", condition: disciplineRules.journalTime, ruleKey: "journal" },
-                    "strategy": { type: "Auto", condition: "—", ruleKey: "strategy" },
-                    "stoploss": { type: "Auto", condition: "—", ruleKey: "stoploss" },
-                    "maxLossPerTrade": { type: "Auto", condition: `${getCurrencySymbol()}${disciplineRules.maxLossPerTrade}`, ruleKey: "maxLossPerTrade" },
-                    "maxLossPerDay": { type: "Auto", condition: `${getCurrencySymbol()}${disciplineRules.maxLossPerDay}`, ruleKey: "maxLossPerDay" },
-                  };
-                  
-                  const data = ruleData[rule.id];
-                  const days = data ? activeDays[data.ruleKey] : [true,true,true,true,true,true,false];
-                  
-                  return (
-                    <tr key={rule.id} onClick={() => setShowRulesModal(true)} style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?T.white:T.bg,cursor:"pointer",transition:"background 0.2s"}} onMouseEnter={(e) => e.currentTarget.style.background = T.accentBg} onMouseLeave={(e) => e.currentTarget.style.background = (i%2===0?T.white:T.bg)}>
-                      <td style={{padding:"10px 12px",fontSize:12,color:rule.status?T.green:T.text,fontWeight:500}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{width:8,height:8,borderRadius:"50%",background:rule.status?T.green:"#D1D5DB"}}/>
-                          {rule.label}
-                        </div>
-                      </td>
-                      <td style={{padding:"10px 12px",fontSize:11}}>
-                        {(() => {
-                          const displayType = rule.status ? "Auto" : (data?.type || "Manuel");
-                          return (
-                            <span style={{background:displayType==="Auto"?T.accentBg:T.bg,color:displayType==="Auto"?T.accent:T.text,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:600}}>
-                              {displayType}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td style={{padding:"10px 12px",fontSize:12,color:T.textMut}}>{data?.condition||"—"}</td>
-                      <td style={{padding:"10px 12px",fontSize:12,textAlign:"center",fontWeight:600,color:T.text}}>0</td>
-                      <td style={{padding:"10px 12px",fontSize:12,textAlign:"center",color:T.textMut}}>—</td>
-                      <td style={{padding:"10px 12px",fontSize:12,textAlign:"center",fontWeight:600,color:rule.status?T.green:T.red}}>
-                        {rule.status ? "100%" : "0%"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div style={{padding:"10px 14px",borderTop:`1px solid ${T.border}`,fontSize:11,color:T.textSub}}>{t("disc.rulesFooter").replace("{n}", String(allRules.length))}</div>
-        </div>
-      </div>
+        {/* COMPLIANCE ENGINE — règles structurées, KPIs, heatmap, log, insights, webhooks */}
+        <ComplianceModule trades={trades} />
 
-      {/* RISK CALCULATOR — sizing pré-trade */}
-      <div style={{ marginTop: 16 }}>
-        <RiskCalculator />
       </div>
 
       {/* MODAL MODIFIER REGLES */}

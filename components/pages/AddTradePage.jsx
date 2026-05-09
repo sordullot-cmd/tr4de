@@ -15,7 +15,8 @@ import QuickAccountSelector from "@/components/QuickAccountSelector";
 
 export default function AddTradePage({ trades, setPage, setAccounts, setSelectedAccountIds, accountType, setAccountType, selectedEvalAccount, setSelectedEvalAccount, accounts = [], selectedAccountIds = [], addTrade, addStrategy, strategies = [], user }) {
   useLang();
-  const [accountName, setAccountName] = useState("");
+  const [accountNames, setAccountNames] = useState([]);
+  const accountName = accountNames.length === 1 ? accountNames[0] : "";
   const [selectedBroker, setSelectedBroker] = useState("tradovate");
 
   // Favoris brokers : localStorage = cache rapide, Supabase = source de vérité.
@@ -620,7 +621,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   };
 
   const handleImport = async () => {
-    if (!accountName.trim()) {
+    if (accountNames.length === 0) {
       setError(t("addTrade.err.noAccountName"));
       return;
     }
@@ -628,9 +629,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setError(t("addTrade.err.noFile"));
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const supabase = createClient();
       const userId = user?.id;
@@ -640,113 +641,124 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         setLoading(false);
         return;
       }
-      
+
       // Nom officiel du broker pour enregistrement DB
       const brokerObj = brokers.find(b => b.id === selectedBroker);
       const brokerFormatted = brokerObj?.name || "Tradovate";
-      
-      // Créer ou obtenir le compte
-      let accountId;
-      
-      // Vérifier si le compte existe déjà
-      const { data: existingAccount, error: checkError } = await supabase
-        .from("trading_accounts")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("name", accountName.trim())
-        .single();
-      
-      if (existingAccount) {
-        // Le compte existe, utiliser son ID
-        accountId = existingAccount.id;
-      } else {
-        // Créer un nouveau compte
+
+      // Résoudre / créer chaque compte sélectionné
+      const targetAccountIds = [];
+      for (const rawName of accountNames) {
+        const name = String(rawName).trim();
+        if (!name) continue;
+
+        const { data: existingAccount } = await supabase
+          .from("trading_accounts")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("name", name)
+          .maybeSingle();
+
+        if (existingAccount?.id) {
+          targetAccountIds.push(existingAccount.id);
+          continue;
+        }
+
         const { data: newAccount, error: createError } = await supabase
           .from("trading_accounts")
           .insert([{
             user_id: userId,
-            name: accountName.trim(),
+            name,
             broker: brokerFormatted,
             account_type: accountType,
             eval_account_size: selectedEvalAccount || null,
           }])
           .select();
-        
+
         if (createError) {
           console.error("Error creating account:", createError);
           setError(t("addTrade.err.createAccount").replace("{msg}", createError.message));
           setLoading(false);
           return;
         }
-
         if (!newAccount || newAccount.length === 0) {
           setError(t("addTrade.err.accountNotCreated"));
           setLoading(false);
           return;
         }
-        
-        accountId = newAccount[0].id;
+        targetAccountIds.push(newAccount[0].id);
       }
-      
-      // Construit la liste à insérer
-      const allTrades = importedTrades.map(t => ({
-        user_id: userId,
-        account_id: accountId,
-        date: t.date,
-        symbol: t.symbol,
-        direction: t.direction,
-        entry: t.entry,
-        exit: t.exit,
-        pnl: t.pnl,
-        entry_time: t.entryTime || t.entry_time || null,
-        exit_time: t.exitTime || t.exit_time || null,
-      }));
 
-      if (allTrades.length === 0) {
-        setError(t("addTrade.err.minPnL"));
+      if (targetAccountIds.length === 0) {
+        setError(t("addTrade.err.noAccountName"));
         setLoading(false);
         return;
       }
 
-      // Filtre anti-doublons : on récupère les trades existants pour ce compte
-      // et on retire ceux qui matchent date+symbol+entry+exit (au centime près).
-      const { data: existingTrades } = await supabase
-        .from("apex_trades")
-        .select("date, symbol, entry, exit, entry_time")
-        .eq("user_id", userId)
-        .eq("account_id", accountId);
+      // Premier compte = "principal" pour la suite (rechargement, navigation)
+      const accountId = targetAccountIds[0];
 
       const norm = (v) => (v == null ? "" : String(v));
       const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
       const sigOf = (t) => `${norm(t.date).slice(0, 10)}|${norm(t.symbol).toUpperCase()}|${round2(t.entry)}|${round2(t.exit)}|${norm(t.entry_time)}`;
-      const existingSet = new Set((existingTrades || []).map(sigOf));
 
-      const tradesToInsert = [];
-      const seenInBatch = new Set();
+      let totalInserted = 0;
       let duplicateCount = 0;
-      for (const t of allTrades) {
-        const sig = sigOf(t);
-        if (existingSet.has(sig) || seenInBatch.has(sig)) {
-          duplicateCount += 1;
-          continue;
+
+      // Insère les trades pour chaque compte cible
+      for (const targetId of targetAccountIds) {
+        const allTrades = importedTrades.map(t => ({
+          user_id: userId,
+          account_id: targetId,
+          date: t.date,
+          symbol: t.symbol,
+          direction: t.direction,
+          entry: t.entry,
+          exit: t.exit,
+          pnl: t.pnl,
+          entry_time: t.entryTime || t.entry_time || null,
+          exit_time: t.exitTime || t.exit_time || null,
+        }));
+
+        if (allTrades.length === 0) continue;
+
+        // Anti-doublons : par compte
+        const { data: existingTrades } = await supabase
+          .from("apex_trades")
+          .select("date, symbol, entry, exit, entry_time")
+          .eq("user_id", userId)
+          .eq("account_id", targetId);
+        const existingSet = new Set((existingTrades || []).map(sigOf));
+
+        const tradesToInsert = [];
+        const seenInBatch = new Set();
+        for (const tr of allTrades) {
+          const sig = sigOf(tr);
+          if (existingSet.has(sig) || seenInBatch.has(sig)) {
+            duplicateCount += 1;
+            continue;
+          }
+          seenInBatch.add(sig);
+          tradesToInsert.push(tr);
         }
-        seenInBatch.add(sig);
-        tradesToInsert.push(t);
+
+        if (tradesToInsert.length === 0) continue;
+
+        const { error: insertError } = await supabase
+          .from("apex_trades")
+          .insert(tradesToInsert);
+
+        if (insertError) {
+          console.error("Error inserting trades:", insertError);
+          setError(t("addTrade.err.saveTrades").replace("{msg}", insertError.message));
+          setLoading(false);
+          return;
+        }
+        totalInserted += tradesToInsert.length;
       }
 
-      if (tradesToInsert.length === 0) {
-        setError(t("addTrade.info.allDuplicates").replace("{n}", String(allTrades.length)));
-        setLoading(false);
-        return;
-      }
-
-      const { error: insertError } = await supabase
-        .from("apex_trades")
-        .insert(tradesToInsert);
-      
-      if (insertError) {
-        console.error("Error inserting trades:", insertError);
-        setError(t("addTrade.err.saveTrades").replace("{msg}", insertError.message));
+      if (totalInserted === 0) {
+        setError(t("addTrade.info.allDuplicates").replace("{n}", String(importedTrades.length)));
         setLoading(false);
         return;
       }
@@ -843,19 +855,14 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       
       if (setAccounts) {
         setAccounts(updatedAccounts || []);
-        
-        // ✅ CRITICAL FIX 3: After successful import, ADD the new account to selected accounts
-        // (Don't replace! User should see both old and new account trades)
-        const importedAccount = updatedAccounts?.find(acc => acc.id === accountId);
-        if (importedAccount) {
-          // Append new account to existing selectedAccountIds
-          const newSelectedIds = Array.from(new Set([...selectedAccountIds, accountId]));
-          setSelectedAccountIds(newSelectedIds);
-          localStorage.setItem('selectedAccountIds', JSON.stringify(newSelectedIds));
-        }
+
+        // Ajoute tous les comptes cibles aux comptes sélectionnés
+        const newSelectedIds = Array.from(new Set([...selectedAccountIds, ...targetAccountIds]));
+        setSelectedAccountIds(newSelectedIds);
+        localStorage.setItem('selectedAccountIds', JSON.stringify(newSelectedIds));
       }
-      
-      setAccountName("");
+
+      setAccountNames([]);
       setFileName("");
       setFileContent("");
       setPreview([]);
@@ -863,9 +870,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       setSelectedImportStrategy("");
       setError(duplicateCount > 0
         ? t("addTrade.info.imported")
-            .replace("{n}", String(tradesToInsert.length))
+            .replace("{n}", String(totalInserted))
             .replace("{d}", String(duplicateCount))
-            .replace(/\{s\}/g, tradesToInsert.length > 1 ? "s" : "")
+            .replace(/\{s\}/g, totalInserted > 1 ? "s" : "")
             .replace(/\{ds\}/g, duplicateCount > 1 ? "s" : "")
         : "");
       setLoading(false);
@@ -884,14 +891,14 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   const brokerInfo = getBrokerInstructions();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", flex: 1, minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "row", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", flexDirection: "row", width: "100%", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
-      <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: "0.7" }}>
+      <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: 1, minWidth: 0 }}>
           <div style={{ padding: 24 }}>
           
           {/* ACCOUNT SELECTOR */}
@@ -900,8 +907,9 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               {t("addTrade.account")}
             </label>
             <QuickAccountSelector
-              selectedAccountName={accountName}
-              onAccountNameChange={setAccountName}
+              multi
+              selectedAccountNames={accountNames}
+              onAccountNamesChange={setAccountNames}
               T={T}
             />
           </div>
@@ -1152,7 +1160,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
 
           <button
             onClick={handleImport}
-            disabled={!fileContent || !accountName.trim() || loading}
+            disabled={!fileContent || accountNames.length === 0 || loading}
             style={{
               width: "100%",
               display: "inline-flex",
@@ -1161,13 +1169,13 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               gap: 6,
               padding: "10px 18px",
               borderRadius: 999,
-              background: fileContent && accountName.trim() && !loading ? T.text : "#FFFFFF",
-              color: fileContent && accountName.trim() && !loading ? "#FFFFFF" : T.textMut,
-              border: `1px solid ${fileContent && accountName.trim() && !loading ? T.text : T.border}`,
-              cursor: fileContent && accountName.trim() && !loading ? "pointer" : "not-allowed",
+              background: fileContent && accountNames.length > 0 && !loading ? T.text : "#FFFFFF",
+              color: fileContent && accountNames.length > 0 && !loading ? "#FFFFFF" : T.textMut,
+              border: `1px solid ${fileContent && accountNames.length > 0 && !loading ? T.text : T.border}`,
+              cursor: fileContent && accountNames.length > 0 && !loading ? "pointer" : "not-allowed",
               fontSize: 13,
               fontWeight: 500,
-              opacity: fileContent && accountName.trim() && !loading ? 1 : 0.6,
+              opacity: fileContent && accountNames.length > 0 && !loading ? 1 : 0.6,
               transition: "background 140ms ease, border-color 140ms ease, color 140ms ease",
               fontFamily: "var(--font-sans)",
             }}
@@ -1239,7 +1247,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         </div>
 
         {/* RIGHT: INSTRUCTIONS */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "24px", paddingLeft: "32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", padding: "24px", paddingLeft: "32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
             <img src={brokerInfo.iconPath} alt={brokerInfo.name} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
             <h3 style={{ fontSize: "14px", fontWeight: "700", color: T.text }}>{brokerInfo.name}</h3>

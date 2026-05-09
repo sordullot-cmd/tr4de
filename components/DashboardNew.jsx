@@ -1070,7 +1070,17 @@ export default function App() {
                   </HeaderSlotPortal>
                 );
               })()}
-              {pages[page] || pages.dashboard}
+              <div
+                key={page}
+                style={{
+                  width: "100%",
+                  flex: page === "add-trade" ? 1 : undefined,
+                  minWidth: 0,
+                  display: page === "add-trade" ? "flex" : undefined,
+                }}
+              >
+                {pages[page] || pages.dashboard}
+              </div>
             </div>
           </div>
         </div>

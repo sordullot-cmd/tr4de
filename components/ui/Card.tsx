@@ -28,7 +28,8 @@ export function Card({ padded = true, hoverable = false, accent = "default", sty
         borderRadius: 12,
         padding: padded ? 20 : 0,
         boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
-        transition: "border-color 120ms ease, box-shadow 120ms ease",
+        transition:
+          "border-color 200ms cubic-bezier(0.23,1,0.32,1), box-shadow 200ms cubic-bezier(0.23,1,0.32,1), transform 200ms cubic-bezier(0.23,1,0.32,1)",
         position: "relative",
         ...(accent !== "default" && { borderLeft: `3px solid ${accentColor}` }),
         ...style,
@@ -37,6 +38,7 @@ export function Card({ padded = true, hoverable = false, accent = "default", sty
         if (hoverable) {
           e.currentTarget.style.borderColor = "#D4D4D4";
           e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.06)";
+          e.currentTarget.style.transform = "translateY(-1px)";
         }
         onMouseEnter?.(e);
       }}
@@ -44,6 +46,7 @@ export function Card({ padded = true, hoverable = false, accent = "default", sty
         if (hoverable) {
           e.currentTarget.style.borderColor = "#E5E5E5";
           e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.04)";
+          e.currentTarget.style.transform = "translateY(0)";
         }
         onMouseLeave?.(e);
       }}
