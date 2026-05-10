@@ -891,12 +891,12 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   const brokerInfo = getBrokerInstructions();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", flex: 1, minHeight: "100%", fontFamily: "var(--font-sans)" }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px", width: "100%", flex: 1, alignSelf: "flex-start", fontFamily: "var(--font-sans)" }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("addTrade.title")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "row", width: "100%", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", flexDirection: "row", width: "100%", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
       {/* LEFT: QUESTIONNAIRE FORM */}
       <div style={{ display: "flex", flexDirection: "column", padding: 0, background: "#fff", flex: 1, minWidth: 0 }}>
           <div style={{ padding: 24 }}>
@@ -1247,7 +1247,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
         </div>
 
         {/* RIGHT: INSTRUCTIONS */}
-        <div style={{ display: "flex", flexDirection: "column", padding: "24px", paddingLeft: "32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", padding: "24px 28px 28px 32px", background: T.bg, borderLeft: `1px solid ${T.border}`, flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
             <img src={brokerInfo.iconPath} alt={brokerInfo.name} style={{ width: "32px", height: "32px", objectFit: "contain" }} />
             <h3 style={{ fontSize: "14px", fontWeight: "700", color: T.text }}>{brokerInfo.name}</h3>
