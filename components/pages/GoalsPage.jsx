@@ -273,13 +273,13 @@ export default function GoalsPage() {
   };
 
   // Modal d'ajout/édition
-  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live" };
+  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live", accountIdFilter: "all" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowForm(true); };
-  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", customUnit: g.customUnit || "", accountTypeFilter: g.accountTypeFilter || "live" }); setEditingId(g.id); setShowForm(true); };
+  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", customUnit: g.customUnit || "", accountTypeFilter: g.accountTypeFilter || "live", accountIdFilter: g.accountIdFilter || "all" }); setEditingId(g.id); setShowForm(true); };
   const close = () => { setForm(emptyForm); setEditingId(null); setShowForm(false); };
 
   // Auto-save : dès qu'un champ change et qu'il y a assez d'infos, on enregistre
@@ -296,6 +296,7 @@ export default function GoalsPage() {
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
           customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
+          accountIdFilter: form.accountIdFilter,
         })));
       } else {
         // Créer le nouveau goal et passer immédiatement en mode édition
@@ -307,6 +308,7 @@ export default function GoalsPage() {
           target: parseFloat(form.target), deadline: form.deadline, unit: form.unit,
           customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
+          accountIdFilter: form.accountIdFilter,
           manual: 0,
         }]);
         setEditingId(id);
@@ -411,22 +413,27 @@ export default function GoalsPage() {
     // Si l'autoType impose un horizon (pnl_day/week/month/year), on l'utilise.
     const horizonForCompute = at?.horizon || g.horizon || "month";
     const { start, end } = rangeOf(horizonForCompute);
+    // Filtrage par compte spécifique (ou type) si demandé
+    const accountFilter = g.accountIdFilter && g.accountIdFilter !== "all" ? g.accountIdFilter : null;
+    const scopedTrades = accountFilter
+      ? (trades || []).filter(t => String(t.account_id) === String(accountFilter))
+      : trades;
     let current = 0;
     if (g.autoType === "manual") current = parseFloat(g.manual) || 0;
-    else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(trades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
+    else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(scopedTrades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
     else if (g.autoType === "winrate") {
-      const list = tradesInRange(trades, start, end);
+      const list = tradesInRange(scopedTrades, start, end);
       const w = list.filter(t => (t.pnl || 0) > 0).length;
       const l = list.filter(t => (t.pnl || 0) < 0).length;
       current = (w + l) > 0 ? (w / (w + l)) * 100 : 0;
     }
-    else if (g.autoType === "trades") current = tradesInRange(trades, start, end).length;
+    else if (g.autoType === "trades") current = tradesInRange(scopedTrades, start, end).length;
     else if (g.autoType === "account_type") {
       const wanted = g.accountTypeFilter || "live";
       current = (accounts || []).filter(a => (a.account_type || "live") === wanted).length;
     }
     else if (g.autoType === "max_dd") {
-      const list = tradesInRange(trades, start, end).sort((a, b) => new Date(a.date) - new Date(b.date));
+      const list = tradesInRange(scopedTrades, start, end).sort((a, b) => new Date(a.date) - new Date(b.date));
       let peak = 0, cum = 0, mdd = 0;
       for (const tr of list) { cum += (tr.pnl || 0); if (cum > peak) peak = cum; if (peak - cum > mdd) mdd = peak - cum; }
       current = mdd;
@@ -816,7 +823,7 @@ export default function GoalsPage() {
 
               {/* Source de suivi — visible uniquement pour Trading */}
               {form.category === "trading" && (
-                <StackField label="Source de suivi" last={form.autoType !== "manual"}>
+                <StackField label="Source de suivi" last={form.autoType !== "manual" && !["pnl","pnl_day","pnl_week","pnl_month","pnl_year","winrate","trades","max_dd"].includes(form.autoType)}>
                   <FancyDropdown
                     value={form.autoType}
                     options={AUTO_TYPES}
@@ -824,6 +831,32 @@ export default function GoalsPage() {
                     renderOption={(a, active) => (
                       <>
                         <span style={{ flex: 1 }}>{a.label}</span>
+                        {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
+                      </>
+                    )}
+                  />
+                </StackField>
+              )}
+
+              {/* Compte ciblé — pour les sources de perf (PnL / WR / Nb trades / DD) */}
+              {form.category === "trading" && ["pnl","pnl_day","pnl_week","pnl_month","pnl_year","winrate","trades","max_dd"].includes(form.autoType) && (
+                <StackField label="Compte ciblé" last={form.autoType !== "manual"}>
+                  <FancyDropdown
+                    value={form.accountIdFilter || "all"}
+                    options={[
+                      { id: "all", label: "Tous mes comptes" },
+                      ...((accounts || []).map(a => ({
+                        id: String(a.id),
+                        label: `${a.name || "Compte"}${a.account_type ? ` · ${a.account_type}` : ""}`,
+                      }))),
+                    ]}
+                    onChange={(v) => setForm({ ...form, accountIdFilter: v })}
+                    renderValue={(o) => (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{o.label}</span>
+                    )}
+                    renderOption={(o, active) => (
+                      <>
+                        <span style={{ flex: 1 }}>{o.label}</span>
                         {active && <Check size={12} strokeWidth={2.5} color={T.green} />}
                       </>
                     )}

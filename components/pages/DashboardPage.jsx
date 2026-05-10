@@ -190,59 +190,14 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   const winRate = ((winCount/(winCount+lossCount||1))*100).toFixed(1);
   const profitFactor = (wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0)||1)).toFixed(2);
 
-  // ===== Comparaison vs moyenne du compte =====
-  // On compare la période courante (mois sélectionné, ou jour de la semaine filtré)
-  // à la moyenne du compte calculée sur `allTrades` :
-  //  - P&L : variation % du P&L moyen par trade (cur.pnl/cur.n vs total.pnl/total.n)
-  //  - WR  : différence en points de % entre WR courant et WR global
-  //  - PF  : différence absolue entre PF courant et PF global
-  const calcKpis = (arr) => {
-    const pnl = arr.reduce((s,t)=>s+t.pnl,0);
-    const w = arr.filter(t=>t.pnl>0);
-    const l = arr.filter(t=>t.pnl<0);
-    const wr = (w.length+l.length) ? (w.length/(w.length+l.length))*100 : 0;
-    const pf = l.length ? w.reduce((s,t)=>s+t.pnl,0) / Math.abs(l.reduce((s,t)=>s+t.pnl,0)) : 0;
-    const avgPerTrade = arr.length ? pnl / arr.length : 0;
-    return { pnl, wr, pf, n: arr.length, avgPerTrade };
-  };
-  const cur = calcKpis(filteredTrades);
-  const totalKpi = calcKpis(allTrades || []);
-  // Référence = moyenne du compte. Disponible dès qu'il y a au moins 1 trade.
-  const hasRef = totalKpi.n > 0 && cur.n > 0;
-  // Formatte un delta avec flèche/couleur. `kind` = "pct" (variation %), "pp" (points
-  // de %, ex. winrate), "abs" (delta absolu, ex. profit factor).
-  const formatDelta = (curV, refV, kind) => {
-    if (!hasRef) return { text: "—", color: "#8E8E8E", arrow: "" };
-    if (kind === "pct") {
-      if (refV === 0) return { text: curV === 0 ? "0%" : "—", color: "#8E8E8E", arrow: "" };
-      const d = ((curV - refV) / Math.abs(refV)) * 100;
-      const sign = d > 0 ? "+" : "";
-      return { text: `${sign}${d.toFixed(1)}%`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
-    }
-    if (kind === "pp") {
-      const d = curV - refV;
-      const sign = d > 0 ? "+" : "";
-      return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
-    }
-    // abs
-    const d = curV - refV;
-    const sign = d > 0 ? "+" : "";
-    return { text: `${sign}${d.toFixed(2)}`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" };
-  };
-  // P&L : on compare le P&L moyen par trade (sinon un mois avec plus de trades
-  // serait toujours "mieux" qu'un mois plus calme).
-  const dPnL = formatDelta(cur.avgPerTrade, totalKpi.avgPerTrade, "pct");
-  const dWR  = formatDelta(cur.wr, totalKpi.wr, "pp");
-  const dPF  = formatDelta(cur.pf, totalKpi.pf, "abs");
-
-  // WR Today = winrate sur les trades d'aujourd'hui, comparé au WR global
+  // WR Today = winrate sur les trades d'aujourd'hui
   const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   const todayTrades = (allTrades || []).filter(tr => (tr.date || "").slice(0,10) === todayIso);
-  const todayKpi = calcKpis(todayTrades);
-  const wrToday = todayKpi.n > 0 ? todayKpi.wr.toFixed(1) : "0.0";
-  const dWRToday = (todayKpi.n > 0 && totalKpi.n > 0)
-    ? (() => { const d = todayKpi.wr - totalKpi.wr; const sign = d > 0 ? "+" : ""; return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" }; })()
-    : { text: "—", color: "#8E8E8E", arrow: "" };
+  const todayWins = todayTrades.filter(t => t.pnl > 0).length;
+  const todayLosses = todayTrades.filter(t => t.pnl < 0).length;
+  const wrToday = (todayWins + todayLosses) > 0
+    ? ((todayWins / (todayWins + todayLosses)) * 100).toFixed(1)
+    : "0.0";
   const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
   const maxWin = filteredTrades.length ? Math.max(...filteredTrades.map(t=>t.pnl)) : 0;
@@ -519,29 +474,25 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         {/* ROW 1: 4 KPIs avec separateurs verticaux */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"1px solid #E5E5E5"}}>
           {/* NET P&L */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasRef ? `P&L moyen période : ${fmt(cur.avgPerTrade,true)} / trade — moyenne compte : ${fmt(totalKpi.avgPerTrade,true)} / trade` : "Pas assez de données pour comparer à la moyenne"}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dPnL.color}}>{dPnL.arrow} {dPnL.text}</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.totalPnL")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{fmt(totalPnL,true)}</div>
           </div>
 
           {/* TRADE WIN */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasRef ? `WR période : ${cur.wr.toFixed(1)}% — WR moyen compte : ${totalKpi.wr.toFixed(1)}%` : "Pas assez de données pour comparer à la moyenne"}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWR.color}}>{dWR.arrow} {dWR.text}</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.winRate")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{winRate}%</div>
           </div>
 
           {/* PROFIT FACTOR */}
-          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}} title={hasRef ? `PF période : ${cur.pf.toFixed(2)} — PF moyen compte : ${totalKpi.pf.toFixed(2)}` : "Pas assez de données pour comparer à la moyenne"}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dPF.color}}>{dPF.arrow} {dPF.text}</div>
+          <div style={{padding:"14px 18px",borderRight:"1px solid #E5E5E5",position:"relative"}}>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>{t("dash.kpi.profitFactor")} <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{profitFactor}</div>
           </div>
 
           {/* WR TODAY */}
-          <div style={{padding:"14px 18px",position:"relative"}} title={todayKpi.n > 0 ? `WR aujourd'hui : ${todayKpi.wr.toFixed(1)}% (${todayKpi.n} trades) — WR moyen compte : ${totalKpi.wr.toFixed(1)}%` : "Aucun trade aujourd'hui"}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWRToday.color}}>{dWRToday.arrow} {dWRToday.text}</div>
+          <div style={{padding:"14px 18px",position:"relative"}}>
             <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>WR Today <span style={{color:"#8E8E8E"}}>›</span></div>
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{wrToday}%</div>
           </div>

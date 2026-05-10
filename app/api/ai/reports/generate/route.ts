@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { buildSessionReportPrompt, buildWeeklyReviewPrompt } from "@/lib/ai/prompts";
+import { buildDailyAnalysisPrompt, buildWeeklyAnalysisPrompt } from "@/lib/ai/prompts";
 
 // POST /api/ai/reports/generate
 // body: { type: 'daily'|'weekly', date?: 'YYYY-MM-DD', force?: boolean, trades?: any[] }
@@ -130,18 +130,11 @@ export async function POST(request: NextRequest) {
     let title: string;
     if (type === "daily") {
       const dateStr = periodStart.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-      userPrompt = buildSessionReportPrompt(dateStr, trades);
+      userPrompt = buildDailyAnalysisPrompt(dateStr, trades);
       title = `Rapport du ${periodStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}`;
     } else {
       const dateRange = `${periodStart.toLocaleDateString("fr-FR")} → ${periodEnd.toLocaleDateString("fr-FR")}`;
-      userPrompt = buildWeeklyReviewPrompt(dateRange, {
-        totalTrades: trades.length,
-        winRate,
-        totalPnL,
-        bestSetup,
-        worstSetup,
-        trades,
-      });
+      userPrompt = buildWeeklyAnalysisPrompt(dateRange, trades);
       title = `Semaine du ${periodStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}`;
     }
 

@@ -9,6 +9,7 @@ import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
 import { exportJournalPdf } from "@/lib/export/journalPdf";
 import { getCurrencySymbol } from "@/lib/userPrefs";
+import DictatableTextarea from "@/components/MicDictateButton";
 
 export default function JournalPage({ trades = [] }) {
   useLang();
@@ -243,23 +244,19 @@ export default function JournalPage({ trades = [] }) {
                 </div>
 
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                  <textarea
+                  <DictatableTextarea
                     placeholder={t("journal.dailyNotes")}
                     value={dailyNotes[dateStr] || ""}
-                    onChange={(e) => updateDailyNote(dateStr, e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: 200,
+                    onChange={(next) => updateDailyNote(dateStr, next)}
+                    height={200}
+                    micSize={32}
+                    textareaStyle={{
                       border: `1px solid ${T.border}`,
                       borderRadius: 12,
                       padding: 14,
                       fontSize: 12,
-                      fontFamily: "var(--font-sans)",
                       color: T.text,
                       background: T.white,
-                      resize: "none",
-                      outline: "none",
-                      boxSizing: "border-box",
                     }}
                   />
 
@@ -329,23 +326,20 @@ export default function JournalPage({ trades = [] }) {
                                           <td colSpan="6" style={{ padding: "12px 12px" }}>
                                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                               <div style={{ fontSize: 11, color: T.textMut, textTransform: "uppercase" }}>{t("journal.notesFor").replace("{symbol}", trade.symbol)}</div>
-                                              <textarea
+                                              <DictatableTextarea
                                                 placeholder={t("journal.tradeNote")}
                                                 value={tradeNotes[tradeId] || ""}
-                                                onChange={(e) => updateTradeNote(tradeId, e.target.value)}
-                                                style={{
-                                                  width: "100%",
-                                                  height: 60,
+                                                onChange={(next) => updateTradeNote(tradeId, next)}
+                                                height={60}
+                                                micSize={26}
+                                                micStyle={{ bottom: 6, right: 6 }}
+                                                textareaStyle={{
                                                   border: `1px solid ${T.border}`,
                                                   borderRadius: 8,
                                                   padding: 12,
                                                   fontSize: 12,
-                                                  fontFamily: "var(--font-sans)",
                                                   color: T.text,
                                                   background: T.white,
-                                                  resize: "none",
-                                                  outline: "none",
-                                                  boxSizing: "border-box",
                                                 }}
                                               />
                                             </div>

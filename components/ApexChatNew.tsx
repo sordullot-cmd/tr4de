@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 import {
-  buildSessionReportPrompt,
-  buildWeeklyReviewPrompt,
+  buildDailyAnalysisPrompt,
+  buildWeeklyAnalysisPrompt,
+  buildFreeAnalysisPrompt,
 } from "@/lib/ai/prompts";
 
 interface ApexChatProps {
@@ -58,12 +59,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   Mind: "#A855F7",
 };
 
+const PROMPT_DAILY = "Analyse de ma journée";
+const PROMPT_WEEKLY = "Analyse de ma semaine";
+const PROMPT_FREE = "Diagnostic complet sur l'historique";
+
 const PROMPTS = [
-  { category: "Trades", text: "Résumé de ma journée de trading" },
-  { category: "Mind", text: "Où suis-je le plus rentable ?" },
-  { category: "Trades", text: "Où suis-je le moins rentable ?" },
-  { category: "Net P&L", text: "Comment améliorer mon trading ?" },
-  { category: "Trades", text: "Où est-ce que je manque dans mon trading ?" },
+  { category: "Trades", text: PROMPT_DAILY },
+  { category: "Net P&L", text: PROMPT_WEEKLY },
+  { category: "Mind", text: PROMPT_FREE },
 ];
 
 const cleanString = (str: any): string => {
@@ -376,10 +379,11 @@ export default function ApexChatNew({
     const text = messageText.trim();
     if (!text || isLoading) return;
 
-    // Déterminer si c'est un prompt spécialisé
+    // Déterminer si c'est un prompt spécialisé (3 analyses : journalière / hebdo / libre)
     let finalText = text;
-    if (text === "Résumé de ma journée de trading") {
+    if (text === PROMPT_DAILY) {
       const today = new Date();
+      const todayStr = today.toLocaleDateString("fr-FR");
       const dateStr = today.toLocaleDateString("fr-FR", {
         weekday: "long",
         year: "numeric",
@@ -387,36 +391,43 @@ export default function ApexChatNew({
         day: "numeric",
       });
       const tradesToday = trades.filter((t: any) => {
-        const tradeDate = new Date(t.entry_time).toLocaleDateString("fr-FR");
-        return tradeDate === today.toLocaleDateString("fr-FR");
+        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        return d && !Number.isNaN(d.getTime()) && d.toLocaleDateString("fr-FR") === todayStr;
       });
-      finalText = buildSessionReportPrompt(dateStr, tradesToday);
-    } else if (text === "Revue hebdomadaire - 80/20 analyse") {
+      finalText = buildDailyAnalysisPrompt(dateStr, tradesToday);
+    } else if (text === PROMPT_WEEKLY) {
       const today = new Date();
+      const day = today.getDay();
+      const diffToMonday = day === 0 ? -6 : 1 - day;
       const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - today.getDay());
-      const weekEnd = new Date(today);
-      weekEnd.setDate(today.getDate() + (6 - today.getDay()));
-      
+      weekStart.setDate(today.getDate() + diffToMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
       const tradesThisWeek = trades.filter((t: any) => {
-        const tradeDate = new Date(t.entry_time);
-        return tradeDate >= weekStart && tradeDate <= weekEnd;
+        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        return d && !Number.isNaN(d.getTime()) && d >= weekStart && d <= weekEnd;
       });
-      
+
       const dateRange = `${weekStart.toLocaleDateString("fr-FR")} → ${weekEnd.toLocaleDateString("fr-FR")}`;
-      const totalPnL = tradesThisWeek.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
-      const winRate = tradesThisWeek.length > 0
-        ? ((tradesThisWeek.filter((t: any) => t.pnl > 0).length / tradesThisWeek.length) * 100)
-        : 0;
-      
-      finalText = buildWeeklyReviewPrompt(dateRange, {
-        totalTrades: tradesThisWeek.length,
-        winRate,
-        totalPnL,
-        bestSetup: null,
-        worstSetup: null,
-        trades: tradesThisWeek,
+      finalText = buildWeeklyAnalysisPrompt(dateRange, tradesThisWeek);
+    } else if (text === PROMPT_FREE) {
+      const validTrades = trades.filter((t: any) => {
+        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        return d && !Number.isNaN(d.getTime());
       });
+      let periodLabel = "Historique complet";
+      if (validTrades.length) {
+        const sorted = [...validTrades].sort(
+          (a: any, b: any) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime()
+        );
+        const first = new Date(sorted[0].entry_time).toLocaleDateString("fr-FR");
+        const last = new Date(sorted[sorted.length - 1].entry_time).toLocaleDateString("fr-FR");
+        periodLabel = `${first} → ${last}`;
+      }
+      finalText = buildFreeAnalysisPrompt(periodLabel, validTrades, dailyNotes);
     }
 
     const userMsg: Message = { role: "user", content: text };

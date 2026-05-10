@@ -131,9 +131,38 @@ const defaultHabits = () => {
   ];
 };
 
+// === Helpers semaine ===
+// Lundi = début de semaine. Retourne l'ISO du lundi de la semaine contenant `iso`.
+const weekStartIso = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  const dow = d.getDay(); // 0 = dim, 1 = lun, ..., 6 = sam
+  const offset = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const addDaysIso = (iso, n) => {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const fmtShortDay = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return capFirst(d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", ""));
+};
+const fmtRange = (startIso, endIso) => {
+  const s = new Date(startIso + "T00:00:00");
+  const e = new Date(endIso + "T00:00:00");
+  const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+  const sM = capFirst(s.toLocaleDateString("fr-FR", { month: "short" })).replace(".", "");
+  const eM = capFirst(e.toLocaleDateString("fr-FR", { month: "short" })).replace(".", "");
+  if (sameMonth) return `${s.getDate()} – ${e.getDate()} ${sM} ${e.getFullYear()}`;
+  return `${s.getDate()} ${sM} – ${e.getDate()} ${eM} ${e.getFullYear()}`;
+};
+
 export default function DailyPlannerPage() {
   useLang();
   const [dateKey, setDateKey] = useState(() => todayKey());
+  const [weekStart, setWeekStart] = useState(() => weekStartIso(todayKey()));
 
   // Planner (tâches, objectifs, énergie) par jour — synchronisé Supabase
   const [plannerStore, setPlannerStore] = useCloudState(STORAGE_PLANNER, "daily_planner", {});
@@ -143,6 +172,7 @@ export default function DailyPlannerPage() {
   // Habits — synchronisées Supabase
   const [habits, setHabits] = useCloudState(STORAGE_HABITS, "habits", defaultHabits());
   const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, "habits_history", {});
+
   const { pushUndo } = useUndo();
   const [dragHabitId, setDragHabitId] = useState(null);
   const [dragOverHabitId, setDragOverHabitId] = useState(null);
@@ -247,55 +277,17 @@ export default function DailyPlannerPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
-      {/* Header : gros titre */}
+      {/* Header : titre */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("nav.dailyPlanner")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 
-      {/* Date nav stylée */}
-      {(() => {
-        const parts = fmtDateParts(dateKey);
-        const isToday = dateKey === todayKey();
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 14, background: T.white, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 18px" }}>
-            <button onClick={() => shiftDay(-1)} style={iconBtn()} aria-label="Jour précédent"><ChevronLeft size={16} /></button>
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 24, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
-            {/* Bloc date : day number big + weekday/month */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1, minWidth: 48 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: T.textMut }}>{parts.month.slice(0, 3)}.</div>
-                <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: -0.3, marginTop: 2 }}>{String(parts.day).padStart(2, "0")}</div>
-              </div>
-              <div style={{ height: 30, width: 1, background: T.border }} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{parts.weekday}</div>
-                  {isToday && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, color: T.green, background: T.green + "18",
-                      padding: "2px 7px", borderRadius: 999, letterSpacing: 0.4, textTransform: "uppercase",
-                    }}>Aujourd&apos;hui</span>
-                  )}
-                </div>
-                <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500 }}>{parts.month} {parts.year}</div>
-              </div>
-              {!isToday && (
-                <button onClick={() => setDateKey(todayKey())}
-                  style={{ marginLeft: "auto", fontSize: 11, color: T.blue, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
-                  Aujourd&apos;hui
-                </button>
-              )}
-            </div>
-
-            <button onClick={() => shiftDay(1)} style={iconBtn()} aria-label="Jour suivant"><ChevronRight size={16} /></button>
-          </div>
-        );
-      })()}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24, alignItems: "start" }}>
-        {/* LEFT : Habitudes du jour (sans carte, style timeline comme la page Objectifs) */}
-        <div>
+      {/* Habitudes du jour */}
+      <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Habitudes du jour</h2>
             <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -548,90 +540,316 @@ export default function DailyPlannerPage() {
           )}
         </div>
 
-        {/* RIGHT : Tâches du jour */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px" }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Tâches du jour</h2>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-            <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-              {taskDoneCount}/{tasks.length}
-            </span>
-          </div>
+        {/* Objectifs du jour — colonne gauche, sous les Habitudes */}
+        {(() => {
+          const goals = day.goals || [];
+          const goalsDone = goals.filter(g => g.done).length;
+          const updateGoalText = (id, text) => updateDay({ goals: goals.map(g => g.id === id ? { ...g, text } : g) });
+          const addEmptyGoal = () => updateDay({ goals: [...goals, { id: Date.now() + Math.floor(Math.random() * 1000), text: "", done: false }] });
+          return (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
+                <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Objectifs du jour</h2>
+                <div style={{ flex: 1, height: 1, background: T.border }} />
+                <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                  {goalsDone}/{goals.length}
+                </span>
+                <button onClick={addEmptyGoal} title="Ajouter un objectif"
+                  style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}>
+                  <Plus size={13} strokeWidth={2} />
+                </button>
+              </div>
 
-          <div style={{ padding: "0 16px 0 28px", display: "flex", flexDirection: "column", gap: 2 }}>
-            {tasks.map(p => {
-              const expanded = expandedTaskId === p.id;
-              const hasNote = !!(p.note && p.note.trim());
-              return (
-                <div key={p.id} style={{ display: "flex", flexDirection: "column" }}>
-                  <div
-                    onMouseEnter={(e) => e.currentTarget.querySelectorAll("[data-task-action]").forEach(b => b.style.opacity = 1)}
-                    onMouseLeave={(e) => e.currentTarget.querySelectorAll("[data-task-action]").forEach(b => { if (!(b.dataset.persist === "1")) b.style.opacity = 0; })}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", borderRadius: 6 }}>
-                    <button onClick={() => toggleTask(p.id)} aria-label={p.done ? "Décocher" : "Cocher"}
-                      style={{ width: 14, height: 14, borderRadius: 4, border: p.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`, background: p.done ? T.green : T.white, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0, transition: "all .15s ease" }}>
-                      {p.done && <Check size={9} strokeWidth={3} color="#fff" />}
+              <div style={{ padding: "0 16px 0 28px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {goals.map((g) => (
+                  <div key={g.id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", borderRadius: 6 }}
+                    onMouseEnter={(e) => { const btn = e.currentTarget.querySelector("[data-goal-del]"); if (btn) btn.style.opacity = "1"; }}
+                    onMouseLeave={(e) => { const btn = e.currentTarget.querySelector("[data-goal-del]"); if (btn) btn.style.opacity = "0"; }}>
+                    <button onClick={() => toggleGoal(g.id)}
+                      style={{
+                        width: 14, height: 14, borderRadius: 4,
+                        border: g.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`,
+                        background: g.done ? T.green : T.white,
+                        cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, padding: 0, transition: "all .15s ease",
+                      }}>
+                      {g.done && <Check size={9} strokeWidth={3} color="#fff" />}
                     </button>
-                    <input type="text" value={p.text}
-                      autoFocus={p.id === newTaskId}
+                    <input
+                      value={g.text}
+                      onChange={(e) => updateGoalText(g.id, e.target.value)}
                       placeholder="Sans titre"
-                      onChange={(e) => updateTaskText(p.id, e.target.value)}
-                      onBlur={() => { if (p.id === newTaskId) setNewTaskId(null); }}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); addTask(); } }}
-                      style={{ flex: 1, minWidth: 0, padding: "2px 4px", border: "none", outline: "none", background: "transparent", fontSize: 13, color: p.done ? T.textMut : T.text, textDecoration: p.done ? "line-through" : "none", fontFamily: "inherit" }} />
-                    <button data-task-action data-persist={hasNote || expanded ? "1" : "0"}
-                      onClick={() => setExpandedTaskId(expanded ? null : p.id)}
-                      title={hasNote ? "Voir / éditer la note" : "Ajouter une note"}
-                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: expanded ? T.accentBg : "transparent", color: hasNote ? T.text : T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: hasNote || expanded ? 1 : 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = hasNote ? T.text : T.textMut; e.currentTarget.style.background = expanded ? T.accentBg : "transparent"; }}>
-                      <StickyNote size={11} strokeWidth={1.75} />
-                    </button>
-                    <button data-task-action data-persist="0" onClick={() => removeTask(p.id)} title="Supprimer"
-                      style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease" }}
+                      autoFocus={!g.text}
+                      style={{
+                        flex: 1, minWidth: 0, padding: "2px 4px",
+                        border: "none", outline: "none", background: "transparent",
+                        fontSize: 13, color: g.done ? T.textMut : T.text,
+                        textDecoration: g.done ? "line-through" : "none", fontFamily: "inherit",
+                      }} />
+                    <button data-goal-del onClick={() => removeGoal(g.id)}
+                      style={{
+                        width: 22, height: 22, borderRadius: 5, border: "none",
+                        background: "transparent", color: T.textMut, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease",
+                      }}
                       onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
                       <Trash2 size={11} strokeWidth={1.75} />
                     </button>
                   </div>
-                  {expanded && (
-                    <textarea
-                      value={p.note || ""}
-                      onChange={(e) => updateTaskNote(p.id, e.target.value)}
-                      placeholder="Description, note, sous-étapes…"
-                      rows={3}
-                      style={{
-                        margin: "2px 6px 6px 28px",
-                        padding: "8px 10px",
-                        background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6,
-                        fontSize: 12, color: T.text, outline: "none",
-                        fontFamily: "inherit", resize: "vertical", lineHeight: 1.5,
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-            <button type="button" onClick={addTask}
-              style={{
-                alignSelf: "flex-start",
-                display: "inline-flex", alignItems: "center", gap: 4,
-                marginTop: 4, padding: "5px 6px",
-                border: "none", background: "transparent",
-                color: T.textMut, fontSize: 12, fontWeight: 500,
-                cursor: "pointer", fontFamily: "inherit",
-                borderRadius: 6, transition: "color .12s ease, background .12s ease",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
-              <Plus size={12} strokeWidth={2} /> Ajouter une tâche
-            </button>
-          </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         </div>
+
+        {/* RIGHT : Calendrier semaine (Objectifs de la semaine intégrés à l'intérieur) */}
+        <WeekPlannerView
+          weekStart={weekStart}
+          setWeekStart={setWeekStart}
+          plannerStore={plannerStore}
+          setPlannerStore={setPlannerStore}
+          habits={habits}
+          habitHistory={habitHistory}
+          onJumpToDay={(iso) => setDateKey(iso)}
+        />
       </div>
 
       {/* Graphique ligne : complétion habitudes (30 derniers jours) — pleine largeur, en bas */}
       <HabitsChart habits={habits} history={habitHistory} />
+    </div>
+  );
+}
+
+function WeekPlannerView({ weekStart, setWeekStart, plannerStore, setPlannerStore, habits, habitHistory, onJumpToDay }) {
+  const days = Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i));
+  const weekEnd = days[6];
+  const today = todayKey();
+  const isCurrentWeek = weekStart === weekStartIso(today);
+
+  // ── Tâches du jour (lecture/écriture dans plannerStore) ──
+  const updateDayTasks = (iso, mut) => {
+    setPlannerStore(prev => {
+      const day = prev[iso] || { tasks: [], goals: [], energy: 7 };
+      const tasks = day.tasks || [];
+      return { ...prev, [iso]: { ...day, tasks: mut(tasks) } };
+    });
+  };
+  const addTask = (iso) => updateDayTasks(iso, (ts) => [...ts, { id: Date.now() + Math.floor(Math.random() * 1000), text: "", done: false, note: "" }]);
+  const toggleTask = (iso, id) => updateDayTasks(iso, (ts) => ts.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const updateTaskText = (iso, id, text) => updateDayTasks(iso, (ts) => ts.map(t => t.id === id ? { ...t, text } : t));
+  const removeTask = (iso, id) => updateDayTasks(iso, (ts) => ts.filter(t => t.id !== id));
+
+  // ── Objectifs de la semaine ──
+  // Stockés dans plannerStore sous une clé préfixée pour ne pas collisionner
+  // avec les entrées par jour (qui utilisent une clé YYYY-MM-DD).
+  const weekKey = `_week:${weekStart}`;
+  const weekGoals = plannerStore[weekKey]?.weekGoals || [];
+  const weekGoalsDone = weekGoals.filter(g => g.done).length;
+  const updateWeekGoals = (mut) => {
+    setPlannerStore(prev => {
+      const data = prev[weekKey] || { weekGoals: [] };
+      return { ...prev, [weekKey]: { ...data, weekGoals: mut(data.weekGoals || []) } };
+    });
+  };
+  const addWeekGoal = () => updateWeekGoals(g => [...g, { id: Date.now() + Math.floor(Math.random() * 1000), text: "", done: false }]);
+  const toggleWeekGoal = (id) => updateWeekGoals(g => g.map(x => x.id === id ? { ...x, done: !x.done } : x));
+  const updateWeekGoalText = (id, text) => updateWeekGoals(g => g.map(x => x.id === id ? { ...x, text } : x));
+  const removeWeekGoal = (id) => updateWeekGoals(g => g.filter(x => x.id !== id));
+
+  const shiftWeek = (delta) => setWeekStart(addDaysIso(weekStart, delta * 7));
+  const goCurrentWeek = () => setWeekStart(weekStartIso(today));
+
+  // Stats
+  const totalTasks = days.reduce((s, iso) => s + (plannerStore[iso]?.tasks?.length || 0), 0);
+  const doneTasks = days.reduce((s, iso) => s + (plannerStore[iso]?.tasks || []).filter(t => t.done).length, 0);
+  const totalHabits = habits.length * 7;
+  const doneHabits = days.reduce((s, iso) => s + habits.filter(h => habitHistory[h.id]?.[iso]).length, 0);
+
+  return (
+    <div>
+      {/* Header timeline : titre + nav discrète */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 4px" }}>
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Tâches de la semaine</h2>
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+        <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+          {doneTasks}/{totalTasks}
+        </span>
+        <button onClick={() => shiftWeek(-1)} style={iconBtn()} aria-label="Semaine précédente"><ChevronLeft size={14} /></button>
+        <button onClick={() => shiftWeek(1)} style={iconBtn()} aria-label="Semaine suivante"><ChevronRight size={14} /></button>
+        {!isCurrentWeek && (
+          <button onClick={goCurrentWeek} title="Revenir à cette semaine"
+            style={{ fontSize: 11, color: T.text, background: T.bg, border: `1px solid ${T.border}`, padding: "4px 8px", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
+            Aujourd&apos;hui
+          </button>
+        )}
+      </div>
+
+      {/* Objectifs de la semaine — bloc inséré sous le titre, encapsulé dans la même carte */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ padding: "0 4px 0 16px", display: "flex", flexDirection: "column", gap: 2 }}>
+          {/* Rangée d'entête : compteur + bouton rond, alignée comme la première ligne d'objectif */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px" }}>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+              {weekGoalsDone}/{weekGoals.length}
+            </span>
+            <button onClick={addWeekGoal} title="Ajouter un objectif de la semaine"
+              style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Plus size={11} strokeWidth={2} />
+            </button>
+          </div>
+          {weekGoals.map((g) => (
+            <div key={g.id}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", borderRadius: 6 }}
+              onMouseEnter={(e) => { const btn = e.currentTarget.querySelector("[data-week-goal-del]"); if (btn) btn.style.opacity = "1"; }}
+              onMouseLeave={(e) => { const btn = e.currentTarget.querySelector("[data-week-goal-del]"); if (btn) btn.style.opacity = "0"; }}>
+              <button onClick={() => toggleWeekGoal(g.id)}
+                style={{
+                  width: 14, height: 14, borderRadius: 4,
+                  border: g.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`,
+                  background: g.done ? T.green : T.white,
+                  cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, padding: 0, transition: "all .15s ease",
+                }}>
+                {g.done && <Check size={9} strokeWidth={3} color="#fff" />}
+              </button>
+              <input
+                value={g.text}
+                onChange={(e) => updateWeekGoalText(g.id, e.target.value)}
+                placeholder="Objectif de la semaine"
+                autoFocus={!g.text}
+                style={{
+                  flex: 1, minWidth: 0, padding: "2px 4px",
+                  border: "none", outline: "none", background: "transparent",
+                  fontSize: 13, color: g.done ? T.textMut : T.text,
+                  textDecoration: g.done ? "line-through" : "none", fontFamily: "inherit",
+                }} />
+              <button data-week-goal-del onClick={() => removeWeekGoal(g.id)}
+                style={{
+                  width: 22, height: 22, borderRadius: 5, border: "none",
+                  background: "transparent", color: T.textMut, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                <Trash2 size={11} strokeWidth={1.75} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cartes empilées : 1 carte par jour */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {days.map((iso) => {
+          const isTodayCard = iso === today;
+          const parts = fmtDateParts(iso);
+          const tasks = plannerStore[iso]?.tasks || [];
+          const doneCount = tasks.filter(t => t.done).length;
+
+          return (
+            <div key={iso}
+              style={{
+                background: T.white,
+                border: `1px solid ${isTodayCard ? T.text : T.border}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                transition: "border-color .15s ease",
+              }}>
+              {/* Header carte */}
+              <button
+                onClick={() => onJumpToDay && onJumpToDay(iso)}
+                title="Ouvrir la vue jour"
+                style={{
+                  width: "100%",
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: 0, marginBottom: tasks.length > 0 ? 8 : 4,
+                  border: "none", background: "transparent",
+                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: isTodayCard ? T.text : T.textMut, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                  {fmtShortDay(iso)}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: isTodayCard ? T.text : T.textSub }}>
+                  {parts.day}
+                </span>
+                {isTodayCard && (
+                  <span style={{ fontSize: 8, fontWeight: 700, color: T.text, background: T.bg, padding: "2px 6px", borderRadius: 999, letterSpacing: 0.4, textTransform: "uppercase" }}>
+                    Aujourd&apos;hui
+                  </span>
+                )}
+                <span style={{ flex: 1 }} />
+                {tasks.length > 0 && (
+                  <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+                    {doneCount}/{tasks.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Tâches */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {tasks.map((p) => (
+                  <div key={p.id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 2px", borderRadius: 5 }}
+                    onMouseEnter={(e) => { const btn = e.currentTarget.querySelector("[data-week-del]"); if (btn) btn.style.opacity = "1"; }}
+                    onMouseLeave={(e) => { const btn = e.currentTarget.querySelector("[data-week-del]"); if (btn) btn.style.opacity = "0"; }}>
+                    <button onClick={() => toggleTask(iso, p.id)}
+                      style={{
+                        width: 14, height: 14, borderRadius: 4,
+                        border: p.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`,
+                        background: p.done ? T.green : T.white,
+                        cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, padding: 0, transition: "all .15s ease",
+                      }}>
+                      {p.done && <Check size={9} strokeWidth={3} color="#fff" />}
+                    </button>
+                    <input
+                      value={p.text}
+                      onChange={(e) => updateTaskText(iso, p.id, e.target.value)}
+                      placeholder="Sans titre"
+                      style={{
+                        flex: 1, minWidth: 0, padding: "2px 4px",
+                        border: "none", outline: "none", background: "transparent",
+                        fontSize: 13, color: p.done ? T.textMut : T.text,
+                        textDecoration: p.done ? "line-through" : "none", fontFamily: "inherit",
+                      }} />
+                    <button data-week-del onClick={() => removeTask(iso, p.id)}
+                      style={{
+                        width: 20, height: 20, borderRadius: 5, border: "none",
+                        background: "transparent", color: T.textMut, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                      <Trash2 size={11} strokeWidth={1.75} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => addTask(iso)}
+                  style={{
+                    alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4,
+                    marginTop: 0, padding: "3px 6px",
+                    border: "none", background: "transparent",
+                    color: T.textMut, fontSize: 11.5, fontWeight: 500,
+                    cursor: "pointer", fontFamily: "inherit",
+                    borderRadius: 5, transition: "color .12s ease, background .12s ease",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = T.text; e.currentTarget.style.background = T.accentBg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
+                  <Plus size={11} strokeWidth={2} /> Ajouter
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
