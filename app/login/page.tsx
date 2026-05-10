@@ -144,7 +144,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          <Button type="submit" loading={loading} fullWidth size="lg">
+          <Button
+            type="submit"
+            loading={loading}
+            fullWidth
+            size="lg"
+            style={{ background: "#0D0D0D", color: "#FFFFFF", border: "1px solid #0D0D0D" }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "#262626"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#0D0D0D"; }}
+          >
             {isLogin ? "Se connecter" : "Créer mon compte"}
           </Button>
         </form>

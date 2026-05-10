@@ -4,7 +4,7 @@ import React from "react";
 import {
   Plus, Trash2, ShieldCheck, Lock, Clock, AlertTriangle, TrendingUp,
   Flame, Target, Zap, Calendar as CalIcon, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Pencil,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import {
@@ -436,20 +436,33 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
   const [type, setType] = React.useState("position_limit");
   const [params, setParams] = React.useState({});
   const [open, setOpen] = React.useState(false);
+  const [editId, setEditId] = React.useState(null);
+  const isEditing = editId !== null;
 
-  const reset = () => { setParams({}); setType("position_limit"); };
+  const reset = () => { setParams({}); setType("position_limit"); setEditId(null); };
+
+  const startEdit = (rule) => {
+    const p = { ...(rule.params || {}) };
+    if (Array.isArray(p.symbols)) p.symbols = p.symbols.join(", ");
+    setEditId(rule.id);
+    setType(rule.type);
+    setParams(p);
+    setOpen(true);
+  };
 
   const submit = () => {
     const cleaned = { ...params };
-    // Symbols : split CSV
     if ((type === "instrument_ban" || type === "instrument_only") && typeof cleaned.symbols === "string") {
       cleaned.symbols = cleaned.symbols.split(",").map(s => s.trim()).filter(Boolean);
     }
-    // Coerce numbers
     ["max", "minutes", "minRR"].forEach(k => {
       if (cleaned[k] != null && cleaned[k] !== "") cleaned[k] = Number(cleaned[k]);
     });
-    addRule({ type, active: true, params: cleaned });
+    if (isEditing) {
+      updateRule(editId, { type, params: cleaned });
+    } else {
+      addRule({ type, active: true, params: cleaned });
+    }
     reset();
     setOpen(false);
   };
@@ -501,7 +514,7 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
     <div style={card()}>
       {sectionHeader("Mes règles", `${rules.filter(r => r.active).length} active${rules.filter(r => r.active).length > 1 ? "s" : ""} · règles structurées évaluées automatiquement sur tes trades`,
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={() => { if (open) { reset(); setOpen(false); } else { setOpen(true); } }}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "7px 14px", borderRadius: 999,
@@ -530,8 +543,7 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={() => { reset(); setOpen(false); }} style={btnGhost()}>Annuler</button>
             <button onClick={submit} style={btnPrimary()}>
-              <Lock size={12} strokeWidth={2} style={{ marginRight: 4, verticalAlign: "-1px" }} />
-              Créer (verrou 24h)
+              {isEditing ? "Enregistrer" : "Créer la règle"}
             </button>
           </div>
         </div>
@@ -550,8 +562,8 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
             return (
               <div key={rule.id} style={{
                 display: "grid",
-                gridTemplateColumns: "auto 1fr auto auto",
-                gap: 12, alignItems: "center",
+                gridTemplateColumns: "auto 1fr auto auto auto",
+                gap: 8, alignItems: "center",
                 padding: "12px 4px",
                 borderTop: idx === 0 ? "none" : `1px solid ${T.border}`,
                 opacity: rule.active ? 1 : 0.55,
@@ -578,8 +590,16 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
                   {rule.active ? "Désactiver" : "Réactiver"}
                 </button>
                 <button
+                  onClick={() => startEdit(rule)}
+                  aria-label="Modifier la règle"
+                  title="Modifier"
+                  style={{ ...btnGhost(), padding: 6 }}>
+                  <Pencil size={13} strokeWidth={1.75} />
+                </button>
+                <button
                   onClick={() => deleteRule(rule.id)}
                   aria-label="Supprimer la règle"
+                  title="Supprimer"
                   style={{ ...btnGhost(), padding: 6, color: T.red }}>
                   <Trash2 size={13} strokeWidth={1.75} />
                 </button>

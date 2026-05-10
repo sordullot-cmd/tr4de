@@ -349,7 +349,7 @@ export default function NotesPage() {
           {/* Folders */}
           <div style={{ padding: 10, borderBottom: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>Dossiers</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMut, paddingLeft: 6 }}>Dossiers</span>
               <button onClick={() => { setCreatingFolder(true); setFolderDraft(""); }}
                 title="Nouveau dossier"
                 style={{ width: 22, height: 22, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
@@ -363,7 +363,6 @@ export default function NotesPage() {
               {[
                 { id: null, name: "Toutes les notes", count: notes.length },
                 ...folders.map(f => ({ id: f.id, name: f.name, count: notes.filter(n => n.folderId === f.id).length, removable: true })),
-                { id: "unfiled", name: "Sans dossier", count: notes.filter(n => !n.folderId).length },
               ].map(item => {
                 const active = selectedFolderId === item.id;
                 return (
@@ -384,13 +383,15 @@ export default function NotesPage() {
                     <span style={{ fontSize: 10, color: T.textMut, fontWeight: 500 }}>{item.count}</span>
                     {item.removable && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); if (confirm(`Supprimer le dossier "${item.name}" ? Les notes seront déplacées vers "Sans dossier".`)) removeFolder(item.id); }}
-                        title="Supprimer le dossier"
-                        style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                        type="button"
+                        onMouseDown={(e) => { e.stopPropagation(); }}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeFolder(item.id); }}
+                        title="Supprimer le dossier (annulable via Ctrl+Z)"
+                        style={{ width: 20, height: 20, borderRadius: 4, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}
                       >
-                        <X size={10} strokeWidth={2} />
+                        <X size={12} strokeWidth={2} />
                       </button>
                     )}
                   </div>

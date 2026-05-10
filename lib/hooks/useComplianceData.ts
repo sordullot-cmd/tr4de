@@ -5,6 +5,7 @@ import { ComplianceRule, RULE_LOCK_MS } from "@/lib/compliance";
 
 const RULES_KEY = "tr4de_compliance_rules";
 const WEBHOOK_KEY = "tr4de_compliance_webhook";
+const RULES_EVENT = "tr4de:compliance-rules-changed";
 
 function readRules(): ComplianceRule[] {
   try {
@@ -21,6 +22,10 @@ function readRules(): ComplianceRule[] {
 function writeRules(rules: ComplianceRule[]) {
   try {
     localStorage.setItem(RULES_KEY, JSON.stringify(rules));
+    // Notifie toutes les instances du hook dans le même onglet (storage event ne fire que cross-tab)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(RULES_EVENT));
+    }
   } catch {}
 }
 
@@ -34,8 +39,13 @@ export function useComplianceRules() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === RULES_KEY) setRules(readRules());
     };
+    const onLocal = () => setRules(readRules());
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(RULES_EVENT, onLocal);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(RULES_EVENT, onLocal);
+    };
   }, []);
 
   const persist = useCallback((next: ComplianceRule[]) => {

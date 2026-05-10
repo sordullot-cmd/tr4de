@@ -25,7 +25,7 @@ import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import RiskCalculator from "@/components/RiskCalculator";
 import ComplianceModule, { ComplianceKpiRow, ComplianceInsights } from "@/components/discipline/ComplianceModule";
 import { useComplianceRules } from "@/lib/hooks/useComplianceData";
-import { describeRule, isRuleLive } from "@/lib/compliance";
+import { describeRule, isRuleLive, computeStats } from "@/lib/compliance";
 
 function reorder(arr, from, to) {
   const next = [...arr];
@@ -460,6 +460,23 @@ export default function DisciplinePage({ trades = [] }) {
   const { getDayDiscipline, setRuleCompleted, getDayScore, baseRules, disciplineData } = useDisciplineTracking();
   const { customRules, loading: rulesLoading, addRule, deleteRule } = useCustomDisciplineRules();
   const { pushUndo } = useUndo();
+
+  // Stats compliance (règles automatiques) → utilisées par la heatmap pour afficher
+  // un % de discipline quotidien basé sur les violations détectées sur les trades du jour.
+  const { rules: complianceRules } = useComplianceRules();
+  const complianceStats = React.useMemo(
+    () => computeStats(complianceRules || [], trades || []),
+    [complianceRules, trades]
+  );
+  const violatingTradesByDay = React.useMemo(() => {
+    const map = new Map();
+    for (const v of complianceStats.violations) {
+      let s = map.get(v.date);
+      if (!s) { s = new Set(); map.set(v.date, s); }
+      s.add(v.trade_id);
+    }
+    return map;
+  }, [complianceStats]);
   
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRuleForm, setShowRuleForm] = useState(false);
@@ -805,28 +822,14 @@ export default function DisciplinePage({ trades = [] }) {
           {/* HEATMAP CALENDAR - DISCIPLINE TRACKER */}
           <div key={heatmapVersion} style={{minWidth:0,overflow:"hidden",borderRight:`1px solid ${T.border}`}}>
             {(() => {
-              // Calculer la streak de jours consécutifs (Supabase d'abord, localStorage en fallback)
-              let streak = 0;
-              const cursor = new Date();
-              while (true) {
-                const dateStr = getLocalDateString(cursor);
-                let checked = null;
-                if (disciplineData && disciplineData[dateStr]) {
-                  checked = disciplineData[dateStr];
-                } else {
-                  const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
-                  if (stored) {
-                    try { checked = JSON.parse(stored); } catch {}
-                  }
-                }
-                if (checked) {
-                  const hasAnyRule = Object.values(checked).some(v => v === true);
-                  if (hasAnyRule) {
-                    streak++;
-                    cursor.setDate(cursor.getDate() - 1);
-                  } else { break; }
-                } else { break; }
-              }
+              // Streak compliance = nombre de jours consécutifs sans aucune violation (depuis le jour le plus récent ayant tradé)
+              const streak = complianceStats.streak;
+              // Stats du jour
+              const todayStr = getLocalDateString(new Date());
+              const todayDay = complianceStats.byDay.get(todayStr);
+              const todayViolatingSet = violatingTradesByDay.get(todayStr) || new Set();
+              const todayClean = todayDay ? Math.max(0, todayDay.trades - todayViolatingSet.size) : 0;
+              const todayTotal = todayDay ? todayDay.trades : 0;
               return (
                 <div style={{padding:"16px 20px 0",display:"flex",alignItems:"flex-start",gap:10}}>
                   <div style={{flex:1,minWidth:0}}>
@@ -836,7 +839,7 @@ export default function DisciplinePage({ trades = [] }) {
                     </div>
                   </div>
                   <div style={{fontSize:11,color:"#8E8E8E",fontVariantNumeric:"tabular-nums",marginTop:2}}>
-                    {dailyRules.filter(r => r.status).length}/{dailyRules.length}
+                    {todayTotal > 0 ? `${todayClean}/${todayTotal}` : "—"}
                   </div>
                 </div>
               );
@@ -886,28 +889,23 @@ export default function DisciplinePage({ trades = [] }) {
                   return '#16A34A';                         // Vert vif uniquement si 100%
                 };
                 
-                // Le progress tracker / heatmap est lié aux "Règles à suivre" (personalRules).
-                // Total = nombre de règles perso ; respectées = celles cochées ce jour-là.
+                // La heatmap est désormais branchée sur le moteur de compliance (règles automatiques).
+                // Pour chaque jour, on compte les trades sans aucune violation comme "compliants".
+                // % = trades compliants / trades du jour (100% = aucun trade en infraction).
                 const getDailyData = (dateStr) => {
-                  const totalRules = personalRules.length;
-                  if (totalRules === 0) {
+                  const day = complianceStats.byDay.get(dateStr);
+                  if (!day || day.trades === 0) {
                     return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0 };
                   }
-                  try {
-                    let checked = null;
-                    if (disciplineData && disciplineData[dateStr]) {
-                      checked = disciplineData[dateStr];
-                    } else {
-                      const stored = localStorage.getItem(`tr4de_checked_rules_${dateStr}`);
-                      if (stored) checked = JSON.parse(stored);
-                    }
-                    if (checked) {
-                      const checkedCount = personalRules.filter(r => checked[r.id] === true).length;
-                      const percentage = Math.round((checkedCount / totalRules) * 100);
-                      return { percentage, hadTrading: true, rulesRespected: checkedCount, totalRules };
-                    }
-                  } catch (e) {}
-                  return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules };
+                  const violatingSet = violatingTradesByDay.get(dateStr) || new Set();
+                  const cleanTrades = day.trades - violatingSet.size;
+                  const percentage = Math.round((cleanTrades / day.trades) * 100);
+                  return {
+                    percentage,
+                    hadTrading: true,
+                    rulesRespected: cleanTrades,
+                    totalRules: day.trades,
+                  };
                 };
                 
                 // Build all weeks across all months
@@ -1065,7 +1063,7 @@ export default function DisciplinePage({ trades = [] }) {
                                     border: 'none',
                                     opacity: 1
                                   }}
-                                  title={`${day.dateStr}: ${day.percentage}% discipline (${day.rulesRespected}/${day.totalRules} rules)`}
+                                  title={`${day.dateStr} : ${day.percentage}% compliance (${day.rulesRespected}/${day.totalRules} trades clean)`}
                                 />
                               );
                             })}

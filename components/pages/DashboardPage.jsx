@@ -249,14 +249,14 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   const dPnL = formatDelta(cur.pnl, prev.pnl, "pct");
   const dWR  = formatDelta(cur.wr, prev.wr, "pp");
   const dPF  = formatDelta(cur.pf, prev.pf, "abs");
-  // WR Today = délta vs WR de la période courante (ce qu'on est habitué à faire)
-  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
-  const todayTrades = (allTrades || []).filter(tr => (tr.date || "").slice(0,10) === todayIso);
-  const todayKpi = calcKpis(todayTrades);
-  const dWRToday = todayKpi.n > 0
-    ? (() => { const d = todayKpi.wr - cur.wr; const sign = d > 0 ? "+" : ""; return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" }; })()
+
+  // WR Total = winrate sur tous les trades du compte (toutes périodes confondues)
+  const totalKpi = calcKpis(allTrades || []);
+  const wrTotalStr = totalKpi.n > 0 ? totalKpi.wr.toFixed(1) : "0.0";
+  // Delta = WR de la période courante vs WR total (montre si on bat ou non sa moyenne)
+  const dWRTotal = (cur.n > 0 && totalKpi.n > 0)
+    ? (() => { const d = cur.wr - totalKpi.wr; const sign = d > 0 ? "+" : ""; return { text: `${sign}${d.toFixed(1)}pp`, color: d >= 0 ? "#16A34A" : "#EF4444", arrow: d >= 0 ? "↑" : "↓" }; })()
     : { text: "—", color: "#8E8E8E", arrow: "" };
-  const wrToday = todayKpi.n > 0 ? todayKpi.wr.toFixed(1) : "0.0";
   const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
   const avgLoss = losses.length ? losses.reduce((s,t)=>s+t.pnl,0)/losses.length : 0;
   const maxWin = filteredTrades.length ? Math.max(...filteredTrades.map(t=>t.pnl)) : 0;
@@ -553,11 +553,11 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{profitFactor}</div>
           </div>
 
-          {/* WIN RATE TODAY */}
-          <div style={{padding:"14px 18px",position:"relative"}} title={todayKpi.n > 0 ? `vs WR période : ${cur.wr.toFixed(1)}%` : "Aucun trade aujourd'hui"}>
-            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWRToday.color}}>{dWRToday.arrow} {dWRToday.text}</div>
-            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>WR Today <span style={{color:"#8E8E8E"}}>›</span></div>
-            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{wrToday}%</div>
+          {/* WR TOTAL (compte) */}
+          <div style={{padding:"14px 18px",position:"relative"}} title={totalKpi.n > 0 ? `WR période courante : ${cur.wr.toFixed(1)}% (${cur.n} trades) — WR total : ${totalKpi.wr.toFixed(1)}% (${totalKpi.n} trades)` : "Aucun trade enregistré"}>
+            <div style={{position:"absolute",top:10,right:12,fontSize:10,fontWeight:600,color:dWRTotal.color}}>{dWRTotal.arrow} {dWRTotal.text}</div>
+            <div style={{fontSize:12,color:"#5C5C5C",marginBottom:8,fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>WR Total <span style={{color:"#8E8E8E"}}>›</span></div>
+            <div style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2}}>{wrTotalStr}%</div>
           </div>
         </div>
 
