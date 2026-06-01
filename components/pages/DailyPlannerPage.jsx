@@ -15,6 +15,25 @@ import {
   Droplets, Coffee, Apple, Salad, ShoppingCart, GraduationCap, TrendingUp,
   Music, Sparkles as Sparkle, Wallet, Code as CodeIcon, Users, ShowerHead,
   Pill, Dog, Sprout, Wind, Sun, Star, Mic, Utensils, Car,
+  // Librairie d'icônes additionnelles pour le picker
+  Heart, Smile, Moon, Cloud, CloudRain, Snowflake, Leaf, TreePine, Flower, Flower2,
+  Cat, Bird, Fish, Rabbit, Squirrel, Turtle,
+  Activity, HeartPulse, Stethoscope, Syringe, Bandage, Eye,
+  Trophy, Medal, Award, Crown, Gem, Diamond, Gift,
+  Pizza, Sandwich, Cookie, IceCreamCone, IceCreamBowl, Cake, Beef, Egg, Carrot, Cherry, Grape, Wine, Beer, CupSoda, Milk, Soup,
+  Tent, Mountain, MountainSnow, Trees, TreePalm, Sailboat, Plane, TrainFront, Bus, Truck, Rocket,
+  Camera, Film, Tv, Gamepad2, Headphones, Radio, Guitar,
+  Paintbrush, Palette, Scissors, Hammer, Wrench, Cog, Settings,
+  Laptop, Smartphone, Keyboard, Monitor, Printer, Server, Database,
+  FileText, Notebook, NotebookPen, Folder, Archive, Library, Newspaper, BookMarked, BookOpenCheck,
+  Lightbulb, Zap, Battery as BatteryIcon, Plug, Atom, FlaskConical, TestTube, Microscope, Telescope, Globe,
+  Briefcase, Building, Building2, House, Bed,
+  Map, Compass, Navigation, Anchor, LifeBuoy, Umbrella,
+  ShieldCheck, Shield, Lock, Key, Bell, BellRing, Mail, MessageCircle, Phone, PhoneCall, Video,
+  DollarSign, Euro, PiggyBank, CreditCard, Receipt, Banknote, Coins,
+  Calendar, CalendarCheck, CalendarDays, Timer, Hourglass, Watch,
+  Hand, ThumbsUp, HandHeart, Handshake, PartyPopper, Baby,
+  Skull, Ghost, Bone, BicepsFlexed,
 } from "lucide-react";
 
 const T = {
@@ -83,6 +102,71 @@ function autoIcon(name) {
   if (!name) return Star;
   for (const r of ICON_RULES) if (r.re.test(name)) return r.Icon;
   return Star;
+}
+
+// Librairie d'icônes choisissables manuellement (clé stable → composant).
+// Organisée par thème pour le picker.
+const ICON_LIBRARY = {
+  // Sport / corps
+  dumbbell: Dumbbell, biceps: BicepsFlexed, footprints: Footprints, bike: Bike, waves: Waves,
+  bone: Bone, activity: Activity, heartpulse: HeartPulse, mountain: Mountain, mountainsnow: MountainSnow,
+  // Mental / bien-être
+  brain: Brain, sparkle: Sparkle, heart: Heart, smile: Smile, sun: Sun, moon: Moon, cloud: Cloud,
+  cloudrain: CloudRain, snowflake: Snowflake, wind: Wind, flame: Flame, eye: Eye,
+  // Lecture / écriture / études
+  book: BookOpen, bookmarked: BookMarked, bookcheck: BookOpenCheck, library: Library,
+  newspaper: Newspaper, notebook: Notebook, notebookpen: NotebookPen, pen: PenLine,
+  file: FileText, folder: Folder, archive: Archive, graduation: GraduationCap,
+  // Sommeil / maison
+  bed: BedDouble, bed2: Bed, alarm: AlarmClock, house: House, building: Building, building2: Building2,
+  shower: ShowerHead,
+  // Boisson / nourriture
+  droplets: Droplets, coffee: Coffee, cupsoda: CupSoda, milk: Milk, wine: Wine, beer: Beer,
+  apple: Apple, cherry: Cherry, grape: Grape, carrot: Carrot, salad: Salad, soup: Soup,
+  pizza: Pizza, sandwich: Sandwich, cookie: Cookie, cake: Cake, icecream: IceCreamCone,
+  icecreambowl: IceCreamBowl, beef: Beef, egg: Egg, utensils: Utensils,
+  // Santé
+  pill: Pill, stethoscope: Stethoscope, syringe: Syringe, bandage: Bandage,
+  // Travail / argent
+  briefcase: Briefcase, wallet: Wallet, dollar: DollarSign, euro: Euro, piggy: PiggyBank,
+  card: CreditCard, receipt: Receipt, banknote: Banknote, coins: Coins, trend: TrendingUp,
+  // Tech / dev
+  code: CodeIcon, laptop: Laptop, smartphone: Smartphone, keyboard: Keyboard,
+  monitor: Monitor, printer: Printer, server: Server, database: Database,
+  // Créatif / loisirs
+  music: Music, mic: Mic, guitar: Guitar, headphones: Headphones, radio: Radio,
+  camera: Camera, film: Film, tv: Tv, gamepad: Gamepad2,
+  paint: Paintbrush, palette: Palette, scissors: Scissors,
+  // Outils
+  hammer: Hammer, wrench: Wrench, cog: Cog, settings: Settings, plug: Plug,
+  // Science
+  atom: Atom, flask: FlaskConical, testtube: TestTube, microscope: Microscope,
+  telescope: Telescope, globe: Globe, lightbulb: Lightbulb, zap: Zap, battery: BatteryIcon,
+  // Voyage / nature
+  tent: Tent, trees: Trees, treepalm: TreePalm, sprout: Sprout, leaf: Leaf,
+  flower: Flower, flower2: Flower2, sailboat: Sailboat, plane: Plane, train: TrainFront,
+  bus: Bus, truck: Truck, car: Car, rocket: Rocket, map: Map, compass: Compass,
+  navigation: Navigation, anchor: Anchor, lifebuoy: LifeBuoy, umbrella: Umbrella,
+  // Animaux
+  dog: Dog, cat: Cat, bird: Bird, fish: Fish, rabbit: Rabbit, squirrel: Squirrel, turtle: Turtle,
+  // Social / communication
+  users: Users, hand: Hand, thumbsup: ThumbsUp, handheart: HandHeart, handshake: Handshake,
+  party: PartyPopper, baby: Baby, bell: Bell, bellring: BellRing,
+  mail: Mail, message: MessageCircle, phone: Phone, phonecall: PhoneCall, video: Video,
+  // Récompenses
+  trophy: Trophy, medal: Medal, award: Award, crown: Crown, gem: Gem, diamond: Diamond, gift: Gift,
+  // Sécurité
+  shield: Shield, shieldcheck: ShieldCheck, lock: Lock, key: Key,
+  // Temps
+  clock: Clock, calendar: Calendar, calendarcheck: CalendarCheck, calendardays: CalendarDays,
+  timer: Timer, hourglass: Hourglass, watch: Watch,
+  // Shopping / divers
+  cart: ShoppingCart, target: TargetIcon, star: Star, skull: Skull, ghost: Ghost,
+};
+
+function iconFor(h) {
+  if (h && h.icon && ICON_LIBRARY[h.icon]) return ICON_LIBRARY[h.icon];
+  return autoIcon(h?.name);
 }
 
 // Auto-description : si le nom match un thème connu, suggère une description.
@@ -225,18 +309,19 @@ export default function DailyPlannerPage() {
   // Habit form (add + edit)
   const [habitFormOpen, setHabitFormOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState(null);
-  const emptyHabit = { name: "", description: "", time: "", location: "" };
+  const emptyHabit = { name: "", description: "", time: "", location: "", icon: "" };
   const [habitDraft, setHabitDraft] = useState(emptyHabit);
   const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setHabitFormOpen(true); };
-  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "" }); setEditingHabitId(h.id); setHabitFormOpen(true); };
+  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "", icon: h.icon || "" }); setEditingHabitId(h.id); setHabitFormOpen(true); };
   const saveHabit = () => {
     const nm = habitDraft.name.trim();
     if (!nm) return;
     const desc = habitDraft.description.trim() || autoDescription(nm);
+    const iconKey = habitDraft.icon && ICON_LIBRARY[habitDraft.icon] ? habitDraft.icon : "";
     if (editingHabitId) {
-      setHabits(prev => prev.map(h => h.id === editingHabitId ? { ...h, name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim() } : h));
+      setHabits(prev => prev.map(h => h.id === editingHabitId ? { ...h, name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey } : h));
     } else {
-      setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim() }]);
+      setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey }]);
     }
     setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null);
   };
@@ -359,6 +444,75 @@ export default function DailyPlannerPage() {
                     />
                   </div>
 
+                  {/* Icône */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span>Icône <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel</span></span>
+                      {habitDraft.icon && (
+                        <button type="button" onClick={() => setHabitDraft({ ...habitDraft, icon: "" })}
+                          style={{ background: "transparent", border: "none", color: T.textMut, fontSize: 11, cursor: "pointer", padding: 0 }}>
+                          Auto
+                        </button>
+                      )}
+                    </label>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(34px, 1fr))",
+                      gap: 6,
+                      maxHeight: 168,
+                      overflowY: "auto",
+                      padding: 8,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 10,
+                      background: T.white,
+                    }}>
+                      {(() => {
+                        const previewName = habitDraft.name?.trim() || "";
+                        const AutoIco = autoIcon(previewName);
+                        const isAuto = !habitDraft.icon;
+                        return (
+                          <button type="button" onClick={() => setHabitDraft({ ...habitDraft, icon: "" })}
+                            title="Auto (selon le nom)"
+                            style={{
+                              width: "100%", aspectRatio: "1 / 1",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              borderRadius: 8,
+                              border: `1px solid ${isAuto ? T.text : T.border}`,
+                              background: isAuto ? T.text : T.white,
+                              color: isAuto ? "#fff" : T.text,
+                              cursor: "pointer", padding: 0,
+                              position: "relative",
+                            }}>
+                            <AutoIco size={15} strokeWidth={1.75} />
+                            <span style={{ position: "absolute", bottom: -2, right: -2, fontSize: 8, background: isAuto ? "#fff" : T.text, color: isAuto ? T.text : "#fff", borderRadius: 6, padding: "1px 3px", lineHeight: 1, fontWeight: 600 }}>A</span>
+                          </button>
+                        );
+                      })()}
+                      {Object.entries(ICON_LIBRARY).map(([key, IconCmp]) => {
+                        const selected = habitDraft.icon === key;
+                        return (
+                          <button key={key} type="button"
+                            onClick={() => setHabitDraft({ ...habitDraft, icon: key })}
+                            title={key}
+                            style={{
+                              width: "100%", aspectRatio: "1 / 1",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              borderRadius: 8,
+                              border: `1px solid ${selected ? T.text : T.border}`,
+                              background: selected ? T.text : T.white,
+                              color: selected ? "#fff" : T.text,
+                              cursor: "pointer", padding: 0,
+                              transition: "background .12s ease, border-color .12s ease",
+                            }}
+                            onMouseEnter={(e) => { if (!selected) { e.currentTarget.style.background = T.bg; } }}
+                            onMouseLeave={(e) => { if (!selected) { e.currentTarget.style.background = T.white; } }}>
+                            <IconCmp size={15} strokeWidth={1.75} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Heure + Lieu */}
                   <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 10 }}>
                     <div>
@@ -417,7 +571,7 @@ export default function DailyPlannerPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {habits.map(h => {
                 const done = !!(habitHistory[h.id] && habitHistory[h.id][dateKey]);
-                const Ico = autoIcon(h.name);
+                const Ico = iconFor(h);
                 return (
                   <div key={h.id}
                     draggable

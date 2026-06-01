@@ -27,6 +27,7 @@ import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
+import DrivePage from "@/components/pages/DrivePage";
 import CalendarPage from "@/components/pages/CalendarPage";
 import JournalPage from "@/components/pages/JournalPage";
 import DashboardPage from "@/components/pages/DashboardPage";
@@ -83,6 +84,7 @@ import {
   Menu as LucideMenu,
   Wallet as LucideWallet,
   Dumbbell as LucideDumbbell,
+  FolderOpen as LucideFolderOpen,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -720,6 +722,7 @@ export default function App() {
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
+        { id: "drive",         icon: LucideFolderOpen,   label: t("nav.drive") },
         { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
@@ -756,6 +759,7 @@ export default function App() {
     sport: <SportPage />,
     reading: <ReadingListPage />,
     notes: <NotesPage />,
+    drive: <DrivePage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
@@ -1043,7 +1047,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading", "sport", "notes"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading", "sport", "notes", "drive"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

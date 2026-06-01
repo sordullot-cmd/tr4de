@@ -64,6 +64,7 @@ const FR: Dict = {
   "nav.habits": "Habitudes",
   "nav.focus": "Minuteur Focus",
   "nav.notes": "Notes",
+  "nav.drive": "Drive",
   "nav.reading": "Liste de lecture",
 
   // Common
@@ -801,6 +802,7 @@ const EN: Dict = {
   "nav.habits": "Habits",
   "nav.focus": "Focus Timer",
   "nav.notes": "Notes",
+  "nav.drive": "Drive",
   "nav.reading": "Reading List",
 
   // Common

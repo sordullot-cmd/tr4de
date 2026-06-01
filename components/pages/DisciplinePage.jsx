@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
 import {
   X as LucideX,
   Trash2 as LucideTrash2,
@@ -10,6 +11,7 @@ import {
   Plus,
   GripVertical,
   Sun, Compass, Newspaper, ListChecks, NotebookPen, ShieldCheck, Flame,
+  ClipboardCheck, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -480,6 +482,117 @@ export default function DisciplinePage({ trades = [] }) {
   
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRuleForm, setShowRuleForm] = useState(false);
+  const [showRoutinePopover, setShowRoutinePopover] = useState(false);
+  const routineBtnRef = useRef(null);
+  // Checklist routine — état journalier, persisté localement par date.
+  const [routineChecks, setRoutineChecks] = useState(() => {
+    try {
+      const k = `tr4de_routine_checklist_${getLocalDateString()}`;
+      return JSON.parse(localStorage.getItem(k) || "{}");
+    } catch { return {}; }
+  });
+  const DEFAULT_ROUTINE_ITEMS = [
+    { id: "biais_journalier", label: "Biais journalier défini" },
+    { id: "fvg_respecte",     label: "FVG respectée identifiée" },
+    { id: "zones_cle",        label: "Traçage des zones clé" },
+  ];
+  const [routineItems, setRoutineItems] = useCloudState(
+    "tr4de_routine_rules",
+    "routine_rules",
+    DEFAULT_ROUTINE_ITEMS,
+  );
+  const ROUTINE_ITEMS = Array.isArray(routineItems) && routineItems.length ? routineItems : DEFAULT_ROUTINE_ITEMS;
+  const [editingRuleId, setEditingRuleId] = useState(null);
+  const [editingRuleDraft, setEditingRuleDraft] = useState("");
+  const [newRuleDraft, setNewRuleDraft] = useState("");
+  const addRoutineRule = () => {
+    const v = newRuleDraft.trim();
+    if (!v) return;
+    setRoutineItems(prev => {
+      const base = Array.isArray(prev) && prev.length ? prev : DEFAULT_ROUTINE_ITEMS;
+      return [...base, { id: `r_${Date.now()}`, label: v }];
+    });
+    setNewRuleDraft("");
+  };
+  // Crée une règle vide et passe immédiatement en édition.
+  const startCreateRoutineRule = () => {
+    const id = `r_${Date.now()}`;
+    setRoutineItems(prev => {
+      const base = Array.isArray(prev) && prev.length ? prev : DEFAULT_ROUTINE_ITEMS;
+      return [...base, { id, label: "" }];
+    });
+    setEditingRuleId(id);
+    setEditingRuleDraft("");
+  };
+  const startEditRule = (it) => { setEditingRuleId(it.id); setEditingRuleDraft(it.label); };
+  const commitEditRule = () => {
+    const v = editingRuleDraft.trim();
+    const id = editingRuleId;
+    if (!id) return;
+    setRoutineItems(prev => {
+      const base = Array.isArray(prev) && prev.length ? prev : DEFAULT_ROUTINE_ITEMS;
+      if (!v) return base.filter(x => x.id !== id); // règle vide → supprimée
+      return base.map(x => x.id === id ? { ...x, label: v } : x);
+    });
+    setEditingRuleId(null); setEditingRuleDraft("");
+  };
+  const cancelEditRule = () => {
+    const id = editingRuleId;
+    if (id) {
+      // Si la règle était vide (création), on la retire.
+      setRoutineItems(prev => {
+        const base = Array.isArray(prev) && prev.length ? prev : DEFAULT_ROUTINE_ITEMS;
+        const cur = base.find(x => x.id === id);
+        if (cur && !cur.label) return base.filter(x => x.id !== id);
+        return base;
+      });
+    }
+    setEditingRuleId(null); setEditingRuleDraft("");
+  };
+  const removeRoutineRule = (id) => {
+    setRoutineItems(prev => {
+      const base = Array.isArray(prev) && prev.length ? prev : DEFAULT_ROUTINE_ITEMS;
+      return base.filter(x => x.id !== id);
+    });
+    // Nettoie l'éventuel check du jour pour cette règle.
+    setRoutineChecks(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev }; delete next[id];
+      try {
+        const k = `tr4de_routine_checklist_${getLocalDateString()}`;
+        localStorage.setItem(k, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+  const toggleRoutineCheck = (id) => {
+    setRoutineChecks(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try {
+        const k = `tr4de_routine_checklist_${getLocalDateString()}`;
+        localStorage.setItem(k, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+  const routineDoneCount = ROUTINE_ITEMS.reduce((n, it) => n + (routineChecks[it.id] ? 1 : 0), 0);
+  // Ferme la popover au clic extérieur / Esc.
+  useEffect(() => {
+    if (!showRoutinePopover) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowRoutinePopover(false); };
+    const onClick = (e) => {
+      const pop = document.getElementById("tr4de-routine-popover");
+      if (pop && pop.contains(e.target)) return;
+      if (routineBtnRef.current && routineBtnRef.current.contains(e.target)) return;
+      setShowRoutinePopover(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, [showRoutinePopover]);
   const [heatmapVersion, setHeatmapVersion] = useState(0);
   // Mémorise la dernière règle cochée pour gérer Shift+clic (sélection plage)
   const [lastClickedRuleId, setLastClickedRuleId] = useState(null);
@@ -809,7 +922,213 @@ export default function DisciplinePage({ trades = [] }) {
       <div style={{display:"flex",flexDirection:"column",gap:16}} className="anim-1">
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("disc.title")}</h1>
-          <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
+          <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:8}}>
+            <div ref={routineBtnRef} style={{position:"relative", fontFamily:"var(--font-sans)"}}>
+              <button
+                onClick={() => setShowRoutinePopover(v => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={showRoutinePopover}
+                title="Règles de routine du jour"
+                style={{
+                  padding:"7px 14px",
+                  height:34,
+                  borderRadius:999,
+                  background:"#FFFFFF",
+                  border:`1px solid ${showRoutinePopover ? "#D4D4D4" : "#E5E5E5"}`,
+                  fontSize:13,
+                  fontWeight:500,
+                  cursor:"pointer",
+                  display:"flex",
+                  alignItems:"center",
+                  gap:8,
+                  color:"#0D0D0D",
+                  fontFamily:"inherit",
+                  transition:"border-color 120ms ease",
+                }}
+              >
+                <ClipboardCheck size={14} strokeWidth={1.75} color="#0D0D0D" />
+                <span>Routine</span>
+                <span style={{
+                  fontSize:11, fontWeight:600, fontVariantNumeric:"tabular-nums",
+                  padding:"1px 7px", borderRadius:999,
+                  background:"#F5F5F5", color:"#5C5C5C",
+                }}>
+                  {routineDoneCount}/{ROUTINE_ITEMS.length}
+                </span>
+                {showRoutinePopover
+                  ? <ChevronUp size={14} strokeWidth={2} color="#8E8E8E" />
+                  : <ChevronDown size={14} strokeWidth={2} color="#8E8E8E" />}
+              </button>
+
+              {showRoutinePopover && (
+                <div
+                  id="tr4de-routine-popover"
+                  role="listbox"
+                  style={{
+                    position:"absolute",
+                    top:"calc(100% + 4px)",
+                    left:0,
+                    right:0,
+                    minWidth:280,
+                    background:"#FFFFFF",
+                    border:"1px solid #E5E5E5",
+                    borderRadius:16,
+                    boxShadow:"0 8px 24px rgba(0, 0, 0, 0.10)",
+                    zIndex:100,
+                    overflow:"hidden",
+                    display:"flex",
+                    flexDirection:"column",
+                    padding:4,
+                  }}
+                >
+                  <div style={{
+                    display:"flex", alignItems:"center", justifyContent:"space-between",
+                    padding:"4px 6px 4px 10px",
+                  }}>
+                    <span style={{ fontSize:11, color:"#8E8E8E", fontWeight:500 }}>
+                      Routine du jour
+                    </span>
+                    <button
+                      type="button"
+                      onClick={startCreateRoutineRule}
+                      title="Ajouter une règle"
+                      aria-label="Ajouter une règle"
+                      style={{
+                        display:"inline-flex", alignItems:"center", justifyContent:"center",
+                        width:22, height:22, border:"none", background:"transparent",
+                        cursor:"pointer", color:"#8E8E8E", borderRadius:4,
+                        transition:"background .12s ease, color .12s ease",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "#0D0D0D"; e.currentTarget.style.background = "#EBEBEB"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "#8E8E8E"; e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <Plus size={13} strokeWidth={2} />
+                    </button>
+                  </div>
+
+                  {ROUTINE_ITEMS.map((it, idx) => {
+                    const checked = !!routineChecks[it.id];
+                    const isEditing = editingRuleId === it.id;
+                    return (
+                      <React.Fragment key={it.id}>
+                        <div
+                          style={{
+                            display:"flex",
+                            alignItems:"center",
+                            gap:10,
+                            width:"100%",
+                            padding:"7px 10px",
+                            borderRadius:10,
+                            fontFamily:"inherit",
+                            color:"#0D0D0D",
+                            fontSize:13,
+                            fontWeight:500,
+                            boxSizing:"border-box",
+                            transition:"background .12s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#F5F5F5";
+                            const act = e.currentTarget.querySelector('[data-rule-actions]'); if (act) act.style.opacity = 1;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            const act = e.currentTarget.querySelector('[data-rule-actions]'); if (act && !isEditing) act.style.opacity = 0;
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={isEditing}
+                            onChange={() => toggleRoutineCheck(it.id)}
+                            style={{ width:14, height:14, accentColor:"#0D0D0D", cursor: isEditing ? "default" : "pointer", margin:0, flexShrink:0, opacity: isEditing ? 0.4 : 1 }}
+                          />
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="Nouvelle règle…"
+                              value={editingRuleDraft}
+                              onChange={(e) => setEditingRuleDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); commitEditRule(); }
+                                if (e.key === "Escape") { e.preventDefault(); cancelEditRule(); }
+                              }}
+                              onBlur={commitEditRule}
+                              style={{
+                                flex:1, minWidth:0,
+                                padding:"4px 8px",
+                                border:`1px solid #D4D4D4`,
+                                borderRadius:6,
+                                fontSize:13, fontWeight:500,
+                                outline:"none", fontFamily:"inherit", color:"#0D0D0D",
+                                background:"#FFFFFF",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => startEditRule(it)}
+                              style={{
+                                flex:1, minWidth:0,
+                                color: checked ? "#8E8E8E" : "#0D0D0D",
+                                textDecoration: checked ? "line-through" : "none",
+                                cursor:"text",
+                                overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+                              }}
+                              title="Cliquer pour modifier"
+                            >{it.label}</span>
+                          )}
+                          <div data-rule-actions style={{
+                            display:"inline-flex", alignItems:"center", gap:2,
+                            opacity: isEditing ? 1 : 0,
+                            transition:"opacity .15s ease",
+                            flexShrink:0,
+                          }}>
+                            {!isEditing && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); startEditRule(it); }}
+                                title="Modifier"
+                                style={{
+                                  display:"inline-flex", alignItems:"center", justifyContent:"center",
+                                  width:22, height:22, border:"none", background:"transparent",
+                                  cursor:"pointer", color:"#8E8E8E", borderRadius:4,
+                                  transition:"background .12s ease, color .12s ease",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.color = "#0D0D0D"; e.currentTarget.style.background = "#EBEBEB"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.color = "#8E8E8E"; e.currentTarget.style.background = "transparent"; }}
+                              >
+                                <Pencil size={12} strokeWidth={1.75} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (isEditing) cancelEditRule(); removeRoutineRule(it.id); }}
+                              title="Supprimer"
+                              style={{
+                                display:"inline-flex", alignItems:"center", justifyContent:"center",
+                                width:22, height:22, border:"none", background:"transparent",
+                                cursor:"pointer", color:"#8E8E8E", borderRadius:4,
+                                transition:"background .12s ease, color .12s ease",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "#FEF2F2"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.color = "#8E8E8E"; e.currentTarget.style.background = "transparent"; }}
+                            >
+                              <LucideTrash2 size={12} strokeWidth={1.75} />
+                            </button>
+                          </div>
+                        </div>
+                        {idx < ROUTINE_ITEMS.length - 1 && (
+                          <div style={{ height:1, background:"#F0F0F0", margin:"0 8px" }} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+
+                </div>
+              )}
+            </div>
+            <div id="tr4de-page-header-slot" />
+          </div>
         </div>
 
         {/* UNIFIED CARD — KPIs (4 cells) + Discipline quotidienne (heatmap, gauche) + Insights (droite) */}
