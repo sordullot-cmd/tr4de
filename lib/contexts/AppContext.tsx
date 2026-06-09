@@ -77,7 +77,26 @@ export function AppProvider({ children, initialPage = "dashboard" }: AppProvider
   const strategiesApi = useStrategies();
   const { accounts: rawAccounts } = useTradingAccounts(user?.id);
 
-  const [page, setPage] = useState<string>(initialPage);
+  // Init depuis le hash de l'URL (#agenda, …) — utilisé notamment par le
+  // retour OAuth Google Agenda. Sinon, page par défaut.
+  const [page, setPage] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.hash.replace(/^#/, "").trim();
+      if (h) return h;
+    }
+    return initialPage;
+  });
+
+  // Synchronise la navigation par hash (#page) après le montage.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onHash = () => {
+      const h = window.location.hash.replace(/^#/, "").trim();
+      if (h) setPage(h);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   const [selectedAccountIds, _setSelectedAccountIds] = useState<string[]>(() =>
     readLS<string[]>("selectedAccountIds", [])
   );

@@ -1,41 +1,59 @@
-import { google } from 'googleapis';
+import { google } from "googleapis";
+import { getOAuthClient } from "@/lib/google/calendar";
+
+export const dynamic = "force-dynamic";
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { accessToken } = body;
+    const { accessToken, timeMin, timeMax } = await req.json();
+    if (!accessToken) return json({ error: "no_access_token" }, 401);
 
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'No access token provided' }), { status: 400 });
-    }
+    const client = getOAuthClient(req);
+    if (!client) return json({ error: "not_configured" }, 503);
+    client.setCredentials({ access_token: accessToken });
 
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      'http://localhost:3000/api/google-calendar/callback'
-    );
-
-    oauth2Client.setCredentials({ access_token: accessToken });
-
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const cal = google.calendar({ version: "v3", auth: client });
 
     const now = new Date();
-    const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const min = timeMin || now.toISOString();
+    const max =
+      timeMax ||
+      new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
 
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: now.toISOString(),
-      timeMax: futureDate.toISOString(),
-      maxResults: 50,
-      orderBy: 'startTime',
+    const res = await cal.events.list({
+      calendarId: "primary",
+      timeMin: min,
+      timeMax: max,
+      maxResults: 250,
       singleEvents: true,
+      orderBy: "startTime",
     });
 
-    const events = response.data.items || [];
+    const events = (res.data.items || []).map((ev) => ({
+      id: ev.id,
+      summary: ev.summary || "(Sans titre)",
+      description: ev.description || "",
+      location: ev.location || "",
+      htmlLink: ev.htmlLink || "",
+      colorId: ev.colorId || null,
+      allDay: !!ev.start?.date,
+      start: ev.start?.dateTime || ev.start?.date || null,
+      end: ev.end?.dateTime || ev.end?.date || null,
+      status: ev.status || "confirmed",
+    }));
 
-    return new Response(JSON.stringify({ events }), { status: 200 });
-  } catch (error) {
-    console.error('Calendar fetch error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return json({ events });
+  } catch (e) {
+    const msg = e?.message || "unknown_error";
+    // 401 si le token est invalide/expiré → le client tentera un refresh.
+    const status = /invalid|expired|unauthor/i.test(msg) ? 401 : 500;
+    return json({ error: msg }, status);
   }
 }

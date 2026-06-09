@@ -28,6 +28,7 @@ import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
 import DrivePage from "@/components/pages/DrivePage";
+import AgendaPage from "@/components/pages/AgendaPage";
 import CalendarPage from "@/components/pages/CalendarPage";
 import JournalPage from "@/components/pages/JournalPage";
 import DashboardPage from "@/components/pages/DashboardPage";
@@ -78,6 +79,7 @@ import {
   ListTodo as LucideListTodo,
   Zap as LucideZap,
   CalendarDays as LucideCalendarDays,
+  CalendarClock as LucideCalendarClock,
   Flame as LucideFlame,
   Timer as LucideTimer,
   BookOpen as LucideBookOpen,
@@ -719,6 +721,7 @@ export default function App() {
       label: t("nav.productivity"),
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
+        { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
@@ -755,6 +758,7 @@ export default function App() {
     "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} strategies={strategies} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
+    agenda: <AgendaPage />,
     focus: <FocusTimerPage />,
     sport: <SportPage />,
     reading: <ReadingListPage />,
@@ -1047,7 +1051,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "goals", "focus", "reading", "sport", "notes", "drive"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

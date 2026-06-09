@@ -1,18 +1,31 @@
-import { google } from 'googleapis';
+import { getOAuthClient, CALENDAR_SCOPES } from "@/lib/google/calendar";
 
-const CLIENT_ID = '979650993052-b69lfgcem299usifs6le5m7ddt07mocr.apps.googleusercontent.com';
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const REDIRECT_URI = 'http://localhost:3000/api/google-calendar/callback';
+export const dynamic = "force-dynamic";
+
+function notConfiguredPage() {
+  return new Response(
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Google Agenda non configuré</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 24px;color:#0D0D0D;line-height:1.5}code{background:#F0F0F0;padding:2px 6px;border-radius:6px}a{color:#3B82F6}</style></head>
+      <body>
+        <h2>Google Agenda n'est pas encore configuré</h2>
+        <p>Les variables d'environnement OAuth sont absentes ou contiennent encore des valeurs d'exemple.</p>
+        <p>Renseigne <code>GOOGLE_CLIENT_ID</code> et <code>GOOGLE_CLIENT_SECRET</code> (dans <code>.env.local</code> en local, et dans les variables d'environnement Vercel en production), puis réessaie.</p>
+        <p><a href="/#agenda">← Retour au calendrier</a></p>
+      </body></html>`,
+    { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
+}
 
 export async function GET(req) {
-  const authUrl = google.auth.oauth2Client({
-    clientId: CLIENT_ID,
-    clientSecret: CLIENT_SECRET,
-    redirectUrl: REDIRECT_URI,
-  }).generateAuthUrl({
-    access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/calendar.readonly'],
+  const client = getOAuthClient(req);
+  if (!client) return notConfiguredPage();
+
+  const url = client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent", // force le renvoi d'un refresh_token
+    scope: CALENDAR_SCOPES,
+    include_granted_scopes: true,
   });
 
-  return Response.redirect(authUrl);
+  return Response.redirect(url);
 }

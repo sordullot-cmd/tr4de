@@ -1,76 +1,56 @@
-import { google } from 'googleapis';
+import { getOAuthClient } from "@/lib/google/calendar";
+
+export const dynamic = "force-dynamic";
+
+function errorPage(message, status = 400) {
+  return new Response(
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Erreur Google Agenda</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 24px;color:#0D0D0D;line-height:1.5}a{color:#3B82F6}</style></head>
+      <body>
+        <h2>Connexion à Google Agenda échouée</h2>
+        <p>${message}</p>
+        <p>Vérifie que l'URI de redirection est bien déclarée dans la Google Cloud Console, et que ton compte est autorisé (testeur ou app publiée).</p>
+        <p><a href="/#agenda">← Retour au calendrier</a></p>
+      </body></html>`,
+    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
+}
 
 export async function GET(req) {
   try {
-    const searchParams = new URL(req.url).searchParams;
-    const code = searchParams.get('code');
-    const error = searchParams.get('error');
-    const error_description = searchParams.get('error_description');
+    const params = new URL(req.url).searchParams;
+    const code = params.get("code");
+    const error = params.get("error");
 
-    if (error) {
-      console.error('OAuth error:', error, error_description);
-      return new Response(
-        `<html><body>
-          <h2>Erreur OAuth: ${error}</h2>
-          <p>${error_description || 'Une erreur s\'est produite lors de l\'authentification.'}</p>
-          <p>Vérifiez que:</p>
-          <ul>
-            <li>Vous avez ajouté <strong>cookoz.mail@gmail.com</strong> comme testeur dans Google Cloud Console</li>
-            <li>L'URI de redirection <strong>http://localhost:3000/api/google-calendar/callback</strong> est configurée dans Google Cloud</li>
-          </ul>
-          <a href="/">Retour à l'accueil</a>
-        </body></html>`,
-        { status: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      );
-    }
+    if (error) return errorPage(`OAuth: ${error}`);
+    if (!code) return errorPage("Code d'autorisation manquant.");
 
-    if (!code) {
-      return new Response('Code not found', { status: 400 });
-    }
+    const client = getOAuthClient(req);
+    if (!client) return errorPage("Identifiants OAuth absents côté serveur.", 503);
 
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      'http://localhost:3000/api/google-calendar/callback'
-    );
+    const { tokens } = await client.getToken(code);
 
-    console.log('Exchanging code for tokens...');
-    console.log('CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
-    console.log('CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+    // On stocke côté navigateur puis on revient sur la page Calendrier (#agenda).
+    // JSON.stringify protège contre les injections dans le <script>.
+    const payload = JSON.stringify({
+      access_token: tokens.access_token || null,
+      refresh_token: tokens.refresh_token || null,
+      expiry_date: tokens.expiry_date || null,
+    });
 
-    const { tokens } = await oauth2Client.getToken(code);
-    const accessToken = tokens.access_token;
-    const refreshToken = tokens.refresh_token;
-
-    console.log('Token exchange successful');
-
-    // Redirect back with token in sessionStorage
     return new Response(
-      `<html><body>
+      `<!doctype html><html><head><meta charset="utf-8"></head><body>
         <script>
-          sessionStorage.setItem('google_access_token', '${accessToken}');
-          ${refreshToken ? `sessionStorage.setItem('google_refresh_token', '${refreshToken}');` : ''}
-          localStorage.setItem('google_access_token', '${accessToken}');
-          ${refreshToken ? `localStorage.setItem('google_refresh_token', '${refreshToken}');` : ''}
-          window.location.href = '/#schedule';
+          try {
+            var data = ${payload};
+            localStorage.setItem('tr4de_gcal_tokens', JSON.stringify(data));
+          } catch (e) {}
+          window.location.replace('/#agenda');
         </script>
       </body></html>`,
-      { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
     );
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    return new Response(
-      `<html><body>
-        <h2>Erreur: ${error.message}</h2>
-        <p>Vérifiez que:</p>
-        <ul>
-          <li>Votre <strong>CLIENT_SECRET</strong> est correct</li>
-          <li>L'URI de redirection <strong>http://localhost:3000/api/google-calendar/callback</strong> est ajoutée dans Google Cloud</li>
-          <li>Vous êtes ajouté comme testeur dans Google Cloud Console (cookoz.mail@gmail.com)</li>
-        </ul>
-        <a href="/">Retour à l'accueil</a>
-      </body></html>`,
-      { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-    );
+  } catch (e) {
+    return errorPage(e?.message || "Erreur inconnue", 500);
   }
 }
