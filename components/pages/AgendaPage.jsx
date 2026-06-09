@@ -1017,17 +1017,19 @@ export default function AgendaPage() {
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
             {/* Barre du haut */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "10px 14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                {modal.id && (
-                  <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
-                    <Trash2 size={18} strokeWidth={2} />
-                  </button>
-                )}
-                <button onClick={() => !saving && setModal(null)} aria-label="Fermer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
-                  <IconX size={20} strokeWidth={2} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, padding: "8px 10px" }}>
+              {modal.id && (
+                <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={topIconBtn}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.red; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                  <Trash2 size={15} strokeWidth={1.9} />
                 </button>
-              </div>
+              )}
+              <button onClick={() => !saving && setModal(null)} aria-label="Fermer" title="Fermer" style={topIconBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                <IconX size={16} strokeWidth={1.9} />
+              </button>
             </div>
 
             {/* Titre */}
@@ -1213,6 +1215,13 @@ const card = () => ({ background: T.white, border: `1px solid ${T.border}`, bord
 const subInp = { padding: "5px 4px", fontSize: 14, fontFamily: "inherit", color: T.text, background: "transparent", border: "none", borderRadius: 6, outline: "none", cursor: "pointer" };
 const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: T.text, padding: "5px 0", boxSizing: "border-box" };
 // Bouton "pilule" moderne (couleur, notification)
+// Bouton icône discret de la barre du haut du modal (fermer / supprimer).
+const topIconBtn = {
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  width: 28, height: 28, borderRadius: "50%", border: "none", background: "transparent",
+  color: "var(--color-text-muted, #8E8E8E)", cursor: "pointer", fontFamily: "inherit",
+  transition: "background-color 120ms ease, color 120ms ease",
+};
 const pillBtn = {
   display: "inline-flex", alignItems: "center", gap: 8,
   padding: "8px 14px", borderRadius: 999,
