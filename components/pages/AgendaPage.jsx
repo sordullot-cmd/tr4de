@@ -203,6 +203,8 @@ export default function AgendaPage() {
   const [modal, setModal] = React.useState(null); // form objet | null
   const [modalError, setModalError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
 
   const range = React.useMemo(() => computeRange(view, cursor), [view, cursor]);
 
@@ -243,6 +245,44 @@ export default function AgendaPage() {
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
   const openCreate = (day, startTime, endTime) => { setModalError(null); setModal(blankForm(day || cursor, startTime, endTime)); };
   const openEdit = (ev) => { setModalError(null); setModal(formFromEvent(ev)); };
+
+  // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
+  // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
+  const startDrag = (e, d) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const columnTop = e.currentTarget.getBoundingClientRect().top;
+    const snap = (clientY) => {
+      const raw = ((clientY - columnTop) / HOUR_H) * 60;
+      return Math.max(0, Math.min(24 * 60, Math.round(raw / 15) * 15));
+    };
+    const startMin = snap(e.clientY);
+    const dk = dateKey(d);
+    dragRef.current = { startMin, endMin: startMin + 15 };
+    setDragBox({ dayKey: dk, a: startMin, b: startMin + 15 });
+
+    const onMove = (ev) => {
+      const cur = snap(ev.clientY);
+      dragRef.current.endMin = cur;
+      setDragBox({ dayKey: dk, a: dragRef.current.startMin, b: cur });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const cur = dragRef.current;
+      dragRef.current = null;
+      setDragBox(null);
+      if (!cur) return;
+      let lo = Math.min(cur.startMin, cur.endMin);
+      let hi = Math.max(cur.startMin, cur.endMin);
+      if (hi - lo < 15) hi = Math.min(24 * 60, lo + 60); // simple clic → 1 h
+      const st = `${pad(Math.floor(lo / 60))}:${pad(lo % 60)}`;
+      const et = `${pad(Math.floor(hi / 60) % 24)}:${pad(hi % 60)}`;
+      openCreate(d, st, et);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const saveModal = async () => {
     if (!modal) return;
@@ -411,22 +451,26 @@ export default function AgendaPage() {
             {/* Colonnes jours */}
             {days.map((d, di) => {
               const layout = layoutDay(eventsByDay.get(dateKey(d)) || [], d);
-              const onColumnClick = (e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const raw = ((e.clientY - rect.top) / HOUR_H) * 60;
-                const min = Math.max(0, Math.min(24 * 60 - 30, Math.round(raw / 30) * 30));
-                const startTime = `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
-                const endMin = Math.min(24 * 60, min + 60);
-                const endTime = `${pad(Math.floor(endMin / 60) % 24)}:${pad(endMin % 60)}`;
-                openCreate(d, startTime, endTime);
-              };
+              const dk = dateKey(d);
+              const dragHere = dragBox && dragBox.dayKey === dk;
               return (
-                <div key={di} onClick={onColumnClick} title="Cliquer pour créer un évènement" style={{
-                  flex: 1, position: "relative", minWidth: 0, cursor: "pointer",
+                <div key={di} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
+                  flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
                   borderLeft: `1px solid ${T.border}`,
                   backgroundImage: `repeating-linear-gradient(to bottom, ${T.border}, ${T.border} 1px, transparent 1px, transparent ${HOUR_H}px)`,
                   height: 24 * HOUR_H,
                 }}>
+                  {dragHere && (() => {
+                    const lo = Math.min(dragBox.a, dragBox.b);
+                    const hi = Math.max(dragBox.a, dragBox.b);
+                    return (
+                      <div style={{
+                        position: "absolute", top: (lo / 60) * HOUR_H, height: Math.max(((hi - lo) / 60) * HOUR_H, 3),
+                        left: 2, right: 2, background: `${T.blue}33`, border: `1px solid ${T.blue}`,
+                        borderRadius: 5, pointerEvents: "none", zIndex: 5,
+                      }} />
+                    );
+                  })()}
                   {layout.map((ev) => {
                     const top = (ev.startMin / 60) * HOUR_H;
                     const height = Math.max(((ev.endMin - ev.startMin) / 60) * HOUR_H, 16);
@@ -434,7 +478,7 @@ export default function AgendaPage() {
                     const left = ev._col * w;
                     const col = eventColor(ev);
                     return (
-                      <div key={ev.id} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${eventTimeLabel(ev)} ${ev.summary}`}
+                      <div key={ev.id} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${eventTimeLabel(ev)} ${ev.summary}`}
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
