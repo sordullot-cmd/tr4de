@@ -4,6 +4,7 @@ import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
+  Menu, Clock, Users, Video, MapPin, AlignLeft, Lock, Bell, HelpCircle, ChevronDown, Briefcase,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -62,40 +63,72 @@ const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const toISO = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}:00`).toISOString();
 function addDayStr(dateStr, n) { const d = new Date(`${dateStr}T00:00:00`); d.setDate(d.getDate() + n); return dateKey(d); }
 
+/** Déduit le champ `reminder` (minutes | "default" | "none") depuis l'évènement. */
+function reminderFromEvent(ev) {
+  const r = ev.reminders;
+  if (!r) return 10;
+  if (r.useDefault) return "default";
+  if (Array.isArray(r.overrides) && r.overrides.length) return r.overrides[0].minutes;
+  return "none";
+}
+
 /** Form vierge pour la création. */
 function blankForm(day, startTime = "09:00", endTime = "10:00") {
   const dk = typeof day === "string" ? day : dateKey(day);
-  return { id: null, htmlLink: null, summary: "", allDay: false, date: dk, endDate: dk, startTime, endTime, location: "", description: "" };
+  return {
+    id: null, htmlLink: null, summary: "", allDay: false, date: dk, endDate: dk, startTime, endTime,
+    location: "", description: "", guests: "", addMeet: false, hadMeet: false,
+    colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
+  };
 }
 
 /** Form pré-rempli depuis un évènement existant. */
 function formFromEvent(ev) {
   const summary = ev.summary === "(Sans titre)" ? "" : ev.summary;
+  const common = {
+    id: ev.id, htmlLink: ev.htmlLink,
+    location: ev.location || "", description: ev.description || "", colorId: ev.colorId || null,
+    guests: (ev.guests || []).join(", "),
+    addMeet: !!ev.hangoutLink, hadMeet: !!ev.hangoutLink,
+    transparency: ev.transparency || "opaque", visibility: ev.visibility || "default",
+    reminder: reminderFromEvent(ev),
+  };
   if (ev.allDay) {
     const startD = ev.start.slice(0, 10);
     let endIncl = ev.end ? addDayStr(ev.end.slice(0, 10), -1) : startD; // end exclusif → inclusif
     if (endIncl < startD) endIncl = startD;
-    return { id: ev.id, htmlLink: ev.htmlLink, summary, allDay: true, date: startD, endDate: endIncl, startTime: "09:00", endTime: "10:00", location: ev.location || "", description: ev.description || "" };
+    return { ...common, summary, allDay: true, date: startD, endDate: endIncl, startTime: "09:00", endTime: "10:00" };
   }
   const s = new Date(ev.start);
   const e = ev.end ? new Date(ev.end) : new Date(s.getTime() + 3600000);
   const dk = dateKey(s);
-  return { id: ev.id, htmlLink: ev.htmlLink, summary, allDay: false, date: dk, endDate: dk, startTime: hhmm(s), endTime: hhmm(e), location: ev.location || "", description: ev.description || "" };
+  return { ...common, summary, allDay: false, date: dk, endDate: dk, startTime: hhmm(s), endTime: hhmm(e) };
 }
 
 /** Construit le payload API à partir du form. */
 function payloadFromForm(form) {
   const tz = localTZ();
+  const guests = String(form.guests || "").split(/[,;\s]+/).map((g) => g.trim()).filter((g) => /.+@.+\..+/.test(g));
+  const extra = {
+    colorId: form.colorId || null,
+    guests,
+    addMeet: !!form.addMeet,
+    hadMeet: !!form.hadMeet,
+    transparency: form.transparency || "opaque",
+    visibility: form.visibility || "default",
+    reminder: form.reminder,
+  };
   if (form.allDay) {
     return {
       summary: form.summary, location: form.location, description: form.description,
       allDay: true, start: form.date, end: addDayStr(form.endDate || form.date, 1), timeZone: tz,
+      ...extra,
     };
   }
   let start = toISO(form.date, form.startTime);
   let end = toISO(form.date, form.endTime);
   if (new Date(end) <= new Date(start)) end = new Date(new Date(start).getTime() + 3600000).toISOString();
-  return { summary: form.summary, location: form.location, description: form.description, allDay: false, start, end, timeZone: tz };
+  return { summary: form.summary, location: form.location, description: form.description, allDay: false, start, end, timeZone: tz, ...extra };
 }
 
 const VIEWS = [
@@ -206,6 +239,7 @@ export default function AgendaPage() {
   const [modal, setModal] = React.useState(null); // form objet | null
   const [modalError, setModalError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const [colorOpen, setColorOpen] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
 
@@ -246,8 +280,8 @@ export default function AgendaPage() {
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
-  const openCreate = (day, startTime, endTime) => { setModalError(null); setModal(blankForm(day || cursor, startTime, endTime)); };
-  const openEdit = (ev) => { setModalError(null); setModal(formFromEvent(ev)); };
+  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setModal(blankForm(day || cursor, startTime, endTime)); };
+  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setModal(formFromEvent(ev)); };
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -435,6 +469,7 @@ export default function AgendaPage() {
               return (
                 <div key={di} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
+                  borderLeft: daysCount > 1 && di > 0 ? `1px solid ${T.border}` : "none",
                   backgroundImage: `repeating-linear-gradient(to bottom, ${T.border}, ${T.border} 1px, transparent 1px, transparent ${HOUR_H}px)`,
                   height: 24 * HOUR_H,
                 }}>
@@ -652,87 +687,165 @@ export default function AgendaPage() {
       {header}
       {body}
       {modal && (
-        <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 440, padding: 0, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{modal.id ? "Modifier l'évènement" : "Nouvel évènement"}</div>
-              <button onClick={() => !saving && setModal(null)} aria-label="Fermer" style={{ ...iconBtn(), width: 30, height: 30, border: "none", background: "transparent" }}>
-                <IconX size={16} strokeWidth={2} />
-              </button>
+        <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 480, padding: 0, marginTop: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+            {/* Barre du haut */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
+              <Menu size={20} strokeWidth={2} color={T.textMut} />
+              <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                {modal.id && (
+                  <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
+                    <Trash2 size={18} strokeWidth={2} />
+                  </button>
+                )}
+                <button onClick={() => !saving && setModal(null)} aria-label="Fermer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
+                  <IconX size={20} strokeWidth={2} />
+                </button>
+              </div>
             </div>
 
-            <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={fieldLbl}>Titre</label>
-                <input autoFocus value={modal.summary} onChange={(e) => setModal({ ...modal, summary: e.target.value })} placeholder="Titre de l'évènement" style={inp()} />
-              </div>
+            {/* Titre */}
+            <div style={{ padding: "0 20px 0 60px" }}>
+              <input autoFocus value={modal.summary} onChange={(e) => setModal({ ...modal, summary: e.target.value })} placeholder="Ajouter un titre"
+                style={{ width: "100%", border: "none", borderBottom: `2px solid ${T.border}`, outline: "none", fontFamily: "inherit", fontSize: 22, fontWeight: 400, color: T.text, padding: "6px 0", background: "transparent" }} />
+            </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
-                <input type="checkbox" checked={modal.allDay} onChange={(e) => setModal({ ...modal, allDay: e.target.checked })} />
-                Toute la journée
-              </label>
+            {/* Onglets (Événement actif ; les autres décoratifs) */}
+            <div style={{ display: "flex", gap: 6, padding: "12px 20px 4px 60px", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: `${T.blue}1A`, color: T.blue }}>Événement</span>
+              <span style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13, color: T.textMut, opacity: 0.6 }}>Tâche</span>
+              <span style={{ padding: "6px 12px", borderRadius: 999, fontSize: 13, color: T.textMut, opacity: 0.6, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Planning des rendez-vous
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: T.blue, borderRadius: 999, padding: "1px 6px" }}>Nouveauté</span>
+              </span>
+            </div>
 
-              {modal.allDay ? (
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={fieldLbl}>Début</label>
-                    <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={inp()} />
+            {/* Corps */}
+            <div style={{ padding: "8px 20px 4px" }}>
+              {/* Date / heures */}
+              <FormRow icon={Clock} top>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={subInp} />
+                    {modal.allDay ? (
+                      <>
+                        <span style={{ color: T.textMut, fontSize: 13 }}>au</span>
+                        <input type="date" value={modal.endDate} min={modal.date} onChange={(e) => setModal({ ...modal, endDate: e.target.value })} style={subInp} />
+                      </>
+                    ) : (
+                      <>
+                        <input type="time" value={modal.startTime} onChange={(e) => setModal({ ...modal, startTime: e.target.value })} style={subInp} />
+                        <span style={{ color: T.textMut }}>–</span>
+                        <input type="time" value={modal.endTime} onChange={(e) => setModal({ ...modal, endTime: e.target.value })} style={subInp} />
+                      </>
+                    )}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={fieldLbl}>Fin</label>
-                    <input type="date" value={modal.endDate} min={modal.date} onChange={(e) => setModal({ ...modal, endDate: e.target.value })} style={inp()} />
-                  </div>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: T.textSub, cursor: "pointer" }}>
+                    <input type="checkbox" checked={modal.allDay} onChange={(e) => setModal({ ...modal, allDay: e.target.checked })} />
+                    Toute la journée
+                  </label>
                 </div>
-              ) : (
-                <>
-                  <div>
-                    <label style={fieldLbl}>Date</label>
-                    <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={inp()} />
-                  </div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={fieldLbl}>Début</label>
-                      <input type="time" value={modal.startTime} onChange={(e) => setModal({ ...modal, startTime: e.target.value })} style={inp()} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={fieldLbl}>Fin</label>
-                      <input type="time" value={modal.endTime} onChange={(e) => setModal({ ...modal, endTime: e.target.value })} style={inp()} />
-                    </div>
-                  </div>
-                </>
-              )}
+              </FormRow>
 
-              <div>
-                <label style={fieldLbl}>Lieu</label>
-                <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Optionnel" style={inp()} />
-              </div>
-              <div>
-                <label style={fieldLbl}>Description</label>
-                <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Optionnel" rows={3} style={{ ...inp(), resize: "vertical" }} />
-              </div>
+              {/* Invités */}
+              <FormRow icon={Users}>
+                <input value={modal.guests} onChange={(e) => setModal({ ...modal, guests: e.target.value })} placeholder="Ajouter des invités" style={rowInp} />
+              </FormRow>
+
+              {/* Google Meet */}
+              <FormRow icon={Video} iconColor="#1A73E8">
+                <button type="button" onClick={() => setModal({ ...modal, addMeet: !modal.addMeet })}
+                  style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 14, color: modal.addMeet ? T.text : T.textMut, padding: "6px 0", textAlign: "left", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${modal.addMeet ? T.blue : T.border2}`, background: modal.addMeet ? T.blue : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, lineHeight: 1 }}>{modal.addMeet ? "✓" : ""}</span>
+                  {modal.hadMeet ? "Visioconférence Google Meet" : "Ajouter une visioconférence Google Meet"}
+                </button>
+              </FormRow>
+
+              <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
+
+              {/* Lieu */}
+              <FormRow icon={MapPin}>
+                <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
+              </FormRow>
+
+              {/* Description */}
+              <FormRow icon={AlignLeft} top>
+                <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Ajouter une description" rows={2} style={{ ...rowInp, resize: "vertical" }} />
+              </FormRow>
+
+              <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
+
+              {/* Couleur */}
+              <FormRow icon={CalendarIcon}>
+                <div style={{ position: "relative" }}>
+                  <button type="button" onClick={() => setColorOpen((o) => !o)}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, padding: "4px 0", fontFamily: "inherit" }}>
+                    <span style={{ width: 16, height: 16, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : T.blue, display: "inline-block" }} />
+                    <span style={{ fontSize: 14, color: T.text }}>Couleur</span>
+                    <ChevronDown size={15} color={T.textMut} />
+                  </button>
+                  {colorOpen && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 5, background: T.white, border: `1px solid ${T.border}`, borderRadius: 10, padding: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+                      <button type="button" onClick={() => { setModal({ ...modal, colorId: null }); setColorOpen(false); }} title="Par défaut" style={{ width: 22, height: 22, borderRadius: "50%", background: T.blue, border: modal.colorId == null ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
+                      {Object.entries(GCAL_COLORS).map(([id, hex]) => (
+                        <button key={id} type="button" onClick={() => { setModal({ ...modal, colorId: id }); setColorOpen(false); }} title={`Couleur ${id}`}
+                          style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: String(modal.colorId) === id ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </FormRow>
+
+              {/* Disponibilité */}
+              <FormRow icon={Briefcase}>
+                <select value={modal.transparency} onChange={(e) => setModal({ ...modal, transparency: e.target.value })} style={selStyle}>
+                  <option value="opaque">Occupé(e)</option>
+                  <option value="transparent">Disponible</option>
+                </select>
+              </FormRow>
+
+              {/* Visibilité */}
+              <FormRow icon={Lock}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <select value={modal.visibility} onChange={(e) => setModal({ ...modal, visibility: e.target.value })} style={selStyle}>
+                    <option value="default">Visibilité par défaut</option>
+                    <option value="public">Public</option>
+                    <option value="private">Privé</option>
+                  </select>
+                  <HelpCircle size={15} color={T.textMut} />
+                </div>
+              </FormRow>
+
+              {/* Notification */}
+              <FormRow icon={Bell}>
+                <select value={String(modal.reminder)} onChange={(e) => { const v = e.target.value; setModal({ ...modal, reminder: (v === "none" || v === "default") ? v : Number(v) }); }} style={selStyle}>
+                  <option value="none">Aucune notification</option>
+                  <option value="0">À l'heure de l'évènement</option>
+                  <option value="5">5 minutes avant</option>
+                  <option value="10">10 minutes avant</option>
+                  <option value="30">30 minutes avant</option>
+                  <option value="60">1 heure avant</option>
+                  <option value="1440">1 jour avant</option>
+                  <option value="default">Notifications par défaut</option>
+                </select>
+              </FormRow>
 
               {modalError && (
-                <div style={{ fontSize: 12, color: T.red, background: T.redBg, border: `1px solid ${T.redBd}`, borderRadius: 8, padding: "8px 10px" }}>{modalError}</div>
-              )}
-              {modal.htmlLink && (
-                <a href={modal.htmlLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: T.blue, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  <ExternalLink size={12} strokeWidth={2} /> Ouvrir dans Google Agenda
-                </a>
+                <div style={{ fontSize: 12, color: T.red, background: T.redBg, border: `1px solid ${T.redBd}`, borderRadius: 8, padding: "8px 10px", marginTop: 8 }}>{modalError}</div>
               )}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 20px", borderTop: `1px solid ${T.border}` }}>
-              {modal.id && (
-                <button onClick={removeModal} disabled={saving} style={{ ...ghostBtn(), color: T.red, borderColor: T.redBd }}>
-                  <Trash2 size={13} strokeWidth={2} style={{ marginRight: 6 }} /> Supprimer
-                </button>
+            {/* Pied */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "14px 20px", borderTop: `1px solid ${T.border}` }}>
+              {modal.htmlLink && (
+                <a href={modal.htmlLink} target="_blank" rel="noopener noreferrer" style={{ marginRight: "auto", fontSize: 12, color: T.blue, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <ExternalLink size={12} strokeWidth={2} /> Ouvrir dans Google
+                </a>
               )}
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                <button onClick={() => setModal(null)} disabled={saving} style={ghostBtn()}>Annuler</button>
-                <button onClick={saveModal} disabled={saving || !modal.summary.trim()} style={{ ...primaryBtn(true), opacity: saving || !modal.summary.trim() ? 0.5 : 1 }}>
-                  {saving ? "…" : modal.id ? "Enregistrer" : "Créer"}
-                </button>
-              </div>
+              <button onClick={() => setModal(null)} disabled={saving} style={ghostBtn()}>Annuler</button>
+              <button onClick={saveModal} disabled={saving || !modal.summary.trim()} style={{ ...primaryBtn(true), opacity: saving || !modal.summary.trim() ? 0.5 : 1 }}>
+                {saving ? "…" : "Enregistrer"}
+              </button>
             </div>
           </div>
         </div>
@@ -741,8 +854,23 @@ export default function AgendaPage() {
   );
 }
 
+/* ─────────────── Ligne de formulaire (icône + contenu), façon Google Agenda ─────────────── */
+function FormRow({ icon: Icon, children, top = false, iconColor }) {
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: top ? "flex-start" : "center", padding: "5px 0", minHeight: 38 }}>
+      <div style={{ width: 24, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: top ? 8 : 0 }}>
+        <Icon size={18} strokeWidth={1.9} color={iconColor || T.textMut} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    </div>
+  );
+}
+
 /* ─────────────── Styles ─────────────── */
 const card = () => ({ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12 });
+const subInp = { padding: "6px 10px", fontSize: 13, fontFamily: "inherit", color: T.text, background: T.accentBg, border: "none", borderRadius: 8, outline: "none" };
+const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: T.text, padding: "6px 0", boxSizing: "border-box" };
+const selStyle = { padding: "7px 10px", fontSize: 13, fontFamily: "inherit", color: T.text, background: T.accentBg, border: "none", borderRadius: 8, outline: "none", cursor: "pointer" };
 const codeStyle = { background: T.accentBg, padding: "1px 5px", borderRadius: 5, fontSize: 12 };
 const fieldLbl = { display: "block", fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 };
 const inp = () => ({

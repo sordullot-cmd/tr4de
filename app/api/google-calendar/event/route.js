@@ -39,18 +39,45 @@ export async function POST(req) {
         summary: event.summary || "(Sans titre)",
         description: event.description || undefined,
         location: event.location || undefined,
+        colorId: event.colorId || undefined,
         start: event.allDay
           ? { date: event.start }
           : { dateTime: event.start, timeZone: tz },
         end: event.allDay
           ? { date: event.end }
           : { dateTime: event.end, timeZone: tz },
+        attendees: Array.isArray(event.guests) && event.guests.length
+          ? event.guests.map((email) => ({ email }))
+          : undefined,
+        // 'opaque' = Occupé · 'transparent' = Disponible
+        transparency: event.transparency || undefined,
+        visibility: event.visibility && event.visibility !== "default" ? event.visibility : undefined,
+        reminders:
+          event.reminder === "default"
+            ? { useDefault: true }
+            : event.reminder === "none"
+              ? { useDefault: false, overrides: [] }
+              : typeof event.reminder === "number"
+                ? { useDefault: false, overrides: [{ method: "popup", minutes: event.reminder }] }
+                : undefined,
       };
+
+      // Visioconférence Google Meet (uniquement si demandée et pas déjà présente).
+      let conferenceDataVersion = 0;
+      if (event.addMeet && !event.hadMeet) {
+        conferenceDataVersion = 1;
+        resource.conferenceData = {
+          createRequest: {
+            requestId: `tr4de-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            conferenceSolutionKey: { type: "hangoutsMeet" },
+          },
+        };
+      }
 
       const res =
         action === "create"
-          ? await cal.events.insert({ calendarId: "primary", requestBody: resource })
-          : await cal.events.patch({ calendarId: "primary", eventId, requestBody: resource });
+          ? await cal.events.insert({ calendarId: "primary", requestBody: resource, conferenceDataVersion, sendUpdates: "all" })
+          : await cal.events.patch({ calendarId: "primary", eventId, requestBody: resource, conferenceDataVersion, sendUpdates: "all" });
 
       return json({ ok: true, event: res.data });
     }
