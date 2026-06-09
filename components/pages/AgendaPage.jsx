@@ -292,6 +292,15 @@ export default function AgendaPage() {
   const [timeEdit, setTimeEdit] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
+  const titleRef = React.useRef(null);
+
+  // Focalise le titre à l'ouverture du formulaire SANS faire défiler la page.
+  // `autoFocus` natif force un scrollIntoView qui remontait le conteneur en haut ;
+  // `preventScroll: true` conserve la position de défilement courante.
+  const modalOpen = !!modal;
+  React.useEffect(() => {
+    if (modalOpen) titleRef.current?.focus({ preventScroll: true });
+  }, [modalOpen]);
 
   const range = React.useMemo(() => computeRange(view, cursor), [view, cursor]);
 
@@ -411,11 +420,11 @@ export default function AgendaPage() {
     }
   };
 
-  // Scroll auto vers ~7h dans le time-grid (jour / semaine).
+  // Scroll auto vers 5h du matin à l'ouverture du time-grid (jour / semaine).
   const scrollRef = React.useRef(null);
   React.useEffect(() => {
     if ((view === "day" || view === "week") && scrollRef.current) {
-      scrollRef.current.scrollTop = 7 * HOUR_H;
+      scrollRef.current.scrollTop = 5 * HOUR_H;
     }
   }, [view, cursor]);
 
@@ -486,9 +495,12 @@ export default function AgendaPage() {
     const gutter = 54;
 
     return (
-      <div style={{ ...card(), border: "none", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ ...card(), border: "none", overflow: "hidden" }}>
+        <div ref={scrollRef} style={{ overflowY: "auto", maxHeight: "calc(100vh - 210px)" }}>
+        {/* En-tête + bandeau : épinglés en haut pendant le scroll */}
+        <div style={{ position: "sticky", top: 0, zIndex: 3, background: T.white }}>
         {/* En-tête jours */}
-        <div style={{ display: "flex" }}>
+        <div style={{ display: "flex", background: T.white }}>
           <div style={{ width: gutter, flexShrink: 0 }} />
           {days.map((d, i) => {
             const isToday = sameDay(d, today);
@@ -505,30 +517,10 @@ export default function AgendaPage() {
             );
           })}
         </div>
-
-        {/* Bandeau jour entier */}
-        <div style={{ display: "flex", borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}`, minHeight: 26 }}>
-          <div style={{ width: gutter, flexShrink: 0, fontSize: 9, color: T.textMut, padding: "5px 6px", textAlign: "right" }}>Jour</div>
-          {days.map((d, i) => {
-            const dk = dateKey(d);
-            const allDay = (eventsByDay.get(dk) || []).filter((e) => e.allDay);
-            return (
-              <div key={i} style={{ flex: 1, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none", padding: 3, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                {allDay.map((ev) => (
-                  <div key={ev.id} onClick={() => openEdit(ev)} title={ev.summary}
-                    style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "26" : "73"}`, borderRadius: 4, padding: "1px 6px", minWidth: 0 }}>
-                    {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>{ev.summary}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        </div>{/* fin en-tête épinglé */}
 
         {/* Grille horaire */}
-        <div ref={scrollRef} style={{ overflowY: "auto" }}>
-          <div style={{ display: "flex", position: "relative" }}>
+        <div style={{ display: "flex", position: "relative" }}>
             {/* Gouttière heures */}
             <div style={{ width: gutter, flexShrink: 0 }}>
               {hours.map((h) => (
@@ -772,8 +764,8 @@ export default function AgendaPage() {
       {header}
       {body}
       {modal && (
-        <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, marginTop: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+        <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
             {/* Barre du haut */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "10px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -790,7 +782,7 @@ export default function AgendaPage() {
 
             {/* Titre */}
             <div style={{ padding: "0 24px 0 58px" }}>
-              <input autoFocus value={modal.summary} onChange={(e) => setModal({ ...modal, summary: e.target.value })} placeholder="Ajouter un titre"
+              <input ref={titleRef} value={modal.summary} onChange={(e) => setModal({ ...modal, summary: e.target.value })} placeholder="Ajouter un titre"
                 style={{ width: "100%", border: "none", borderBottom: `2px solid ${T.border}`, outline: "none", fontFamily: "inherit", fontSize: 22, fontWeight: 400, color: T.text, padding: "6px 0", background: "transparent" }} />
             </div>
 
