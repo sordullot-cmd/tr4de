@@ -4,7 +4,7 @@ import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
-  Menu, Clock, Users, Video, MapPin, AlignLeft, Lock, Bell, HelpCircle, ChevronDown, Briefcase,
+  Menu, Clock, MapPin, AlignLeft, Bell, ChevronDown,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -138,6 +138,17 @@ const VIEWS = [
   { id: "year", label: "Année" },
 ];
 
+const REMINDER_OPTS = [
+  { v: "none", label: "Aucune notification" },
+  { v: 0, label: "À l'heure de l'évènement" },
+  { v: 5, label: "5 minutes avant" },
+  { v: 10, label: "10 minutes avant" },
+  { v: 30, label: "30 minutes avant" },
+  { v: 60, label: "1 heure avant" },
+  { v: 1440, label: "1 jour avant" },
+  { v: "default", label: "Notifications par défaut" },
+];
+
 const HOUR_H = 68; // hauteur d'une heure (px) dans le time-grid
 
 /* ─────────────── Plage de dates par mode ─────────────── */
@@ -240,6 +251,7 @@ export default function AgendaPage() {
   const [modalError, setModalError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [colorOpen, setColorOpen] = React.useState(false);
+  const [remindOpen, setRemindOpen] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
 
@@ -280,8 +292,8 @@ export default function AgendaPage() {
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
-  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setModal(blankForm(day || cursor, startTime, endTime)); };
-  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setModal(formFromEvent(ev)); };
+  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setModal(blankForm(day || cursor, startTime, endTime)); };
+  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setModal(formFromEvent(ev)); };
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -747,20 +759,6 @@ export default function AgendaPage() {
                 </div>
               </FormRow>
 
-              {/* Invités */}
-              <FormRow icon={Users}>
-                <input value={modal.guests} onChange={(e) => setModal({ ...modal, guests: e.target.value })} placeholder="Ajouter des invités" style={rowInp} />
-              </FormRow>
-
-              {/* Google Meet */}
-              <FormRow icon={Video} iconColor="#1A73E8">
-                <button type="button" onClick={() => setModal({ ...modal, addMeet: !modal.addMeet })}
-                  style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 14, color: modal.addMeet ? T.text : T.textMut, padding: "6px 0", textAlign: "left", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${modal.addMeet ? T.blue : T.border2}`, background: modal.addMeet ? T.blue : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, lineHeight: 1 }}>{modal.addMeet ? "✓" : ""}</span>
-                  {modal.hadMeet ? "Visioconférence Google Meet" : "Ajouter une visioconférence Google Meet"}
-                </button>
-              </FormRow>
-
               <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
 
               {/* Lieu */}
@@ -775,59 +773,50 @@ export default function AgendaPage() {
 
               <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
 
-              {/* Couleur */}
+              {/* Couleur — bouton moderne + palette */}
               <FormRow icon={CalendarIcon}>
                 <div style={{ position: "relative" }}>
-                  <button type="button" onClick={() => setColorOpen((o) => !o)}
-                    style={{ border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, padding: "4px 0", fontFamily: "inherit" }}>
-                    <span style={{ width: 16, height: 16, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : T.blue, display: "inline-block" }} />
-                    <span style={{ fontSize: 14, color: T.text }}>Couleur</span>
-                    <ChevronDown size={15} color={T.textMut} />
+                  <button type="button" onClick={() => { setColorOpen((o) => !o); setRemindOpen(false); }} style={pillBtn}>
+                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : T.blue, display: "inline-block" }} />
+                    Couleur
+                    <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
                   </button>
                   {colorOpen && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 5, background: T.white, border: `1px solid ${T.border}`, borderRadius: 10, padding: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-                      <button type="button" onClick={() => { setModal({ ...modal, colorId: null }); setColorOpen(false); }} title="Par défaut" style={{ width: 22, height: 22, borderRadius: "50%", background: T.blue, border: modal.colorId == null ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 5, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.14)", display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+                      <button type="button" onClick={() => { setModal({ ...modal, colorId: null }); setColorOpen(false); }} title="Par défaut" style={{ width: 24, height: 24, borderRadius: "50%", background: T.blue, border: modal.colorId == null ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
                       {Object.entries(GCAL_COLORS).map(([id, hex]) => (
                         <button key={id} type="button" onClick={() => { setModal({ ...modal, colorId: id }); setColorOpen(false); }} title={`Couleur ${id}`}
-                          style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: String(modal.colorId) === id ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
+                          style={{ width: 24, height: 24, borderRadius: "50%", background: hex, border: String(modal.colorId) === id ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
                       ))}
                     </div>
                   )}
                 </div>
               </FormRow>
 
-              {/* Disponibilité */}
-              <FormRow icon={Briefcase}>
-                <select value={modal.transparency} onChange={(e) => setModal({ ...modal, transparency: e.target.value })} style={selStyle}>
-                  <option value="opaque">Occupé(e)</option>
-                  <option value="transparent">Disponible</option>
-                </select>
-              </FormRow>
-
-              {/* Visibilité */}
-              <FormRow icon={Lock}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <select value={modal.visibility} onChange={(e) => setModal({ ...modal, visibility: e.target.value })} style={selStyle}>
-                    <option value="default">Visibilité par défaut</option>
-                    <option value="public">Public</option>
-                    <option value="private">Privé</option>
-                  </select>
-                  <HelpCircle size={15} color={T.textMut} />
-                </div>
-              </FormRow>
-
-              {/* Notification */}
+              {/* Notification — bouton moderne + menu */}
               <FormRow icon={Bell}>
-                <select value={String(modal.reminder)} onChange={(e) => { const v = e.target.value; setModal({ ...modal, reminder: (v === "none" || v === "default") ? v : Number(v) }); }} style={selStyle}>
-                  <option value="none">Aucune notification</option>
-                  <option value="0">À l'heure de l'évènement</option>
-                  <option value="5">5 minutes avant</option>
-                  <option value="10">10 minutes avant</option>
-                  <option value="30">30 minutes avant</option>
-                  <option value="60">1 heure avant</option>
-                  <option value="1440">1 jour avant</option>
-                  <option value="default">Notifications par défaut</option>
-                </select>
+                <div style={{ position: "relative" }}>
+                  <button type="button" onClick={() => { setRemindOpen((o) => !o); setColorOpen(false); }} style={pillBtn}>
+                    {REMINDER_OPTS.find((r) => String(r.v) === String(modal.reminder))?.label || "Notification"}
+                    <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
+                  </button>
+                  {remindOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 5, minWidth: 200, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 10px 30px rgba(0,0,0,0.14)" }}>
+                      {REMINDER_OPTS.map((r) => {
+                        const selected = String(r.v) === String(modal.reminder);
+                        return (
+                          <button key={String(r.v)} type="button"
+                            onClick={() => { setModal({ ...modal, reminder: r.v }); setRemindOpen(false); }}
+                            onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = T.bg; }}
+                            onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+                            style={{ width: "100%", textAlign: "left", border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: T.text, background: selected ? T.accentBg : "transparent", fontWeight: selected ? 600 : 400 }}>
+                            {r.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </FormRow>
 
               {modalError && (
@@ -868,9 +857,15 @@ function FormRow({ icon: Icon, children, top = false, iconColor }) {
 
 /* ─────────────── Styles ─────────────── */
 const card = () => ({ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12 });
-const subInp = { padding: "4px 8px", fontSize: 12, fontFamily: "inherit", color: T.text, background: T.accentBg, border: "none", borderRadius: 6, outline: "none" };
+const subInp = { padding: "4px 2px", fontSize: 13, fontFamily: "inherit", color: T.text, background: "transparent", border: "none", borderRadius: 6, outline: "none", cursor: "pointer" };
 const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: T.text, padding: "4px 0", boxSizing: "border-box" };
-const selStyle = { padding: "5px 8px", fontSize: 12, fontFamily: "inherit", color: T.text, background: T.accentBg, border: "none", borderRadius: 6, outline: "none", cursor: "pointer" };
+// Bouton "pilule" moderne (couleur, notification)
+const pillBtn = {
+  display: "inline-flex", alignItems: "center", gap: 8,
+  padding: "6px 12px", borderRadius: 999,
+  border: `1px solid ${T.border}`, background: T.white, color: T.text,
+  fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+};
 const codeStyle = { background: T.accentBg, padding: "1px 5px", borderRadius: 5, fontSize: 12 };
 const fieldLbl = { display: "block", fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 };
 const inp = () => ({
