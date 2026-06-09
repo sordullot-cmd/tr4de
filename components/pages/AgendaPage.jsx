@@ -2,7 +2,7 @@
 
 import React from "react";
 import {
-  Calendar as CalendarIcon, ChevronLeft, ChevronRight, RefreshCw,
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Plus, Trash2, X as IconX, ExternalLink,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
@@ -13,6 +13,9 @@ import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const WEEKDAYS_FULL = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const WEEKDAYS_MIN = ["L", "M", "M", "J", "V", "S", "D"];
+// Style des libellés de jour repris de la page Calendrier : léger, discret,
+// sans majuscules ni interlettrage marqué (uniquement le visuel, pas le format).
+const dayLabelStyle = { fontSize: 10, fontWeight: 500, textAlign: "center", color: T.textMut };
 const MONTHS = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
@@ -357,7 +360,6 @@ export default function AgendaPage() {
       </h1>
       {connected && (
         <>
-          {segmented}
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <button onClick={() => setCursor(shiftCursor(view, cursor, -1))} aria-label="Précédent" style={iconBtn()}>
               <ChevronLeft size={16} strokeWidth={2} />
@@ -378,11 +380,9 @@ export default function AgendaPage() {
             <button onClick={() => openCreate()} style={primaryBtn(true)}>
               <Plus size={15} strokeWidth={2.2} style={{ marginRight: 6 }} /> Nouvel évènement
             </button>
-            <button onClick={loadEvents} aria-label="Rafraîchir" title="Rafraîchir" style={iconBtn()}>
-              <RefreshCw size={15} strokeWidth={2} className={loading ? "anim-spin" : ""} />
-            </button>
-            <button onClick={disconnect} style={ghostBtn()}>
-              <LogOut size={13} strokeWidth={2} style={{ marginRight: 6 }} /> Déconnecter
+            {segmented}
+            <button onClick={disconnect} aria-label="Déconnecter" title="Déconnecter" style={iconBtn()}>
+              <LogOut size={15} strokeWidth={2} />
             </button>
           </>
         )}
@@ -407,7 +407,7 @@ export default function AgendaPage() {
             const isToday = sameDay(d, today);
             return (
               <div key={i} style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderLeft: `1px solid ${T.border}`, minWidth: 0 }}>
-                <div style={{ fontSize: 10.5, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>{WEEKDAYS[weekdayIdx(d)]}</div>
+                <div style={dayLabelStyle}>{WEEKDAYS[weekdayIdx(d)]}</div>
                 <div style={{
                   marginTop: 3, display: "inline-flex", alignItems: "center", justifyContent: "center",
                   minWidth: 26, height: 26, borderRadius: 999, padding: "0 7px",
@@ -509,7 +509,7 @@ export default function AgendaPage() {
       <div style={{ ...card(), padding: 0, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: `1px solid ${T.border}` }}>
           {WEEKDAYS.map((w) => (
-            <div key={w} style={{ padding: "10px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>{w}</div>
+            <div key={w} style={{ ...dayLabelStyle, padding: "10px 8px" }}>{w}</div>
           ))}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridAutoRows: "minmax(110px, 1fr)" }}>
@@ -572,12 +572,12 @@ export default function AgendaPage() {
           return (
             <div key={m} style={{ ...card(), padding: 12 }}>
               <button onClick={() => { setCursor(new Date(year, m, 1)); setView("month"); }}
-                style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 8, fontSize: 13, fontWeight: 600, color: T.text }}>
+                style={{ display: "block", width: "100%", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 8, fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, textAlign: "center" }}>
                 {MONTHS[m]}
               </button>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
                 {WEEKDAYS_MIN.map((w, i) => (
-                  <div key={i} style={{ textAlign: "center", fontSize: 9, color: T.textMut, fontWeight: 600 }}>{w}</div>
+                  <div key={i} style={{ textAlign: "center", fontSize: 9, color: T.textMut, fontWeight: 500 }}>{w}</div>
                 ))}
                 {cells.map((c, i) => {
                   if (!c) return <div key={i} />;
