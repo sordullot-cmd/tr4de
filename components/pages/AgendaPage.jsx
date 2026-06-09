@@ -597,21 +597,43 @@ export default function AgendaPage() {
   // On réarme l'intention à chaque changement de vue/date…
   const scrollRef = React.useRef(null);
   const didScrollRef = React.useRef(false);
+  const animTimerRef = React.useRef(null);
+  const animRafRef = React.useRef(0);
   React.useEffect(() => { didScrollRef.current = false; }, [view, cursor]);
-  // …puis on applique le scroll dès que la grille est effectivement montée
-  // (la grille n'existe pas tant que Google n'est pas connecté / chargé, donc
-  // on ne peut pas se contenter d'un effet sur [view, cursor]).
+  // …puis on applique le scroll dès que la grille est effectivement montée.
+  // ⚠️ Pas de cleanup ici : un re-rendu (ex. chargement async des évènements)
+  // déclencherait sinon le cleanup et annulerait le timer avant l'animation.
+  // On annule uniquement au démontage (effet dédié plus bas).
   React.useEffect(() => {
     if (view !== "day" && view !== "week") return;
     if (didScrollRef.current || !scrollRef.current) return;
-    const id = requestAnimationFrame(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = 5 * HOUR_H;
-        didScrollRef.current = true;
-      }
-    });
-    return () => cancelAnimationFrame(id);
+    didScrollRef.current = true;
+    clearTimeout(animTimerRef.current);
+    cancelAnimationFrame(animRafRef.current);
+    // Animation maison (le scrollTo natif "smooth" est trop court/saccadé) :
+    // la grille s'affiche à 00h, puis défile en douceur jusqu'à 5h avec une
+    // courbe easeInOutCubic sur ~900 ms.
+    animTimerRef.current = setTimeout(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const start = el.scrollTop;
+      const dist = 5 * HOUR_H - start;
+      const duration = 900;
+      const t0 = performance.now();
+      const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / duration);
+        el.scrollTop = start + dist * ease(p);
+        if (p < 1) animRafRef.current = requestAnimationFrame(step);
+      };
+      animRafRef.current = requestAnimationFrame(step);
+    }, 200);
   });
+  // Nettoyage uniquement au démontage du composant.
+  React.useEffect(() => () => {
+    clearTimeout(animTimerRef.current);
+    cancelAnimationFrame(animRafRef.current);
+  }, []);
 
   /* ─────────────── Header ─────────────── */
   const segmented = (
@@ -764,7 +786,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: ev.isTask ? `${col}26` : `${col}73`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: ev.isTask ? `${col}1A` : `${col}40`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
                           boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
@@ -833,7 +855,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "26" : "73"}`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "1A" : "40"}`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
