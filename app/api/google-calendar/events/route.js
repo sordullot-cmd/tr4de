@@ -31,7 +31,7 @@ export async function POST(req) {
       calendarId: "primary",
       timeMin: min,
       timeMax: max,
-      maxResults: 250,
+      maxResults: 2500,
       singleEvents: true,
       orderBy: "startTime",
     });
@@ -52,6 +52,11 @@ export async function POST(req) {
     return json({ events });
   } catch (e) {
     const msg = e?.message || "unknown_error";
+    // Token sans le scope calendar.readonly → l'utilisateur doit reconnecter
+    // en accordant la permission (et le scope doit être déclaré côté Google).
+    if (/insufficient.*scope|scope|permission|forbidden/i.test(msg)) {
+      return json({ error: "insufficient_scope", detail: msg }, 403);
+    }
     // 401 si le token est invalide/expiré → le client tentera un refresh.
     const status = /invalid|expired|unauthor/i.test(msg) ? 401 : 500;
     return json({ error: msg }, status);

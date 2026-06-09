@@ -51,7 +51,8 @@ export function getOAuthClient(req: Request) {
 }
 
 export const CALENDAR_SCOPES = [
-  "https://www.googleapis.com/auth/calendar.readonly",
+  // Lecture + écriture des évènements (créer / modifier / supprimer).
+  "https://www.googleapis.com/auth/calendar.events",
   "openid",
   "email",
   "profile",

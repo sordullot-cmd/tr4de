@@ -125,15 +125,51 @@ export function useGoogleCalendar() {
         setTokens(null);
         throw new Error("token_expired");
       }
+      // Token sans permission Calendar → message dédié, on garde la connexion
+      // pour proposer une reconnexion explicite.
+      if (res.status === 403) {
+        throw new Error("insufficient_scope");
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        console.error("[gcal] events error", res.status, body);
         throw new Error(body.error || `http_${res.status}`);
       }
       const data = await res.json();
+      console.log(`[gcal] ${data.events?.length ?? 0} évènement(s) reçus`, { timeMin, timeMax });
       return data.events || [];
     },
     [getValidAccessToken],
   );
+
+  /** Crée / modifie / supprime un évènement, puis renvoie la réponse. */
+  const mutateEvent = useCallback(
+    async (action: "create" | "update" | "delete", payload: { eventId?: string; event?: any }) => {
+      const token = await getValidAccessToken();
+      if (!token) throw new Error("not_connected");
+      const res = await fetch("/api/google-calendar/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, accessToken: token, ...payload }),
+      });
+      if (res.status === 403) throw new Error("insufficient_scope");
+      if (res.status === 401) {
+        writeTokens(null);
+        setTokens(null);
+        throw new Error("token_expired");
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `http_${res.status}`);
+      }
+      return res.json();
+    },
+    [getValidAccessToken],
+  );
+
+  const createEvent = useCallback((event: any) => mutateEvent("create", { event }), [mutateEvent]);
+  const updateEvent = useCallback((eventId: string, event: any) => mutateEvent("update", { eventId, event }), [mutateEvent]);
+  const deleteEvent = useCallback((eventId: string) => mutateEvent("delete", { eventId }), [mutateEvent]);
 
   return {
     ready,
@@ -142,5 +178,8 @@ export function useGoogleCalendar() {
     connect,
     disconnect,
     fetchEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent,
   };
 }
