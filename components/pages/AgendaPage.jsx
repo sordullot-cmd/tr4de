@@ -3,7 +3,7 @@
 import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
-  LogOut, AlertTriangle, Plug, Plus, Trash2, X as IconX, ExternalLink,
+  LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -377,9 +377,6 @@ export default function AgendaPage() {
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         {connected && (
           <>
-            <button onClick={() => openCreate()} style={primaryBtn(true)}>
-              <Plus size={15} strokeWidth={2.2} style={{ marginRight: 6 }} /> Nouvel évènement
-            </button>
             {segmented}
             <button onClick={disconnect} aria-label="Déconnecter" title="Déconnecter" style={iconBtn()}>
               <LogOut size={15} strokeWidth={2} />
@@ -419,26 +416,8 @@ export default function AgendaPage() {
           })}
         </div>
 
-        {/* Bandeau "journée" (all-day) */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, minHeight: 26, background: T.bg }}>
-          <div style={{ width: gutter, flexShrink: 0, fontSize: 9, color: T.textMut, padding: "5px 6px", textAlign: "right" }}>Journée</div>
-          {days.map((d, i) => {
-            const allDay = (eventsByDay.get(dateKey(d)) || []).filter((e) => e.allDay);
-            return (
-              <div key={i} style={{ flex: 1, borderLeft: `1px solid ${T.border}`, padding: 3, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                {allDay.map((ev) => (
-                  <div key={ev.id} onClick={() => openEdit(ev)} title={ev.summary}
-                    style={{ cursor: "pointer", fontSize: 10.5, color: "#fff", background: eventColor(ev), borderRadius: 4, padding: "1px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {ev.summary}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Grille horaire scrollable */}
-        <div ref={scrollRef} style={{ overflowY: "auto", maxHeight: 560 }}>
+        {/* Grille horaire */}
+        <div ref={scrollRef} style={{ overflowY: "auto" }}>
           <div style={{ display: "flex", position: "relative" }}>
             {/* Gouttière heures */}
             <div style={{ width: gutter, flexShrink: 0 }}>
