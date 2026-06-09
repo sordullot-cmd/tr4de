@@ -8,7 +8,22 @@
 
 import type { ParsedTrade } from "@/lib/types/trade";
 
-export type BrokerId = "tradovate" | "rithmic" | "mt5" | "ibkr" | "wealthcharts" | "ninjatrader";
+export type BrokerId =
+  // Plateformes / brokers d'exécution
+  | "tradovate"
+  | "rithmic"
+  | "mt5"
+  | "ibkr"
+  | "wealthcharts"
+  | "ninjatrader"
+  // Prop firms futures
+  | "topstep"
+  | "apex"
+  | "alphafutures"
+  | "tradeify"
+  | "lucid"
+  // Prop firms forex / CFD
+  | "ftmo";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -27,8 +42,10 @@ export interface BrokerMeta {
   docsUrl?: string;
   /** Couleur d'accent (header card). */
   color: string;
-  /** Lettre/abréviation pour le placeholder logo. */
+  /** Lettre/abréviation pour le placeholder logo (fallback si pas de logoPath). */
   initial: string;
+  /** Chemin du logo (public/). Si absent, on affiche la pastille `initial`. */
+  logoPath?: string;
 }
 
 export interface BrokerConnection {

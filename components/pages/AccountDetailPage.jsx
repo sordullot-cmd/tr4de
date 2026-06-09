@@ -46,7 +46,7 @@ const BROKER_LOGOS = {
   "ibkr":                "/brokers/Interactive broker.png",
   "capital.com":         "/brokers/capital.png",
   "capital":             "/brokers/capital.png",
-  "ig":                  "/brokers/if logo.png",
+  "ig":                  "/brokers/ig logo.png",
   "webull":              "/brokers/webull.png",
 };
 const getBrokerLogo = (b) => b ? (BROKER_LOGOS[String(b).trim().toLowerCase()] || null) : null;

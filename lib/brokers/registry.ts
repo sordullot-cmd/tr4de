@@ -1,12 +1,42 @@
 import type { BrokerAdapter, BrokerId } from "@/lib/brokers/types";
 import { tradovate } from "@/lib/brokers/tradovate";
-import { parseMT5CSV, parseMT5HTML, parseWealthChartsCSV, parseNinjaTraderCSV } from "@/lib/csvParsers";
+import { parseCSV, parseMT5CSV, parseMT5HTML, parseWealthChartsCSV, parseNinjaTraderCSV } from "@/lib/csvParsers";
 
 /**
  * Registry des brokers supportés. Pour ajouter un broker :
  *   1) implémenter `BrokerAdapter` dans lib/brokers/<id>.ts
  *   2) l'ajouter ici
  */
+
+/**
+ * Fabrique un adapter "prop firm" : import fichier uniquement, parsing
+ * auto-détecté (`parseCSV` reconnaît le format Tradovate/Rithmic/CSV générique
+ * exporté par la plupart des prop firms). `hint` oriente le fallback de parsing.
+ */
+function propFirm(
+  id: BrokerId,
+  name: string,
+  description: string,
+  color: string,
+  initial: string,
+  logoPath?: string,
+  hint: "tradovate" | "generic" = "tradovate",
+): BrokerAdapter {
+  return {
+    meta: {
+      id,
+      name,
+      description,
+      features: { fileImport: true, apiSync: false },
+      color,
+      initial,
+      logoPath,
+    },
+    parseFile(content: string) {
+      return parseCSV(content, hint);
+    },
+  };
+}
 
 export const BROKERS: Record<BrokerId, BrokerAdapter> = {
   tradovate,
@@ -18,6 +48,7 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
       features: { fileImport: true, apiSync: false },
       color: "#7C3AED",
       initial: "R",
+      logoPath: "/brokers/rithmic.png",
     },
     parseFile: tradovate.parseFile,
   },
@@ -29,6 +60,7 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
       features: { fileImport: true, apiSync: false },
       color: "#0891B2",
       initial: "M",
+      logoPath: "/MetaTrader_5.png",
     },
     parseFile(content: string) {
       // Détecte HTML vs CSV selon le contenu
@@ -46,6 +78,7 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
       features: { fileImport: true, apiSync: false },
       color: "#F97316",
       initial: "N",
+      logoPath: "/brokers/ninja%20trader.png",
     },
     parseFile(content: string) {
       return parseNinjaTraderCSV(content);
@@ -59,6 +92,7 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
       features: { fileImport: false, apiSync: false },
       color: "#DC2626",
       initial: "I",
+      logoPath: "/brokers/Interactive%20broker.png",
     },
   },
   wealthcharts: {
@@ -69,11 +103,22 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
       features: { fileImport: true, apiSync: false },
       color: "#059669",
       initial: "W",
+      logoPath: "/weal.webp",
     },
     parseFile(content: string) {
       return parseWealthChartsCSV(content);
     },
   },
+
+  // ── Prop firms futures (exécution via Tradovate / Rithmic / NinjaTrader / ProjectX) ──
+  topstep: propFirm("topstep", "Topstep", "Prop firm futures. Export CSV depuis TopstepX (Performance → Trades).", "#16A34A", "T", "/brokers/Topstep_Logo.jpg"),
+  apex: propFirm("apex", "Apex Trader Funding", "Prop firm futures. Export CSV depuis la plateforme (Tradovate / Rithmic).", "#8B5CF6", "A", "/brokers/apex.avif"),
+  alphafutures: propFirm("alphafutures", "Alpha Futures", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#0EA5E9", "A", "/brokers/alpha%20futur.svg"),
+  tradeify: propFirm("tradeify", "Tradeify", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#F43F5E", "T", "/brokers/Tradeify.svg"),
+  lucid: propFirm("lucid", "Lucid Trading", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#6366F1", "L", "/brokers/lucid.png"),
+
+  // ── Prop firms forex / CFD ──
+  ftmo: propFirm("ftmo", "FTMO", "Prop firm forex/CFD. Export CSV ou rapport HTML MetaTrader.", "#2563EB", "F", "/brokers/ftmo.png", "generic"),
 };
 
 export function getBroker(id: string): BrokerAdapter | null {

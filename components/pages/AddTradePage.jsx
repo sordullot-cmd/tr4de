@@ -165,11 +165,17 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   };
 
   const brokers = [
-    // Futures / Prop firms
+    // Plateformes / Brokers futures (exécution)
     { id: "tradovate",     name: "Tradovate",            format: "csv",  iconPath: "/trado.png" },
     { id: "rithmic",       name: "Rithmic R|Trader",     format: "csv",  iconPath: "/brokers/rithmic.png" },
     { id: "ninjatrader",   name: "NinjaTrader",          format: "csv",  iconPath: "/brokers/ninja%20trader.png" },
-    { id: "topstep",       name: "Topstep X",            format: "csv",  iconPath: "/brokers/Topstep_Logo.jpg" },
+    // Prop firms futures
+    { id: "topstep",       name: "Topstep",              format: "csv",  iconPath: "/brokers/Topstep_Logo.jpg" },
+    { id: "apex",          name: "Apex Trader Funding",  format: "csv",  iconPath: "/brokers/apex.avif" },
+    { id: "alphafutures",  name: "Alpha Futures",        format: "csv",  iconPath: "/brokers/alpha%20futur.svg" },
+    { id: "tradeify",      name: "Tradeify",             format: "csv",  iconPath: "/brokers/Tradeify.svg" },
+    { id: "lucid",         name: "Lucid Trading",        format: "csv",  iconPath: "/brokers/lucid.png" },
+    // Prop firms forex / CFD
     { id: "ftmo",          name: "FTMO",                 format: "csv",  iconPath: "/brokers/ftmo.png" },
     // Plateformes
     { id: "tradingview",   name: "TradingView",          format: "csv",  iconPath: "/brokers/tradingview.webp" },
@@ -180,7 +186,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     // Brokers actions / CFD
     { id: "ibkr",          name: "Interactive Brokers",  format: "csv",  iconPath: "/brokers/Interactive%20broker.png" },
     { id: "capitalcom",    name: "Capital.com",          format: "csv",  iconPath: "/brokers/capital.png" },
-    { id: "ig",            name: "IG",                   format: "csv",  iconPath: "/brokers/if%20logo.png" },
+    { id: "ig",            name: "IG",                   format: "csv",  iconPath: "/brokers/ig%20logo.png" },
     { id: "webull",        name: "Webull",               format: "csv",  iconPath: "/brokers/webull.png" },
   ];
 
@@ -483,10 +489,17 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   };
 
   const lastSavedRef = useRef({ broker: null, type: null, size: null });
+  // Compte pour lequel le formulaire a déjà été initialisé. Évite de
+  // ré-initialiser (et de réécraser lastSavedRef) quand `accounts` change suite
+  // à une MAJ optimiste — sinon l'auto-sauvegarde serait court-circuitée.
+  const initializedForRef = useRef(null);
 
-  // Charger les infos du compte quand le nom change
+  // Charger les infos du compte quand le compte sélectionné change
   useEffect(() => {
     if (accountName && accounts.length > 0) {
+      // Déjà initialisé pour ce compte : on ne réécrase pas l'état du formulaire
+      // (l'utilisateur est peut-être en train d'éditer le broker/type/taille).
+      if (initializedForRef.current === accountName) return;
       const selectedAccount = accounts.find(acc => acc.name === accountName);
       if (selectedAccount) {
         const brokerMatch = brokers.find(b =>
@@ -500,12 +513,14 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           : (aType === "live" ? "" : "25k");
 
         lastSavedRef.current = { broker: bId, type: aType, size: aSize };
+        initializedForRef.current = accountName;
         setSelectedBroker(bId);
         setAccountType(aType);
         setSelectedEvalAccount(aSize);
         setIsEditingAccount(true);
       }
     } else {
+      initializedForRef.current = null;
       setIsEditingAccount(false);
     }
   }, [accountName, accounts]);
@@ -910,6 +925,11 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               multi
               selectedAccountNames={accountNames}
               onAccountNamesChange={setAccountNames}
+              accounts={accounts}
+              allowDelete
+              onAccountDeleted={(id) => {
+                if (setAccounts) setAccounts(prev => (prev || []).filter(a => a.id !== id));
+              }}
               T={T}
             />
           </div>
@@ -920,7 +940,18 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             </label>
             <SearchableSelect
               value={selectedBroker}
-              onChange={(id) => { setSelectedBroker(id); setError(""); }}
+              onChange={(id) => {
+                setSelectedBroker(id);
+                setError("");
+                // MAJ optimiste du compte sélectionné → l'icône à gauche du
+                // compte se met à jour immédiatement (sans attendre la DB).
+                const brokerObj = brokers.find(b => b.id === id);
+                if (accountName && setAccounts && brokerObj) {
+                  setAccounts(prev => (prev || []).map(a =>
+                    a.name === accountName ? { ...a, broker: brokerObj.name } : a
+                  ));
+                }
+              }}
               options={(() => {
                 const isFav = (id) => favoriteBrokers.includes(id);
                 const sorted = [...brokers].sort((a, b) => {

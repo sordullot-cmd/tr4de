@@ -28,6 +28,13 @@ const BROKER_LOGOS = {
   "ninja trader":        "/brokers/ninja trader.png",
   "topstep":             "/brokers/Topstep_Logo.jpg",
   "topstep x":           "/brokers/Topstep_Logo.jpg",
+  "apex":                "/brokers/apex.avif",
+  "apex trader funding": "/brokers/apex.avif",
+  "alphafutures":        "/brokers/alpha futur.svg",
+  "alpha futures":       "/brokers/alpha futur.svg",
+  "tradeify":            "/brokers/Tradeify.svg",
+  "lucid":               "/brokers/lucid.png",
+  "lucid trading":       "/brokers/lucid.png",
   "ftmo":                "/brokers/ftmo.png",
   "tradingview":         "/brokers/tradingview.webp",
   "metatrader 5":        "/MetaTrader_5.png",
@@ -40,7 +47,7 @@ const BROKER_LOGOS = {
   "ibkr":                "/brokers/Interactive broker.png",
   "capital.com":         "/brokers/capital.png",
   "capital":             "/brokers/capital.png",
-  "ig":                  "/brokers/if logo.png",
+  "ig":                  "/brokers/ig logo.png",
   "webull":              "/brokers/webull.png",
 };
 
@@ -513,7 +520,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
 /* ============== SCALING SIMULATOR ============== */
 function ScalingSimulator({ accounts = [] }) {
   const [sim, setSim] = useCloudState("tr4de_scaling_sim", "scaling_sim", { capitalSize: 100000, pctMonthly: 5, accountsTarget: 3, weeksPerEval: 7 });
-  const [open, setOpen] = useCloudState("tr4de_scaling_sim_open", "scaling_sim_open", true);
+  const [open, setOpen] = useCloudState("tr4de_scaling_sim_open", "scaling_sim_open", false);
 
   // Comptes "financés" = ceux dont le type est funded dans la liste de comptes existante.
   const fundedAccounts = (accounts || []).filter(a => (a.account_type || "live") === "funded");

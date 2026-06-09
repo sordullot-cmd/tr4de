@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
-import { ChevronDown, ChevronUp, Search, Check, Plus, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Check, Plus, Pencil, Trash2 } from "lucide-react";
 import { t, useLang } from "@/lib/i18n";
 
 // Map id (lowercase) → chemin du logo. Utilisé pour afficher l'icône à gauche
@@ -16,6 +16,13 @@ const BROKER_ICONS = {
   ninjatrader: "/brokers/ninja%20trader.png",
   topstep: "/brokers/Topstep_Logo.jpg",
   "topstep x": "/brokers/Topstep_Logo.jpg",
+  apex: "/brokers/apex.avif",
+  "apex trader funding": "/brokers/apex.avif",
+  alphafutures: "/brokers/alpha%20futur.svg",
+  "alpha futures": "/brokers/alpha%20futur.svg",
+  tradeify: "/brokers/Tradeify.svg",
+  lucid: "/brokers/lucid.png",
+  "lucid trading": "/brokers/lucid.png",
   ftmo: "/brokers/ftmo.png",
   tradingview: "/brokers/tradingview.webp",
   mt4: "/brokers/MetaTrader_4.png",
@@ -25,7 +32,7 @@ const BROKER_ICONS = {
   "interactive brokers": "/brokers/Interactive%20broker.png",
   capitalcom: "/brokers/capital.png",
   "capital.com": "/brokers/capital.png",
-  ig: "/brokers/if%20logo.png",
+  ig: "/brokers/ig%20logo.png",
   webull: "/brokers/webull.png",
 };
 
@@ -35,6 +42,14 @@ export default function QuickAccountSelector({
   multi = false,
   selectedAccountNames = [],
   onAccountNamesChange = () => {},
+  // Si fourni, le parent est la source de vérité (mise à jour optimiste instantanée).
+  // Sinon, le composant charge lui-même les comptes depuis Supabase.
+  accounts: accountsProp = null,
+  // Active le bouton de suppression de compte dans le dropdown.
+  allowDelete = false,
+  // Callback appelé après suppression (id du compte) — permet au parent de
+  // resynchroniser sa propre liste de comptes en mode piloté par prop.
+  onAccountDeleted = null,
   T = {},
 }) {
   useLang();
@@ -60,12 +75,18 @@ export default function QuickAccountSelector({
     } catch (err) { console.error(err); setAccounts([]); }
   };
   useEffect(() => {
+    // Mode piloté par le parent : on reflète le prop directement (instantané),
+    // pas de chargement DB ni d'écoute d'événement.
+    if (accountsProp != null) {
+      setAccounts(accountsProp);
+      return;
+    }
     loadAccounts();
     // Réagit aux mises à jour de comptes (ex: changement de broker dans AddTradePage)
     const onAccountsChanged = () => loadAccounts();
     window.addEventListener("tr4de:accounts-changed", onAccountsChanged);
     return () => window.removeEventListener("tr4de:accounts-changed", onAccountsChanged);
-  }, [user?.id]);
+  }, [user?.id, accountsProp]);
 
   // Click outside
   useEffect(() => {
@@ -92,6 +113,10 @@ export default function QuickAccountSelector({
     if (key.includes("rithmic")) return BROKER_ICONS.rithmic;
     if (key.includes("ninja"))   return BROKER_ICONS.ninjatrader;
     if (key.includes("topstep")) return BROKER_ICONS.topstep;
+    if (key.includes("apex"))    return BROKER_ICONS.apex;
+    if (key.includes("alpha"))   return BROKER_ICONS.alphafutures;
+    if (key.includes("tradeify")) return BROKER_ICONS.tradeify;
+    if (key.includes("lucid"))   return BROKER_ICONS.lucid;
     if (key.includes("ftmo"))    return BROKER_ICONS.ftmo;
     if (key.includes("trading view") || key.includes("tradingview")) return BROKER_ICONS.tradingview;
     if (key.includes("think"))   return BROKER_ICONS.thinkorswim;
@@ -161,6 +186,41 @@ export default function QuickAccountSelector({
       await loadAccounts();
     } catch (e) { console.error(e); }
     setEditingId(null);
+  };
+
+  // Supprime un compte + ses trades associés (irréversible). Nettoie la
+  // sélection, met à jour l'état local et notifie les autres vues.
+  const deleteAccount = async (acc) => {
+    if (!acc?.id) return;
+    const ok = typeof window !== "undefined"
+      ? window.confirm(`Supprimer le compte « ${acc.name} » et tous ses trades ?\nCette action est irréversible.`)
+      : true;
+    if (!ok) return;
+    try {
+      const uid = user?.id;
+      // Supprimer d'abord les trades liés au compte
+      await supabase.from("apex_trades").delete().eq("account_id", acc.id).eq("user_id", uid);
+      // Puis le compte
+      const { error } = await supabase
+        .from("trading_accounts")
+        .delete()
+        .eq("id", acc.id)
+        .eq("user_id", uid);
+      if (error) { console.error("delete account failed:", error.message); return; }
+
+      // Retirer le compte de la sélection
+      if (multi && onAccountNamesChange) {
+        onAccountNamesChange(selectedAccountNames.filter(n => n !== acc.name));
+      } else if (selectedAccountName === acc.name) {
+        onAccountNameChange("");
+      }
+      // MAJ immédiate de la liste affichée
+      setAccounts(prev => prev.filter(a => a.id !== acc.id));
+      // Resync parent (mode piloté par prop) + autres vues
+      if (onAccountDeleted) onAccountDeleted(acc.id);
+      try { window.dispatchEvent(new CustomEvent("tr4de:accounts-changed")); } catch {}
+      try { window.dispatchEvent(new CustomEvent("tr4de:trades-imported", { detail: { count: 0 } })); } catch {}
+    } catch (e) { console.error(e); }
   };
 
   const borderColor = T.border || "#E5E5E5";
@@ -291,8 +351,8 @@ export default function QuickAccountSelector({
                     background: isSelected ? "#F0F0F0" : "transparent",
                     transition: "background 100ms ease",
                   }}
-                  onMouseEnter={(e)=>{ if (!isSelected) e.currentTarget.style.background = "#F5F5F5"; const btn = e.currentTarget.querySelector('[data-edit]'); if (btn) btn.style.opacity = 1; }}
-                  onMouseLeave={(e)=>{ if (!isSelected) e.currentTarget.style.background = "transparent"; const btn = e.currentTarget.querySelector('[data-edit]'); if (btn) btn.style.opacity = 0; }}
+                  onMouseEnter={(e)=>{ if (!isSelected) e.currentTarget.style.background = "#F5F5F5"; e.currentTarget.querySelectorAll('[data-hover]').forEach(b => { b.style.opacity = 1; }); }}
+                  onMouseLeave={(e)=>{ if (!isSelected) e.currentTarget.style.background = "transparent"; e.currentTarget.querySelectorAll('[data-hover]').forEach(b => { b.style.opacity = 0; }); }}
                 >
                   <button
                     type="button"
@@ -345,7 +405,7 @@ export default function QuickAccountSelector({
                   </button>
                   {!isEditing && (
                     <span
-                      data-edit
+                      data-hover
                       role="button"
                       title={t("accounts.rename")}
                       onClick={(e)=>{ e.stopPropagation(); setEditingId(acc.id); setEditDraft(acc.name); }}
@@ -358,6 +418,23 @@ export default function QuickAccountSelector({
                       onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
                     >
                       <Pencil size={12} strokeWidth={1.75}/>
+                    </span>
+                  )}
+                  {allowDelete && !isEditing && (
+                    <span
+                      data-hover
+                      role="button"
+                      title={t("accounts.deleteTip")}
+                      onClick={(e)=>{ e.stopPropagation(); deleteAccount(acc); }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                        color: "#8E8E8E", opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
+                      }}
+                      onMouseEnter={(e)=>{e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.color = "#DC2626"}}
+                      onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
+                    >
+                      <Trash2 size={12} strokeWidth={1.75}/>
                     </span>
                   )}
                   {isSelected && !isEditing && <Check size={14} color="#0D0D0D"/>}

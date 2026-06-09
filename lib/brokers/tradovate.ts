@@ -32,6 +32,7 @@ export const tradovate: BrokerAdapter = {
     docsUrl: "https://api.tradovate.com/",
     color: "#1E40AF",
     initial: "T",
+    logoPath: "/trado.png",
   },
 
   parseFile(content: string): ParsedTrade[] {

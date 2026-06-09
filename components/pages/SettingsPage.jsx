@@ -744,6 +744,33 @@ function SectionLabel({ children, mt }) {
 }
 
 /* =================== IMPORT HISTORY =================== */
+
+/**
+ * Re-synchronise le cache local des trades après une mutation (suppression, import…).
+ * C'est `localStorage.tr4de_trades` qui alimente le hook useTrades() dans toute l'app :
+ * sans cette mise à jour + l'événement `trades-refreshed`, l'UI continue d'afficher
+ * les trades supprimés jusqu'à un rechargement complet de la page.
+ */
+async function refreshTradesCache(supabase, userId) {
+  try {
+    const { data, error } = await supabase
+      .from("apex_trades")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const fresh = data || [];
+    try { localStorage.setItem("tr4de_trades", JSON.stringify(fresh)); } catch {}
+    try {
+      window.dispatchEvent(new CustomEvent("trades-refreshed", { detail: { trades: fresh } }));
+    } catch {}
+    return fresh;
+  } catch (e) {
+    console.error("[refreshTradesCache] failed", e);
+    return null;
+  }
+}
+
 function ImportHistorySection() {
   useLang();
   const [history, setHistory] = useState([]);
@@ -762,15 +789,30 @@ function ImportHistorySection() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(t("settings.import.notAuth"));
-      const { error } = await supabase
+
+      // 1) Supprimer les trades rattachés à ce compte (= cet import)
+      const { error: tradesError } = await supabase
         .from("apex_trades")
         .delete()
         .eq("user_id", user.id)
         .eq("account_id", item.id);
-      if (error) throw error;
+      if (tradesError) throw tradesError;
+
+      // 2) Supprimer la ligne du compte pour que l'entrée disparaisse
+      //    définitivement de l'historique (sinon elle réapparaît à 0 trade)
+      const { error: accountError } = await supabase
+        .from("trading_accounts")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("id", item.id);
+      if (accountError) throw accountError;
+
       setHistory((prev) => prev.filter((h) => h.id !== item.id));
-      // Notifie le reste de l'app pour rafraîchir trades / dashboards
-      try { window.dispatchEvent(new CustomEvent("tr4de:trades-changed")); } catch {}
+
+      // 3) Re-synchroniser le cache localStorage + notifier toute l'app.
+      //    SANS ça, useTrades() recharge les trades supprimés depuis le cache.
+      await refreshTradesCache(supabase, user.id);
+      try { window.dispatchEvent(new CustomEvent("tr4de:accounts-changed")); } catch {}
     } catch (e) {
       console.error("[ImportHistory] delete failed", e);
       alert(t("settings.import.deleteFailed") + (e?.message || t("settings.import.errUnknown")));
@@ -957,7 +999,7 @@ function DataExportSection() {
         }
       }
 
-      try { window.dispatchEvent(new CustomEvent("tr4de:trades-changed")); } catch {}
+      await refreshTradesCache(supabase, user.id);
       try { window.dispatchEvent(new CustomEvent("tr4de:accounts-changed")); } catch {}
 
       setMsg({ kind: "success", text: t("settings.data.importDone").replace("{n}", String(inserted)) });

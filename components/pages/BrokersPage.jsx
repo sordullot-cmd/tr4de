@@ -110,11 +110,14 @@ export default function BrokersPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 8,
-                  background: m.color, color: "#fff",
+                  background: m.logoPath ? T.white : m.color, color: "#fff",
+                  border: m.logoPath ? `1px solid ${T.border}` : "none",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 16, fontWeight: 700, flexShrink: 0,
+                  fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: "hidden",
                 }}>
-                  {m.initial}
+                  {m.logoPath
+                    ? <img src={m.logoPath} alt={m.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    : m.initial}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{m.name}</div>
