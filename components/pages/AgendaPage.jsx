@@ -59,7 +59,7 @@ const GCAL_COLORS = {
   5: "#F6BF26",  // Banane
   6: "#F4511E",  // Tangerine
   7: "#039BE5",  // Paon
-  8: "#616161",  // Graphite
+  8: "#B0B0B0",  // Graphite (gris clair)
   9: "#3F51B5",  // Myrtille
   10: "#0B8043", // Basilic
   11: "#D50000", // Tomate
@@ -787,7 +787,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: ev.isTask ? `${col}40` : `${col}80`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: ev.isTask ? `${col}2E` : `${col}59`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
                           boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
@@ -856,7 +856,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "40" : "80"}`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "2E" : "59"}`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
