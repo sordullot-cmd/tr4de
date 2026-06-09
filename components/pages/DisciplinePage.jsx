@@ -27,7 +27,9 @@ import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import RiskCalculator from "@/components/RiskCalculator";
 import ComplianceModule, { ComplianceKpiRow, ComplianceInsights } from "@/components/discipline/ComplianceModule";
 import { useComplianceRules } from "@/lib/hooks/useComplianceData";
-import { describeRule, isRuleLive, computeStats } from "@/lib/compliance";
+import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
+import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
+import { describeRule, isRuleLive, computeStats, computeJournaledDates } from "@/lib/compliance";
 
 function reorder(arr, from, to) {
   const next = [...arr];
@@ -466,9 +468,15 @@ export default function DisciplinePage({ trades = [] }) {
   // Stats compliance (règles automatiques) → utilisées par la heatmap pour afficher
   // un % de discipline quotidien basé sur les violations détectées sur les trades du jour.
   const { rules: complianceRules } = useComplianceRules();
+  const { notes: dailyNotes } = useDailySessionNotes();
+  const { notes: tradeNotes } = useTradeNotes();
+  const journaledDates = React.useMemo(
+    () => computeJournaledDates(trades || [], dailyNotes, tradeNotes),
+    [trades, dailyNotes, tradeNotes]
+  );
   const complianceStats = React.useMemo(
-    () => computeStats(complianceRules || [], trades || []),
-    [complianceRules, trades]
+    () => computeStats(complianceRules || [], trades || [], journaledDates),
+    [complianceRules, trades, journaledDates]
   );
   const violatingTradesByDay = React.useMemo(() => {
     const map = new Map();

@@ -6,6 +6,8 @@ import { ComplianceRule, RULE_LOCK_MS } from "@/lib/compliance";
 const RULES_KEY = "tr4de_compliance_rules";
 const WEBHOOK_KEY = "tr4de_compliance_webhook";
 const RULES_EVENT = "tr4de:compliance-rules-changed";
+// Flag de seed (une seule fois) — voir seedDefaultRules().
+const SEED_KEY = "tr4de_compliance_seeded_v1";
 
 function readRules(): ComplianceRule[] {
   try {
@@ -16,6 +18,34 @@ function readRules(): ComplianceRule[] {
     return parsed;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Ajoute les règles présentes par défaut, une seule fois (flag SEED_KEY).
+ * Aujourd'hui : une règle de journaling active, pour suivre la constance du
+ * journal dès l'arrivée sur la page. Respecte une suppression ultérieure
+ * (le flag empêche toute réapparition).
+ */
+function seedDefaultRules(current: ComplianceRule[]): ComplianceRule[] {
+  try {
+    if (localStorage.getItem(SEED_KEY)) return current;
+    localStorage.setItem(SEED_KEY, "1");
+    if (current.some(r => r.type === "journaling")) return current;
+    const now = new Date();
+    const rule: ComplianceRule = {
+      id: `cr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      type: "journaling",
+      active: true,
+      created_at: now.toISOString(),
+      effective_at: new Date(now.getTime() + RULE_LOCK_MS).toISOString(),
+      params: {},
+    };
+    const next = [...current, rule];
+    writeRules(next);
+    return next;
+  } catch {
+    return current;
   }
 }
 
@@ -34,7 +64,7 @@ export function useComplianceRules() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setRules(readRules());
+    setRules(seedDefaultRules(readRules()));
     setLoaded(true);
     const onStorage = (e: StorageEvent) => {
       if (e.key === RULES_KEY) setRules(readRules());

@@ -4,14 +4,26 @@ import React from "react";
 import {
   Plus, Trash2, ShieldCheck, Lock, Clock, AlertTriangle, TrendingUp,
   Flame, Target, Zap, Calendar as CalIcon, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, Pencil,
+  CheckCircle2, XCircle, Pencil, NotebookPen,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import {
-  computeStats, describeRule, isRuleLive, RULE_LOCK_MS,
+  computeStats, describeRule, isRuleLive, RULE_LOCK_MS, computeJournaledDates,
 } from "@/lib/compliance";
 import { useComplianceRules } from "@/lib/hooks/useComplianceData";
+import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
+import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { Stat } from "@/components/ui/Stat";
+
+/** Dates journalisées (note de session ou note de trade) pour la règle `journaling`. */
+function useJournaledDates(trades) {
+  const { notes: dailyNotes } = useDailySessionNotes();
+  const { notes: tradeNotes } = useTradeNotes();
+  return React.useMemo(
+    () => computeJournaledDates(trades, dailyNotes, tradeNotes),
+    [trades, dailyNotes, tradeNotes],
+  );
+}
 
 const RULE_TYPES = [
   { value: "position_limit",        label: "Limite de position",     hint: "Max N contrats par trade",                Icon: Target },
@@ -22,6 +34,7 @@ const RULE_TYPES = [
   { value: "max_daily_loss",        label: "Stop-loss journalier",   hint: "Cesser après une perte cumulée",          Icon: TrendingUp },
   { value: "no_reentry_after_loss", label: "Cooldown après perte",   hint: "Pause obligatoire post-trade perdant",    Icon: Lock },
   { value: "min_rr",                label: "RR minimum",             hint: "Risk/Reward plancher sur les winners",    Icon: Zap },
+  { value: "journaling",            label: "Journal quotidien",      hint: "Journaliser ses trades chaque jour",      Icon: NotebookPen },
 ];
 
 /* ─────────────── Custom dropdown for rule types ─────────────── */
@@ -169,7 +182,8 @@ const sectionHeader = (title, subtitle, right) => (
 /* ─────────────── KPIs : streak, multiplier, compliance rate, violations ─────────────── */
 export function ComplianceKpiRow({ trades = [], flat = false }) {
   const { rules, loaded } = useComplianceRules();
-  const stats = React.useMemo(() => computeStats(rules, trades), [rules, trades]);
+  const journaledDates = useJournaledDates(trades);
+  const stats = React.useMemo(() => computeStats(rules, trades, journaledDates), [rules, trades, journaledDates]);
   const today = React.useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -340,7 +354,8 @@ function ViolationsLog({ stats, rules }) {
 /* ─────────────── Insights : top rule, hour cluster, weekday ─────────────── */
 export function ComplianceInsights({ trades = [], flat = false }) {
   const { rules, loaded } = useComplianceRules();
-  const stats = React.useMemo(() => computeStats(rules, trades), [rules, trades]);
+  const journaledDates = useJournaledDates(trades);
+  const stats = React.useMemo(() => computeStats(rules, trades, journaledDates), [rules, trades, journaledDates]);
   if (!loaded) return null;
   return <Insights stats={stats} rules={rules} flat={flat} />;
 }
@@ -506,6 +521,13 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
           <input type="number" min={0} step={0.1} placeholder="RR minimum (ex: 1.5)" value={params.minRR ?? ""}
             onChange={e => setParams(p => ({ ...p, minRR: e.target.value }))} style={inp()} />
         );
+      case "journaling":
+        return (
+          <div style={{ fontSize: 12, color: T.textMut, lineHeight: 1.5, padding: "2px 0" }}>
+            Aucun paramètre. Chaque jour où tu trades sans journaliser ta session
+            (note de journée ou note de trade dans la page Journal) compte comme une violation.
+          </div>
+        );
       default: return null;
     }
   };
@@ -644,7 +666,8 @@ const btnGhost = () => ({
 /* ─────────────── Module principal ─────────────── */
 export default function ComplianceModule({ trades = [] }) {
   const { rules, loaded, addRule, updateRule, deleteRule } = useComplianceRules();
-  const stats = React.useMemo(() => computeStats(rules, trades), [rules, trades]);
+  const journaledDates = useJournaledDates(trades);
+  const stats = React.useMemo(() => computeStats(rules, trades, journaledDates), [rules, trades, journaledDates]);
 
   if (!loaded) return null;
 

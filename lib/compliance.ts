@@ -15,7 +15,8 @@ export type RuleType =
   | "max_trades_per_day"
   | "max_daily_loss"
   | "no_reentry_after_loss"
-  | "min_rr";
+  | "min_rr"
+  | "journaling";
 
 export interface ComplianceRule {
   id: string;
@@ -89,6 +90,7 @@ export function describeRule(rule: ComplianceRule): string {
     case "max_daily_loss": return `Stop trading après ${p.max ?? "?"} de perte journalière`;
     case "no_reentry_after_loss": return `Cooldown ${p.minutes ?? "?"} min après un trade perdant`;
     case "min_rr":         return `RR minimum ${p.minRR ?? "?"}`;
+    case "journaling":     return `Journal quotidien`;
   }
 }
 
@@ -254,6 +256,9 @@ export function evaluateTrade(
       }
       return null;
     }
+    case "journaling":
+      // Évaluée au niveau du jour dans computeStats (pas par trade).
+      return null;
   }
 }
 
@@ -288,7 +293,11 @@ export interface ComplianceStats {
   topWeekday: { weekday: string; count: number } | null;
 }
 
-export function computeStats(rules: ComplianceRule[], trades: Trade[]): ComplianceStats {
+export function computeStats(
+  rules: ComplianceRule[],
+  trades: Trade[],
+  journaledDates: Set<string> = new Set(),
+): ComplianceStats {
   // Group trades by day, sorted chronologically
   const byDay = new Map<string, Trade[]>();
   for (const tr of trades) {
@@ -319,6 +328,30 @@ export function computeStats(rules: ComplianceRule[], trades: Trade[]): Complian
           violations.push(v);
           violatingTradeIds.add(t.id);
         }
+      }
+    }
+  }
+
+  // Règles de journaling : évaluées au niveau du JOUR (pas du trade).
+  // Un jour qui a tradé mais qui n'a pas été journalisé dans la page Journal
+  // (ni note de session, ni note de trade) génère une violation — à l'inverse,
+  // dès que la session est journalisée, aucune violation n'est levée.
+  // On ne marque PAS les trades comme "violants" : la qualité d'exécution reste
+  // indépendante, mais le jour passe en "violated" (casse le streak clean).
+  const journalingRules = rules.filter(r => r.type === "journaling" && isRuleLive(r));
+  if (journalingRules.length) {
+    for (const [d, dayTrades] of byDay) {
+      if (!dayTrades.length || journaledDates.has(d)) continue;
+      for (const rule of journalingRules) {
+        violations.push({
+          rule_id: rule.id,
+          rule_type: "journaling",
+          trade_id: `journal:${d}`,
+          date: d,
+          distance: dayTrades.length,
+          distance_label: "non journalisé",
+          message: `Session non journalisée (${dayTrades.length} trade${dayTrades.length > 1 ? "s" : ""})`,
+        });
       }
     }
   }
@@ -423,6 +456,33 @@ export function computeStats(rules: ComplianceRule[], trades: Trade[]): Complian
     topHourBin,
     topWeekday,
   };
+}
+
+/**
+ * Calcule l'ensemble des dates (YYYY-MM-DD) considérées comme « journalisées ».
+ * Un jour compte comme journalisé s'il possède une note de session non vide,
+ * ou si au moins un de ses trades porte une note. Alimente la règle `journaling`.
+ *
+ * Les clés de `tradeNotes` suivent le même schéma que la page Journal :
+ * `trade.date + trade.symbol + trade.entry`.
+ */
+export function computeJournaledDates(
+  trades: Trade[],
+  dailyNotes: Record<string, string> = {},
+  tradeNotes: Record<string, string> = {},
+): Set<string> {
+  const journaled = new Set<string>();
+  for (const [date, note] of Object.entries(dailyNotes)) {
+    if (note && note.trim()) journaled.add(date.slice(0, 10));
+  }
+  for (const t of trades) {
+    const d = tradeDate(t);
+    if (!d || journaled.has(d)) continue;
+    const tradeId = `${t.date ?? ""}${t.symbol ?? ""}${t.entry ?? ""}`;
+    const note = tradeNotes[tradeId];
+    if (note && note.trim()) journaled.add(d);
+  }
+  return journaled;
 }
 
 /** ───────────────────────── Webhook ───────────────────────── */
