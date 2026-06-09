@@ -52,9 +52,9 @@ export function getOAuthClient(req: Request) {
 
 export const CALENDAR_SCOPES = [
   // Lecture + écriture des évènements (créer / modifier / supprimer).
-  // Les "tâches" tr4de sont des évènements marqués (extendedProperties) :
-  // pas besoin du scope Google Tasks.
   "https://www.googleapis.com/auth/calendar.events",
+  // Vraies tâches Google (l'heure précise est conservée côté tr4de).
+  "https://www.googleapis.com/auth/tasks",
   "openid",
   "email",
   "profile",

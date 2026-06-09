@@ -165,6 +165,59 @@ function payloadFromForm(form) {
   return { summary: form.summary, location: form.location, description: form.description, allDay: false, start, end, timeZone: tz, ...extra };
 }
 
+/* ─────────────── Tâches Google : heure conservée côté tr4de ─────────────── */
+const TASK_TIMES_KEY = "tr4de_task_times";
+function readTaskTimes() {
+  try { return JSON.parse(localStorage.getItem(TASK_TIMES_KEY) || "{}"); } catch { return {}; }
+}
+function writeTaskTimes(map) {
+  try { localStorage.setItem(TASK_TIMES_KEY, JSON.stringify(map)); } catch {}
+}
+
+/** Convertit une Google Task (+ heure locale) en item affiché comme un évènement. */
+function taskToItem(tk, times) {
+  const dueDate = tk.due ? tk.due.slice(0, 10) : null;
+  if (!dueDate) return null; // sans échéance → pas placée sur le calendrier
+  const t = times[tk.id];
+  const allDay = !t;
+  let start, end;
+  if (t) {
+    start = new Date(`${dueDate}T${t.startTime}:00`).toISOString();
+    end = new Date(`${dueDate}T${t.endTime}:00`).toISOString();
+  } else { start = dueDate; end = dueDate; }
+  return {
+    id: tk.id, summary: tk.title || "(Sans titre)", description: tk.notes || "",
+    isTask: true, isGTask: true, done: !!tk.completed,
+    allDay, start, end,
+    colorId: null, location: "", htmlLink: null, guests: [], hangoutLink: null,
+    transparency: "opaque", visibility: "default", reminders: null,
+  };
+}
+
+/** Form pré-rempli depuis un item de tâche Google. */
+function formFromTaskItem(item, times) {
+  const dueDate = item.allDay ? String(item.start || "").slice(0, 10) : dateKey(new Date(item.start));
+  const t = times[item.id];
+  return {
+    kind: "task", done: !!item.done, id: item.id, htmlLink: null,
+    summary: item.summary === "(Sans titre)" ? "" : item.summary,
+    allDay: !!item.allDay, date: dueDate, endDate: dueDate,
+    startTime: t?.startTime || "09:00", endTime: t?.endTime || "10:00",
+    location: "", description: item.description || "",
+    guests: "", addMeet: false, hadMeet: false, colorId: null,
+    transparency: "opaque", visibility: "default", reminder: 10,
+  };
+}
+
+/** Payload Tasks API depuis le form. */
+function taskPayloadFromForm(form) {
+  return {
+    title: form.summary || "(Sans titre)",
+    notes: form.description || "",
+    due: form.date ? `${form.date}T00:00:00.000Z` : undefined,
+  };
+}
+
 const VIEWS = [
   { id: "day", label: "Jour" },
   { id: "week", label: "Semaine" },
@@ -277,11 +330,14 @@ export default function AgendaPage() {
   const {
     ready, configured, connected, connect, disconnect,
     fetchEvents, createEvent, updateEvent, deleteEvent, setEventDone,
+    fetchTasks, createTask, updateTask, toggleTask, deleteTask,
   } = useGoogleCalendar();
 
   const [view, setView] = React.useState("week");
   const [cursor, setCursor] = React.useState(() => startOfDay(new Date()));
   const [events, setEvents] = React.useState([]);
+  const [tasks, setTasks] = React.useState([]);
+  const [taskTimes, setTaskTimes] = React.useState({});
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [modal, setModal] = React.useState(null); // form objet | null
@@ -292,6 +348,8 @@ export default function AgendaPage() {
   const [timeEdit, setTimeEdit] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
+  const resizeRef = React.useRef(null);
+  const [resizeBox, setResizeBox] = React.useState(null); // { id, dayKey, startMin, endMin }
   const titleRef = React.useRef(null);
 
   // Focalise le titre à l'ouverture du formulaire SANS faire défiler la page.
@@ -321,9 +379,26 @@ export default function AgendaPage() {
 
   React.useEffect(() => { loadEvents(); }, [loadEvents]);
 
+  // Heures locales des tâches (localStorage).
+  React.useEffect(() => { setTaskTimes(readTaskTimes()); }, []);
+
+  // Vraies tâches Google (échec silencieux si scope/API pas encore prêts).
+  const loadTasks = React.useCallback(async () => {
+    if (!connected) return;
+    try { setTasks(await fetchTasks()); } catch { setTasks([]); }
+  }, [connected, fetchTasks]);
+
+  React.useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  // Tâches converties en items affichables (mêmes champs qu'un évènement).
+  const taskItems = React.useMemo(
+    () => tasks.map((tk) => taskToItem(tk, taskTimes)).filter(Boolean),
+    [tasks, taskTimes],
+  );
+
   const eventsByDay = React.useMemo(() => {
     const map = new Map();
-    for (const ev of events) {
+    for (const ev of [...events, ...taskItems]) {
       const k = eventDayKey(ev);
       if (!k) continue;
       if (!map.has(k)) map.set(k, []);
@@ -333,20 +408,28 @@ export default function AgendaPage() {
       arr.sort((a, b) => (a.allDay === b.allDay ? String(a.start).localeCompare(String(b.start)) : a.allDay ? -1 : 1));
     }
     return map;
-  }, [events]);
+  }, [events, taskItems]);
 
   const today = startOfDay(new Date());
 
-  // Bascule l'état "terminé" d'une tâche-évènement (optimiste).
-  const onToggleDone = async (ev) => {
-    setEvents((prev) => prev.map((x) => (x.id === ev.id ? { ...x, done: !x.done } : x)));
-    try { await setEventDone(ev.id, !ev.done); } catch { loadEvents(); }
+  // Bascule l'état "terminé" (tâche Google ou évènement-tâche legacy).
+  const onToggleDone = async (item) => {
+    if (item.isGTask) {
+      setTasks((prev) => prev.map((x) => (x.id === item.id ? { ...x, completed: !item.done } : x)));
+      try { await toggleTask(item.id, !item.done); } catch { loadTasks(); }
+    } else {
+      setEvents((prev) => prev.map((x) => (x.id === item.id ? { ...x, done: !x.done } : x)));
+      try { await setEventDone(item.id, !item.done); } catch { loadEvents(); }
+    }
   };
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
   const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
-  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(formFromEvent(ev)); };
+  const openEdit = (item) => {
+    setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false);
+    setModal(item.isGTask ? formFromTaskItem(item, taskTimes) : formFromEvent(item));
+  };
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -386,16 +469,96 @@ export default function AgendaPage() {
     window.addEventListener("mouseup", onUp);
   };
 
+  // Redimensionnement d'un évènement par ses bords (façon Google Agenda) :
+  // on glisse le bord haut (modifie l'heure de début) ou bas (heure de fin),
+  // par pas de 15 min, puis on enregistre la nouvelle plage.
+  const startResize = (e, ev, d, edge) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const colEl = e.currentTarget.closest("[data-daycol]");
+    if (!colEl) return;
+    const columnTop = colEl.getBoundingClientRect().top;
+    const dk = dateKey(d);
+    const snap = (clientY) => {
+      const raw = ((clientY - columnTop) / HOUR_H) * 60;
+      return Math.max(0, Math.min(24 * 60, Math.round(raw / 15) * 15));
+    };
+    const init = { startMin: ev.startMin, endMin: ev.endMin };
+    resizeRef.current = { id: ev.id, edge, ev, ...init };
+    setResizeBox({ id: ev.id, dayKey: dk, ...init });
+
+    const onMove = (m) => {
+      const cur = snap(m.clientY);
+      const st = resizeRef.current;
+      if (!st) return;
+      if (edge === "top") st.startMin = Math.min(cur, st.endMin - 15);
+      else st.endMin = Math.max(cur, st.startMin + 15);
+      setResizeBox({ id: ev.id, dayKey: dk, startMin: st.startMin, endMin: st.endMin });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const st = resizeRef.current;
+      resizeRef.current = null;
+      setResizeBox(null);
+      if (!st) return;
+      if (st.startMin === init.startMin && st.endMin === init.endMin) return; // aucun changement
+      applyResize(st.ev, d, st.startMin, st.endMin);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // Applique la nouvelle plage horaire (MAJ optimiste puis appel API).
+  const applyResize = async (ev, d, startMin, endMin) => {
+    const toTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+    const endM = endMin >= 24 * 60 ? 24 * 60 - 1 : endMin; // 24:00 impossible → 23:59
+    const dk = dateKey(d);
+    const form = {
+      ...formFromEvent(ev),
+      allDay: false, date: dk, endDate: dk,
+      startTime: toTime(startMin), endTime: toTime(endM),
+    };
+    const newStart = toISO(dk, form.startTime);
+    const newEnd = toISO(dk, form.endTime);
+    setEvents((prev) => prev.map((x) => (x.id === ev.id ? { ...x, start: newStart, end: newEnd } : x)));
+    try {
+      await updateEvent(ev.id, payloadFromForm(form));
+      await loadEvents();
+    } catch (err) {
+      if (err?.message === "insufficient_scope") setError("insufficient_scope");
+      loadEvents();
+    }
+  };
+
   const saveModal = async () => {
     if (!modal) return;
     setSaving(true);
     setModalError(null);
     try {
-      const payload = payloadFromForm(modal);
-      if (modal.id) await updateEvent(modal.id, payload);
-      else await createEvent(payload);
-      setModal(null);
-      await loadEvents();
+      if (modal.kind === "task") {
+        const payload = taskPayloadFromForm(modal);
+        let taskId = modal.id;
+        if (taskId) await updateTask(taskId, payload);
+        else { const r = await createTask(payload); taskId = r?.task?.id; }
+        // Heure conservée côté tr4de (Google ne stocke que la date).
+        const times = readTaskTimes();
+        if (taskId) {
+          if (modal.allDay) delete times[taskId];
+          else times[taskId] = { startTime: modal.startTime, endTime: modal.endTime };
+          writeTaskTimes(times);
+          setTaskTimes(times);
+        }
+        setModal(null);
+        await loadTasks();
+      } else {
+        const payload = payloadFromForm(modal);
+        if (modal.id) await updateEvent(modal.id, payload);
+        else await createEvent(payload);
+        setModal(null);
+        await loadEvents();
+      }
     } catch (e) {
       if (e?.message === "insufficient_scope") { setModal(null); setError("insufficient_scope"); }
       else setModalError(e?.message || "Erreur d'enregistrement");
@@ -409,9 +572,19 @@ export default function AgendaPage() {
     setSaving(true);
     setModalError(null);
     try {
-      await deleteEvent(modal.id);
-      setModal(null);
-      await loadEvents();
+      if (modal.kind === "task") {
+        await deleteTask(modal.id);
+        const times = readTaskTimes();
+        delete times[modal.id];
+        writeTaskTimes(times);
+        setTaskTimes(times);
+        setModal(null);
+        await loadTasks();
+      } else {
+        await deleteEvent(modal.id);
+        setModal(null);
+        await loadEvents();
+      }
     } catch (e) {
       if (e?.message === "insufficient_scope") { setModal(null); setError("insufficient_scope"); }
       else setModalError(e?.message || "Erreur de suppression");
@@ -421,12 +594,24 @@ export default function AgendaPage() {
   };
 
   // Scroll auto vers 5h du matin à l'ouverture du time-grid (jour / semaine).
+  // On réarme l'intention à chaque changement de vue/date…
   const scrollRef = React.useRef(null);
+  const didScrollRef = React.useRef(false);
+  React.useEffect(() => { didScrollRef.current = false; }, [view, cursor]);
+  // …puis on applique le scroll dès que la grille est effectivement montée
+  // (la grille n'existe pas tant que Google n'est pas connecté / chargé, donc
+  // on ne peut pas se contenter d'un effet sur [view, cursor]).
   React.useEffect(() => {
-    if ((view === "day" || view === "week") && scrollRef.current) {
-      scrollRef.current.scrollTop = 5 * HOUR_H;
-    }
-  }, [view, cursor]);
+    if (view !== "day" && view !== "week") return;
+    if (didScrollRef.current || !scrollRef.current) return;
+    const id = requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 5 * HOUR_H;
+        didScrollRef.current = true;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  });
 
   /* ─────────────── Header ─────────────── */
   const segmented = (
@@ -535,7 +720,7 @@ export default function AgendaPage() {
               const dk = dateKey(d);
               const dragHere = dragBox && dragBox.dayKey === dk;
               return (
-                <div key={di} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
+                <div key={di} data-daycol="" onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
                   borderLeft: daysCount > 1 && di > 0 ? `1px solid ${T.border}` : "none",
                   backgroundImage: `repeating-linear-gradient(to bottom, ${T.border}, ${T.border} 1px, transparent 1px, transparent ${HOUR_H}px)`,
@@ -553,31 +738,51 @@ export default function AgendaPage() {
                     );
                   })()}
                   {layout.map((ev) => {
-                    const top = (ev.startMin / 60) * HOUR_H;
-                    const height = Math.max(((ev.endMin - ev.startMin) / 60) * HOUR_H, 16);
+                    // Pendant un redimensionnement, on affiche la plage en cours
+                    // d'édition (prévisualisation live) au lieu des bornes d'origine.
+                    const resizing = resizeBox && resizeBox.id === ev.id && resizeBox.dayKey === dk;
+                    const sMin = resizing ? resizeBox.startMin : ev.startMin;
+                    const eMin = resizing ? resizeBox.endMin : ev.endMin;
+                    const top = (sMin / 60) * HOUR_H;
+                    const height = Math.max(((eMin - sMin) / 60) * HOUR_H, 16);
                     const w = 100 / ev._cols;
                     const left = ev._col * w;
                     const col = eventColor(ev);
                     // Évènements courts (≤ 30 min) : titre et heure sur une seule
                     // ligne, l'heure poussée à droite.
-                    const compact = (ev.endMin - ev.startMin) <= 30;
+                    const compact = (eMin - sMin) <= 30;
+                    const minLbl = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+                    const timeLbl = resizing ? `${minLbl(sMin)} – ${minLbl(eMin >= 1440 ? 1439 : eMin)}` : eventTimeLabel(ev);
+                    // Poignées de redimensionnement (évènements horaires uniquement).
+                    const resizable = !ev.isTask;
+                    const handleStyle = (pos) => ({
+                      position: "absolute", left: 0, right: 0, [pos]: 0, height: 8,
+                      cursor: "ns-resize", zIndex: 2,
+                    });
                     return (
-                      <div key={ev.id} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${eventTimeLabel(ev)} ${ev.summary}`}
+                      <div key={ev.id} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${timeLbl} ${ev.summary}`}
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
                           background: ev.isTask ? `${col}26` : `${col}73`, borderLeft: `3px solid ${col}`, borderRadius: 5,
-                          padding: "2px 5px", overflow: "hidden",
+                          padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
+                          boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
                         }}>
+                        {resizable && (
+                          <div onMouseDown={(e) => startResize(e, ev, d, "top")} onClick={(e) => e.stopPropagation()} style={handleStyle("top")} />
+                        )}
                         <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, flex: compact ? 1 : "none" }}>
                           {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
                           <span style={{ fontSize: 10.5, fontWeight: 600, color: ev.done ? T.textMut : T.text, textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
                         </span>
                         {compact
-                          ? <span style={{ fontSize: 9.5, color: T.textSub, flexShrink: 0, whiteSpace: "nowrap" }}>{eventTimeLabel(ev)}</span>
-                          : (height > 28 && <span style={{ fontSize: 9.5, color: T.textSub }}>{eventTimeLabel(ev)}</span>)}
+                          ? <span style={{ fontSize: 9.5, color: T.textSub, flexShrink: 0, whiteSpace: "nowrap" }}>{timeLbl}</span>
+                          : (height > 28 && <span style={{ fontSize: 9.5, color: T.textSub }}>{timeLbl}</span>)}
+                        {resizable && (
+                          <div onMouseDown={(e) => startResize(e, ev, d, "bottom")} onClick={(e) => e.stopPropagation()} style={handleStyle("bottom")} />
+                        )}
                       </div>
                     );
                   })}
