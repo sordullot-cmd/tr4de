@@ -799,7 +799,7 @@ export default function AgendaPage() {
 
               {/* Description */}
               <FormRow icon={AlignLeft} top>
-                <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Ajouter une description" rows={2} style={{ ...rowInp, resize: "vertical" }} />
+                <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Ajouter une description" rows={2} style={{ ...rowInp, resize: "vertical", display: "block", lineHeight: 1.4, verticalAlign: "top" }} />
               </FormRow>
 
               {/* Couleur — bouton moderne + palette */}
