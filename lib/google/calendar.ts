@@ -53,6 +53,8 @@ export function getOAuthClient(req: Request) {
 export const CALENDAR_SCOPES = [
   // Lecture + écriture des évènements (créer / modifier / supprimer).
   "https://www.googleapis.com/auth/calendar.events",
+  // Tâches Google (créer / cocher / supprimer).
+  "https://www.googleapis.com/auth/tasks",
   "openid",
   "email",
   "profile",

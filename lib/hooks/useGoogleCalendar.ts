@@ -171,6 +171,40 @@ export function useGoogleCalendar() {
   const updateEvent = useCallback((eventId: string, event: any) => mutateEvent("update", { eventId, event }), [mutateEvent]);
   const deleteEvent = useCallback((eventId: string) => mutateEvent("delete", { eventId }), [mutateEvent]);
 
+  /** Appels génériques pour les tâches Google. */
+  const callTasks = useCallback(
+    async (action: string, payload: { task?: any; taskId?: string } = {}) => {
+      const token = await getValidAccessToken();
+      if (!token) throw new Error("not_connected");
+      const res = await fetch("/api/google-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, accessToken: token, ...payload }),
+      });
+      if (res.status === 403) throw new Error("insufficient_scope");
+      if (res.status === 401) {
+        writeTokens(null);
+        setTokens(null);
+        throw new Error("token_expired");
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `http_${res.status}`);
+      }
+      return res.json();
+    },
+    [getValidAccessToken],
+  );
+
+  const fetchTasks = useCallback(async () => {
+    const d = await callTasks("list");
+    return d.tasks || [];
+  }, [callTasks]);
+  const createTask = useCallback((task: any) => callTasks("create", { task }), [callTasks]);
+  const updateTask = useCallback((taskId: string, task: any) => callTasks("update", { taskId, task }), [callTasks]);
+  const toggleTask = useCallback((taskId: string, completed: boolean) => callTasks("toggle", { taskId, task: { completed } }), [callTasks]);
+  const deleteTask = useCallback((taskId: string) => callTasks("delete", { taskId }), [callTasks]);
+
   return {
     ready,
     configured,
@@ -181,5 +215,10 @@ export function useGoogleCalendar() {
     createEvent,
     updateEvent,
     deleteEvent,
+    fetchTasks,
+    createTask,
+    updateTask,
+    toggleTask,
+    deleteTask,
   };
 }
