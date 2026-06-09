@@ -758,7 +758,14 @@ export default function AgendaPage() {
                 {!timeEdit ? (
                   <button type="button" onClick={() => setTimeEdit(true)}
                     style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", width: "100%" }}>
-                    <div style={{ fontSize: 15, color: T.text }}>{summarizeWhen(modal)}</div>
+                    <div style={{ fontSize: 15, color: T.text, display: "flex", alignItems: "baseline", gap: 24, flexWrap: "wrap" }}>
+                      <span>{formatDateLong(modal.date)}</span>
+                      <span>
+                        {modal.allDay
+                          ? (modal.endDate && modal.endDate !== modal.date ? `→ ${formatDateLong(modal.endDate)}` : "Toute la journée")
+                          : `${modal.startTime} – ${modal.endTime}`}
+                      </span>
+                    </div>
                     <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · Une seule fois</div>
                   </button>
                 ) : (
@@ -786,8 +793,6 @@ export default function AgendaPage() {
                 )}
               </FormRow>
 
-              <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
-
               {/* Lieu */}
               <FormRow icon={MapPin}>
                 <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
@@ -797,8 +802,6 @@ export default function AgendaPage() {
               <FormRow icon={AlignLeft} top>
                 <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Ajouter une description" rows={2} style={{ ...rowInp, resize: "vertical" }} />
               </FormRow>
-
-              <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
 
               {/* Couleur — bouton moderne + palette */}
               <FormRow icon={CalendarIcon}>
