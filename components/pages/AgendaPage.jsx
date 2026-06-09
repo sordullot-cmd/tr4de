@@ -66,7 +66,19 @@ const GCAL_COLORS = {
 };
 // Couleur par défaut (évènement sans colorId) : bleu Google.
 const DEFAULT_EVENT_COLOR = "#4285F4";
-const eventColor = (ev) => GCAL_COLORS[ev.colorId] || DEFAULT_EVENT_COLOR;
+
+/** Éclaircit une couleur hex (mélange vers le blanc). */
+function lighten(hex, f = 0.2) {
+  const h = String(hex).replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  if (isNaN(n)) return hex;
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.round(r + (255 - r) * f); g = Math.round(g + (255 - g) * f); b = Math.round(b + (255 - b) * f);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+// Toutes les couleurs sont légèrement éclaircies à l'affichage.
+const eventColor = (ev) => lighten(GCAL_COLORS[ev.colorId] || DEFAULT_EVENT_COLOR, 0.22);
 
 /** Assombrit une couleur hex (pour le texte lié à la couleur de l'évènement). */
 function darken(hex, f = 0.5) {
