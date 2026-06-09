@@ -76,6 +76,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // Vérification de propriété Google Search Console : crée la propriété sur
+  // https://search.google.com/search-console, choisis la méthode "balise HTML"
+  // et colle ici le code fourni (juste la valeur du content=, ex "abc123…").
+  // verification: { google: "REMPLACER_PAR_TON_CODE" },
   appleWebApp: {
     capable: true,
     title: "tao trade",
@@ -97,7 +101,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       className={`${openAISans.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >

@@ -11,6 +11,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/dashboard", "/api/", "/strategie", "/_next/", "/font-test"],
       },
     ],
+    sitemap: "https://tao-trade.vercel.app/sitemap.xml",
     host: "https://tao-trade.vercel.app",
   };
 }
