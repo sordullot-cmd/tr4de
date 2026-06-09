@@ -63,6 +63,24 @@ const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const toISO = (dateStr, timeStr) => new Date(`${dateStr}T${timeStr}:00`).toISOString();
 function addDayStr(dateStr, n) { const d = new Date(`${dateStr}T00:00:00`); d.setDate(d.getDate() + n); return dateKey(d); }
 
+/** "Dimanche, 14 juin" à partir d'une date "YYYY-MM-DD". */
+function formatDateLong(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return dateStr;
+  return `${WEEKDAYS_FULL[weekdayIdx(d)]}, ${d.getDate()} ${MONTHS[d.getMonth()].toLowerCase()}`;
+}
+
+/** Résumé lisible de la plage (façon Google Agenda). */
+function summarizeWhen(form) {
+  if (form.allDay) {
+    const base = formatDateLong(form.date);
+    return form.endDate && form.endDate !== form.date
+      ? `${base} – ${formatDateLong(form.endDate)}`
+      : `${base} · Toute la journée`;
+  }
+  return `${formatDateLong(form.date)}  ${form.startTime} – ${form.endTime}`;
+}
+
 /** Déduit le champ `reminder` (minutes | "default" | "none") depuis l'évènement. */
 function reminderFromEvent(ev) {
   const r = ev.reminders;
@@ -252,6 +270,7 @@ export default function AgendaPage() {
   const [saving, setSaving] = React.useState(false);
   const [colorOpen, setColorOpen] = React.useState(false);
   const [remindOpen, setRemindOpen] = React.useState(false);
+  const [timeEdit, setTimeEdit] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
 
@@ -292,8 +311,8 @@ export default function AgendaPage() {
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
-  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setModal(blankForm(day || cursor, startTime, endTime)); };
-  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setModal(formFromEvent(ev)); };
+  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
+  const openEdit = (ev) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(formFromEvent(ev)); };
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -700,10 +719,10 @@ export default function AgendaPage() {
       {body}
       {modal && (
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 400, padding: 0, marginTop: 16, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, marginTop: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
             {/* Barre du haut */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px" }}>
-              <Menu size={18} strokeWidth={2} color={T.textMut} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
+              <Menu size={20} strokeWidth={2} color={T.textMut} />
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                 {modal.id && (
                   <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
@@ -717,46 +736,54 @@ export default function AgendaPage() {
             </div>
 
             {/* Titre */}
-            <div style={{ padding: "0 16px 0 48px" }}>
+            <div style={{ padding: "0 24px 0 58px" }}>
               <input autoFocus value={modal.summary} onChange={(e) => setModal({ ...modal, summary: e.target.value })} placeholder="Ajouter un titre"
-                style={{ width: "100%", border: "none", borderBottom: `2px solid ${T.border}`, outline: "none", fontFamily: "inherit", fontSize: 17, fontWeight: 400, color: T.text, padding: "4px 0", background: "transparent" }} />
+                style={{ width: "100%", border: "none", borderBottom: `2px solid ${T.border}`, outline: "none", fontFamily: "inherit", fontSize: 22, fontWeight: 400, color: T.text, padding: "6px 0", background: "transparent" }} />
             </div>
 
             {/* Onglets (Événement actif ; les autres décoratifs) */}
-            <div style={{ display: "flex", gap: 6, padding: "8px 16px 2px 48px", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: `${T.blue}1A`, color: T.blue }}>Événement</span>
-              <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12, color: T.textMut, opacity: 0.6 }}>Tâche</span>
-              <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, color: T.textMut, opacity: 0.6, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                Rendez-vous
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: T.blue, borderRadius: 999, padding: "1px 5px" }}>New</span>
+            <div style={{ display: "flex", gap: 6, padding: "12px 24px 4px 58px", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: `${T.blue}1A`, color: T.blue }}>Événement</span>
+              <span style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13, color: T.textMut, opacity: 0.6 }}>Tâche</span>
+              <span style={{ padding: "6px 12px", borderRadius: 999, fontSize: 13, color: T.textMut, opacity: 0.6, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Planning des rendez-vous
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: T.blue, borderRadius: 999, padding: "1px 6px" }}>Nouveauté</span>
               </span>
             </div>
 
             {/* Corps */}
-            <div style={{ padding: "4px 16px 2px" }}>
-              {/* Date / heures */}
-              <FormRow icon={Clock} top>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={subInp} />
-                    {modal.allDay ? (
-                      <>
-                        <span style={{ color: T.textMut, fontSize: 13 }}>au</span>
-                        <input type="date" value={modal.endDate} min={modal.date} onChange={(e) => setModal({ ...modal, endDate: e.target.value })} style={subInp} />
-                      </>
-                    ) : (
-                      <>
-                        <input type="time" value={modal.startTime} onChange={(e) => setModal({ ...modal, startTime: e.target.value })} style={subInp} />
-                        <span style={{ color: T.textMut }}>–</span>
-                        <input type="time" value={modal.endTime} onChange={(e) => setModal({ ...modal, endTime: e.target.value })} style={subInp} />
-                      </>
-                    )}
+            <div style={{ padding: "8px 24px 6px" }}>
+              {/* Date / heures — résumé lisible, éditable au clic */}
+              <FormRow icon={Clock} top={timeEdit}>
+                {!timeEdit ? (
+                  <button type="button" onClick={() => setTimeEdit(true)}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", width: "100%" }}>
+                    <div style={{ fontSize: 15, color: T.text }}>{summarizeWhen(modal)}</div>
+                    <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · Une seule fois</div>
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={subInp} />
+                      {modal.allDay ? (
+                        <>
+                          <span style={{ color: T.textMut, fontSize: 13 }}>au</span>
+                          <input type="date" value={modal.endDate} min={modal.date} onChange={(e) => setModal({ ...modal, endDate: e.target.value })} style={subInp} />
+                        </>
+                      ) : (
+                        <>
+                          <input type="time" value={modal.startTime} onChange={(e) => setModal({ ...modal, startTime: e.target.value })} style={subInp} />
+                          <span style={{ color: T.textMut }}>–</span>
+                          <input type="time" value={modal.endTime} onChange={(e) => setModal({ ...modal, endTime: e.target.value })} style={subInp} />
+                        </>
+                      )}
+                    </div>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: T.textSub, cursor: "pointer" }}>
+                      <input type="checkbox" checked={modal.allDay} onChange={(e) => setModal({ ...modal, allDay: e.target.checked })} />
+                      Toute la journée
+                    </label>
                   </div>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: T.textSub, cursor: "pointer" }}>
-                    <input type="checkbox" checked={modal.allDay} onChange={(e) => setModal({ ...modal, allDay: e.target.checked })} />
-                    Toute la journée
-                  </label>
-                </div>
+                )}
               </FormRow>
 
               <div style={{ borderTop: `1px solid ${T.border}`, margin: "4px 0" }} />
@@ -825,7 +852,7 @@ export default function AgendaPage() {
             </div>
 
             {/* Pied */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 16px", borderTop: `1px solid ${T.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "14px 24px", borderTop: `1px solid ${T.border}` }}>
               {modal.htmlLink && (
                 <a href={modal.htmlLink} target="_blank" rel="noopener noreferrer" style={{ marginRight: "auto", fontSize: 12, color: T.blue, display: "inline-flex", alignItems: "center", gap: 5 }}>
                   <ExternalLink size={12} strokeWidth={2} /> Ouvrir dans Google
@@ -846,9 +873,9 @@ export default function AgendaPage() {
 /* ─────────────── Ligne de formulaire (icône + contenu), façon Google Agenda ─────────────── */
 function FormRow({ icon: Icon, children, top = false, iconColor }) {
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: top ? "flex-start" : "center", padding: "2px 0", minHeight: 30 }}>
-      <div style={{ width: 20, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: top ? 6 : 0 }}>
-        <Icon size={16} strokeWidth={1.9} color={iconColor || T.textMut} />
+    <div style={{ display: "flex", gap: 18, alignItems: top ? "flex-start" : "center", padding: "6px 0", minHeight: 42 }}>
+      <div style={{ width: 24, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: top ? 8 : 0 }}>
+        <Icon size={20} strokeWidth={1.9} color={iconColor || T.textMut} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
     </div>
@@ -857,14 +884,14 @@ function FormRow({ icon: Icon, children, top = false, iconColor }) {
 
 /* ─────────────── Styles ─────────────── */
 const card = () => ({ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12 });
-const subInp = { padding: "4px 2px", fontSize: 13, fontFamily: "inherit", color: T.text, background: "transparent", border: "none", borderRadius: 6, outline: "none", cursor: "pointer" };
-const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 13, color: T.text, padding: "4px 0", boxSizing: "border-box" };
+const subInp = { padding: "5px 4px", fontSize: 14, fontFamily: "inherit", color: T.text, background: "transparent", border: "none", borderRadius: 6, outline: "none", cursor: "pointer" };
+const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: T.text, padding: "5px 0", boxSizing: "border-box" };
 // Bouton "pilule" moderne (couleur, notification)
 const pillBtn = {
   display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "6px 12px", borderRadius: 999,
+  padding: "8px 14px", borderRadius: 999,
   border: `1px solid ${T.border}`, background: T.white, color: T.text,
-  fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+  fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
 };
 const codeStyle = { background: T.accentBg, padding: "1px 5px", borderRadius: 5, fontSize: 12 };
 const fieldLbl = { display: "block", fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 };
