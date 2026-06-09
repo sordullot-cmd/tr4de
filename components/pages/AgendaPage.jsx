@@ -49,24 +49,23 @@ function eventTimeLabel(ev) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Palette des couleurs Google Agenda (colorId 1–11), version claire / douce / pastel.
-// Teintes pastel franches ; encore adoucies à l'affichage via la transparence
-// (~45 %) appliquée aux fonds d'évènements.
+// Palette officielle Google Agenda (colorId 1–11) — teintes saturées.
+// Le fond est tinté via la transparence ; la barre latérale reste pleine.
 const GCAL_COLORS = {
-  1: "#B7BEEA",  // Lavande
-  2: "#A8E0C5",  // Sauge
-  3: "#D2B3E2",  // Raisin
-  4: "#F6C2BC",  // Flamant
-  5: "#FCE7A6",  // Banane
-  6: "#F9C3AC",  // Tangerine
-  7: "#ABD9F4",  // Paon
-  8: "#CFCFCF",  // Graphite
-  9: "#B3BAE8",  // Myrtille
-  10: "#A6D7BC", // Basilic
-  11: "#F4B5B5", // Tomate
+  1: "#7986CB",  // Lavande
+  2: "#33B679",  // Sauge
+  3: "#8E24AA",  // Raisin
+  4: "#E67C73",  // Flamant
+  5: "#F6BF26",  // Banane
+  6: "#F4511E",  // Tangerine
+  7: "#039BE5",  // Paon
+  8: "#616161",  // Graphite
+  9: "#3F51B5",  // Myrtille
+  10: "#0B8043", // Basilic
+  11: "#D50000", // Tomate
 };
-// Couleur par défaut (évènement sans colorId) : bleu pastel doux.
-const DEFAULT_EVENT_COLOR = "#B5D2F2";
+// Couleur par défaut (évènement sans colorId) : bleu Google.
+const DEFAULT_EVENT_COLOR = "#4285F4";
 const eventColor = (ev) => GCAL_COLORS[ev.colorId] || DEFAULT_EVENT_COLOR;
 
 /* ─────────────── Helpers formulaire évènement ─────────────── */
@@ -179,9 +178,10 @@ function taskToItem(tk, times) {
   const dueDate = tk.due ? tk.due.slice(0, 10) : null;
   if (!dueDate) return null; // sans échéance → pas placée sur le calendrier
   const t = times[tk.id];
-  const allDay = !t;
+  const hasTime = !!(t && t.startTime);
+  const allDay = !hasTime;
   let start, end;
-  if (t) {
+  if (hasTime) {
     start = new Date(`${dueDate}T${t.startTime}:00`).toISOString();
     end = new Date(`${dueDate}T${t.endTime}:00`).toISOString();
   } else { start = dueDate; end = dueDate; }
@@ -189,7 +189,7 @@ function taskToItem(tk, times) {
     id: tk.id, summary: tk.title || "(Sans titre)", description: tk.notes || "",
     isTask: true, isGTask: true, done: !!tk.completed,
     allDay, start, end,
-    colorId: null, location: "", htmlLink: null, guests: [], hangoutLink: null,
+    colorId: t?.colorId || null, location: "", htmlLink: null, guests: [], hangoutLink: null,
     transparency: "opaque", visibility: "default", reminders: null,
   };
 }
@@ -204,7 +204,7 @@ function formFromTaskItem(item, times) {
     allDay: !!item.allDay, date: dueDate, endDate: dueDate,
     startTime: t?.startTime || "09:00", endTime: t?.endTime || "10:00",
     location: "", description: item.description || "",
-    guests: "", addMeet: false, hadMeet: false, colorId: null,
+    guests: "", addMeet: false, hadMeet: false, colorId: item.colorId || null,
     transparency: "opaque", visibility: "default", reminder: 10,
   };
 }
@@ -545,8 +545,9 @@ export default function AgendaPage() {
         // Heure conservée côté tr4de (Google ne stocke que la date).
         const times = readTaskTimes();
         if (taskId) {
-          if (modal.allDay) delete times[taskId];
-          else times[taskId] = { startTime: modal.startTime, endTime: modal.endTime };
+          times[taskId] = modal.allDay
+            ? { colorId: modal.colorId || null }
+            : { startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null };
           writeTaskTimes(times);
           setTaskTimes(times);
         }
@@ -786,7 +787,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: ev.isTask ? `${col}1A` : `${col}40`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: ev.isTask ? `${col}40` : `${col}80`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
                           boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
@@ -855,7 +856,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "1A" : "40"}`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "40" : "80"}`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
