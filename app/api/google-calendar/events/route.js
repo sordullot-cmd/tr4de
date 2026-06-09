@@ -52,6 +52,8 @@ export async function POST(req) {
       visibility: ev.visibility || "default",
       reminders: ev.reminders || null,
       hangoutLink: ev.hangoutLink || null,
+      isTask: ev.extendedProperties?.private?.tr4deKind === "task",
+      done: ev.extendedProperties?.private?.tr4deDone === "1",
     }));
 
     return json({ events });

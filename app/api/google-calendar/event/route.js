@@ -32,6 +32,17 @@ export async function POST(req) {
       return json({ ok: true });
     }
 
+    // Bascule rapide "tâche terminée" sans réécrire le reste de l'évènement.
+    if (action === "setDone") {
+      if (!eventId) return json({ error: "no_event_id" }, 400);
+      await cal.events.patch({
+        calendarId: "primary",
+        eventId,
+        requestBody: { extendedProperties: { private: { tr4deDone: event?.done ? "1" : "0" } } },
+      });
+      return json({ ok: true });
+    }
+
     if (action === "create" || action === "update") {
       if (!event) return json({ error: "no_event" }, 400);
       const tz = event.timeZone || "UTC";
@@ -60,6 +71,10 @@ export async function POST(req) {
               : typeof event.reminder === "number"
                 ? { useDefault: false, overrides: [{ method: "popup", minutes: event.reminder }] }
                 : undefined,
+        // Marqueur "tâche" tr4de (un évènement-tâche avec état terminé/non).
+        extendedProperties: event.isTask
+          ? { private: { tr4deKind: "task", tr4deDone: event.done ? "1" : "0" } }
+          : undefined,
       };
 
       // Visioconférence Google Meet (uniquement si demandée et pas déjà présente).

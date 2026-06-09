@@ -49,23 +49,24 @@ function eventTimeLabel(ev) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Palette des couleurs Google Agenda (colorId 1–11), version claire / pastel.
-// On garde la correspondance de teintes Google, mais en tons adoucis.
+// Palette des couleurs Google Agenda (colorId 1–11), version claire / douce / pastel.
+// Teintes pastel franches ; encore adoucies à l'affichage via la transparence
+// (~45 %) appliquée aux fonds d'évènements.
 const GCAL_COLORS = {
-  1: "#AEB6E5",  // Lavande
-  2: "#A3DCC0",  // Sauge
-  3: "#CBA6DC",  // Raisin
-  4: "#F2B7B1",  // Flamant
-  5: "#FBE39C",  // Banane
-  6: "#F7B49B",  // Tangerine
-  7: "#9FD3F1",  // Paon
-  8: "#C2C2C2",  // Graphite
-  9: "#AAB2E1",  // Myrtille
-  10: "#9ACFB4", // Basilic
-  11: "#F0A6A6", // Tomate
+  1: "#B7BEEA",  // Lavande
+  2: "#A8E0C5",  // Sauge
+  3: "#D2B3E2",  // Raisin
+  4: "#F6C2BC",  // Flamant
+  5: "#FCE7A6",  // Banane
+  6: "#F9C3AC",  // Tangerine
+  7: "#ABD9F4",  // Paon
+  8: "#CFCFCF",  // Graphite
+  9: "#B3BAE8",  // Myrtille
+  10: "#A6D7BC", // Basilic
+  11: "#F4B5B5", // Tomate
 };
-// Couleur par défaut (évènement sans colorId) : un bleu pastel doux.
-const DEFAULT_EVENT_COLOR = "#A9C9F0";
+// Couleur par défaut (évènement sans colorId) : bleu pastel doux.
+const DEFAULT_EVENT_COLOR = "#B5D2F2";
 const eventColor = (ev) => GCAL_COLORS[ev.colorId] || DEFAULT_EVENT_COLOR;
 
 /* ─────────────── Helpers formulaire évènement ─────────────── */
@@ -105,37 +106,18 @@ function reminderFromEvent(ev) {
 function blankForm(day, startTime = "09:00", endTime = "10:00") {
   const dk = typeof day === "string" ? day : dateKey(day);
   return {
-    kind: "event",
+    kind: "event", done: false,
     id: null, htmlLink: null, summary: "", allDay: false, date: dk, endDate: dk, startTime, endTime,
     location: "", description: "", guests: "", addMeet: false, hadMeet: false,
     colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
   };
 }
 
-/** Form pré-rempli depuis une tâche Google. */
-function formFromTask(tk) {
-  return {
-    kind: "task", id: tk.id, htmlLink: null,
-    summary: tk.title === "(Sans titre)" ? "" : tk.title,
-    date: tk.due ? tk.due.slice(0, 10) : dateKey(new Date()),
-    description: tk.notes || "", completed: !!tk.completed,
-  };
-}
-
-/** Payload API pour une tâche. */
-function payloadFromTask(form) {
-  return {
-    title: form.summary || "(Sans titre)",
-    notes: form.description || "",
-    due: form.date ? `${form.date}T00:00:00.000Z` : undefined,
-  };
-}
-
-/** Form pré-rempli depuis un évènement existant. */
+/** Form pré-rempli depuis un évènement existant (ou une tâche-évènement). */
 function formFromEvent(ev) {
   const summary = ev.summary === "(Sans titre)" ? "" : ev.summary;
   const common = {
-    kind: "event",
+    kind: ev.isTask ? "task" : "event", done: !!ev.done,
     id: ev.id, htmlLink: ev.htmlLink,
     location: ev.location || "", description: ev.description || "", colorId: ev.colorId || null,
     guests: (ev.guests || []).join(", "),
@@ -167,6 +149,8 @@ function payloadFromForm(form) {
     transparency: form.transparency || "opaque",
     visibility: form.visibility || "default",
     reminder: form.reminder,
+    isTask: form.kind === "task",
+    done: !!form.done,
   };
   if (form.allDay) {
     return {
@@ -292,14 +276,12 @@ export default function AgendaPage() {
   useLang();
   const {
     ready, configured, connected, connect, disconnect,
-    fetchEvents, createEvent, updateEvent, deleteEvent,
-    fetchTasks, createTask, updateTask, toggleTask, deleteTask,
+    fetchEvents, createEvent, updateEvent, deleteEvent, setEventDone,
   } = useGoogleCalendar();
 
   const [view, setView] = React.useState("week");
   const [cursor, setCursor] = React.useState(() => startOfDay(new Date()));
   const [events, setEvents] = React.useState([]);
-  const [tasks, setTasks] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [modal, setModal] = React.useState(null); // form objet | null
@@ -330,19 +312,6 @@ export default function AgendaPage() {
 
   React.useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  // Tâches Google (échec silencieux si le scope n'est pas encore accordé).
-  const loadTasks = React.useCallback(async () => {
-    if (!connected) return;
-    try {
-      const ts = await fetchTasks();
-      setTasks(ts);
-    } catch {
-      setTasks([]);
-    }
-  }, [connected, fetchTasks]);
-
-  React.useEffect(() => { loadTasks(); }, [loadTasks]);
-
   const eventsByDay = React.useMemo(() => {
     const map = new Map();
     for (const ev of events) {
@@ -357,31 +326,18 @@ export default function AgendaPage() {
     return map;
   }, [events]);
 
-  // Tâches indexées par jour d'échéance (due = date).
-  const tasksByDay = React.useMemo(() => {
-    const map = new Map();
-    for (const tk of tasks) {
-      if (!tk.due) continue;
-      const k = tk.due.slice(0, 10);
-      if (!map.has(k)) map.set(k, []);
-      map.get(k).push(tk);
-    }
-    return map;
-  }, [tasks]);
-
   const today = startOfDay(new Date());
 
-  // Bascule l'état "terminé" d'une tâche (optimiste).
-  const onToggleTask = async (tk) => {
-    setTasks((prev) => prev.map((x) => (x.id === tk.id ? { ...x, completed: !x.completed } : x)));
-    try { await toggleTask(tk.id, !tk.completed); } catch { loadTasks(); }
+  // Bascule l'état "terminé" d'une tâche-évènement (optimiste).
+  const onToggleDone = async (ev) => {
+    setEvents((prev) => prev.map((x) => (x.id === ev.id ? { ...x, done: !x.done } : x)));
+    try { await setEventDone(ev.id, !ev.done); } catch { loadEvents(); }
   };
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
   const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
   const openEdit = (ev) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(formFromEvent(ev)); };
-  const openTaskEdit = (tk) => { setModalError(null); setModal(formFromTask(tk)); };
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -426,19 +382,11 @@ export default function AgendaPage() {
     setSaving(true);
     setModalError(null);
     try {
-      if (modal.kind === "task") {
-        const payload = payloadFromTask(modal);
-        if (modal.id) await updateTask(modal.id, payload);
-        else await createTask(payload);
-        setModal(null);
-        await loadTasks();
-      } else {
-        const payload = payloadFromForm(modal);
-        if (modal.id) await updateEvent(modal.id, payload);
-        else await createEvent(payload);
-        setModal(null);
-        await loadEvents();
-      }
+      const payload = payloadFromForm(modal);
+      if (modal.id) await updateEvent(modal.id, payload);
+      else await createEvent(payload);
+      setModal(null);
+      await loadEvents();
     } catch (e) {
       if (e?.message === "insufficient_scope") { setModal(null); setError("insufficient_scope"); }
       else setModalError(e?.message || "Erreur d'enregistrement");
@@ -452,8 +400,9 @@ export default function AgendaPage() {
     setSaving(true);
     setModalError(null);
     try {
-      if (modal.kind === "task") { await deleteTask(modal.id); setModal(null); await loadTasks(); }
-      else { await deleteEvent(modal.id); setModal(null); await loadEvents(); }
+      await deleteEvent(modal.id);
+      setModal(null);
+      await loadEvents();
     } catch (e) {
       if (e?.message === "insufficient_scope") { setModal(null); setError("insufficient_scope"); }
       else setModalError(e?.message || "Erreur de suppression");
@@ -557,22 +506,21 @@ export default function AgendaPage() {
           })}
         </div>
 
-        {/* Bandeau jour entier + tâches */}
+        {/* Bandeau jour entier */}
         <div style={{ display: "flex", borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}`, minHeight: 26 }}>
           <div style={{ width: gutter, flexShrink: 0, fontSize: 9, color: T.textMut, padding: "5px 6px", textAlign: "right" }}>Jour</div>
           {days.map((d, i) => {
             const dk = dateKey(d);
             const allDay = (eventsByDay.get(dk) || []).filter((e) => e.allDay);
-            const dayTasks = tasksByDay.get(dk) || [];
             return (
               <div key={i} style={{ flex: 1, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none", padding: 3, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 {allDay.map((ev) => (
                   <div key={ev.id} onClick={() => openEdit(ev)} title={ev.summary}
-                    style={{ cursor: "pointer", fontSize: 10.5, color: T.text, background: `${eventColor(ev)}99`, borderRadius: 4, padding: "1px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {ev.summary}
+                    style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}73`, borderRadius: 4, padding: "1px 6px", minWidth: 0 }}>
+                    {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>{ev.summary}</span>
                   </div>
                 ))}
-                {dayTasks.map((tk) => <TaskChip key={tk.id} task={tk} onToggle={onToggleTask} onOpen={openTaskEdit} />)}
               </div>
             );
           })}
@@ -626,12 +574,15 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: `${col}99`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: `${col}73`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden",
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
                         }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: compact ? 1 : "none" }}>{ev.summary}</span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, flex: compact ? 1 : "none" }}>
+                          {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
+                          <span style={{ fontSize: 10.5, fontWeight: 600, color: ev.done ? T.textMut : T.text, textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
+                        </span>
                         {compact
                           ? <span style={{ fontSize: 9.5, color: T.textSub, flexShrink: 0, whiteSpace: "nowrap" }}>{eventTimeLabel(ev)}</span>
                           : (height > 28 && <span style={{ fontSize: 9.5, color: T.textSub }}>{eventTimeLabel(ev)}</span>)}
@@ -685,16 +636,16 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: T.text, background: `${eventColor(ev)}99`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}73`, borderRadius: 4, padding: "1px 5px",
                     }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {!ev.allDay && <span style={{ color: T.textMut, marginRight: 3 }}>{eventTimeLabel(ev)}</span>}
+                      {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
+                        {!ev.allDay && !ev.isTask && <span style={{ color: T.textMut, marginRight: 3 }}>{eventTimeLabel(ev)}</span>}
                         {ev.summary}
                       </span>
                     </div>
                   ))}
                   {overflow > 0 && <div style={{ fontSize: 10, color: T.textMut, paddingLeft: 5 }}>+{overflow} autre{overflow > 1 ? "s" : ""}</div>}
-                  {(tasksByDay.get(dateKey(d)) || []).map((tk) => <TaskChip key={tk.id} task={tk} onToggle={onToggleTask} onOpen={openTaskEdit} />)}
                 </div>
               </div>
             );
@@ -869,17 +820,7 @@ export default function AgendaPage() {
             <div style={{ padding: "8px 24px 6px" }}>
               {/* Date / heures — résumé lisible, éditable au clic */}
               <FormRow icon={Clock} top={timeEdit}>
-                {modal.kind === "task" ? (
-                  !timeEdit ? (
-                    <button type="button" onClick={() => setTimeEdit(true)}
-                      style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", width: "100%" }}>
-                      <div style={{ fontSize: 15, color: T.text }}>{formatDateLong(modal.date)}</div>
-                      <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Échéance</div>
-                    </button>
-                  ) : (
-                    <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={subInp} />
-                  )
-                ) : !timeEdit ? (
+                {!timeEdit ? (
                   <button type="button" onClick={() => setTimeEdit(true)}
                     style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: "2px 0", width: "100%" }}>
                     <div style={{ fontSize: 15, color: T.text, display: "flex", alignItems: "baseline", gap: 24, flexWrap: "wrap" }}>
@@ -917,20 +858,17 @@ export default function AgendaPage() {
                 )}
               </FormRow>
 
-              {/* Lieu (évènement uniquement) */}
-              {modal.kind === "event" && (
-                <FormRow icon={MapPin}>
-                  <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
-                </FormRow>
-              )}
+              {/* Lieu */}
+              <FormRow icon={MapPin}>
+                <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
+              </FormRow>
 
               {/* Description */}
               <FormRow icon={AlignLeft} top>
                 <textarea value={modal.description} onChange={(e) => setModal({ ...modal, description: e.target.value })} placeholder="Ajouter une description" rows={2} style={{ ...rowInp, resize: "vertical", display: "block", lineHeight: 1.4, verticalAlign: "top" }} />
               </FormRow>
 
-              {/* Couleur + Notification — évènement uniquement */}
-              {modal.kind === "event" && (<>
+              {/* Couleur */}
               <FormRow icon={CalendarIcon}>
                 <div style={{ position: "relative" }}>
                   <button type="button" onClick={() => { setColorOpen((o) => !o); setRemindOpen(false); }} style={pillBtn}>
@@ -975,7 +913,6 @@ export default function AgendaPage() {
                   )}
                 </div>
               </FormRow>
-              </>)}
 
               {modalError && (
                 <div style={{ fontSize: 12, color: T.red, background: T.redBg, border: `1px solid ${T.redBd}`, borderRadius: 8, padding: "8px 10px", marginTop: 8 }}>{modalError}</div>
@@ -1001,28 +938,19 @@ export default function AgendaPage() {
   );
 }
 
-/* ─────────────── Puce de tâche : rond cliquable + titre ─────────────── */
-function TaskChip({ task, onToggle, onOpen }) {
+/* ─────────────── Rond de complétion d'une tâche-évènement ─────────────── */
+function TaskCircle({ done, onToggle, size = 13 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-      <button type="button" onClick={(e) => { e.stopPropagation(); onToggle(task); }}
-        aria-label={task.completed ? "Marquer non terminée" : "Marquer terminée"} title="Terminer la tâche"
-        style={{
-          width: 14, height: 14, borderRadius: "50%", flexShrink: 0, cursor: "pointer", padding: 0,
-          border: `1.5px solid ${task.completed ? T.green : T.textMut}`,
-          background: task.completed ? T.green : "transparent",
-          display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, lineHeight: 1,
-        }}>
-        {task.completed ? "✓" : ""}
-      </button>
-      <span onClick={(e) => { e.stopPropagation(); onOpen(task); }} title={task.title}
-        style={{
-          fontSize: 10.5, cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          color: task.completed ? T.textMut : T.text, textDecoration: task.completed ? "line-through" : "none",
-        }}>
-        {task.title}
-      </span>
-    </div>
+    <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={onToggle}
+      aria-label={done ? "Marquer non terminée" : "Marquer terminée"} title="Terminer la tâche"
+      style={{
+        width: size, height: size, borderRadius: "50%", flexShrink: 0, cursor: "pointer", padding: 0,
+        border: `1.5px solid ${done ? T.green : T.textMut}`,
+        background: done ? T.green : "transparent",
+        display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, lineHeight: 1,
+      }}>
+      {done ? "✓" : ""}
+    </button>
   );
 }
 

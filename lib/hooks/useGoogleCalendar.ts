@@ -170,6 +170,7 @@ export function useGoogleCalendar() {
   const createEvent = useCallback((event: any) => mutateEvent("create", { event }), [mutateEvent]);
   const updateEvent = useCallback((eventId: string, event: any) => mutateEvent("update", { eventId, event }), [mutateEvent]);
   const deleteEvent = useCallback((eventId: string) => mutateEvent("delete", { eventId }), [mutateEvent]);
+  const setEventDone = useCallback((eventId: string, done: boolean) => mutateEvent("setDone", { eventId, event: { done } }), [mutateEvent]);
 
   /** Appels génériques pour les tâches Google. */
   const callTasks = useCallback(
@@ -215,6 +216,7 @@ export function useGoogleCalendar() {
     createEvent,
     updateEvent,
     deleteEvent,
+    setEventDone,
     fetchTasks,
     createTask,
     updateTask,
