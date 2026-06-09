@@ -59,7 +59,7 @@ const GCAL_COLORS = {
   5: "#F6BF26",  // Banane
   6: "#F4511E",  // Tangerine
   7: "#039BE5",  // Paon
-  8: "#B0B0B0",  // Graphite (gris clair)
+  8: "#D9D9D9",  // Graphite (gris clair)
   9: "#3F51B5",  // Myrtille
   10: "#0B8043", // Basilic
   11: "#D50000", // Tomate
@@ -67,6 +67,19 @@ const GCAL_COLORS = {
 // Couleur par défaut (évènement sans colorId) : bleu Google.
 const DEFAULT_EVENT_COLOR = "#4285F4";
 const eventColor = (ev) => GCAL_COLORS[ev.colorId] || DEFAULT_EVENT_COLOR;
+
+/** Assombrit une couleur hex (pour le texte lié à la couleur de l'évènement). */
+function darken(hex, f = 0.5) {
+  const h = String(hex).replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  if (isNaN(n)) return "#0D0D0D";
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.round(r * (1 - f)); g = Math.round(g * (1 - f)); b = Math.round(b * (1 - f));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+// Texte d'un évènement : version foncée de sa couleur (ex. vert → vert foncé).
+const eventTextColor = (ev) => darken(eventColor(ev), 0.5);
 
 /* ─────────────── Helpers formulaire évènement ─────────────── */
 const localTZ = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; } };
@@ -787,7 +800,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: ev.isTask ? `${col}2E` : `${col}59`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: ev.isTask ? `${col}1A` : `${col}33`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
                           boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
@@ -798,11 +811,11 @@ export default function AgendaPage() {
                         )}
                         <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, flex: compact ? 1 : "none" }}>
                           {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
-                          <span style={{ fontSize: 10.5, fontWeight: 600, color: ev.done ? T.textMut : T.text, textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 600, color: ev.done ? T.textMut : eventTextColor(ev), textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
                         </span>
                         {compact
-                          ? <span style={{ fontSize: 9.5, color: T.textSub, flexShrink: 0, whiteSpace: "nowrap" }}>{timeLbl}</span>
-                          : (height > 28 && <span style={{ fontSize: 9.5, color: T.textSub }}>{timeLbl}</span>)}
+                          ? <span style={{ fontSize: 9.5, color: ev.done ? T.textMut : eventTextColor(ev), flexShrink: 0, whiteSpace: "nowrap", opacity: 0.8 }}>{timeLbl}</span>
+                          : (height > 28 && <span style={{ fontSize: 9.5, color: ev.done ? T.textMut : eventTextColor(ev), opacity: 0.8 }}>{timeLbl}</span>)}
                         {resizable && (
                           <div onMouseDown={(e) => startResize(e, ev, d, "bottom")} onClick={(e) => e.stopPropagation()} style={handleStyle("bottom")} />
                         )}
@@ -856,7 +869,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "2E" : "59"}`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : eventTextColor(ev), background: `${eventColor(ev)}${ev.isTask ? "1A" : "33"}`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
