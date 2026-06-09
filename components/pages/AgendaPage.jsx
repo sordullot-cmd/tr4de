@@ -516,7 +516,7 @@ export default function AgendaPage() {
               <div key={i} style={{ flex: 1, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none", padding: 3, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 {allDay.map((ev) => (
                   <div key={ev.id} onClick={() => openEdit(ev)} title={ev.summary}
-                    style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}73`, borderRadius: 4, padding: "1px 6px", minWidth: 0 }}>
+                    style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "26" : "73"}`, borderRadius: 4, padding: "1px 6px", minWidth: 0 }}>
                     {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>{ev.summary}</span>
                   </div>
@@ -574,7 +574,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: `${col}73`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          background: ev.isTask ? `${col}26` : `${col}73`, borderLeft: `3px solid ${col}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden",
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
@@ -636,7 +636,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}73`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : T.text, background: `${eventColor(ev)}${ev.isTask ? "26" : "73"}`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
