@@ -4,7 +4,7 @@ import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
-  Menu, Clock, MapPin, AlignLeft, Bell, ChevronDown,
+  Clock, MapPin, AlignLeft, Bell, ChevronDown,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -721,8 +721,7 @@ export default function AgendaPage() {
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, marginTop: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
             {/* Barre du haut */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
-              <Menu size={20} strokeWidth={2} color={T.textMut} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "10px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                 {modal.id && (
                   <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={{ ...iconBtn(), border: "none", background: "transparent", color: T.textMut }}>
