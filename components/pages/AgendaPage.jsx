@@ -52,7 +52,7 @@ function eventTimeLabel(ev) {
 // Palette officielle Google Agenda (colorId 1–11) — teintes saturées.
 // Le fond est tinté via la transparence ; la barre latérale reste pleine.
 const GCAL_COLORS = {
-  1: "#7986CB",  // Lavande
+  1: "#7B68EE",  // Lavande (violet plus franc, lisible)
   2: "#33B679",  // Sauge
   3: "#8E24AA",  // Raisin
   4: "#E67C73",  // Flamant
@@ -692,18 +692,15 @@ export default function AgendaPage() {
       </h1>
       {connected && (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <button onClick={() => setCursor(shiftCursor(view, cursor, -1))} aria-label="Précédent" style={iconBtn()}>
+          <button onClick={goToday} style={ghostBtn()}>Aujourd'hui</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <button onClick={() => setCursor(shiftCursor(view, cursor, -1))} aria-label="Précédent" style={{ ...iconBtn(), border: "none", background: "transparent" }}>
               <ChevronLeft size={16} strokeWidth={2} />
             </button>
-            <div style={{ minWidth: 180, textAlign: "center", fontSize: 14, fontWeight: 600, color: T.text }}>
-              {titleFor(view, cursor)}
-            </div>
-            <button onClick={() => setCursor(shiftCursor(view, cursor, 1))} aria-label="Suivant" style={iconBtn()}>
+            <button onClick={() => setCursor(shiftCursor(view, cursor, 1))} aria-label="Suivant" style={{ ...iconBtn(), border: "none", background: "transparent" }}>
               <ChevronRight size={16} strokeWidth={2} />
             </button>
           </div>
-          <button onClick={goToday} style={ghostBtn()}>Aujourd'hui</button>
         </>
       )}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
