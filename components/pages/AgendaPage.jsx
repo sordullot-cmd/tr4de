@@ -105,7 +105,7 @@ const VIEWS = [
   { id: "year", label: "Année" },
 ];
 
-const HOUR_H = 44; // hauteur d'une heure (px) dans le time-grid
+const HOUR_H = 68; // hauteur d'une heure (px) dans le time-grid
 
 /* ─────────────── Plage de dates par mode ─────────────── */
 function computeRange(view, cursor) {
@@ -396,14 +396,14 @@ export default function AgendaPage() {
     const gutter = 54;
 
     return (
-      <div style={{ ...card(), overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ ...card(), border: "none", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {/* En-tête jours */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: "flex" }}>
           <div style={{ width: gutter, flexShrink: 0 }} />
           {days.map((d, i) => {
             const isToday = sameDay(d, today);
             return (
-              <div key={i} style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderLeft: `1px solid ${T.border}`, minWidth: 0 }}>
+              <div key={i} style={{ flex: 1, textAlign: "center", padding: "8px 4px", minWidth: 0, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none" }}>
                 <div style={dayLabelStyle}>{WEEKDAYS[weekdayIdx(d)]}</div>
                 <div style={{
                   marginTop: 3, display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -435,7 +435,6 @@ export default function AgendaPage() {
               return (
                 <div key={di} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
-                  borderLeft: `1px solid ${T.border}`,
                   backgroundImage: `repeating-linear-gradient(to bottom, ${T.border}, ${T.border} 1px, transparent 1px, transparent ${HOUR_H}px)`,
                   height: 24 * HOUR_H,
                 }}>
