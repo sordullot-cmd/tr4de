@@ -270,12 +270,12 @@ export default function FocusTimerPage() {
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
 
-      {/* Header stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
-        <Stat icon={Focus}        label="Aujourd'hui"     value={`${todayMinutes}m`}  subtext={`${todaysSessions.length} session${todaysSessions.length > 1 ? "s" : ""}`} size="sm" />
-        <Stat icon={Coffee}       label="Cette semaine"   value={`${weekMinutes}m`}   subtext={`${weekSessions.length} session${weekSessions.length > 1 ? "s" : ""}`} size="sm" />
-        <Stat icon={CheckCircle2} label="Sessions totales" value={sessions.length}     size="sm" />
-        <Stat icon={Flame}        label="Streak"          value={`${streak}j`}        subtext={streak > 0 ? "jours consécutifs" : "aucun jour"} size="sm" positive={streak > 0} />
+      {/* Header stats — 4 blocs collés dans un seul conteneur (séparateurs fins) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 1, background: T.border, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <Stat flat icon={Focus}        label="Aujourd'hui"     value={`${todayMinutes}m`}  subtext={`${todaysSessions.length} session${todaysSessions.length > 1 ? "s" : ""}`} size="sm" />
+        <Stat flat icon={Coffee}       label="Cette semaine"   value={`${weekMinutes}m`}   subtext={`${weekSessions.length} session${weekSessions.length > 1 ? "s" : ""}`} size="sm" />
+        <Stat flat icon={CheckCircle2} label="Sessions totales" value={sessions.length}     size="sm" />
+        <Stat flat icon={Flame}        label="Streak"          value={`${streak}j`}        subtext={streak > 0 ? "jours consécutifs" : "aucun jour"} size="sm" positive={streak > 0} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 16 }}>

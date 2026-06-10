@@ -442,10 +442,11 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
   scrollbar-color: rgba(0, 0, 0, 0.14) transparent;
 }
 
-/* === Focus visible accessible === */
+/* === Focus visible === */
+/* Contours rectangulaires de focus retirés sur l'ensemble du site (demande
+   utilisateur). Note : supprime l'indicateur de focus clavier par défaut. */
 :focus-visible {
-  outline: 2px solid var(--color-btn-primary-bg);
-  outline-offset: 2px;
+  outline: none;
 }
 
 /* === Selection === */
@@ -636,13 +637,13 @@ input:not([type="checkbox"]):not([type="radio"]):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(13, 13, 13, 0.08);
+  /* Plus d'anneau rectangulaire au focus — seule la bordure du champ se
+     renforce légèrement pour indiquer le focus. */
   border-color: var(--color-text, #0D0D0D) !important;
 }
 :root[data-theme="dark"] input:focus-visible,
 :root[data-theme="dark"] textarea:focus-visible,
 :root[data-theme="dark"] select:focus-visible {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
   border-color: #C8C8C8 !important;
 }
 
@@ -1179,4 +1180,3 @@ img, canvas {
     padding: 16px !important;
   }
 }
-

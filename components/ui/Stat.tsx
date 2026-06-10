@@ -13,9 +13,11 @@ interface StatProps {
   positive?: boolean;
   negative?: boolean;
   onClick?: () => void;
+  /** Sans bordure ni arrondi propre — pour coller plusieurs Stat dans un conteneur commun. */
+  flat?: boolean;
 }
 
-export function Stat({ label, value, subtext, trend, icon: Icon, size = "md", positive, negative, onClick }: StatProps) {
+export function Stat({ label, value, subtext, trend, icon: Icon, size = "md", positive, negative, onClick, flat }: StatProps) {
   const valueSize = size === "sm" ? 18 : size === "md" ? 24 : 32;
   const labelSize = 11;
 
@@ -53,8 +55,8 @@ export function Stat({ label, value, subtext, trend, icon: Icon, size = "md", po
         onClick={onClick}
         style={{
           background: "#FFFFFF",
-          border: "1px solid #E5E5E5",
-          borderRadius: 12,
+          border: flat ? "none" : "1px solid #E5E5E5",
+          borderRadius: flat ? 0 : 12,
           padding: 20,
           textAlign: "left",
           cursor: "pointer",
@@ -78,8 +80,8 @@ export function Stat({ label, value, subtext, trend, icon: Icon, size = "md", po
   return (
     <div style={{
       background: "#FFFFFF",
-      border: "1px solid #E5E5E5",
-      borderRadius: 12,
+      border: flat ? "none" : "1px solid #E5E5E5",
+      borderRadius: flat ? 0 : 12,
       padding: 20,
     }}>
       {content}

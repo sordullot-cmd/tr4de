@@ -725,9 +725,6 @@ export default function App() {
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
-        { id: "drive",         icon: LucideFolderOpen,   label: t("nav.drive") },
-        { id: "reading",       icon: LucideBookOpen,     label: t("nav.reading") },
-        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];

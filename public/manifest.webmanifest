@@ -5,9 +5,10 @@
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay"],
   "orientation": "portrait-primary",
-  "background_color": "#FFFFFF",
-  "theme_color": "#0D0D0D",
+  "background_color": "#F5F5F5",
+  "theme_color": "#F5F5F5",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

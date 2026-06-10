@@ -208,49 +208,45 @@ function KpiRow({ stats, sessionViolations, activeRules, totalRules, isClean, fl
     ? `streak ${stats.streak}j · ${(stats.compliantWinRate * 100).toFixed(0)}% vs ${(stats.violatingWinRate * 100).toFixed(0)}%`
     : `streak ${stats.streak}j`;
 
+  // KPI volontairement sobres : valeurs en couleur de texte neutre, le seul
+  // signal coloré est une petite pastille de statut (vert/rouge).
   const cells = [
     {
       label: "Statut session",
-      title: isClean ? "Clean" : "Violations",
-      titleColor: isClean ? T.green : T.red,
-      value: isClean ? "aucune violation aujourd'hui" : `${sessionViolations.length} violation${sessionViolations.length > 1 ? "s" : ""} aujourd'hui`,
+      title: isClean ? "Clean" : `${sessionViolations.length} violation${sessionViolations.length > 1 ? "s" : ""}`,
+      dot: isClean ? T.green : T.red,
+      sub: isClean ? "aucune violation aujourd'hui" : "aujourd'hui",
     },
     {
       label: "Règles actives",
-      title: String(activeRules),
-      titleColor: T.text,
-      value: totalRules > 0 ? `${activeRules}/${totalRules} live` : "aucune règle définie",
+      title: totalRules > 0 ? `${activeRules}/${totalRules}` : "—",
+      sub: totalRules > 0 ? "règles live" : "aucune règle définie",
     },
     {
-      label: "Violations session",
-      title: String(sessionViolations.length),
-      titleColor: sessionViolations.length === 0 ? T.green : sessionViolations.length > 3 ? T.red : T.text,
-      value: sessionViolations.length === 0 ? "tout propre" : "aujourd'hui",
-    },
-    {
-      label: "Streak · Multiplier WR",
+      label: "Streak",
       title: multiplierTxt,
-      titleColor: stats.multiplier > 1 ? T.green : T.text,
-      value: multiplierSub,
+      sub: multiplierSub,
     },
   ];
 
   const grid = (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
       {cells.map((c, i) => (
         <div key={i} style={{
           padding: "16px 20px",
           borderRight: i < cells.length - 1 ? `1px solid ${T.border}` : "none",
-          display: "flex", flexDirection: "column", gap: 2, minWidth: 0,
+          display: "flex", flexDirection: "column", gap: 3, minWidth: 0,
         }}>
           <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>{c.label}</div>
           <div style={{
-            fontSize: 20, fontWeight: 600, color: c.titleColor, letterSpacing: -0.2,
+            fontSize: 19, fontWeight: 600, color: T.text, letterSpacing: -0.2,
             lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            display: "inline-flex", alignItems: "center", gap: 8,
+            display: "inline-flex", alignItems: "center", gap: 7,
           }}>
+            {c.dot && <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />}
             {c.title}
           </div>
+          {c.sub && <div style={{ fontSize: 11, color: T.textMut, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sub}</div>}
         </div>
       ))}
     </div>
@@ -322,7 +318,7 @@ function ViolationsLog({ stats, rules }) {
                 gridTemplateColumns: "auto 1fr auto auto",
                 gap: 12, alignItems: "center",
                 padding: "10px 12px",
-                background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8,
+                background: T.bg, borderRadius: 8,
               }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.red }} />
                 <div style={{ minWidth: 0 }}>
@@ -422,9 +418,9 @@ function Insights({ stats, rules, flat = false }) {
             gridTemplateColumns: "auto 1fr auto",
             gap: 12, alignItems: "center",
             padding: "10px 12px",
-            background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8,
+            background: T.bg, borderRadius: 8,
           }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.tone }} />
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.textMut, flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.value}>
                 {t.value}
@@ -432,10 +428,8 @@ function Insights({ stats, rules, flat = false }) {
               <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>{t.title}</div>
             </div>
             <div style={{
-              fontSize: 11, fontWeight: 600,
-              padding: "3px 8px", borderRadius: 999,
-              background: T.bg, color: t.tone, border: `1px solid ${t.tone}33`,
-              whiteSpace: "nowrap",
+              fontSize: 11, fontWeight: 500,
+              color: T.textMut, whiteSpace: "nowrap",
             }}>
               {t.sub}
             </div>

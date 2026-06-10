@@ -4,11 +4,12 @@ import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
-  Clock, MapPin, AlignLeft, Bell, ChevronDown,
+  Clock, MapPin, AlignLeft, Bell, ChevronDown, Target, HelpCircle,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
+import { DateField, TimeField } from "./AgendaDateFields";
 
 /* ─────────────── Helpers date ─────────────── */
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -40,6 +41,23 @@ function eventDayKey(ev) {
   if (ev.allDay) return ev.start.slice(0, 10);
   const d = new Date(ev.start);
   return isNaN(d.getTime()) ? null : dateKey(d);
+}
+
+/** Échéance relative en français : "aujourd'hui", "il y a 3 jours", "il y a 1 semaine"… */
+function relativeDue(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return "";
+  const now = startOfDay(new Date());
+  const days = Math.round((now - startOfDay(d)) / 86400000);
+  if (days <= 0) return "aujourd'hui";
+  if (days === 1) return "hier";
+  if (days < 7) return `il y a ${days} jours`;
+  if (days < 14) return "il y a 1 semaine";
+  if (days < 30) return `il y a ${Math.floor(days / 7)} semaines`;
+  if (days < 60) return "il y a 1 mois";
+  if (days < 365) return `il y a ${Math.floor(days / 30)} mois`;
+  const y = Math.floor(days / 365);
+  return `il y a ${y} an${y > 1 ? "s" : ""}`;
 }
 
 function eventTimeLabel(ev) {
@@ -304,6 +322,21 @@ function titleFor(view, cursor) {
   return `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
 }
 
+/** Libellé mois + année courant ; "Mois1 – Mois2" si la période chevauche deux mois. */
+function monthYearLabel(view, cursor) {
+  if (view === "year") return String(cursor.getFullYear());
+  if (view === "week") {
+    const s = startOfWeekMonday(cursor);
+    const e = addDays(s, 6);
+    const m1 = s.getMonth(), y1 = s.getFullYear();
+    const m2 = e.getMonth(), y2 = e.getFullYear();
+    if (m1 === m2 && y1 === y2) return `${MONTHS[m1]} ${y1}`;
+    if (y1 === y2) return `${MONTHS[m1]} – ${MONTHS[m2]} ${y1}`;
+    return `${MONTHS[m1]} ${y1} – ${MONTHS[m2]} ${y2}`;
+  }
+  return `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+}
+
 /** Positionne les évènements horodatés d'un jour (clusters + colonnes). */
 function layoutDay(evts, day) {
   const dayStart = startOfDay(day);
@@ -360,6 +393,12 @@ export default function AgendaPage() {
 
   const [view, setView] = React.useState("week");
   const [cursor, setCursor] = React.useState(() => startOfDay(new Date()));
+  // Horloge courante : sert à tracer la ligne « maintenant » et à griser le passé.
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
   const [events, setEvents] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
   const [taskTimes, setTaskTimes] = React.useState({});
@@ -368,6 +407,8 @@ export default function AgendaPage() {
   const [modal, setModal] = React.useState(null); // form objet | null
   const [modalError, setModalError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const [overdueOpen, setOverdueOpen] = React.useState(false);
+  const [overduePos, setOverduePos] = React.useState(null); // { top, left } du popover
   const [colorOpen, setColorOpen] = React.useState(false);
   const [remindOpen, setRemindOpen] = React.useState(false);
   const [timeEdit, setTimeEdit] = React.useState(false);
@@ -376,14 +417,57 @@ export default function AgendaPage() {
   const resizeRef = React.useRef(null);
   const [resizeBox, setResizeBox] = React.useState(null); // { id, dayKey, startMin, endMin }
   const titleRef = React.useRef(null);
+  // Position du formulaire (décalage depuis le centre), ajustable en glissant la poignée.
+  const [modalPos, setModalPos] = React.useState({ x: 0, y: 0 });
+  const [modalDragging, setModalDragging] = React.useState(false);
+  const [dragHover, setDragHover] = React.useState(false);
+  const modalDragRef = React.useRef(null);
+
+  // Ferme les menus déroulants (couleur / notification) au clic en dehors.
+  React.useEffect(() => {
+    if (!colorOpen && !remindOpen) return;
+    const onDown = (e) => {
+      if (e.target.closest?.("[data-menu-root]")) return;
+      setColorOpen(false);
+      setRemindOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [colorOpen, remindOpen]);
 
   // Focalise le titre à l'ouverture du formulaire SANS faire défiler la page.
   // `autoFocus` natif force un scrollIntoView qui remontait le conteneur en haut ;
   // `preventScroll: true` conserve la position de défilement courante.
   const modalOpen = !!modal;
   React.useEffect(() => {
-    if (modalOpen) titleRef.current?.focus({ preventScroll: true });
+    if (modalOpen) {
+      setModalPos({ x: 0, y: 0 }); // recentre le formulaire à chaque ouverture
+      setDragHover(false);         // évite la barre grisée si on avait survolé avant fermeture
+      titleRef.current?.focus({ preventScroll: true });
+    }
   }, [modalOpen]);
+
+  // Glisser-déposer du formulaire via la poignée du haut.
+  const startModalDrag = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const start = { mx: e.clientX, my: e.clientY, x: modalPos.x, y: modalPos.y };
+    modalDragRef.current = start;
+    setModalDragging(true);
+    const onMove = (ev) => {
+      const st = modalDragRef.current;
+      if (!st) return;
+      setModalPos({ x: st.x + (ev.clientX - st.mx), y: st.y + (ev.clientY - st.my) });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      modalDragRef.current = null;
+      setModalDragging(false);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const range = React.useMemo(() => computeRange(view, cursor), [view, cursor]);
 
@@ -421,9 +505,10 @@ export default function AgendaPage() {
     [tasks, taskTimes],
   );
 
+  // Évènements (hors tâches) → placés dans la grille horaire.
   const eventsByDay = React.useMemo(() => {
     const map = new Map();
-    for (const ev of [...events, ...taskItems]) {
+    for (const ev of events) {
       const k = eventDayKey(ev);
       if (!k) continue;
       if (!map.has(k)) map.set(k, []);
@@ -433,9 +518,48 @@ export default function AgendaPage() {
       arr.sort((a, b) => (a.allDay === b.allDay ? String(a.start).localeCompare(String(b.start)) : a.allDay ? -1 : 1));
     }
     return map;
-  }, [events, taskItems]);
+  }, [events]);
 
   const today = startOfDay(new Date());
+  const todayKey = dateKey(today);
+
+  // Tâches indexées par jour d'échéance (rangée sous l'en-tête des jours).
+  const tasksByDay = React.useMemo(() => {
+    const map = new Map();
+    for (const it of taskItems) {
+      const k = eventDayKey(it);
+      if (!k) continue;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(it);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    }
+    return map;
+  }, [taskItems]);
+
+  // Évènements « toute la journée » (hors tâches), indexés par jour : ils
+  // s'affichent dans la rangée du haut, au-dessus des tâches du jour.
+  const allDayByDay = React.useMemo(() => {
+    const map = new Map();
+    for (const ev of events) {
+      if (!ev.allDay || ev.isTask) continue;
+      const k = eventDayKey(ev);
+      if (!k) continue;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(ev);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => String(a.summary).localeCompare(String(b.summary)));
+    return map;
+  }, [events]);
+
+  // Tâches "en attente" : échéance passée et non terminées.
+  const overdueTasks = React.useMemo(
+    () => taskItems
+      .filter((it) => !it.done && eventDayKey(it) && eventDayKey(it) < todayKey)
+      .sort((a, b) => String(a.start).localeCompare(String(b.start))),
+    [taskItems, todayKey],
+  );
 
   // Bascule l'état "terminé" (tâche Google ou évènement-tâche legacy).
   const onToggleDone = async (item) => {
@@ -701,6 +825,9 @@ export default function AgendaPage() {
               <ChevronRight size={16} strokeWidth={2} />
             </button>
           </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
+            {monthYearLabel(view, cursor)}
+          </span>
         </>
       )}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
@@ -723,19 +850,25 @@ export default function AgendaPage() {
     const days = Array.from({ length: daysCount }, (_, i) => addDays(weekStart, i));
     const hours = Array.from({ length: 24 }, (_, h) => h);
     const gutter = 54;
+    // Minutes écoulées depuis minuit → position verticale de la ligne « maintenant ».
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowTop = (nowMin / 60) * HOUR_H;
+    // Cellule qui héberge le résumé « tâches en attente » : aujourd'hui si visible, sinon la première.
+    const overdueAnchor = Math.max(0, days.findIndex((d) => sameDay(d, today)));
 
     return (
       <div style={{ ...card(), border: "none", overflow: "hidden" }}>
         <div ref={scrollRef} style={{ overflowY: "auto", maxHeight: "calc(100vh - 210px)" }}>
-        {/* En-tête + bandeau : épinglés en haut pendant le scroll */}
-        <div style={{ position: "sticky", top: 0, zIndex: 3, background: T.white }}>
-        {/* En-tête jours */}
-        <div style={{ display: "flex", background: T.white }}>
+        {/* En-tête jours : nom + numéro + tâches du jour, le tout épinglé en haut */}
+        <div style={{ position: "sticky", top: 0, zIndex: 8, background: T.white, display: "flex", borderBottom: `1px solid ${T.border}`, alignItems: "stretch" }}>
           <div style={{ width: gutter, flexShrink: 0 }} />
           {days.map((d, i) => {
             const isToday = sameDay(d, today);
+            const isPast = startOfDay(d) < today;
+            const list = tasksByDay.get(dateKey(d)) || [];
+            const allDay = allDayByDay.get(dateKey(d)) || [];
             return (
-              <div key={i} style={{ flex: 1, textAlign: "center", padding: "8px 4px", minWidth: 0, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none" }}>
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 3px 6px", minWidth: 0, borderLeft: daysCount > 1 && i > 0 ? `1px solid ${T.border}` : "none", opacity: isPast ? 0.45 : 1 }}>
                 <div style={dayLabelStyle}>{WEEKDAYS[weekdayIdx(d)]}</div>
                 <div style={{
                   marginTop: 3, display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -743,11 +876,48 @@ export default function AgendaPage() {
                   fontSize: 14, fontWeight: isToday ? 700 : 600,
                   background: isToday ? T.text : "transparent", color: isToday ? "#fff" : T.text,
                 }}>{d.getDate()}</div>
+                {/* Évènements « toute la journée » : au-dessus des tâches du jour */}
+                {allDay.length > 0 && (
+                  <div style={{ marginTop: 5, width: "100%", display: "flex", flexDirection: "column", gap: 2, textAlign: "left" }}>
+                    {allDay.map((ev) => <TaskRowChip key={ev.id} item={ev} onToggle={onToggleDone} onOpen={openEdit} />)}
+                  </div>
+                )}
+                {/* Tâches du jour : pleine largeur de la colonne, empilées sous le numéro */}
+                {list.length > 0 && (
+                  <div style={{ marginTop: allDay.length > 0 ? 2 : 5, width: "100%", display: "flex", flexDirection: "column", gap: 2, textAlign: "left" }}>
+                    {list.map((it) => <TaskRowChip key={it.id} item={it} onToggle={onToggleDone} onOpen={openEdit} />)}
+                  </div>
+                )}
+                {/* Résumé des tâches en attente : ouvre un popover façon Google Tasks */}
+                {i === overdueAnchor && overdueTasks.length > 0 && (
+                  <div style={{ marginTop: list.length > 0 ? 4 : 6, width: "100%", textAlign: "left" }}>
+                    <button type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        const vw = typeof window !== "undefined" ? window.innerWidth : 1000;
+                        const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+                        const W = 320;
+                        let left = r.left - W - 8;                          // à gauche du jour
+                        if (left < 8) left = Math.min(r.right + 8, vw - W - 8); // sinon à droite
+                        const top = Math.max(8, Math.min(r.top - 4, vh - 360));
+                        setOverduePos({ top, left });
+                        setOverdueOpen((o) => !o);
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 5, width: "100%",
+                        padding: "3px 9px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit",
+                        border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 10.5, fontWeight: 600,
+                      }}>
+                      <Target size={12} strokeWidth={2.2} color={T.blue} style={{ flexShrink: 0 }} />
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{overdueTasks.length} tâche{overdueTasks.length > 1 ? "s" : ""} en attente</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-        </div>{/* fin en-tête épinglé */}
 
         {/* Grille horaire */}
         <div style={{ display: "flex", position: "relative" }}>
@@ -764,13 +934,22 @@ export default function AgendaPage() {
               const layout = layoutDay(eventsByDay.get(dateKey(d)) || [], d);
               const dk = dateKey(d);
               const dragHere = dragBox && dragBox.dayKey === dk;
+              const isToday = sameDay(d, today);
+              const isPastDay = startOfDay(d) < today;
               return (
                 <div key={di} data-daycol="" onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
                   borderLeft: daysCount > 1 && di > 0 ? `1px solid ${T.border}` : "none",
-                  backgroundImage: `repeating-linear-gradient(to bottom, ${T.border}, ${T.border} 1px, transparent 1px, transparent ${HOUR_H}px)`,
+                  backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, ${T.border} ${HOUR_H - 1}px, ${T.border} ${HOUR_H}px)`,
                   height: 24 * HOUR_H,
                 }}>
+                  {/* Ligne « maintenant » (jour courant uniquement) */}
+                  {isToday && (
+                    <div style={{ position: "absolute", top: nowTop, left: 0, right: 0, height: 0, zIndex: 7, pointerEvents: "none" }}>
+                      <div style={{ position: "absolute", left: -3, top: -3, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
+                      <div style={{ position: "absolute", left: 1, right: 0, top: -1, height: 2, background: T.red }} />
+                    </div>
+                  )}
                   {dragHere && (() => {
                     const lo = Math.min(dragBox.a, dragBox.b);
                     const hi = Math.max(dragBox.a, dragBox.b);
@@ -792,7 +971,19 @@ export default function AgendaPage() {
                     const height = Math.max(((eMin - sMin) / 60) * HOUR_H, 16);
                     const w = 100 / ev._cols;
                     const left = ev._col * w;
-                    const col = eventColor(ev);
+                    // Les tâches reçoivent une teinte plus claire que les évènements
+                    // pour les distinguer d'un coup d'œil.
+                    const col = ev.isTask ? lighten(eventColor(ev), 0.32) : eventColor(ev);
+                    // Évènement déjà passé → estompé (jour révolu, ou fini avant maintenant).
+                    const isPastEvent = isPastDay || (isToday && eMin <= nowMin);
+                    // Estompage du passé via une teinte éclaircie (et NON via l'opacité du
+                    // bloc, qui rendrait le fond blanc translucide et laisserait voir les
+                    // lignes d'heures de la grille au travers).
+                    const dispCol = isPastEvent ? lighten(col, 0.55) : col;
+                    // Teinte semi-transparente posée sur un fond blanc opaque :
+                    // évite que les lignes d'heures du fond transparaissent à travers le bloc.
+                    const tint = ev.isTask ? `${dispCol}1A` : `${dispCol}33`;
+                    const txtCol = (ev.done || isPastEvent) ? T.textMut : eventTextColor(ev);
                     // Évènements courts (≤ 30 min) : titre et heure sur une seule
                     // ligne, l'heure poussée à droite.
                     const compact = (eMin - sMin) <= 30;
@@ -809,7 +1000,7 @@ export default function AgendaPage() {
                         style={{
                           position: "absolute", top, height, cursor: "pointer",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
-                          background: ev.isTask ? `${col}1A` : `${col}33`, borderLeft: `3px solid ${col}`, borderRadius: 5,
+                          backgroundColor: T.white, backgroundImage: `linear-gradient(${tint}, ${tint})`, borderLeft: `2px solid ${dispCol}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
                           boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                           display: "flex", flexDirection: compact ? "row" : "column",
@@ -820,11 +1011,11 @@ export default function AgendaPage() {
                         )}
                         <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, flex: compact ? 1 : "none" }}>
                           {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
-                          <span style={{ fontSize: 10.5, fontWeight: 600, color: ev.done ? T.textMut : eventTextColor(ev), textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 600, color: txtCol, textDecoration: ev.isTask && ev.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.summary}</span>
                         </span>
                         {compact
-                          ? <span style={{ fontSize: 9.5, color: ev.done ? T.textMut : eventTextColor(ev), flexShrink: 0, whiteSpace: "nowrap", opacity: 0.8 }}>{timeLbl}</span>
-                          : (height > 28 && <span style={{ fontSize: 9.5, color: ev.done ? T.textMut : eventTextColor(ev), opacity: 0.8 }}>{timeLbl}</span>)}
+                          ? <span style={{ fontSize: 9.5, color: txtCol, flexShrink: 0, whiteSpace: "nowrap", opacity: 0.8 }}>{timeLbl}</span>
+                          : (height > 28 && <span style={{ fontSize: 9.5, color: txtCol, opacity: 0.8 }}>{timeLbl}</span>)}
                         {resizable && (
                           <div onMouseDown={(e) => startResize(e, ev, d, "bottom")} onClick={(e) => e.stopPropagation()} style={handleStyle("bottom")} />
                         )}
@@ -878,7 +1069,7 @@ export default function AgendaPage() {
                   {shown.map((ev) => (
                     <div key={ev.id} title={ev.summary} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} style={{
                       display: "flex", alignItems: "center", gap: 4, minWidth: 0, cursor: "pointer",
-                      fontSize: 10.5, color: ev.done ? T.textMut : eventTextColor(ev), background: `${eventColor(ev)}${ev.isTask ? "1A" : "33"}`, borderRadius: 4, padding: "1px 5px",
+                      fontSize: 10.5, color: ev.done ? T.textMut : eventTextColor(ev), background: ev.isTask ? `${lighten(eventColor(ev), 0.32)}26` : `${eventColor(ev)}33`, borderRadius: 4, padding: "1px 5px",
                     }}>
                       {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} size={12} />}
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: ev.isTask && ev.done ? "line-through" : "none" }}>
@@ -1015,17 +1206,26 @@ export default function AgendaPage() {
       {body}
       {modal && (
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
-            {/* Barre du haut */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, padding: "8px 10px" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", transform: `translate(${modalPos.x}px, ${modalPos.y}px)` }}>
+            {/* Barre du haut = poignée de déplacement (grise au survol, invisible sinon).
+                Les icônes sont à l'intérieur de cette zone pour ne pas ajouter de marge. */}
+            <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
+              onMouseEnter={() => setDragHover(true)} onMouseLeave={() => setDragHover(false)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, padding: "4px 10px",
+                cursor: modalDragging ? "grabbing" : "grab", userSelect: "none",
+                borderTopLeftRadius: 12, borderTopRightRadius: 12,
+                background: (dragHover || modalDragging) ? "rgba(0,0,0,0.035)" : "transparent",
+                transition: "background-color 120ms ease",
+              }}>
               {modal.id && (
-                <button onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={topIconBtn}
+                <button onMouseDown={(e) => e.stopPropagation()} onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={topIconBtn}
                   onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.red; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
                   <Trash2 size={15} strokeWidth={1.9} />
                 </button>
               )}
-              <button onClick={() => !saving && setModal(null)} aria-label="Fermer" title="Fermer" style={topIconBtn}
+              <button onMouseDown={(e) => e.stopPropagation()} onClick={() => !saving && setModal(null)} aria-label="Fermer" title="Fermer" style={topIconBtn}
                 onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
                 <IconX size={16} strokeWidth={1.9} />
@@ -1080,32 +1280,54 @@ export default function AgendaPage() {
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <input type="date" value={modal.date} onChange={(e) => setModal({ ...modal, date: e.target.value })} style={subInp} />
+                      <DateField value={modal.date} onChange={(v) => setModal({ ...modal, date: v, endDate: modal.endDate < v ? v : modal.endDate })} />
                       {modal.allDay ? (
                         <>
                           <span style={{ color: T.textMut, fontSize: 13 }}>au</span>
-                          <input type="date" value={modal.endDate} min={modal.date} onChange={(e) => setModal({ ...modal, endDate: e.target.value })} style={subInp} />
+                          <DateField value={modal.endDate} min={modal.date} onChange={(v) => setModal({ ...modal, endDate: v })} />
                         </>
                       ) : (
                         <>
-                          <input type="time" value={modal.startTime} onChange={(e) => setModal({ ...modal, startTime: e.target.value })} style={subInp} />
+                          <TimeField value={modal.startTime} onChange={(v) => setModal({ ...modal, startTime: v })} />
                           <span style={{ color: T.textMut }}>–</span>
-                          <input type="time" value={modal.endTime} onChange={(e) => setModal({ ...modal, endTime: e.target.value })} style={subInp} />
+                          <TimeField value={modal.endTime} onChange={(v) => setModal({ ...modal, endTime: v })} />
                         </>
                       )}
                     </div>
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: T.textSub, cursor: "pointer" }}>
-                      <input type="checkbox" checked={modal.allDay} onChange={(e) => setModal({ ...modal, allDay: e.target.checked })} />
+                    <button type="button" onClick={() => setModal({ ...modal, allDay: !modal.allDay })}
+                      style={{
+                        ...pillBtn, alignSelf: "flex-start",
+                        background: modal.allDay ? `${T.blue}1A` : T.white,
+                        borderColor: modal.allDay ? `${T.blue}55` : T.border,
+                        color: modal.allDay ? T.blue : T.text,
+                        fontWeight: modal.allDay ? 600 : 500,
+                      }}>
+                      <span style={{
+                        width: 15, height: 15, borderRadius: 5, flexShrink: 0,
+                        border: `1.5px solid ${modal.allDay ? T.blue : T.textMut}`,
+                        background: modal.allDay ? T.blue : "transparent",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        color: "#fff", fontSize: 10, lineHeight: 1,
+                      }}>{modal.allDay ? "✓" : ""}</span>
                       Toute la journée
-                    </label>
+                    </button>
                   </div>
                 )}
               </FormRow>
 
-              {/* Lieu */}
-              <FormRow icon={MapPin}>
-                <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
-              </FormRow>
+              {/* Lieu (évènement) / Date limite (tâche) */}
+              {modal.kind === "task" ? (
+                <FormRow icon={CalendarIcon}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 14, color: T.textMut }}>Date limite</span>
+                    <DateField value={modal.date} onChange={(v) => setModal({ ...modal, date: v, endDate: v })} />
+                  </div>
+                </FormRow>
+              ) : (
+                <FormRow icon={MapPin}>
+                  <input value={modal.location} onChange={(e) => setModal({ ...modal, location: e.target.value })} placeholder="Ajouter un lieu" style={rowInp} />
+                </FormRow>
+              )}
 
               {/* Description */}
               <FormRow icon={AlignLeft} top>
@@ -1114,7 +1336,7 @@ export default function AgendaPage() {
 
               {/* Couleur */}
               <FormRow icon={CalendarIcon}>
-                <div style={{ position: "relative" }}>
+                <div data-menu-root style={{ position: "relative" }}>
                   <button type="button" onClick={() => { setColorOpen((o) => !o); setRemindOpen(false); }} style={pillBtn}>
                     <span style={{ width: 14, height: 14, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : T.blue, display: "inline-block" }} />
                     Couleur
@@ -1134,7 +1356,7 @@ export default function AgendaPage() {
 
               {/* Notification — bouton moderne + menu */}
               <FormRow icon={Bell}>
-                <div style={{ position: "relative" }}>
+                <div data-menu-root style={{ position: "relative" }}>
                   <button type="button" onClick={() => { setRemindOpen((o) => !o); setColorOpen(false); }} style={pillBtn}>
                     {REMINDER_OPTS.find((r) => String(r.v) === String(modal.reminder))?.label || "Notification"}
                     <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
@@ -1177,6 +1399,112 @@ export default function AgendaPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Popover « Tâches en attente » façon Google Tasks */}
+      {overdueOpen && overduePos && (
+        <div onClick={() => setOverdueOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1100 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            position: "absolute", top: overduePos.top, left: overduePos.left, width: 320,
+            ...card(), boxShadow: "0 12px 40px rgba(0,0,0,0.18)", padding: "12px 18px 16px",
+            maxHeight: "70vh", overflowY: "auto",
+          }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 2 }}>
+              <a href="https://support.google.com/tasks" target="_blank" rel="noopener noreferrer" title="Aide" style={{ color: T.textMut, display: "inline-flex" }}>
+                <HelpCircle size={16} strokeWidth={2} />
+              </a>
+              <button type="button" onClick={() => setOverdueOpen(false)} aria-label="Fermer" style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", padding: 0 }}>
+                <IconX size={16} strokeWidth={2} />
+              </button>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: T.text, letterSpacing: -0.2 }}>Tâches en attente</div>
+            <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Au cours des 365 derniers jours</div>
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+              {overdueTasks.map((it) => {
+                const rel = relativeDue(eventDayKey(it));
+                const relCap = rel.charAt(0).toUpperCase() + rel.slice(1);
+                return (
+                  <div key={it.id} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{ paddingTop: 2 }}>
+                      <TaskCircle done={it.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(it); }} size={18} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <button type="button" onClick={() => { setOverdueOpen(false); openEdit(it); }}
+                        style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left", display: "block", width: "100%" }}>
+                        <div style={{ fontSize: 14, color: T.text, textDecoration: it.done ? "line-through" : "none" }}>{it.summary}</div>
+                        {it.description && (
+                          <div style={{ fontSize: 12.5, color: T.textMut, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</div>
+                        )}
+                      </button>
+                      {/* Échéance uniquement si une vraie date limite (heure) est posée ;
+                          un simple jour n'est pas une échéance. */}
+                      {!it.allDay && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 12.5, color: T.red }}>
+                          <Target size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+                          <span>Arrivée à échéance {rel}</span>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, fontSize: 12.5, color: T.textMut }}>
+                        <Clock size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+                        <span>{relCap}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <a href="https://tasks.google.com" target="_blank" rel="noopener noreferrer" style={{ color: T.blue, fontSize: 13, fontWeight: 500 }}>Ouvrir Tasks</a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────── Puce de tâche (rangée sous l'en-tête des jours) ─────────────── */
+function TaskRowChip({ item, onToggle, onOpen, overdue = false }) {
+  const isTask = !!item.isTask;
+  // Évènement « toute la journée » : couleur pleine de l'évènement, sans pastille.
+  // Tâche : palette tâche (éclaircie) avec rond de complétion.
+  const base = !isTask
+    ? eventColor(item)
+    : item.colorId ? lighten(GCAL_COLORS[item.colorId] || DEFAULT_EVENT_COLOR, 0.38) : (overdue ? T.textMut : T.blue);
+  const txt = item.done ? T.textMut : darken(base, 0.5);
+  const timeLbl = item.allDay ? "" : eventTimeLabel(item);
+  // En attente : on rappelle le jour d'échéance (jj/mm) plutôt que l'heure.
+  const overdueLbl = (() => {
+    if (!overdue) return "";
+    const k = eventDayKey(item);
+    if (!k) return "";
+    const [, mm, dd] = k.split("-");
+    return `${dd}/${mm}`;
+  })();
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onOpen(item); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(item); } }}
+      title={item.summary}
+      style={{
+        display: "flex", alignItems: "center", gap: 5, width: "100%",
+        minWidth: 0, textAlign: "left", boxSizing: "border-box",
+        padding: "2px 6px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit",
+        background: `${base}1A`, borderLeft: `2px solid ${base}`,
+      }}
+    >
+      {isTask && <TaskCircle done={item.done} onToggle={(e) => { e.stopPropagation(); onToggle(item); }} size={12} />}
+      <span style={{
+        fontSize: 10.5, fontWeight: 600, color: txt, minWidth: 0, flex: 1,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        textDecoration: item.done ? "line-through" : "none",
+      }}>{item.summary}</span>
+      {(overdueLbl || timeLbl) && (
+        <span style={{ fontSize: 9, color: txt, opacity: 0.8, flexShrink: 0, whiteSpace: "nowrap" }}>
+          {overdueLbl || timeLbl}
+        </span>
       )}
     </div>
   );
