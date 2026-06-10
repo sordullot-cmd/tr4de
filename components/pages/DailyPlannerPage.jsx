@@ -6,6 +6,7 @@ import { useCloudState } from "@/lib/hooks/useCloudState";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
+import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
@@ -245,6 +246,8 @@ const fmtRange = (startIso, endIso) => {
 
 export default function DailyPlannerPage() {
   useLang();
+  // Mobile : on centre le bloc « Habitudes du jour » avec une largeur max.
+  const isMobile = useIsMobile();
   const [dateKey, setDateKey] = useState(() => todayKey());
 
   // Planner (tâches, objectifs, énergie) par jour — synchronisé Supabase
@@ -371,7 +374,7 @@ export default function DailyPlannerPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* Habitudes du jour */}
-      <div>
+      <div style={isMobile ? { alignSelf: "center", width: "100%", maxWidth: 480 } : undefined}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Habitudes du jour</h2>
             <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -379,7 +382,7 @@ export default function DailyPlannerPage() {
               {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
             </span>
             <button onClick={openCreateHabit} title="Ajouter une habitude"
-              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}>
+              style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: isMobile ? 0 : 64 }}>
               <Plus size={13} strokeWidth={2} />
             </button>
           </div>

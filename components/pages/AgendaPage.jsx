@@ -151,6 +151,7 @@ function blankForm(day, startTime = "09:00", endTime = "10:00") {
   return {
     kind: "event", done: false,
     id: null, htmlLink: null, summary: "", allDay: false, date: dk, endDate: dk, startTime, endTime,
+    dueDate: "", // date limite (tâche) : facultative, aucune par défaut
     location: "", description: "", guests: "", addMeet: false, hadMeet: false,
     colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
   };
@@ -219,20 +220,24 @@ function writeTaskTimes(map) {
 
 /** Convertit une Google Task (+ heure locale) en item affiché comme un évènement. */
 function taskToItem(tk, times) {
-  const dueDate = tk.due ? tk.due.slice(0, 10) : null;
-  if (!dueDate) return null; // sans échéance → pas placée sur le calendrier
   const t = times[tk.id];
+  // Date limite (échéance) : champ `due` de Google Tasks, facultatif.
+  const dueDate = tk.due ? tk.due.slice(0, 10) : null;
+  // Jour de planification dans l'agenda : conservé côté tr4de. Repli sur la date
+  // limite pour les tâches créées hors tr4de (sans jour planifié enregistré).
+  const day = (t && t.day) || dueDate;
+  if (!day) return null; // ni jour planifié ni échéance → pas placée sur le calendrier
   const hasTime = !!(t && t.startTime);
   const allDay = !hasTime;
   let start, end;
   if (hasTime) {
-    start = new Date(`${dueDate}T${t.startTime}:00`).toISOString();
-    end = new Date(`${dueDate}T${t.endTime}:00`).toISOString();
-  } else { start = dueDate; end = dueDate; }
+    start = new Date(`${day}T${t.startTime}:00`).toISOString();
+    end = new Date(`${day}T${t.endTime}:00`).toISOString();
+  } else { start = day; end = day; }
   return {
     id: tk.id, summary: tk.title || "(Sans titre)", description: tk.notes || "",
     isTask: true, isGTask: true, done: !!tk.completed,
-    allDay, start, end,
+    allDay, start, end, dueDate,
     colorId: t?.colorId || null, location: "", htmlLink: null, guests: [], hangoutLink: null,
     transparency: "opaque", visibility: "default", reminders: null,
   };
@@ -240,12 +245,13 @@ function taskToItem(tk, times) {
 
 /** Form pré-rempli depuis un item de tâche Google. */
 function formFromTaskItem(item, times) {
-  const dueDate = item.allDay ? String(item.start || "").slice(0, 10) : dateKey(new Date(item.start));
+  const day = item.allDay ? String(item.start || "").slice(0, 10) : dateKey(new Date(item.start));
   const t = times[item.id];
   return {
     kind: "task", done: !!item.done, id: item.id, htmlLink: null,
     summary: item.summary === "(Sans titre)" ? "" : item.summary,
-    allDay: !!item.allDay, date: dueDate, endDate: dueDate,
+    allDay: !!item.allDay, date: day, endDate: day,
+    dueDate: item.dueDate || "", // date limite (facultative)
     startTime: t?.startTime || "09:00", endTime: t?.endTime || "10:00",
     location: "", description: item.description || "",
     guests: "", addMeet: false, hadMeet: false, colorId: item.colorId || null,
@@ -258,7 +264,9 @@ function taskPayloadFromForm(form) {
   return {
     title: form.summary || "(Sans titre)",
     notes: form.description || "",
-    due: form.date ? `${form.date}T00:00:00.000Z` : undefined,
+    // Date limite (facultative) → champ `due` de Google Tasks. Vide = aucune échéance
+    // (envoyé à null pour effacer une échéance existante).
+    due: form.dueDate ? `${form.dueDate}T00:00:00.000Z` : null,
   };
 }
 
@@ -353,34 +361,44 @@ function layoutDay(evts, day) {
     })
     .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
 
-  // Clusters d'évènements qui se chevauchent.
-  const clusters = [];
-  let cluster = [];
-  let clusterEnd = -1;
-  for (const ev of timed) {
-    if (cluster.length && ev.startMin >= clusterEnd) {
-      clusters.push(cluster);
-      cluster = [];
-      clusterEnd = -1;
-    }
-    cluster.push(ev);
-    clusterEnd = Math.max(clusterEnd, ev.endMin);
-  }
-  if (cluster.length) clusters.push(cluster);
-
-  const out = [];
-  for (const cl of clusters) {
-    const colEnds = [];
-    for (const ev of cl) {
-      let placed = false;
-      for (let c = 0; c < colEnds.length; c++) {
-        if (ev.startMin >= colEnds[c]) { ev._col = c; colEnds[c] = ev.endMin; placed = true; break; }
+  // Partage en colonnes (côte à côte) des éléments qui se chevauchent.
+  const place = (items) => {
+    const clusters = [];
+    let cluster = [];
+    let clusterEnd = -1;
+    for (const ev of items) {
+      if (cluster.length && ev.startMin >= clusterEnd) {
+        clusters.push(cluster);
+        cluster = [];
+        clusterEnd = -1;
       }
-      if (!placed) { ev._col = colEnds.length; colEnds.push(ev.endMin); }
+      cluster.push(ev);
+      clusterEnd = Math.max(clusterEnd, ev.endMin);
     }
-    for (const ev of cl) { ev._cols = colEnds.length; out.push(ev); }
-  }
-  return out;
+    if (cluster.length) clusters.push(cluster);
+
+    const out = [];
+    for (const cl of clusters) {
+      const colEnds = [];
+      for (const ev of cl) {
+        let placed = false;
+        for (let c = 0; c < colEnds.length; c++) {
+          if (ev.startMin >= colEnds[c]) { ev._col = c; colEnds[c] = ev.endMin; placed = true; break; }
+        }
+        if (!placed) { ev._col = colEnds.length; colEnds.push(ev.endMin); }
+      }
+      for (const ev of cl) { ev._cols = colEnds.length; out.push(ev); }
+    }
+    return out;
+  };
+
+  // Évènements et tâches sont disposés séparément : une tâche qui chevauche un
+  // évènement ne le pousse pas sur le côté — elle se superpose par-dessus (z-index
+  // plus élevé au rendu). Le partage en colonnes ne joue qu'entre éléments de même
+  // nature (évènement/évènement ou tâche/tâche).
+  const events = place(timed.filter((e) => !e.isTask));
+  const tasks = place(timed.filter((e) => e.isTask));
+  return [...events, ...tasks];
 }
 
 /* ─────────────── Composant ─────────────── */
@@ -561,11 +579,11 @@ export default function AgendaPage() {
     return map;
   }, [events]);
 
-  // Tâches "en attente" : échéance passée et non terminées.
+  // Tâches "en attente" : date limite dépassée et non terminées.
   const overdueTasks = React.useMemo(
     () => taskItems
-      .filter((it) => !it.done && eventDayKey(it) && eventDayKey(it) < todayKey)
-      .sort((a, b) => String(a.start).localeCompare(String(b.start))),
+      .filter((it) => !it.done && it.dueDate && it.dueDate < todayKey)
+      .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))),
     [taskItems, todayKey],
   );
 
@@ -689,11 +707,11 @@ export default function AgendaPage() {
     }
   };
 
-  // Déplacement d'un évènement par glisser-déposer : on saisit le bloc et on le
-  // glisse vers une autre heure (pas de 15 min) et/ou un autre jour. Un simple
-  // clic (sans déplacement) ouvre l'édition. Les tâches ne sont pas déplaçables ici.
+  // Déplacement d'un bloc par glisser-déposer (évènement OU tâche horodatée) : on
+  // saisit le bloc et on le glisse vers une autre heure (pas de 15 min) et/ou un
+  // autre jour. Un simple clic (sans déplacement) ouvre l'édition.
   const startMove = (e, ev, d) => {
-    if (e.button !== 0 || ev.isTask) return;
+    if (e.button !== 0) return;
     e.preventDefault();
     const colEl = e.currentTarget.closest("[data-daycol]");
     if (!colEl) return;
@@ -739,6 +757,16 @@ export default function AgendaPage() {
   const applyMove = async (ev, targetDayKey, startMin, endMin) => {
     const toTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
     const endM = endMin >= 24 * 60 ? 24 * 60 - 1 : endMin; // 24:00 impossible → 23:59
+    if (ev.isTask) {
+      // Tâche : le jour de planification et l'heure sont conservés côté tr4de
+      // (la date limite Google `due` n'est pas affectée par un déplacement).
+      const times = readTaskTimes();
+      const prev = times[ev.id] || {};
+      times[ev.id] = { ...prev, day: targetDayKey, startTime: toTime(startMin), endTime: toTime(endM) };
+      writeTaskTimes(times);
+      setTaskTimes(times);
+      return;
+    }
     const form = {
       ...formFromEvent(ev),
       allDay: false, date: targetDayKey, endDate: targetDayKey,
@@ -766,12 +794,13 @@ export default function AgendaPage() {
         let taskId = modal.id;
         if (taskId) await updateTask(taskId, payload);
         else { const r = await createTask(payload); taskId = r?.task?.id; }
-        // Heure conservée côté tr4de (Google ne stocke que la date).
+        // Jour de planification + heure conservés côté tr4de : Google Tasks ne
+        // stocke que la date limite (`due`), pas le jour où l'on pose la tâche.
         const times = readTaskTimes();
         if (taskId) {
           times[taskId] = modal.allDay
-            ? { colorId: modal.colorId || null }
-            : { startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null };
+            ? { day: modal.date, colorId: modal.colorId || null }
+            : { day: modal.date, startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null };
           writeTaskTimes(times);
           setTaskTimes(times);
         }
@@ -843,6 +872,8 @@ export default function AgendaPage() {
     animTimerRef.current = setTimeout(() => {
       const el = scrollRef.current;
       if (!el) return;
+      // Sur mobile : pas d'animation de défilement, on positionne directement à 5h.
+      if (isMobile) { el.scrollTop = 5 * HOUR_H; return; }
       const start = el.scrollTop;
       const dist = 5 * HOUR_H - start;
       const duration = 900;
@@ -1050,7 +1081,7 @@ export default function AgendaPage() {
                     return (
                       <div style={{
                         position: "absolute", top: (lo / 60) * HOUR_H, height: Math.max(((hi - lo) / 60) * HOUR_H, 3),
-                        left: 2, right: 2, background: `${DEFAULT_EVENT_COLOR}33`, border: `1px solid ${DEFAULT_EVENT_COLOR}`,
+                        left: 2, right: 2, background: "rgba(200, 222, 255, 0.45)", border: "none",
                         borderRadius: 5, pointerEvents: "none", zIndex: 5,
                       }} />
                     );
@@ -1093,15 +1124,15 @@ export default function AgendaPage() {
                     });
                     return (
                       <div key={ev.id}
-                        onMouseDown={(e) => { e.stopPropagation(); if (resizable) startMove(e, ev, d); }}
-                        onClick={(e) => { e.stopPropagation(); if (!resizable) openEdit(ev); }}
+                        onMouseDown={(e) => { e.stopPropagation(); startMove(e, ev, d); }}
+                        onClick={(e) => e.stopPropagation()}
                         title={`${timeLbl} ${ev.summary}`}
                         style={{
-                          position: "absolute", top, height, cursor: ev.isTask ? "pointer" : (moving ? "grabbing" : "grab"),
+                          position: "absolute", top, height, cursor: moving ? "grabbing" : "grab",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
                           backgroundColor: T.white, backgroundImage: `linear-gradient(${tint}, ${tint})`, borderLeft: `2px solid ${dispCol}`, borderRadius: 5,
-                          padding: "2px 5px", overflow: "hidden", zIndex: active ? 6 : 1,
-                          boxShadow: active ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
+                          padding: "2px 5px", overflow: "hidden", zIndex: active ? 6 : ev.isTask ? 3 : 1,
+                          boxShadow: active ? "0 4px 14px rgba(0,0,0,0.16)" : "none",
                           opacity: moving ? 0.92 : 1,
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
@@ -1313,7 +1344,7 @@ export default function AgendaPage() {
       {body}
       {modal && (
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.14)", transform: `translate(${modalPos.x}px, ${modalPos.y}px)` }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", transform: `translate(${modalPos.x}px, ${modalPos.y}px)` }}>
             {/* Barre du haut = poignée de déplacement (grise au survol, invisible sinon).
                 Les icônes sont à l'intérieur de cette zone pour ne pas ajouter de marge. */}
             <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
@@ -1424,10 +1455,17 @@ export default function AgendaPage() {
 
               {/* Lieu (évènement) / Date limite (tâche) */}
               {modal.kind === "task" ? (
-                <FormRow icon={CalendarIcon}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <FormRow icon={Target}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14, color: T.textMut }}>Date limite</span>
-                    <DateField value={modal.date} onChange={(v) => setModal({ ...modal, date: v, endDate: v })} />
+                    <DateField value={modal.dueDate} onChange={(v) => setModal({ ...modal, dueDate: v })} />
+                    {modal.dueDate && (
+                      <button type="button" onClick={() => setModal({ ...modal, dueDate: "" })}
+                        aria-label="Retirer la date limite" title="Retirer la date limite"
+                        style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", alignItems: "center", padding: 2, borderRadius: 6 }}>
+                        <IconX size={14} strokeWidth={2} />
+                      </button>
+                    )}
                   </div>
                 </FormRow>
               ) : (
@@ -1528,7 +1566,7 @@ export default function AgendaPage() {
             <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Au cours des 365 derniers jours</div>
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
               {overdueTasks.map((it) => {
-                const rel = relativeDue(eventDayKey(it));
+                const rel = relativeDue(it.dueDate);
                 const relCap = rel.charAt(0).toUpperCase() + rel.slice(1);
                 return (
                   <div key={it.id} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -1543,14 +1581,11 @@ export default function AgendaPage() {
                           <div style={{ fontSize: 12.5, color: T.textMut, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.description}</div>
                         )}
                       </button>
-                      {/* Échéance uniquement si une vraie date limite (heure) est posée ;
-                          un simple jour n'est pas une échéance. */}
-                      {!it.allDay && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 12.5, color: T.red }}>
-                          <Target size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-                          <span>Arrivée à échéance {rel}</span>
-                        </div>
-                      )}
+                      {/* Date limite dépassée. */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 12.5, color: T.red }}>
+                        <Target size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+                        <span>Arrivée à échéance {rel}</span>
+                      </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, fontSize: 12.5, color: T.textMut }}>
                         <Clock size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
                         <span>{relCap}</span>
@@ -1580,12 +1615,10 @@ function TaskRowChip({ item, onToggle, onOpen, overdue = false }) {
     : item.colorId ? lighten(GCAL_COLORS[item.colorId] || DEFAULT_EVENT_COLOR, 0.38) : (overdue ? T.textMut : T.blue);
   const txt = item.done ? T.textMut : darken(base, 0.5);
   const timeLbl = item.allDay ? "" : eventTimeLabel(item);
-  // En attente : on rappelle le jour d'échéance (jj/mm) plutôt que l'heure.
+  // En attente : on rappelle la date limite (jj/mm) plutôt que l'heure.
   const overdueLbl = (() => {
-    if (!overdue) return "";
-    const k = eventDayKey(item);
-    if (!k) return "";
-    const [, mm, dd] = k.split("-");
+    if (!overdue || !item.dueDate) return "";
+    const [, mm, dd] = item.dueDate.split("-");
     return `${dd}/${mm}`;
   })();
   return (
