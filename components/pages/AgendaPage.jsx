@@ -9,6 +9,7 @@ import {
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
+import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import { DateField, TimeField } from "./AgendaDateFields";
 
 /* ─────────────── Helpers date ─────────────── */
@@ -77,13 +78,13 @@ const GCAL_COLORS = {
   5: "#F6BF26",  // Banane
   6: "#F4511E",  // Tangerine
   7: "#039BE5",  // Paon
-  8: "#D9D9D9",  // Graphite (gris clair)
+  8: "#CCCCCC",  // Graphite (gris clair)
   9: "#3F51B5",  // Myrtille
   10: "#0B8043", // Basilic
   11: "#D50000", // Tomate
 };
-// Couleur par défaut (évènement sans colorId) : bleu Google.
-const DEFAULT_EVENT_COLOR = "#4285F4";
+// Couleur par défaut (évènement sans colorId) : lavande, accordée à la palette.
+const DEFAULT_EVENT_COLOR = "#7B68EE";
 
 /** Éclaircit une couleur hex (mélange vers le blanc). */
 function lighten(hex, f = 0.2) {
@@ -385,6 +386,8 @@ function layoutDay(evts, day) {
 /* ─────────────── Composant ─────────────── */
 export default function AgendaPage() {
   useLang();
+  // Mobile : interface basée sur 3 jours, header épuré (sans boutons).
+  const isMobile = useIsMobile();
   const {
     ready, configured, connected, connect, disconnect,
     fetchEvents, createEvent, updateEvent, deleteEvent, setEventDone,
@@ -416,6 +419,8 @@ export default function AgendaPage() {
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
   const resizeRef = React.useRef(null);
   const [resizeBox, setResizeBox] = React.useState(null); // { id, dayKey, startMin, endMin }
+  const moveRef = React.useRef(null);
+  const [moveBox, setMoveBox] = React.useState(null); // { id, ev, dayKey, startMin, endMin }
   const titleRef = React.useRef(null);
   // Position du formulaire (décalage depuis le centre), ajustable en glissant la poignée.
   const [modalPos, setModalPos] = React.useState({ x: 0, y: 0 });
@@ -505,10 +510,13 @@ export default function AgendaPage() {
     [tasks, taskTimes],
   );
 
-  // Évènements (hors tâches) → placés dans la grille horaire.
+  // Évènements + tâches → placés dans la grille horaire / la vue mois.
+  // Les tâches avec une heure enregistrée se positionnent ainsi dans le
+  // calendrier à leur horaire (layoutDay ne garde que les items horodatés) ;
+  // elles restent aussi affichées dans la rangée du haut via `tasksByDay`.
   const eventsByDay = React.useMemo(() => {
     const map = new Map();
-    for (const ev of events) {
+    for (const ev of [...events, ...taskItems]) {
       const k = eventDayKey(ev);
       if (!k) continue;
       if (!map.has(k)) map.set(k, []);
@@ -518,7 +526,7 @@ export default function AgendaPage() {
       arr.sort((a, b) => (a.allDay === b.allDay ? String(a.start).localeCompare(String(b.start)) : a.allDay ? -1 : 1));
     }
     return map;
-  }, [events]);
+  }, [events, taskItems]);
 
   const today = startOfDay(new Date());
   const todayKey = dateKey(today);
@@ -681,6 +689,73 @@ export default function AgendaPage() {
     }
   };
 
+  // Déplacement d'un évènement par glisser-déposer : on saisit le bloc et on le
+  // glisse vers une autre heure (pas de 15 min) et/ou un autre jour. Un simple
+  // clic (sans déplacement) ouvre l'édition. Les tâches ne sont pas déplaçables ici.
+  const startMove = (e, ev, d) => {
+    if (e.button !== 0 || ev.isTask) return;
+    e.preventDefault();
+    const colEl = e.currentTarget.closest("[data-daycol]");
+    if (!colEl) return;
+    const columnTop = colEl.getBoundingClientRect().top;
+    const duration = ev.endMin - ev.startMin;
+    // Décalage entre le point saisi et le haut du bloc (pour qu'il ne « saute » pas).
+    const grabOffset = ((e.clientY - columnTop) / HOUR_H) * 60 - ev.startMin;
+    const startDk = dateKey(d);
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+    let last = { dayKey: startDk, startMin: ev.startMin, endMin: ev.endMin };
+    moveRef.current = { id: ev.id, ev };
+
+    const onMove = (m) => {
+      if (!moved && Math.abs(m.clientY - startY) < 4 && Math.abs(m.clientX - startX) < 4) return;
+      moved = true;
+      const rawStart = ((m.clientY - columnTop) / HOUR_H) * 60 - grabOffset;
+      let startMin = Math.round(rawStart / 15) * 15;
+      startMin = Math.max(0, Math.min(24 * 60 - duration, startMin));
+      const endMin = startMin + duration;
+      // Jour cible : colonne survolée (vue semaine), sinon jour d'origine.
+      let dayKey = startDk;
+      const target = typeof document !== "undefined" ? document.elementFromPoint(m.clientX, m.clientY) : null;
+      const tcol = target && target.closest ? target.closest("[data-daykey]") : null;
+      if (tcol && tcol.getAttribute("data-daykey")) dayKey = tcol.getAttribute("data-daykey");
+      last = { dayKey, startMin, endMin };
+      setMoveBox({ id: ev.id, ev, dayKey, startMin, endMin });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      moveRef.current = null;
+      setMoveBox(null);
+      if (!moved) { openEdit(ev); return; }                 // simple clic → édition
+      if (last.dayKey === startDk && last.startMin === ev.startMin && last.endMin === ev.endMin) return;
+      applyMove(ev, last.dayKey, last.startMin, last.endMin);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // Applique la nouvelle position (jour + plage horaire) : MAJ optimiste puis API.
+  const applyMove = async (ev, targetDayKey, startMin, endMin) => {
+    const toTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+    const endM = endMin >= 24 * 60 ? 24 * 60 - 1 : endMin; // 24:00 impossible → 23:59
+    const form = {
+      ...formFromEvent(ev),
+      allDay: false, date: targetDayKey, endDate: targetDayKey,
+      startTime: toTime(startMin), endTime: toTime(endM),
+    };
+    const newStart = toISO(targetDayKey, form.startTime);
+    const newEnd = toISO(targetDayKey, form.endTime);
+    setEvents((prev) => prev.map((x) => (x.id === ev.id ? { ...x, start: newStart, end: newEnd } : x)));
+    try {
+      await updateEvent(ev.id, payloadFromForm(form));
+      await loadEvents();
+    } catch (err) {
+      if (err?.message === "insufficient_scope") setError("insufficient_scope");
+      loadEvents();
+    }
+  };
+
   const saveModal = async () => {
     if (!modal) return;
     setSaving(true);
@@ -749,13 +824,15 @@ export default function AgendaPage() {
   const didScrollRef = React.useRef(false);
   const animTimerRef = React.useRef(null);
   const animRafRef = React.useRef(0);
-  React.useEffect(() => { didScrollRef.current = false; }, [view, cursor]);
+  React.useEffect(() => { didScrollRef.current = false; }, [view, cursor, isMobile]);
   // …puis on applique le scroll dès que la grille est effectivement montée.
   // ⚠️ Pas de cleanup ici : un re-rendu (ex. chargement async des évènements)
   // déclencherait sinon le cleanup et annulerait le timer avant l'animation.
   // On annule uniquement au démontage (effet dédié plus bas).
   React.useEffect(() => {
-    if (view !== "day" && view !== "week") return;
+    // Sur mobile la grille (3 jours) est toujours affichée ; sinon seulement
+    // en vue jour/semaine.
+    if (!isMobile && view !== "day" && view !== "week") return;
     if (didScrollRef.current || !scrollRef.current) return;
     didScrollRef.current = true;
     clearTimeout(animTimerRef.current);
@@ -814,7 +891,7 @@ export default function AgendaPage() {
       <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>
         {t("nav.agenda")}
       </h1>
-      {connected && (
+      {connected && !isMobile && (
         <>
           <button onClick={goToday} style={ghostBtn()}>Aujourd'hui</button>
           <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -830,8 +907,14 @@ export default function AgendaPage() {
           </span>
         </>
       )}
+      {/* Mobile : pas de boutons, juste le libellé du mois pour le repère. */}
+      {connected && isMobile && (
+        <span style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
+          {monthYearLabel(view, cursor)}
+        </span>
+      )}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-        {connected && (
+        {connected && !isMobile && (
           <>
             {segmented}
             <button onClick={disconnect} aria-label="Déconnecter" title="Déconnecter" style={iconBtn()}>
@@ -846,7 +929,9 @@ export default function AgendaPage() {
 
   /* ─────────────── Time-grid (jour / semaine) ─────────────── */
   const renderTimeGrid = (daysCount) => {
-    const weekStart = daysCount === 1 ? startOfDay(cursor) : startOfWeekMonday(cursor);
+    // Vue jour (1) et vue 3 jours (mobile) : ancrées sur le jour courant.
+    // Vue semaine (7+) : ancrée sur le lundi de la semaine.
+    const weekStart = daysCount >= 7 ? startOfWeekMonday(cursor) : startOfDay(cursor);
     const days = Array.from({ length: daysCount }, (_, i) => addDays(weekStart, i));
     const hours = Array.from({ length: 24 }, (_, h) => h);
     const gutter = 54;
@@ -931,13 +1016,22 @@ export default function AgendaPage() {
             </div>
             {/* Colonnes jours */}
             {days.map((d, di) => {
-              const layout = layoutDay(eventsByDay.get(dateKey(d)) || [], d);
               const dk = dateKey(d);
+              let layout = layoutDay(eventsByDay.get(dk) || [], d);
+              // Aperçu live d'un évènement en cours de déplacement : on le retire de
+              // sa colonne d'origine et on l'injecte dans la colonne cible.
+              if (moveBox) {
+                if (moveBox.dayKey !== dk) {
+                  layout = layout.filter((e) => e.id !== moveBox.id);
+                } else if (!layout.some((e) => e.id === moveBox.id)) {
+                  layout = [...layout, { ...moveBox.ev, startMin: moveBox.startMin, endMin: moveBox.endMin, _col: 0, _cols: 1 }];
+                }
+              }
               const dragHere = dragBox && dragBox.dayKey === dk;
               const isToday = sameDay(d, today);
               const isPastDay = startOfDay(d) < today;
               return (
-                <div key={di} data-daycol="" onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
+                <div key={di} data-daycol="" data-daykey={dk} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
                   borderLeft: daysCount > 1 && di > 0 ? `1px solid ${T.border}` : "none",
                   backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, ${T.border} ${HOUR_H - 1}px, ${T.border} ${HOUR_H}px)`,
@@ -956,7 +1050,7 @@ export default function AgendaPage() {
                     return (
                       <div style={{
                         position: "absolute", top: (lo / 60) * HOUR_H, height: Math.max(((hi - lo) / 60) * HOUR_H, 3),
-                        left: 2, right: 2, background: `${T.blue}33`, border: `1px solid ${T.blue}`,
+                        left: 2, right: 2, background: `${DEFAULT_EVENT_COLOR}33`, border: `1px solid ${DEFAULT_EVENT_COLOR}`,
                         borderRadius: 5, pointerEvents: "none", zIndex: 5,
                       }} />
                     );
@@ -965,8 +1059,10 @@ export default function AgendaPage() {
                     // Pendant un redimensionnement, on affiche la plage en cours
                     // d'édition (prévisualisation live) au lieu des bornes d'origine.
                     const resizing = resizeBox && resizeBox.id === ev.id && resizeBox.dayKey === dk;
-                    const sMin = resizing ? resizeBox.startMin : ev.startMin;
-                    const eMin = resizing ? resizeBox.endMin : ev.endMin;
+                    const moving = moveBox && moveBox.id === ev.id && moveBox.dayKey === dk;
+                    const active = resizing || moving;
+                    const sMin = resizing ? resizeBox.startMin : moving ? moveBox.startMin : ev.startMin;
+                    const eMin = resizing ? resizeBox.endMin : moving ? moveBox.endMin : ev.endMin;
                     const top = (sMin / 60) * HOUR_H;
                     const height = Math.max(((eMin - sMin) / 60) * HOUR_H, 16);
                     const w = 100 / ev._cols;
@@ -988,7 +1084,7 @@ export default function AgendaPage() {
                     // ligne, l'heure poussée à droite.
                     const compact = (eMin - sMin) <= 30;
                     const minLbl = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
-                    const timeLbl = resizing ? `${minLbl(sMin)} – ${minLbl(eMin >= 1440 ? 1439 : eMin)}` : eventTimeLabel(ev);
+                    const timeLbl = active ? `${minLbl(sMin)} – ${minLbl(eMin >= 1440 ? 1439 : eMin)}` : eventTimeLabel(ev);
                     // Poignées de redimensionnement (évènements horaires uniquement).
                     const resizable = !ev.isTask;
                     const handleStyle = (pos) => ({
@@ -996,13 +1092,17 @@ export default function AgendaPage() {
                       cursor: "ns-resize", zIndex: 2,
                     });
                     return (
-                      <div key={ev.id} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openEdit(ev); }} title={`${timeLbl} ${ev.summary}`}
+                      <div key={ev.id}
+                        onMouseDown={(e) => { e.stopPropagation(); if (resizable) startMove(e, ev, d); }}
+                        onClick={(e) => { e.stopPropagation(); if (!resizable) openEdit(ev); }}
+                        title={`${timeLbl} ${ev.summary}`}
                         style={{
-                          position: "absolute", top, height, cursor: "pointer",
+                          position: "absolute", top, height, cursor: ev.isTask ? "pointer" : (moving ? "grabbing" : "grab"),
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
                           backgroundColor: T.white, backgroundImage: `linear-gradient(${tint}, ${tint})`, borderLeft: `2px solid ${dispCol}`, borderRadius: 5,
-                          padding: "2px 5px", overflow: "hidden", zIndex: resizing ? 6 : 1,
-                          boxShadow: resizing ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
+                          padding: "2px 5px", overflow: "hidden", zIndex: active ? 6 : 1,
+                          boxShadow: active ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
+                          opacity: moving ? 0.92 : 1,
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
                         }}>
@@ -1192,10 +1292,17 @@ export default function AgendaPage() {
             {error}
           </div>
         )}
-        {view === "day" && renderTimeGrid(1)}
-        {view === "week" && renderTimeGrid(7)}
-        {view === "month" && renderMonth()}
-        {view === "year" && renderYear()}
+        {isMobile ? (
+          // Mobile : interface unique basée sur 3 jours.
+          renderTimeGrid(3)
+        ) : (
+          <>
+            {view === "day" && renderTimeGrid(1)}
+            {view === "week" && renderTimeGrid(7)}
+            {view === "month" && renderMonth()}
+            {view === "year" && renderYear()}
+          </>
+        )}
       </>
     );
   }
@@ -1206,7 +1313,7 @@ export default function AgendaPage() {
       {body}
       {modal && (
         <div onClick={() => !saving && setModal(null)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24, overflowY: "auto" }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", transform: `translate(${modalPos.x}px, ${modalPos.y}px)` }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...card(), width: "100%", maxWidth: 540, padding: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.14)", transform: `translate(${modalPos.x}px, ${modalPos.y}px)` }}>
             {/* Barre du haut = poignée de déplacement (grise au survol, invisible sinon).
                 Les icônes sont à l'intérieur de cette zone pour ne pas ajouter de marge. */}
             <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
@@ -1338,13 +1445,13 @@ export default function AgendaPage() {
               <FormRow icon={CalendarIcon}>
                 <div data-menu-root style={{ position: "relative" }}>
                   <button type="button" onClick={() => { setColorOpen((o) => !o); setRemindOpen(false); }} style={pillBtn}>
-                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : T.blue, display: "inline-block" }} />
+                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: modal.colorId ? GCAL_COLORS[modal.colorId] : DEFAULT_EVENT_COLOR, display: "inline-block" }} />
                     Couleur
                     <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
                   </button>
                   {colorOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 5, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.14)", display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
-                      <button type="button" onClick={() => { setModal({ ...modal, colorId: null }); setColorOpen(false); }} title="Par défaut" style={{ width: 24, height: 24, borderRadius: "50%", background: T.blue, border: modal.colorId == null ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
+                      <button type="button" onClick={() => { setModal({ ...modal, colorId: null }); setColorOpen(false); }} title="Par défaut" style={{ width: 24, height: 24, borderRadius: "50%", background: DEFAULT_EVENT_COLOR, border: modal.colorId == null ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
                       {Object.entries(GCAL_COLORS).map(([id, hex]) => (
                         <button key={id} type="button" onClick={() => { setModal({ ...modal, colorId: id }); setColorOpen(false); }} title={`Couleur ${id}`}
                           style={{ width: 24, height: 24, borderRadius: "50%", background: hex, border: String(modal.colorId) === id ? `2px solid ${T.text}` : "1px solid rgba(0,0,0,0.12)", cursor: "pointer", padding: 0 }} />
