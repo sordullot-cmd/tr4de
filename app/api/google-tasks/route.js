@@ -52,11 +52,20 @@ export async function POST(req) {
     }
 
     if (action === "update") {
-      const r = await tasksApi.tasks.patch({
-        tasklist,
-        task: taskId,
-        requestBody: { title: task.title, notes: task.notes || undefined, due: task.due || undefined },
-      });
+      const base = { title: task.title, notes: task.notes || undefined };
+      if (task.due) {
+        // Pose / met à jour la date limite.
+        const r = await tasksApi.tasks.patch({
+          tasklist, task: taskId, requestBody: { ...base, due: task.due },
+        });
+        return json({ ok: true, task: r.data });
+      }
+      // Aucune date limite : on efface `due`. Un patch ignore `null`, on fait donc
+      // un update complet (PUT) en omettant le champ `due`.
+      const cur = await tasksApi.tasks.get({ tasklist, task: taskId });
+      const merged = { ...cur.data, ...base };
+      delete merged.due;
+      const r = await tasksApi.tasks.update({ tasklist, task: taskId, requestBody: merged });
       return json({ ok: true, task: r.data });
     }
 

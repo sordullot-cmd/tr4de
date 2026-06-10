@@ -4,7 +4,7 @@ import React from "react";
 import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
-  Clock, MapPin, AlignLeft, Bell, ChevronDown, Target, HelpCircle,
+  Clock, MapPin, AlignLeft, Bell, ChevronDown, Target, HelpCircle, Repeat,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -152,6 +152,8 @@ function blankForm(day, startTime = "09:00", endTime = "10:00") {
     kind: "event", done: false,
     id: null, htmlLink: null, summary: "", allDay: false, date: dk, endDate: dk, startTime, endTime,
     dueDate: "", // date limite (tâche) : facultative, aucune par défaut
+    recur: { preset: "once" }, // récurrence : une seule fois par défaut
+    masterId: null, masterStart: null, // série (event récurrent) : renseignés à l'édition
     location: "", description: "", guests: "", addMeet: false, hadMeet: false,
     colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
   };
@@ -168,6 +170,7 @@ function formFromEvent(ev) {
     addMeet: !!ev.hangoutLink, hadMeet: !!ev.hangoutLink,
     transparency: ev.transparency || "opaque", visibility: ev.visibility || "default",
     reminder: reminderFromEvent(ev),
+    recur: { preset: "once" }, masterId: null, masterStart: null,
   };
   if (ev.allDay) {
     const startD = ev.start.slice(0, 10);
@@ -346,6 +349,95 @@ function monthYearLabel(view, cursor) {
   return `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
 }
 
+/* ─────────────── Récurrence (RRULE Google Agenda) ─────────────── */
+// Code RRULE du jour de la semaine, indexé sur weekdayIdx (0 = lundi).
+const RRULE_WEEKDAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+const WEEKDAY_OPTS = [
+  { code: "MO", label: "L" }, { code: "TU", label: "M" }, { code: "WE", label: "M" },
+  { code: "TH", label: "J" }, { code: "FR", label: "V" }, { code: "SA", label: "S" }, { code: "SU", label: "D" },
+];
+const RECUR_PRESETS = [
+  { id: "once", label: "Une seule fois" },
+  { id: "daily", label: "Tous les jours" },
+  { id: "everyOther", label: "Un jour sur deux" },
+  { id: "weekdays", label: "Tous les jours de la semaine" },
+  { id: "weekly", label: "Toutes les semaines" },
+  { id: "monthly", label: "Tous les mois" },
+  { id: "yearly", label: "Tous les ans" },
+  { id: "custom", label: "Personnaliser…" },
+];
+const FREQ_UNIT = { DAILY: "jour", WEEKLY: "semaine", MONTHLY: "mois", YEARLY: "an" };
+
+/** Construit la liste `recurrence` (RRULE) à envoyer à Google, depuis le form. */
+function buildRecurrence(form) {
+  const r = form.recur || { preset: "once" };
+  const dCode = (() => {
+    const d = new Date(`${form.date}T00:00:00`);
+    return isNaN(d.getTime()) ? "MO" : RRULE_WEEKDAYS[weekdayIdx(d)];
+  })();
+  switch (r.preset) {
+    case "once": return [];
+    case "daily": return ["RRULE:FREQ=DAILY"];
+    case "everyOther": return ["RRULE:FREQ=DAILY;INTERVAL=2"];
+    case "weekdays": return ["RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"];
+    case "weekly": return [`RRULE:FREQ=WEEKLY;BYDAY=${dCode}`];
+    case "monthly": return ["RRULE:FREQ=MONTHLY"];
+    case "yearly": return ["RRULE:FREQ=YEARLY"];
+    case "custom": {
+      const freq = r.freq || "WEEKLY";
+      const interval = Math.max(1, parseInt(r.interval, 10) || 1);
+      const parts = [`FREQ=${freq}`];
+      if (interval > 1) parts.push(`INTERVAL=${interval}`);
+      if (freq === "WEEKLY") {
+        const days = (r.byday && r.byday.length) ? r.byday : [dCode];
+        parts.push(`BYDAY=${days.join(",")}`);
+      }
+      if (r.end === "count" && r.count) parts.push(`COUNT=${Math.max(1, parseInt(r.count, 10) || 1)}`);
+      else if (r.end === "until" && r.until) parts.push(`UNTIL=${r.until.replace(/-/g, "")}T235959Z`);
+      return [`RRULE:${parts.join(";")}`];
+    }
+    default: return [];
+  }
+}
+
+/** Reconstruit la config du form (preset/custom) depuis une liste `recurrence`. */
+function parseRecurrence(recurrence) {
+  const rule = (recurrence || []).find((x) => typeof x === "string" && x.startsWith("RRULE:"));
+  if (!rule) return { preset: "once" };
+  const map = {};
+  rule.slice(6).split(";").forEach((kv) => { const [k, v] = kv.split("="); if (k) map[k] = v; });
+  const freq = map.FREQ;
+  const interval = parseInt(map.INTERVAL, 10) || 1;
+  const byday = map.BYDAY ? map.BYDAY.split(",") : [];
+  const finite = !!(map.COUNT || map.UNTIL);
+  if (!finite) {
+    if (freq === "DAILY" && interval === 1) return { preset: "daily" };
+    if (freq === "DAILY" && interval === 2) return { preset: "everyOther" };
+    if (freq === "WEEKLY" && interval === 1 && map.BYDAY === "MO,TU,WE,TH,FR") return { preset: "weekdays" };
+    if (freq === "WEEKLY" && interval === 1 && byday.length <= 1) return { preset: "weekly" };
+    if (freq === "MONTHLY" && interval === 1) return { preset: "monthly" };
+    if (freq === "YEARLY" && interval === 1) return { preset: "yearly" };
+  }
+  let end = "never", count = 10, until = "";
+  if (map.COUNT) { end = "count"; count = parseInt(map.COUNT, 10) || 1; }
+  else if (map.UNTIL) {
+    end = "until";
+    const m = /^(\d{4})(\d{2})(\d{2})/.exec(map.UNTIL);
+    if (m) until = `${m[1]}-${m[2]}-${m[3]}`;
+  }
+  return { preset: "custom", freq: freq || "WEEKLY", interval, byday, end, count, until };
+}
+
+/** Libellé court de la récurrence (pour le sous-titre et le bouton). */
+function recurrenceLabel(recur) {
+  const r = recur || { preset: "once" };
+  if (r.preset !== "custom") return (RECUR_PRESETS.find((p) => p.id === r.preset) || RECUR_PRESETS[0]).label;
+  const unit = FREQ_UNIT[r.freq] || "semaine";
+  const n = Math.max(1, parseInt(r.interval, 10) || 1);
+  const plural = n > 1 && unit !== "mois" ? "s" : "";
+  return n === 1 ? `Chaque ${unit}` : `Tous les ${n} ${unit}${plural}`;
+}
+
 /** Positionne les évènements horodatés d'un jour (clusters + colonnes). */
 function layoutDay(evts, day) {
   const dayStart = startOfDay(day);
@@ -408,7 +500,7 @@ export default function AgendaPage() {
   const isMobile = useIsMobile();
   const {
     ready, configured, connected, connect, disconnect,
-    fetchEvents, createEvent, updateEvent, deleteEvent, setEventDone,
+    fetchEvents, createEvent, updateEvent, deleteEvent, getEvent, setEventDone,
     fetchTasks, createTask, updateTask, toggleTask, deleteTask,
   } = useGoogleCalendar();
 
@@ -432,6 +524,7 @@ export default function AgendaPage() {
   const [overduePos, setOverduePos] = React.useState(null); // { top, left } du popover
   const [colorOpen, setColorOpen] = React.useState(false);
   const [remindOpen, setRemindOpen] = React.useState(false);
+  const [recurOpen, setRecurOpen] = React.useState(false);
   const [timeEdit, setTimeEdit] = React.useState(false);
   const dragRef = React.useRef(null);
   const [dragBox, setDragBox] = React.useState(null); // { dayKey, a, b } en minutes
@@ -446,17 +539,18 @@ export default function AgendaPage() {
   const [dragHover, setDragHover] = React.useState(false);
   const modalDragRef = React.useRef(null);
 
-  // Ferme les menus déroulants (couleur / notification) au clic en dehors.
+  // Ferme les menus déroulants (couleur / notification / récurrence) au clic en dehors.
   React.useEffect(() => {
-    if (!colorOpen && !remindOpen) return;
+    if (!colorOpen && !remindOpen && !recurOpen) return;
     const onDown = (e) => {
       if (e.target.closest?.("[data-menu-root]")) return;
       setColorOpen(false);
       setRemindOpen(false);
+      setRecurOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [colorOpen, remindOpen]);
+  }, [colorOpen, remindOpen, recurOpen]);
 
   // Focalise le titre à l'ouverture du formulaire SANS faire défiler la page.
   // `autoFocus` natif force un scrollIntoView qui remontait le conteneur en haut ;
@@ -600,11 +694,26 @@ export default function AgendaPage() {
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
-  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
+  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
   const openEdit = (item) => {
-    setModalError(null); setColorOpen(false); setRemindOpen(false); setTimeEdit(false);
+    setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false);
     setModal(item.isGTask ? formFromTaskItem(item, taskTimes) : formFromEvent(item));
+    // Évènement récurrent : la règle est portée par l'évènement maître (les
+    // occurrences sont dépliées). On la récupère en arrière-plan pour pré-remplir.
+    if (!item.isTask && item.recurringEventId) {
+      getEvent(item.recurringEventId)
+        .then((res) => {
+          const recur = parseRecurrence(res?.event?.recurrence);
+          setModal((m) => (m && m.id === item.id
+            ? { ...m, recur, masterId: item.recurringEventId, masterStart: res?.event?.start || null }
+            : m));
+        })
+        .catch(() => {});
+    }
   };
+
+  // Met à jour partiellement la config de récurrence du form.
+  const setRecur = (patch) => setModal((m) => ({ ...m, recur: { ...(m.recur || { preset: "once" }), ...patch } }));
 
   // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
   // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
@@ -807,8 +916,18 @@ export default function AgendaPage() {
         setModal(null);
         await loadTasks();
       } else {
-        const payload = payloadFromForm(modal);
-        if (modal.id) await updateEvent(modal.id, payload);
+        // Édition d'une série récurrente : on vise l'évènement maître et on recale
+        // le jour sur sa date d'origine (en conservant la nouvelle heure) afin de
+        // ne pas déplacer toute la série en éditant une occurrence.
+        let toSave = modal;
+        let targetId = modal.id;
+        if (modal.id && modal.masterId && modal.masterStart) {
+          targetId = modal.masterId;
+          const masterDate = String(modal.masterStart.dateTime || modal.masterStart.date || modal.date).slice(0, 10);
+          toSave = { ...modal, date: masterDate, endDate: masterDate };
+        }
+        const payload = { ...payloadFromForm(toSave), recurrence: buildRecurrence(toSave) };
+        if (targetId) await updateEvent(targetId, payload);
         else await createEvent(payload);
         setModal(null);
         await loadEvents();
@@ -1132,7 +1251,7 @@ export default function AgendaPage() {
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
                           backgroundColor: T.white, backgroundImage: `linear-gradient(${tint}, ${tint})`, borderLeft: `2px solid ${dispCol}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: active ? 6 : ev.isTask ? 3 : 1,
-                          boxShadow: active ? "0 4px 14px rgba(0,0,0,0.16)" : "none",
+                          boxShadow: active ? "0 4px 14px rgba(0,0,0,0.16)" : "0 1px 3px rgba(0,0,0,0.12)",
                           opacity: moving ? 0.92 : 1,
                           display: "flex", flexDirection: compact ? "row" : "column",
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
@@ -1413,7 +1532,7 @@ export default function AgendaPage() {
                           : `${modal.startTime} – ${modal.endTime}`}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · Une seule fois</div>
+                    <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · {modal.kind === "task" ? "Une seule fois" : recurrenceLabel(modal.recur)}</div>
                   </button>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1452,6 +1571,107 @@ export default function AgendaPage() {
                   </div>
                 )}
               </FormRow>
+
+              {/* Récurrence (évènements uniquement) */}
+              {modal.kind !== "task" && (
+                <FormRow icon={Repeat}>
+                  <div data-menu-root style={{ position: "relative" }}>
+                    <button type="button" onClick={() => { setRecurOpen((o) => !o); setColorOpen(false); setRemindOpen(false); }} style={pillBtn}>
+                      {recurrenceLabel(modal.recur)}
+                      <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
+                    </button>
+                    {recurOpen && (
+                      <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 5, minWidth: 240, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 10px 30px rgba(0,0,0,0.14)" }}>
+                        {RECUR_PRESETS.map((p) => {
+                          const selected = (modal.recur?.preset || "once") === p.id;
+                          return (
+                            <button key={p.id} type="button"
+                              onClick={() => {
+                                if (p.id === "custom") {
+                                  // Initialise une config personnalisée sensée si on n'en a pas déjà une.
+                                  setRecur(modal.recur?.preset === "custom" ? {} : { preset: "custom", freq: "WEEKLY", interval: 1, byday: [], end: "never", count: 10, until: "" });
+                                } else {
+                                  setRecur({ preset: p.id });
+                                  setRecurOpen(false);
+                                }
+                              }}
+                              onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = T.bg; }}
+                              onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+                              style={{ width: "100%", textAlign: "left", border: "none", borderRadius: 8, padding: "8px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, color: T.text, background: selected ? T.accentBg : "transparent", fontWeight: selected ? 600 : 400 }}>
+                              {p.label}
+                            </button>
+                          );
+                        })}
+
+                        {/* Panneau personnalisé */}
+                        {modal.recur?.preset === "custom" && (
+                          <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 6, paddingTop: 10, display: "flex", flexDirection: "column", gap: 12 }}>
+                            {/* Intervalle + fréquence */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 13, color: T.text }}>Tous les</span>
+                              <input type="number" min={1} value={modal.recur.interval ?? 1}
+                                onChange={(e) => setRecur({ interval: e.target.value })}
+                                style={{ width: 52, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", color: T.text, background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, outline: "none" }} />
+                              <select value={modal.recur.freq || "WEEKLY"} onChange={(e) => setRecur({ freq: e.target.value })}
+                                style={{ padding: "6px 8px", fontSize: 13, fontFamily: "inherit", color: T.text, background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, outline: "none", cursor: "pointer" }}>
+                                <option value="DAILY">jour(s)</option>
+                                <option value="WEEKLY">semaine(s)</option>
+                                <option value="MONTHLY">mois</option>
+                                <option value="YEARLY">an(s)</option>
+                              </select>
+                            </div>
+
+                            {/* Jours de la semaine (fréquence hebdomadaire) */}
+                            {(modal.recur.freq || "WEEKLY") === "WEEKLY" && (
+                              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                {WEEKDAY_OPTS.map((w) => {
+                                  const on = (modal.recur.byday || []).includes(w.code);
+                                  return (
+                                    <button key={w.code} type="button"
+                                      onClick={() => {
+                                        const set = new Set(modal.recur.byday || []);
+                                        if (set.has(w.code)) set.delete(w.code); else set.add(w.code);
+                                        setRecur({ byday: WEEKDAY_OPTS.filter((x) => set.has(x.code)).map((x) => x.code) });
+                                      }}
+                                      style={{
+                                        width: 30, height: 30, borderRadius: "50%", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
+                                        border: `1px solid ${on ? T.blue : T.border}`, background: on ? T.blue : T.white, color: on ? "#fff" : T.text,
+                                      }}>{w.label}</button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Condition de fin */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>Fin</span>
+                              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
+                                <input type="radio" name="recurEnd" checked={(modal.recur.end || "never") === "never"} onChange={() => setRecur({ end: "never" })} />
+                                Jamais
+                              </label>
+                              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
+                                <input type="radio" name="recurEnd" checked={modal.recur.end === "count"} onChange={() => setRecur({ end: "count" })} />
+                                Après
+                                <input type="number" min={1} value={modal.recur.count ?? 10} disabled={modal.recur.end !== "count"}
+                                  onChange={(e) => setRecur({ count: e.target.value })}
+                                  style={{ width: 52, padding: "4px 8px", fontSize: 13, fontFamily: "inherit", color: T.text, background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, outline: "none", opacity: modal.recur.end === "count" ? 1 : 0.5 }} />
+                                occurrences
+                              </label>
+                              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: T.text, cursor: "pointer" }}>
+                                <input type="radio" name="recurEnd" checked={modal.recur.end === "until"} onChange={() => setRecur({ end: "until", until: modal.recur.until || modal.date })} />
+                                Le
+                                {modal.recur.end === "until"
+                                  ? <DateField value={modal.recur.until || modal.date} min={modal.date} onChange={(v) => setRecur({ until: v })} />
+                                  : <span style={{ color: T.textMut }}>…</span>}
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </FormRow>
+              )}
 
               {/* Lieu (évènement) / Date limite (tâche) */}
               {modal.kind === "task" ? (

@@ -47,6 +47,7 @@ export async function POST(req) {
       start: ev.start?.dateTime || ev.start?.date || null,
       end: ev.end?.dateTime || ev.end?.date || null,
       status: ev.status || "confirmed",
+      recurringEventId: ev.recurringEventId || null,
       guests: (ev.attendees || []).map((a) => a.email).filter(Boolean),
       transparency: ev.transparency || "opaque",
       visibility: ev.visibility || "default",

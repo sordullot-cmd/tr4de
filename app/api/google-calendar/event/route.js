@@ -32,6 +32,15 @@ export async function POST(req) {
       return json({ ok: true });
     }
 
+    // Lecture d'un évènement (utilisé pour récupérer la règle de récurrence de la
+    // série, portée par l'évènement maître et non par les occurrences dépliées).
+    if (action === "get") {
+      if (!eventId) return json({ error: "no_event_id" }, 400);
+      const res = await cal.events.get({ calendarId: "primary", eventId });
+      const ev = res.data || {};
+      return json({ ok: true, event: { id: ev.id, recurrence: ev.recurrence || null, start: ev.start || null, end: ev.end || null } });
+    }
+
     // Bascule rapide "tâche terminée" sans réécrire le reste de l'évènement.
     if (action === "setDone") {
       if (!eventId) return json({ error: "no_event_id" }, 400);
@@ -59,6 +68,10 @@ export async function POST(req) {
           : { dateTime: event.end, timeZone: tz },
         attendees: Array.isArray(event.guests) && event.guests.length
           ? event.guests.map((email) => ({ email }))
+          : undefined,
+        // Récurrence (RRULE). Tableau vide = pas de récurrence / on efface la série.
+        recurrence: Array.isArray(event.recurrence)
+          ? (event.recurrence.length ? event.recurrence : (action === "update" ? [] : undefined))
           : undefined,
         // 'opaque' = Occupé · 'transparent' = Disponible
         transparency: event.transparency || undefined,
