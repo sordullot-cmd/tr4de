@@ -438,11 +438,10 @@ export default function App() {
       const start = earliest || new Date(today.getFullYear(), 0, 1);
       return { start: iso(start), end: iso(today) };
     }
-    // Trades / Journal : semaine en cours
-    const dow = today.getDay();
-    const monday = new Date(today); monday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow));
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    return { start: iso(monday), end: iso(sunday) };
+    // Trades / Journal : mois en cours (du 1er au dernier jour du mois)
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return { start: iso(firstOfMonth), end: iso(lastOfMonth) };
   };
   const [dateRangesByPage, setDateRangesByPage] = useState(() => {
     try {

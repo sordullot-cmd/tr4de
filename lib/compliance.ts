@@ -434,7 +434,7 @@ export function computeStats(
     const wd = d.getDay(); // 0=Dim
     wdCounts.set(wd, (wdCounts.get(wd) || 0) + 1);
   }
-  const wdNames = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  const wdNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
   const topWdEntry = [...wdCounts.entries()].sort((a, b) => b[1] - a[1])[0];
   const topWeekday = topWdEntry && topWdEntry[1] >= 2
     ? { weekday: wdNames[topWdEntry[0]], count: topWdEntry[1] }

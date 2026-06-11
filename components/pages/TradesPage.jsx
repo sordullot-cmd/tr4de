@@ -136,6 +136,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [checkedRules, setCheckedRules] = useState({});
   const [emotionTags, setEmotionTags] = useState({});
   const [errorTags, setErrorTags] = useState({});
+  // Réponses à la checklist Oui/Non par trade : { [tradeId]: { [questionId]: "yes" | "no" } }
+  const [tradeChecklist, setTradeChecklist] = useState({});
   const [loadedStrategies, setLoadedStrategies] = useState([]);
   const [activeTab, setActiveTab] = useState("infos");
 
@@ -207,6 +209,79 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     { id: "boredom", label: "Trade ennui", color: "#5B7EC9" },
     { id: "earlyexit", label: "Sortie anticipée", color: "#8B6BB6" }
   ];
+
+  // Questions de la checklist Oui/Non du panneau détail (remplace direction + horaires)
+  const checklistQuestions = [
+    { id: "plan", label: "Plan respecté ?" },
+    { id: "signal", label: "Entrée sur signal ?" },
+    { id: "sltp", label: "SL / TP placés ?" },
+    { id: "exitplan", label: "Sortie selon le plan ?" },
+  ];
+
+  // Coche une réponse de checklist et la propage aux trades enfants d'un groupe.
+  const setChecklistAnswer = (selectedTrade, questionId, answer) => {
+    const targets = childrenOf(selectedTrade);
+    setTradeChecklist((prev) => {
+      const updated = { ...prev };
+      for (const child of targets) {
+        const cid = child.id;
+        if (!cid) continue;
+        const cur = { ...(updated[cid] || {}) };
+        // Re-cliquer la réponse déjà active la retire (toggle)
+        if (cur[questionId] === answer) delete cur[questionId];
+        else cur[questionId] = answer;
+        updated[cid] = cur;
+      }
+      try { localStorage.setItem("tr4de_trade_checklist", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  // Bascule une émotion (multi-sélection) et propage aux trades enfants d'un groupe.
+  const toggleEmotion = (selectedTrade, tagId) => {
+    const tradeId = selectedTrade?.id;
+    if (!tradeId) return;
+    const targets = childrenOf(selectedTrade);
+    const isSelected = emotionTags[tradeId] && emotionTags[tradeId].includes(tagId);
+    const updated = { ...emotionTags };
+    for (const child of targets) {
+      const cid = child.id;
+      if (!cid) continue;
+      const cur = updated[cid] || [];
+      if (isSelected) {
+        updated[cid] = cur.filter((x) => x !== tagId);
+        removeEmotion(cid, tagId).catch((err) => console.error("❌ Remove emotion failed:", err?.message));
+      } else if (!cur.includes(tagId)) {
+        updated[cid] = [...cur, tagId];
+        addEmotion(cid, tagId).catch((err) => console.error("❌ Add emotion failed:", err?.message));
+      }
+    }
+    setEmotionTags(updated);
+    try { localStorage.setItem("tr4de_emotion_tags", JSON.stringify(updated)); } catch {}
+  };
+
+  // Bascule une erreur (multi-sélection) et propage aux trades enfants d'un groupe.
+  const toggleError = (selectedTrade, tagId) => {
+    const tradeId = selectedTrade?.id;
+    if (!tradeId) return;
+    const targets = childrenOf(selectedTrade);
+    const isSelected = errorTags[tradeId] && errorTags[tradeId].includes(tagId);
+    const updated = { ...errorTags };
+    for (const child of targets) {
+      const cid = child.id;
+      if (!cid) continue;
+      const cur = updated[cid] || [];
+      if (isSelected) {
+        updated[cid] = cur.filter((x) => x !== tagId);
+        removeError(cid, tagId).catch((err) => console.error("❌ Remove error failed:", err?.message));
+      } else if (!cur.includes(tagId)) {
+        updated[cid] = [...cur, tagId];
+        addError(cid, tagId).catch((err) => console.error("❌ Add error failed:", err?.message));
+      }
+    }
+    setErrorTags(updated);
+    try { localStorage.setItem("tr4de_error_tags", JSON.stringify(updated)); } catch {}
+  };
 
   const allErrorTags = [
     { id: "poorentry", label: "Mauvaise entrée", color: "#C94F4F" },
@@ -297,7 +372,12 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       if (savedErrorTags) {
         setErrorTags(JSON.parse(savedErrorTags));
       }
-      
+
+      const savedChecklist = localStorage.getItem("tr4de_trade_checklist");
+      if (savedChecklist) {
+        setTradeChecklist(JSON.parse(savedChecklist));
+      }
+
       // Reload checked rules - ONLY use valid boolean values
       const savedCheckedRules = localStorage.getItem("tr4de_checked_rules");
       if (savedCheckedRules) {
@@ -1118,35 +1198,33 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
               {/* INFOS TAB (NOTES) */}
               {activeTab === "infos" && (
                 <>
-                  {/* INFO ROW - DIRECTION */}
-                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.direction")}</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.direction==="Long"?T.green:T.red}}>{selectedTrade.direction}</div>
-                  </div>
-
-                  {/* INFO ROW - HEURE D'OUVERTURE */}
-                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.openTime")}</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
-                      const v = selectedTrade.entryTime || selectedTrade.entry_time;
-                      if (!v) return "—";
-                      if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
-                      const d = new Date(v);
-                      return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                    })()}</div>
-                  </div>
-
-                  {/* INFO ROW - HEURE DE FERMETURE */}
-                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>{t("trades.detail.closeTime")}</div>
-                    <div style={{fontSize:13,fontWeight:700,color:T.text}}>{(() => {
-                      const v = selectedTrade.exitTime || selectedTrade.exit_time;
-                      if (!v) return "—";
-                      if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
-                      const d = new Date(v);
-                      return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-                    })()}</div>
-                  </div>
+                  {/* CHECKLIST OUI/NON (remplace direction + horaires) */}
+                  {checklistQuestions.map((q) => {
+                    const ans = (tradeChecklist[selectedTrade.id] || {})[q.id];
+                    return (
+                      <div key={q.id} style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+                        <div style={{fontSize:13,fontWeight:500,color:T.text}}>{q.label}</div>
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          {[{v:"yes",label:"Oui",color:T.green},{v:"no",label:"Non",color:T.red}].map((opt)=>{
+                            const active = ans === opt.v;
+                            return (
+                              <button key={opt.v} onClick={()=>setChecklistAnswer(selectedTrade,q.id,opt.v)}
+                                style={{
+                                  padding:"5px 14px",borderRadius:999,
+                                  border:`1.5px solid ${active?opt.color:T.border}`,
+                                  background:active?`${opt.color}1A`:T.white,
+                                  color:active?opt.color:T.textMut,
+                                  fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+                                  transition:"all .15s ease",
+                                }}>
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   {/* INFO ROW - P&L */}
                   <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
@@ -1160,100 +1238,26 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
                   </div>
 
-                  {/* EMOTION TAGS */}
+                  {/* EMOTION TAGS — menu déroulant multi-sélection */}
                   <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.emotionTags")}</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {allEmotionTags.map(tag=>{
-                        const tradeId = selectedTrade.id;
-                        const targets = childrenOf(selectedTrade);
-                        const isSelected = emotionTags[tradeId] && emotionTags[tradeId].includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={()=>{
-                              if (!tradeId) return;
-                              const updated = { ...emotionTags };
-                              for (const child of targets) {
-                                const cid = child.id;
-                                if (!cid) continue;
-                                const cur = updated[cid] || [];
-                                if (isSelected) {
-                                  updated[cid] = cur.filter(t => t !== tag.id);
-                                  removeEmotion(cid, tag.id).catch(err => console.error("❌ Remove emotion failed:", err?.message));
-                                } else if (!cur.includes(tag.id)) {
-                                  updated[cid] = [...cur, tag.id];
-                                  addEmotion(cid, tag.id).catch(err => console.error("❌ Add emotion failed:", err?.message));
-                                }
-                              }
-                              setEmotionTags(updated);
-                              localStorage.setItem("tr4de_emotion_tags", JSON.stringify(updated));
-                            }}
-                            style={{
-                              padding:"6px 12px",
-                              border:`1.5px solid ${isSelected?tag.color:T.border}`,
-                              borderRadius:18,
-                              background:isSelected?`${tag.color}25`:T.white,
-                              color:isSelected?tag.color:T.textMut,
-                              fontSize:11,
-                              fontWeight:600,
-                              cursor:"pointer",
-                              transition:"all .2s"
-                            }}
-                          >
-                            {tag.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <TagMultiSelect
+                      placeholder={t("trades.detail.emotionTags")}
+                      allTags={allEmotionTags}
+                      selected={emotionTags[selectedTrade.id] || []}
+                      onToggle={(id)=>toggleEmotion(selectedTrade, id)}
+                    />
                   </div>
 
-                  {/* ERROR TAGS */}
+                  {/* ERROR TAGS — menu déroulant multi-sélection */}
                   <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`error-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.errors")}</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {allErrorTags.map(tag=>{
-                        const tradeId = selectedTrade.id;
-                        const targets = childrenOf(selectedTrade);
-                        const isSelected = errorTags[tradeId] && errorTags[tradeId].includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={()=>{
-                              if (!tradeId) return;
-                              const updated = { ...errorTags };
-                              for (const child of targets) {
-                                const cid = child.id;
-                                if (!cid) continue;
-                                const cur = updated[cid] || [];
-                                if (isSelected) {
-                                  updated[cid] = cur.filter(t => t !== tag.id);
-                                  removeError(cid, tag.id).catch(err => console.error("❌ Remove error failed:", err?.message));
-                                } else if (!cur.includes(tag.id)) {
-                                  updated[cid] = [...cur, tag.id];
-                                  addError(cid, tag.id).catch(err => console.error("❌ Add error failed:", err?.message));
-                                }
-                              }
-                              setErrorTags(updated);
-                              localStorage.setItem("tr4de_error_tags", JSON.stringify(updated));
-                            }}
-                            style={{
-                              padding:"6px 12px",
-                              border:`1.5px solid ${isSelected?tag.color:T.border}`,
-                              borderRadius:18,
-                              background:isSelected?`${tag.color}25`:T.white,
-                              color:isSelected?tag.color:T.textMut,
-                              fontSize:11,
-                              fontWeight:600,
-                              cursor:"pointer",
-                              transition:"all .2s"
-                            }}
-                          >
-                            {tag.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <TagMultiSelect
+                      placeholder={t("trades.detail.errors")}
+                      allTags={allErrorTags}
+                      selected={errorTags[selectedTrade.id] || []}
+                      onToggle={(id)=>toggleError(selectedTrade, id)}
+                    />
                   </div>
 
                   {/* SCREENSHOT — placé sous les tags d'erreurs */}
@@ -1795,6 +1799,53 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           </div>
         </div>,
         document.body
+      )}
+    </div>
+  );
+}
+
+/* Menu déroulant multi-sélection (émotions / erreurs) du panneau détail.
+   Affiche les tags choisis en pastilles dans le déclencheur ; le menu liste
+   tous les tags avec une case à cocher. Se ferme au clic en dehors. */
+function TagMultiSelect({ placeholder, allTags, selected, onToggle }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const chosen = allTags.filter((tg) => selected.includes(tg.id));
+  return (
+    <div ref={ref} style={{ position: "relative", fontFamily: "var(--font-sans)" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", border: `1px solid ${T.border}`, borderRadius: 10, background: T.white, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {chosen.length === 0
+            ? <span style={{ fontSize: 13, color: T.textMut }}>{placeholder}</span>
+            : chosen.map((tg) => (
+                <span key={tg.id} style={{ fontSize: 11, fontWeight: 600, color: tg.color, background: `${tg.color}1A`, border: `1px solid ${tg.color}55`, borderRadius: 999, padding: "2px 8px" }}>{tg.label}</span>
+              ))}
+        </div>
+        <LucideChevronDown size={15} strokeWidth={2} color={T.textMut} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 10px 30px rgba(0,0,0,0.14)", maxHeight: 260, overflowY: "auto" }}>
+          {allTags.map((tg) => {
+            const on = selected.includes(tg.id);
+            return (
+              <button key={tg.id} type="button" onClick={() => onToggle(tg.id)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", borderRadius: 8, background: on ? T.accentBg : "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = T.bg || "#FAFAFA"; }}
+                onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1.5px solid ${on ? tg.color : T.border}`, background: on ? tg.color : T.white, color: "#fff", fontSize: 11, lineHeight: 1 }}>{on ? "✓" : ""}</span>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: tg.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: T.text }}>{tg.label}</span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
