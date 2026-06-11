@@ -14,6 +14,7 @@ import {
   Target as LucideTarget,
   FileText as LucideFileText,
   Image as LucideImage,
+  Plus as LucidePlus,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -491,10 +492,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("journal.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
-        <div style={{background:T.white,border:`2px dashed ${T.accent}`,borderRadius:12,padding:"48px 24px",textAlign:"center"}}>
-          <div style={{fontSize:20,fontWeight:600,marginBottom:8,color:T.text}}>📥 Aucun trade importé</div>
-          <p style={{color:T.textSub,marginBottom:20}}>Importez vos trades pour commencer à analyser vos performances</p>
-          <button onClick={onImportClick} style={{padding:"12px 24px",borderRadius:8,background:T.accent,border:"none",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>{t("addTrade.importError")}</button>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"64px 40px",textAlign:"center",minHeight:"50vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
+          <div style={{width:48,height:48,borderRadius:12,background:T.accentBg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+            <LucideTrendingUp size={22} strokeWidth={1.75} color={T.text}/>
+          </div>
+          <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>{t("journal.empty")}</div>
+          <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>{t("journal.emptySub")}</div>
+          <button onClick={onImportClick} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:999,background:T.white,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",border:`1px solid ${T.text}`,fontFamily:"var(--font-sans)"}}>
+            <LucidePlus size={14} strokeWidth={2}/> {t("trades.importBtn").replace(/^\+\s*/, "")}
+          </button>
         </div>
       </div>
     );

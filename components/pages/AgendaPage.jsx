@@ -548,8 +548,8 @@ export default function AgendaPage() {
       setRemindOpen(false);
       setRecurOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
   }, [colorOpen, remindOpen, recurOpen]);
 
   // Focalise le titre à l'ouverture du formulaire SANS faire défiler la page.
@@ -715,18 +715,49 @@ export default function AgendaPage() {
   // Met à jour partiellement la config de récurrence du form.
   const setRecur = (patch) => setModal((m) => ({ ...m, recur: { ...(m.recur || { preset: "once" }), ...patch } }));
 
-  // Click & drag dans le time-grid : on dessine une plage horaire puis on ouvre
-  // le modal de création pré-rempli. Un simple clic crée un évènement d'1 h.
+  // Création dans le time-grid. Souris : clic-glissé pour tracer une plage (un
+  // simple clic crée 1 h). Tactile/stylet : un tap crée un évènement d'1 h à
+  // l'horaire touché — on ne trace pas, pour ne pas bloquer le défilement vertical.
   const startDrag = (e, d) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     const columnTop = e.currentTarget.getBoundingClientRect().top;
     const snap = (clientY) => {
       const raw = ((clientY - columnTop) / HOUR_H) * 60;
       return Math.max(0, Math.min(24 * 60, Math.round(raw / 15) * 15));
     };
-    const startMin = snap(e.clientY);
     const dk = dateKey(d);
+    const openAt = (lo, hi) => {
+      if (hi - lo < 15) hi = Math.min(24 * 60, lo + 60); // tap / simple clic → 1 h
+      const st = `${pad(Math.floor(lo / 60))}:${pad(lo % 60)}`;
+      const et = `${pad(Math.floor(hi / 60) % 24)}:${pad(hi % 60)}`;
+      openCreate(d, st, et);
+    };
+
+    // Tactile/stylet : tap = création ; un défilement annule (pointercancel) ou
+    // se reconnaît à un déplacement notable du doigt.
+    if (e.pointerType !== "mouse") {
+      const downX = e.clientX, downY = e.clientY;
+      let aborted = false;
+      const cleanup = () => {
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+      };
+      const onCancel = () => { aborted = true; cleanup(); };
+      const onUp = (ev) => {
+        cleanup();
+        if (aborted) return;
+        if (Math.abs(ev.clientY - downY) > 10 || Math.abs(ev.clientX - downX) > 10) return; // défilement
+        const lo = snap(ev.clientY);
+        openAt(lo, lo);
+      };
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+      return;
+    }
+
+    // Souris : tracé d'une plage horaire.
+    e.preventDefault();
+    const startMin = snap(e.clientY);
     dragRef.current = { startMin, endMin: startMin + 15 };
     setDragBox({ dayKey: dk, a: startMin, b: startMin + 15 });
 
@@ -736,32 +767,28 @@ export default function AgendaPage() {
       setDragBox({ dayKey: dk, a: dragRef.current.startMin, b: cur });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
       const cur = dragRef.current;
       dragRef.current = null;
       setDragBox(null);
       if (!cur) return;
-      let lo = Math.min(cur.startMin, cur.endMin);
-      let hi = Math.max(cur.startMin, cur.endMin);
-      if (hi - lo < 15) hi = Math.min(24 * 60, lo + 60); // simple clic → 1 h
-      const st = `${pad(Math.floor(lo / 60))}:${pad(lo % 60)}`;
-      const et = `${pad(Math.floor(hi / 60) % 24)}:${pad(hi % 60)}`;
-      openCreate(d, st, et);
+      openAt(Math.min(cur.startMin, cur.endMin), Math.max(cur.startMin, cur.endMin));
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
 
   // Redimensionnement d'un évènement par ses bords (façon Google Agenda) :
   // on glisse le bord haut (modifie l'heure de début) ou bas (heure de fin),
   // par pas de 15 min, puis on enregistre la nouvelle plage.
   const startResize = (e, ev, d, edge) => {
-    if (e.button !== 0) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const colEl = e.currentTarget.closest("[data-daycol]");
     if (!colEl) return;
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
     const columnTop = colEl.getBoundingClientRect().top;
     const dk = dateKey(d);
     const snap = (clientY) => {
@@ -781,8 +808,8 @@ export default function AgendaPage() {
       setResizeBox({ id: ev.id, dayKey: dk, startMin: st.startMin, endMin: st.endMin });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
       const st = resizeRef.current;
       resizeRef.current = null;
       setResizeBox(null);
@@ -790,8 +817,8 @@ export default function AgendaPage() {
       if (st.startMin === init.startMin && st.endMin === init.endMin) return; // aucun changement
       applyResize(st.ev, d, st.startMin, st.endMin);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   };
 
   // Applique la nouvelle plage horaire (MAJ optimiste puis appel API).
@@ -820,7 +847,7 @@ export default function AgendaPage() {
   // saisit le bloc et on le glisse vers une autre heure (pas de 15 min) et/ou un
   // autre jour. Un simple clic (sans déplacement) ouvre l'édition.
   const startMove = (e, ev, d) => {
-    if (e.button !== 0) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
     const colEl = e.currentTarget.closest("[data-daycol]");
     if (!colEl) return;
@@ -830,12 +857,14 @@ export default function AgendaPage() {
     const grabOffset = ((e.clientY - columnTop) / HOUR_H) * 60 - ev.startMin;
     const startDk = dateKey(d);
     const startX = e.clientX, startY = e.clientY;
+    // Seuil de déclenchement plus élevé au doigt (tremblement du tap).
+    const threshold = e.pointerType === "mouse" ? 4 : 8;
     let moved = false;
     let last = { dayKey: startDk, startMin: ev.startMin, endMin: ev.endMin };
     moveRef.current = { id: ev.id, ev };
 
     const onMove = (m) => {
-      if (!moved && Math.abs(m.clientY - startY) < 4 && Math.abs(m.clientX - startX) < 4) return;
+      if (!moved && Math.abs(m.clientY - startY) < threshold && Math.abs(m.clientX - startX) < threshold) return;
       moved = true;
       const rawStart = ((m.clientY - columnTop) / HOUR_H) * 60 - grabOffset;
       let startMin = Math.round(rawStart / 15) * 15;
@@ -850,16 +879,18 @@ export default function AgendaPage() {
       setMoveBox({ id: ev.id, ev, dayKey, startMin, endMin });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       moveRef.current = null;
       setMoveBox(null);
-      if (!moved) { openEdit(ev); return; }                 // simple clic → édition
+      if (!moved) { openEdit(ev); return; }                 // simple tap / clic → édition
       if (last.dayKey === startDk && last.startMin === ev.startMin && last.endMin === ev.endMin) return;
       applyMove(ev, last.dayKey, last.startMin, last.endMin);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   // Applique la nouvelle position (jour + plage horaire) : MAJ optimiste puis API.
@@ -960,6 +991,7 @@ export default function AgendaPage() {
       }
     } catch (e) {
       if (e?.message === "insufficient_scope") { setModal(null); setError("insufficient_scope"); }
+      else if (e?.message === "refresh_unavailable") setModalError("Connexion à Google indisponible, réessaie dans un instant.");
       else setModalError(e?.message || "Erreur de suppression");
     } finally {
       setSaving(false);
@@ -1181,7 +1213,7 @@ export default function AgendaPage() {
               const isToday = sameDay(d, today);
               const isPastDay = startOfDay(d) < today;
               return (
-                <div key={di} data-daycol="" data-daykey={dk} onMouseDown={(e) => startDrag(e, d)} title="Glisser pour créer un évènement" style={{
+                <div key={di} data-daycol="" data-daykey={dk} onPointerDown={(e) => startDrag(e, d)} title="Glisser (ou toucher) pour créer un évènement" style={{
                   flex: 1, position: "relative", minWidth: 0, cursor: "pointer", userSelect: "none",
                   borderLeft: daysCount > 1 && di > 0 ? `1px solid ${T.border}` : "none",
                   backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${HOUR_H - 1}px, ${T.border} ${HOUR_H - 1}px, ${T.border} ${HOUR_H}px)`,
@@ -1238,16 +1270,16 @@ export default function AgendaPage() {
                     // Poignées de redimensionnement (évènements horaires uniquement).
                     const resizable = !ev.isTask;
                     const handleStyle = (pos) => ({
-                      position: "absolute", left: 0, right: 0, [pos]: 0, height: 8,
-                      cursor: "ns-resize", zIndex: 2,
+                      position: "absolute", left: 0, right: 0, [pos]: 0, height: isMobile ? 14 : 8,
+                      cursor: "ns-resize", zIndex: 2, touchAction: "none",
                     });
                     return (
                       <div key={ev.id}
-                        onMouseDown={(e) => { e.stopPropagation(); startMove(e, ev, d); }}
+                        onPointerDown={(e) => { e.stopPropagation(); startMove(e, ev, d); }}
                         onClick={(e) => e.stopPropagation()}
                         title={`${timeLbl} ${ev.summary}`}
                         style={{
-                          position: "absolute", top, height, cursor: moving ? "grabbing" : "grab",
+                          position: "absolute", top, height, cursor: moving ? "grabbing" : "grab", touchAction: "none",
                           left: `calc(${left}% + 2px)`, width: `calc(${w}% - 4px)`,
                           backgroundColor: T.white, backgroundImage: `linear-gradient(${tint}, ${tint})`, borderLeft: `2px solid ${dispCol}`, borderRadius: 5,
                           padding: "2px 5px", overflow: "hidden", zIndex: active ? 6 : ev.isTask ? 3 : 1,
@@ -1257,7 +1289,7 @@ export default function AgendaPage() {
                           alignItems: compact ? "baseline" : "stretch", gap: compact ? 5 : 0,
                         }}>
                         {resizable && (
-                          <div onMouseDown={(e) => startResize(e, ev, d, "top")} onClick={(e) => e.stopPropagation()} style={handleStyle("top")} />
+                          <div onPointerDown={(e) => startResize(e, ev, d, "top")} onClick={(e) => e.stopPropagation()} style={handleStyle("top")} />
                         )}
                         <span style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, flex: compact ? 1 : "none" }}>
                           {ev.isTask && <TaskCircle done={ev.done} onToggle={(e) => { e.stopPropagation(); onToggleDone(ev); }} />}
@@ -1267,7 +1299,7 @@ export default function AgendaPage() {
                           ? <span style={{ fontSize: 9.5, color: txtCol, flexShrink: 0, whiteSpace: "nowrap", opacity: 0.8 }}>{timeLbl}</span>
                           : (height > 28 && <span style={{ fontSize: 9.5, color: txtCol, opacity: 0.8 }}>{timeLbl}</span>)}
                         {resizable && (
-                          <div onMouseDown={(e) => startResize(e, ev, d, "bottom")} onClick={(e) => e.stopPropagation()} style={handleStyle("bottom")} />
+                          <div onPointerDown={(e) => startResize(e, ev, d, "bottom")} onClick={(e) => e.stopPropagation()} style={handleStyle("bottom")} />
                         )}
                       </div>
                     );
@@ -1469,12 +1501,20 @@ export default function AgendaPage() {
             <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
               onMouseEnter={() => setDragHover(true)} onMouseLeave={() => setDragHover(false)}
               style={{
+                position: "relative",
                 display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, padding: "4px 10px",
                 cursor: modalDragging ? "grabbing" : "grab", userSelect: "none",
                 borderTopLeftRadius: 12, borderTopRightRadius: 12,
                 background: (dragHover || modalDragging) ? "rgba(0,0,0,0.035)" : "transparent",
                 transition: "background-color 120ms ease",
               }}>
+              {/* Poignée de déplacement (barre grise centrée) */}
+              <div style={{
+                position: "absolute", left: "50%", top: 6, transform: "translateX(-50%)",
+                width: 40, height: 4, borderRadius: 999,
+                background: (dragHover || modalDragging) ? T.textMut : T.border,
+                transition: "background-color 120ms ease",
+              }} />
               {modal.id && (
                 <button onMouseDown={(e) => e.stopPropagation()} onClick={removeModal} disabled={saving} aria-label="Supprimer" title="Supprimer" style={topIconBtn}
                   onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.red; }}
@@ -1873,7 +1913,7 @@ function TaskRowChip({ item, onToggle, onOpen, overdue = false }) {
 /* ─────────────── Rond de complétion d'une tâche-évènement ─────────────── */
 function TaskCircle({ done, onToggle, size = 13 }) {
   return (
-    <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={onToggle}
+    <button type="button" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onClick={onToggle}
       aria-label={done ? "Marquer non terminée" : "Marquer terminée"} title="Terminer la tâche"
       style={{
         width: size, height: size, borderRadius: "50%", flexShrink: 0, cursor: "pointer", padding: 0,

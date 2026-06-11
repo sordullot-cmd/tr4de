@@ -79,7 +79,14 @@ export async function POST(req) {
     }
 
     if (action === "delete") {
-      await tasksApi.tasks.delete({ tasklist, task: taskId });
+      try {
+        await tasksApi.tasks.delete({ tasklist, task: taskId });
+      } catch (err) {
+        // Déjà supprimée / introuvable côté Google : l'objectif est atteint.
+        const code = err?.code || err?.response?.status;
+        if (code === 404 || code === 410) return json({ ok: true });
+        throw err;
+      }
       return json({ ok: true });
     }
 

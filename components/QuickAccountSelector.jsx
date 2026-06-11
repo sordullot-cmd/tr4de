@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
-import { ChevronDown, ChevronUp, Search, Check, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Check, Plus, Pencil, Trash2, X } from "lucide-react";
 import { t, useLang } from "@/lib/i18n";
 
 // Map id (lowercase) → chemin du logo. Utilisé pour afficher l'icône à gauche
@@ -59,6 +59,10 @@ export default function QuickAccountSelector({
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState("");
+  // Compte en attente de confirmation de suppression (confirmation inline,
+  // fiable partout — window.confirm peut être bloqué en PWA / standalone).
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const supabase = createClient();
   const containerRef = useRef(null);
 
@@ -88,12 +92,18 @@ export default function QuickAccountSelector({
     return () => window.removeEventListener("tr4de:accounts-changed", onAccountsChanged);
   }, [user?.id, accountsProp]);
 
+  // Réinitialise les états transitoires quand le dropdown se ferme.
+  useEffect(() => {
+    if (!open) { setConfirmingId(null); setEditingId(null); }
+  }, [open]);
+
   // Click outside
   useEffect(() => {
     const onClick = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setOpen(false);
         setEditingId(null);
+        setConfirmingId(null);
       }
     };
     document.addEventListener("mousedown", onClick);
@@ -190,23 +200,32 @@ export default function QuickAccountSelector({
 
   // Supprime un compte + ses trades associés (irréversible). Nettoie la
   // sélection, met à jour l'état local et notifie les autres vues.
+  // La confirmation est gérée en amont (UI inline), pas via window.confirm.
   const deleteAccount = async (acc) => {
     if (!acc?.id) return;
-    const ok = typeof window !== "undefined"
-      ? window.confirm(`Supprimer le compte « ${acc.name} » et tous ses trades ?\nCette action est irréversible.`)
-      : true;
-    if (!ok) return;
+    setDeletingId(acc.id);
     try {
       const uid = user?.id;
-      // Supprimer d'abord les trades liés au compte
-      await supabase.from("apex_trades").delete().eq("account_id", acc.id).eq("user_id", uid);
+      // Supprimer d'abord les trades liés au compte (sinon la contrainte de clé
+      // étrangère empêche la suppression du compte).
+      const { error: tradesError } = await supabase
+        .from("apex_trades").delete().eq("account_id", acc.id).eq("user_id", uid);
+      if (tradesError) {
+        console.error("delete trades failed:", tradesError.message);
+        if (typeof window !== "undefined") window.alert("Échec de la suppression des trades du compte : " + tradesError.message);
+        return;
+      }
       // Puis le compte
       const { error } = await supabase
         .from("trading_accounts")
         .delete()
         .eq("id", acc.id)
         .eq("user_id", uid);
-      if (error) { console.error("delete account failed:", error.message); return; }
+      if (error) {
+        console.error("delete account failed:", error.message);
+        if (typeof window !== "undefined") window.alert("Échec de la suppression du compte : " + error.message);
+        return;
+      }
 
       // Retirer le compte de la sélection
       if (multi && onAccountNamesChange) {
@@ -220,7 +239,13 @@ export default function QuickAccountSelector({
       if (onAccountDeleted) onAccountDeleted(acc.id);
       try { window.dispatchEvent(new CustomEvent("tr4de:accounts-changed")); } catch {}
       try { window.dispatchEvent(new CustomEvent("tr4de:trades-imported", { detail: { count: 0 } })); } catch {}
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      if (typeof window !== "undefined") window.alert("Erreur lors de la suppression : " + (e?.message || e));
+    } finally {
+      setDeletingId(null);
+      setConfirmingId(null);
+    }
   };
 
   const borderColor = T.border || "#E5E5E5";
@@ -403,41 +428,78 @@ export default function QuickAccountSelector({
                       </span>
                     )}
                   </button>
-                  {!isEditing && (
-                    <span
-                      data-hover
-                      role="button"
-                      title={t("accounts.rename")}
-                      onClick={(e)=>{ e.stopPropagation(); setEditingId(acc.id); setEditDraft(acc.name); }}
-                      style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        width: 22, height: 22, borderRadius: 4, cursor: "pointer",
-                        color: "#8E8E8E", opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
-                      }}
-                      onMouseEnter={(e)=>{e.currentTarget.style.background = "#E5E5E5"; e.currentTarget.style.color = "#0D0D0D"}}
-                      onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
-                    >
-                      <Pencil size={12} strokeWidth={1.75}/>
-                    </span>
+                  {/* Confirmation inline de suppression (✓ / ✕). Remplace les
+                      icônes habituelles pour la ligne concernée. */}
+                  {confirmingId === acc.id && !isEditing ? (
+                    <>
+                      <span style={{ fontSize: 11, color: "#DC2626", fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {t("accounts.deleteTip")} ?
+                      </span>
+                      <span
+                        role="button"
+                        title={t("accounts.confirmDelete")}
+                        onClick={(e)=>{ e.stopPropagation(); if (deletingId !== acc.id) deleteAccount(acc); }}
+                        style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                          background: "#FEE2E2", color: "#DC2626",
+                          opacity: deletingId === acc.id ? 0.5 : 1,
+                        }}
+                      >
+                        <Check size={13} strokeWidth={2.25}/>
+                      </span>
+                      <span
+                        role="button"
+                        title={t("accounts.cancelDelete")}
+                        onClick={(e)=>{ e.stopPropagation(); setConfirmingId(null); }}
+                        style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                          background: "#F0F0F0", color: "#5C5C5C",
+                        }}
+                      >
+                        <X size={13} strokeWidth={2.25}/>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {!isEditing && (
+                        <span
+                          data-hover
+                          role="button"
+                          title={t("accounts.rename")}
+                          onClick={(e)=>{ e.stopPropagation(); setEditingId(acc.id); setEditDraft(acc.name); }}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                            color: "#8E8E8E", opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
+                          }}
+                          onMouseEnter={(e)=>{e.currentTarget.style.background = "#E5E5E5"; e.currentTarget.style.color = "#0D0D0D"}}
+                          onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
+                        >
+                          <Pencil size={12} strokeWidth={1.75}/>
+                        </span>
+                      )}
+                      {allowDelete && !isEditing && (
+                        <span
+                          data-hover
+                          role="button"
+                          title={t("accounts.deleteTip")}
+                          onClick={(e)=>{ e.stopPropagation(); setConfirmingId(acc.id); }}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                            color: "#8E8E8E", opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
+                          }}
+                          onMouseEnter={(e)=>{e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.color = "#DC2626"}}
+                          onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
+                        >
+                          <Trash2 size={12} strokeWidth={1.75}/>
+                        </span>
+                      )}
+                      {isSelected && !isEditing && <Check size={14} color="#0D0D0D"/>}
+                    </>
                   )}
-                  {allowDelete && !isEditing && (
-                    <span
-                      data-hover
-                      role="button"
-                      title={t("accounts.deleteTip")}
-                      onClick={(e)=>{ e.stopPropagation(); deleteAccount(acc); }}
-                      style={{
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        width: 22, height: 22, borderRadius: 4, cursor: "pointer",
-                        color: "#8E8E8E", opacity: 0, transition: "opacity .15s ease, background .12s ease, color .12s ease",
-                      }}
-                      onMouseEnter={(e)=>{e.currentTarget.style.background = "#FEE2E2"; e.currentTarget.style.color = "#DC2626"}}
-                      onMouseLeave={(e)=>{e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8E8E8E"}}
-                    >
-                      <Trash2 size={12} strokeWidth={1.75}/>
-                    </span>
-                  )}
-                  {isSelected && !isEditing && <Check size={14} color="#0D0D0D"/>}
                 </div>
               );
             })}

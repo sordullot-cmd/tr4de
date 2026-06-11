@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { T } from "@/lib/ui/tokens";
+import { NavArrow, NavLabel } from "@/components/ui/DateNav";
 import { t, useLang } from "@/lib/i18n";
 import { getCurrencySymbol } from "@/lib/userPrefs";
 
@@ -358,7 +359,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }} className="anim-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, animation: "none" }} className="anim-1">
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: "#0D0D0D", margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("cal.title")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
@@ -366,13 +367,9 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
       {renderMonthDetail()}
 
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, fontFamily: "var(--font-sans)" }}>
-        <button onClick={() => setYear(year - 1)} aria-label={t("cal.prevYear")} style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-          <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>‹</span>
-        </button>
-        <div style={{ fontSize: 15, fontWeight: 600, color: T.text, minWidth: 48, textAlign: "center" }}>{year}</div>
-        <button onClick={() => setYear(year + 1)} aria-label={t("cal.nextYear")} style={{ padding: 6, borderRadius: 8, background: "transparent", border: "none", cursor: "pointer", color: T.textSub, display: "inline-flex", alignItems: "center", transition: "background .12s ease" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#F0F0F0"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-          <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1 }}>›</span>
-        </button>
+        <NavArrow direction="left" onClick={() => setYear(year - 1)} title={t("cal.prevYear")} />
+        <NavLabel>{year}</NavLabel>
+        <NavArrow direction="right" onClick={() => setYear(year + 1)} title={t("cal.nextYear")} />
       </div>
 
       {trades.length === 0 && (

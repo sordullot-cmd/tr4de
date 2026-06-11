@@ -804,7 +804,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.name")}</label>
                 <input type="text" value={formData.name} onChange={(e)=>setFormData({...formData,name:e.target.value})} placeholder={t("strat.namePh")}
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",fontFamily:"inherit",color:T.text,background:T.white}}
-                  onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
+                  />
               </div>
 
               {/* Description */}
@@ -812,7 +812,7 @@ export default function StrategyPage({ setPage = () => {}, setSelectedStrategyId
                 <label style={{display:"block",fontSize:12,fontWeight:500,marginBottom:6,color:T.textSub}}>{t("strat.description")}</label>
                 <textarea value={formData.description} onChange={(e)=>setFormData({...formData,description:e.target.value})} placeholder={t("strat.descPh")}
                   style={{width:"100%",padding:"9px 12px",border:`1px solid ${T.border}`,borderRadius:8,fontSize:13,outline:"none",resize:"vertical",minHeight:64,fontFamily:"inherit",color:T.text,background:T.white,lineHeight:1.5}}
-                  onFocus={(e)=>{e.currentTarget.style.borderColor=T.text}} onBlur={(e)=>{e.currentTarget.style.borderColor=T.border}}/>
+                  />
               </div>
 
               {/* Couleur */}

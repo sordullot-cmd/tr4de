@@ -7,8 +7,10 @@ import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
 import { useIsMobile } from "@/lib/hooks/useBreakpoint";
+import { TimeField } from "./AgendaDateFields";
+import { NavArrow, NavLabel } from "@/components/ui/DateNav";
 import {
-  ChevronLeft, ChevronRight, Plus, Check, Trash2,
+  Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
   StickyNote, ChevronDown,
   // Icônes pour les habitudes
@@ -44,6 +46,47 @@ const T = {
   accent: "#0D0D0D", accentBg: "#F0F0F0",
   green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
 };
+
+/* ─────────────── Helpers de style du formulaire (alignés sur l'Agenda) ─────────────── */
+// Ligne de formulaire : icône à gauche + contenu, comme la fiche d'événement du calendrier.
+function FormRow({ icon: Icon, children, top = false, iconColor }) {
+  return (
+    <div style={{ display: "flex", gap: 18, alignItems: top ? "flex-start" : "center", padding: "6px 0", minHeight: 42 }}>
+      <div style={{ width: 24, flexShrink: 0, display: "flex", justifyContent: "center", paddingTop: top ? 8 : 0 }}>
+        <Icon size={20} strokeWidth={1.9} color={iconColor || T.textMut} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    </div>
+  );
+}
+// Champ texte sans bordure (souligné par la ligne, pas de boîte).
+const rowInp = { width: "100%", border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: T.text, padding: "5px 0", boxSizing: "border-box" };
+// Bouton icône discret de la barre du haut du modal (fermer).
+const topIconBtn = {
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  width: 28, height: 28, borderRadius: "50%", border: "none", background: "transparent",
+  color: T.textMut, cursor: "pointer", fontFamily: "inherit",
+  transition: "background-color 120ms ease, color 120ms ease",
+};
+// Bouton « pilule » moderne.
+const pillBtn = {
+  display: "inline-flex", alignItems: "center", gap: 8,
+  padding: "8px 14px", borderRadius: 999,
+  border: `1px solid ${T.border}`, background: T.white, color: T.text,
+  fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+};
+const ghostBtn = () => ({
+  display: "inline-flex", alignItems: "center",
+  padding: "7px 14px", height: 34, borderRadius: 999,
+  border: `1px solid ${T.border}`, background: T.white, color: T.text,
+  fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+});
+const primaryBtn = (small = false) => ({
+  display: "inline-flex", alignItems: "center",
+  padding: small ? "7px 14px" : "10px 20px", height: small ? 34 : undefined, borderRadius: 999,
+  border: `1px solid ${T.text}`, background: T.text, color: "#fff",
+  fontSize: small ? 13 : 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+});
 
 const STORAGE_PLANNER = "tr4de_daily_planner";
 const STORAGE_HABITS = "tr4de_habits";
@@ -313,8 +356,34 @@ export default function DailyPlannerPage() {
   const [editingHabitId, setEditingHabitId] = useState(null);
   const emptyHabit = { name: "", description: "", time: "", location: "", icon: "" };
   const [habitDraft, setHabitDraft] = useState(emptyHabit);
-  const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setHabitFormOpen(true); };
-  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "", icon: h.icon || "" }); setEditingHabitId(h.id); setHabitFormOpen(true); };
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  // Glisser-déposer du formulaire (comme le calendrier)
+  const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
+  const [modalDragging, setModalDragging] = useState(false);
+  const [dragHover, setDragHover] = useState(false);
+  const modalDragRef = React.useRef(null);
+  const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setDragHover(false); setHabitFormOpen(true); };
+  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "", icon: h.icon || "" }); setEditingHabitId(h.id); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setDragHover(false); setHabitFormOpen(true); };
+  const startModalDrag = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const start = { mx: e.clientX, my: e.clientY, x: modalPos.x, y: modalPos.y };
+    modalDragRef.current = start;
+    setModalDragging(true);
+    const onMove = (ev) => {
+      const st = modalDragRef.current;
+      if (!st) return;
+      setModalPos({ x: st.x + (ev.clientX - st.mx), y: st.y + (ev.clientY - st.my) });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      modalDragRef.current = null;
+      setModalDragging(false);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const saveHabit = () => {
     const nm = habitDraft.name.trim();
     if (!nm) return;
@@ -325,19 +394,10 @@ export default function DailyPlannerPage() {
     } else {
       setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey }]);
     }
-    setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null);
+    setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false);
   };
-  const closeHabitForm = () => { setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); };
-
-  // Goals (sans limite)
-  const [newGoal, setNewGoal] = useState("");
-  const addGoal = () => {
-    if (!newGoal.trim()) return;
-    updateDay({ goals: [...(day.goals || []), { id: Date.now(), text: newGoal.trim(), done: false }] });
-    setNewGoal("");
-  };
-  const toggleGoal = (id) => updateDay({ goals: (day.goals || []).map(g => g.id === id ? { ...g, done: !g.done } : g) });
-  const removeGoal = (id) => updateDay({ goals: (day.goals || []).filter(g => g.id !== id) });
+  const closeHabitForm = () => { setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false); };
+  const deleteHabitFromForm = () => { if (editingHabitId != null) removeHabit(editingHabitId); closeHabitForm(); };
 
   const shiftDay = (delta) => {
     const d = new Date(dateKey + "T00:00:00");
@@ -364,8 +424,8 @@ export default function DailyPlannerPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
-      {/* Header : titre */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* Header : titre + navigation entre les jours */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>{t("nav.dailyPlanner")}</h1>
         <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
       </div>
@@ -376,7 +436,18 @@ export default function DailyPlannerPage() {
       {/* Habitudes du jour */}
       <div style={isMobile ? { alignSelf: "center", width: "100%", maxWidth: 480 } : undefined}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Habitudes du jour</h2>
+            {(() => {
+              const parts = fmtDateParts(dateKey);
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <NavArrow direction="left" onClick={() => shiftDay(-1)} title="Jour précédent" />
+                  <NavLabel onClick={() => setDateKey(todayKey())} title="Revenir à aujourd'hui" minWidth={0}>
+                    {parts.weekday} {parts.day} {parts.month}
+                  </NavLabel>
+                  <NavArrow direction="right" onClick={() => shiftDay(1)} title="Jour suivant" />
+                </div>
+              );
+            })()}
             <div style={{ flex: 1, height: 1, background: T.border }} />
             <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
               {habits.filter(h => habitHistory[h.id]?.[dateKey]).length}/{habits.length}
@@ -405,113 +476,127 @@ export default function DailyPlannerPage() {
                 onKeyDown={(e) => { if (e.key === "Escape") closeHabitForm(); if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveHabit(); }}
                 style={{
                   background: T.white,
-                  borderRadius: 14,
+                  borderRadius: 12,
                   padding: 0,
-                  width: "min(520px, 96vw)",
+                  width: "100%", maxWidth: 540,
                   maxHeight: "92vh",
                   overflow: "auto",
-                  boxShadow: "0 24px 60px rgba(0,0,0,0.18)",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
                   fontFamily: "var(--font-sans)",
                   display: "flex", flexDirection: "column",
+                  transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
                 }}
               >
-                {/* Header */}
-                <div style={{ padding: "20px 24px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
-                      {editingHabitId ? "Modifier l'habitude" : "Nouvelle habitude"}
-                    </div>
-                    <div style={{ fontSize: 11, color: T.textMut, marginTop: 2 }}>
-                      Une habitude, une heure, un lieu — précis = tenu.
-                    </div>
+                {/* Barre du haut = poignée de déplacement (grise au survol) + boutons */}
+                <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
+                  onMouseEnter={() => setDragHover(true)} onMouseLeave={() => setDragHover(false)}
+                  style={{
+                    position: "relative",
+                    padding: "10px 16px 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2,
+                    cursor: modalDragging ? "grabbing" : "grab", userSelect: "none",
+                    borderTopLeftRadius: 12, borderTopRightRadius: 12,
+                    background: (dragHover || modalDragging) ? "rgba(0,0,0,0.035)" : "transparent",
+                    transition: "background-color 120ms ease",
+                  }}>
+                  {/* Poignée de déplacement (barre grise centrée) */}
+                  <div style={{
+                    position: "absolute", left: "50%", top: 7, transform: "translateX(-50%)",
+                    width: 40, height: 4, borderRadius: 999,
+                    background: (dragHover || modalDragging) ? T.textMut : T.border,
+                    transition: "background-color 120ms ease",
+                  }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                    {editingHabitId != null && (
+                      <button onMouseDown={(e) => e.stopPropagation()} onClick={deleteHabitFromForm} aria-label="Supprimer" title="Supprimer" style={topIconBtn}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.red; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                        <Trash2 size={15} strokeWidth={1.9} />
+                      </button>
+                    )}
+                    <button onMouseDown={(e) => e.stopPropagation()} onClick={closeHabitForm} aria-label="Fermer" title="Fermer" style={topIconBtn}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                      <X size={16} strokeWidth={1.9} />
+                    </button>
                   </div>
-                  <button onClick={closeHabitForm} aria-label="Fermer"
-                    style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; e.currentTarget.style.color = T.text; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
-                    <X size={16} strokeWidth={1.75} />
-                  </button>
                 </div>
 
-                {/* Body */}
-                <div style={{ padding: "8px 24px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* Nom */}
+                {/* Corps : champs encadrés (ancien) + détails Calendar */}
+                <div style={{ padding: "16px 24px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Nom — ligne soulignée (sans rectangle ni label) */}
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "block", marginBottom: 6 }}>Nom de l'habitude</label>
                     <input type="text" value={habitDraft.name} onChange={(e) => setHabitDraft({ ...habitDraft, name: e.target.value })}
-                      placeholder="ex. Méditer 10 min" autoFocus
-                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, transition: "border-color .15s ease" }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = T.text}
-                      onBlur={(e) => e.currentTarget.style.borderColor = T.border}
-                    />
+                      placeholder="Nom de l'habitude" autoFocus
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px 2px", border: "none", borderBottom: `2px solid ${T.border}`, borderRadius: 0, fontSize: 16, fontWeight: 500, outline: "none", fontFamily: "inherit", color: T.text, background: "transparent" }} />
                   </div>
 
-                  {/* Icône */}
+                  {/* Icône — sélecteur en menu déroulant (style Calendar) */}
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span>Icône <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel</span></span>
-                      {habitDraft.icon && (
-                        <button type="button" onClick={() => setHabitDraft({ ...habitDraft, icon: "" })}
-                          style={{ background: "transparent", border: "none", color: T.textMut, fontSize: 11, cursor: "pointer", padding: 0 }}>
-                          Auto
-                        </button>
-                      )}
+                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "block", marginBottom: 6 }}>
+                      Icône <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel</span>
                     </label>
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(34px, 1fr))",
-                      gap: 6,
-                      maxHeight: 168,
-                      overflowY: "auto",
-                      padding: 8,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 10,
-                      background: T.white,
-                    }}>
-                      {(() => {
-                        const previewName = habitDraft.name?.trim() || "";
-                        const AutoIco = autoIcon(previewName);
-                        const isAuto = !habitDraft.icon;
-                        return (
-                          <button type="button" onClick={() => setHabitDraft({ ...habitDraft, icon: "" })}
-                            title="Auto (selon le nom)"
-                            style={{
-                              width: "100%", aspectRatio: "1 / 1",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 8,
-                              border: `1px solid ${isAuto ? T.text : T.border}`,
-                              background: isAuto ? T.text : T.white,
-                              color: isAuto ? "#fff" : T.text,
-                              cursor: "pointer", padding: 0,
-                              position: "relative",
-                            }}>
-                            <AutoIco size={15} strokeWidth={1.75} />
-                            <span style={{ position: "absolute", bottom: -2, right: -2, fontSize: 8, background: isAuto ? "#fff" : T.text, color: isAuto ? T.text : "#fff", borderRadius: 6, padding: "1px 3px", lineHeight: 1, fontWeight: 600 }}>A</span>
-                          </button>
-                        );
-                      })()}
-                      {Object.entries(ICON_LIBRARY).map(([key, IconCmp]) => {
-                        const selected = habitDraft.icon === key;
-                        return (
-                          <button key={key} type="button"
-                            onClick={() => setHabitDraft({ ...habitDraft, icon: key })}
-                            title={key}
-                            style={{
-                              width: "100%", aspectRatio: "1 / 1",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              borderRadius: 8,
-                              border: `1px solid ${selected ? T.text : T.border}`,
-                              background: selected ? T.text : T.white,
-                              color: selected ? "#fff" : T.text,
-                              cursor: "pointer", padding: 0,
-                              transition: "background .12s ease, border-color .12s ease",
-                            }}
-                            onMouseEnter={(e) => { if (!selected) { e.currentTarget.style.background = T.bg; } }}
-                            onMouseLeave={(e) => { if (!selected) { e.currentTarget.style.background = T.white; } }}>
-                            <IconCmp size={15} strokeWidth={1.75} />
-                          </button>
-                        );
-                      })}
+                    <div data-menu-root style={{ position: "relative" }}>
+                      <button type="button" onClick={() => setIconPickerOpen((o) => !o)} style={pillBtn}>
+                        {(() => {
+                          const PreviewIco = habitDraft.icon && ICON_LIBRARY[habitDraft.icon] ? ICON_LIBRARY[habitDraft.icon] : autoIcon(habitDraft.name?.trim() || "");
+                          return <PreviewIco size={16} strokeWidth={1.9} color={T.text} />;
+                        })()}
+                        {habitDraft.icon ? "Icône choisie" : "Icône · auto"}
+                        <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
+                      </button>
+                      {iconPickerOpen && (
+                        <>
+                          {/* Capte le clic en dehors pour refermer le sélecteur */}
+                          <div onClick={() => setIconPickerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 4 }} />
+                          <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 5, width: "100%", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.14)" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(34px, 1fr))", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+                              {(() => {
+                                const previewName = habitDraft.name?.trim() || "";
+                                const AutoIco = autoIcon(previewName);
+                                const isAuto = !habitDraft.icon;
+                                return (
+                                  <button type="button" onClick={() => { setHabitDraft({ ...habitDraft, icon: "" }); setIconPickerOpen(false); }}
+                                    title="Auto (selon le nom)"
+                                    style={{
+                                      width: "100%", aspectRatio: "1 / 1",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      borderRadius: 8,
+                                      border: `1px solid ${isAuto ? T.text : T.border}`,
+                                      background: isAuto ? T.text : T.white,
+                                      color: isAuto ? "#fff" : T.text,
+                                      cursor: "pointer", padding: 0, position: "relative",
+                                    }}>
+                                    <AutoIco size={15} strokeWidth={1.75} />
+                                    <span style={{ position: "absolute", bottom: -2, right: -2, fontSize: 8, background: isAuto ? "#fff" : T.text, color: isAuto ? T.text : "#fff", borderRadius: 6, padding: "1px 3px", lineHeight: 1, fontWeight: 600 }}>A</span>
+                                  </button>
+                                );
+                              })()}
+                              {Object.entries(ICON_LIBRARY).map(([key, IconCmp]) => {
+                                const selected = habitDraft.icon === key;
+                                return (
+                                  <button key={key} type="button"
+                                    onClick={() => { setHabitDraft({ ...habitDraft, icon: key }); setIconPickerOpen(false); }}
+                                    title={key}
+                                    style={{
+                                      width: "100%", aspectRatio: "1 / 1",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      borderRadius: 8,
+                                      border: `1px solid ${selected ? T.text : T.border}`,
+                                      background: selected ? T.text : T.white,
+                                      color: selected ? "#fff" : T.text,
+                                      cursor: "pointer", padding: 0,
+                                      transition: "background .12s ease, border-color .12s ease",
+                                    }}
+                                    onMouseEnter={(e) => { if (!selected) { e.currentTarget.style.background = T.bg; } }}
+                                    onMouseLeave={(e) => { if (!selected) { e.currentTarget.style.background = T.white; } }}>
+                                    <IconCmp size={15} strokeWidth={1.75} />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -521,8 +606,9 @@ export default function DailyPlannerPage() {
                       <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
                         <Clock size={11} strokeWidth={1.75} /> Heure
                       </label>
-                      <input type="time" value={habitDraft.time} onChange={(e) => setHabitDraft({ ...habitDraft, time: e.target.value })}
-                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                      <TimeField value={habitDraft.time} onChange={(v) => setHabitDraft({ ...habitDraft, time: v })}
+                        placeholder="Choisir l'heure"
+                        triggerStyle={{ width: "100%", boxSizing: "border-box", padding: "8px 14px", border: `1px solid ${T.border}`, borderRadius: 999, fontSize: 13, color: T.text, background: T.white, justifyContent: "space-between" }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
@@ -530,7 +616,7 @@ export default function DailyPlannerPage() {
                       </label>
                       <input type="text" value={habitDraft.location} onChange={(e) => setHabitDraft({ ...habitDraft, location: e.target.value })}
                         placeholder="ex. Bureau, salon…"
-                        style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
+                        style={{ width: "100%", boxSizing: "border-box", padding: "8px 14px", border: `1px solid ${T.border}`, borderRadius: 999, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white }} />
                     </div>
                   </div>
 
@@ -546,20 +632,13 @@ export default function DailyPlannerPage() {
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div style={{ padding: "12px 24px 20px", display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.textMut }}>
-                    <kbd style={{ fontSize: 10, padding: "1px 5px", border: `1px solid ${T.border}`, borderRadius: 4, color: T.textSub, fontFamily: "var(--font-mono, ui-monospace), monospace" }}>Esc</kbd> pour fermer
-                  </span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={closeHabitForm} style={{ padding: "0 16px", height: 36, background: T.white, color: T.text, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                      Annuler
-                    </button>
-                    <button onClick={saveHabit} disabled={!habitDraft.name?.trim()}
-                      style={{ padding: "0 18px", height: 36, background: habitDraft.name?.trim() ? T.text : T.border2, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: habitDraft.name?.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", opacity: habitDraft.name?.trim() ? 1 : 0.7 }}>
-                      {editingHabitId ? "Enregistrer" : "Ajouter l'habitude"}
-                    </button>
-                  </div>
+                {/* Pied */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "14px 24px", borderTop: `1px solid ${T.border}` }}>
+                  <button onClick={closeHabitForm} style={ghostBtn()}>Annuler</button>
+                  <button onClick={saveHabit} disabled={!habitDraft.name?.trim()}
+                    style={{ ...primaryBtn(true), opacity: habitDraft.name?.trim() ? 1 : 0.5, cursor: habitDraft.name?.trim() ? "pointer" : "not-allowed" }}>
+                    {editingHabitId ? "Enregistrer" : "Ajouter"}
+                  </button>
                 </div>
               </div>
             </div>,
@@ -696,71 +775,6 @@ export default function DailyPlannerPage() {
           )}
         </div>
 
-        {/* Objectifs du jour — colonne gauche, sous les Habitudes */}
-        {(() => {
-          const goals = day.goals || [];
-          const goalsDone = goals.filter(g => g.done).length;
-          const updateGoalText = (id, text) => updateDay({ goals: goals.map(g => g.id === id ? { ...g, text } : g) });
-          const addEmptyGoal = () => updateDay({ goals: [...goals, { id: Date.now() + Math.floor(Math.random() * 1000), text: "", done: false }] });
-          return (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "0 16px" }}>
-                <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Objectifs du jour</h2>
-                <div style={{ flex: 1, height: 1, background: T.border }} />
-                <span style={{ fontSize: 11, color: T.textMut, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-                  {goalsDone}/{goals.length}
-                </span>
-                <button onClick={addEmptyGoal} title="Ajouter un objectif"
-                  style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.text}`, background: T.text, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", marginRight: 64 }}>
-                  <Plus size={13} strokeWidth={2} />
-                </button>
-              </div>
-
-              <div style={{ padding: "0 16px 0 28px", display: "flex", flexDirection: "column", gap: 2 }}>
-                {goals.map((g) => (
-                  <div key={g.id}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", borderRadius: 6 }}
-                    onMouseEnter={(e) => { const btn = e.currentTarget.querySelector("[data-goal-del]"); if (btn) btn.style.opacity = "1"; }}
-                    onMouseLeave={(e) => { const btn = e.currentTarget.querySelector("[data-goal-del]"); if (btn) btn.style.opacity = "0"; }}>
-                    <button onClick={() => toggleGoal(g.id)}
-                      style={{
-                        width: 14, height: 14, borderRadius: 4,
-                        border: g.done ? "none" : `1.5px solid ${T.border2 || "#D4D4D4"}`,
-                        background: g.done ? T.green : T.white,
-                        cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, padding: 0, transition: "all .15s ease",
-                      }}>
-                      {g.done && <Check size={9} strokeWidth={3} color="#fff" />}
-                    </button>
-                    <input
-                      value={g.text}
-                      onChange={(e) => updateGoalText(g.id, e.target.value)}
-                      placeholder="Sans titre"
-                      autoFocus={!g.text}
-                      style={{
-                        flex: 1, minWidth: 0, padding: "2px 4px",
-                        border: "none", outline: "none", background: "transparent",
-                        fontSize: 13, color: g.done ? T.textMut : T.text,
-                        textDecoration: g.done ? "line-through" : "none", fontFamily: "inherit",
-                      }} />
-                    <button data-goal-del onClick={() => removeGoal(g.id)}
-                      style={{
-                        width: 22, height: 22, borderRadius: 5, border: "none",
-                        background: "transparent", color: T.textMut, cursor: "pointer",
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, opacity: 0, transition: "opacity .15s ease, color .12s ease, background .12s ease",
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = T.red; e.currentTarget.style.background = "#FEF2F2"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; e.currentTarget.style.background = "transparent"; }}>
-                      <Trash2 size={11} strokeWidth={1.75} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
         </div>
       </div>
 
@@ -860,7 +874,11 @@ function HabitsChart({ habits, history }) {
           onMouseMove={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
-            const ratio = rect.width > 0 ? x / rect.width : 0;
+            // Le SVG est étiré (preserveAspectRatio="none") : on convertit la
+            // position souris en coordonnées du viewBox, puis le long de la zone
+            // réellement tracée [padL, padL+chartW] (padR est réservé à l'axe Y).
+            const vbX = rect.width > 0 ? (x / rect.width) * VB_W : 0;
+            const ratio = chartW > 0 ? (vbX - padL) / chartW : 0;
             const idx = Math.max(0, Math.min(points.length - 1, Math.round(ratio * (points.length - 1))));
             setHoverIdx(idx);
           }}
@@ -983,9 +1001,6 @@ function DailyStatCell({ label, value, subLabel, color }) {
   );
 }
 
-function iconBtn() {
-  return { width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.border}`, background: T.white, color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
-}
 function Row({ done, text, onToggle, onDelete, accent }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>

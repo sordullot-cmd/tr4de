@@ -637,14 +637,8 @@ input:not([type="checkbox"]):not([type="radio"]):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
-  /* Plus d'anneau rectangulaire au focus — seule la bordure du champ se
-     renforce légèrement pour indiquer le focus. */
-  border-color: var(--color-text, #0D0D0D) !important;
-}
-:root[data-theme="dark"] input:focus-visible,
-:root[data-theme="dark"] textarea:focus-visible,
-:root[data-theme="dark"] select:focus-visible {
-  border-color: #C8C8C8 !important;
+  /* Pas d'anneau ni d'assombrissement de bordure au focus : la bordure
+     conserve la couleur définie par le champ (demande utilisateur). */
 }
 
 /* === Liens (<a>) : transition couleur fluide === */

@@ -426,8 +426,8 @@ export default function App() {
   const iso = (d) => d.toISOString().split("T")[0];
   const defaultDateRange = (pageId) => {
     const today = new Date();
-    // Dashboard / Stratégies : tout depuis le premier trade
-    if (pageId === "dashboard" || pageId === "strategies" || pageId === "calendar" || pageId === "discipline") {
+    // Dashboard / Stratégies / Agent IA : tout depuis le premier trade
+    if (pageId === "dashboard" || pageId === "strategies" || pageId === "calendar" || pageId === "discipline" || pageId === "agent") {
       const earliest = (trades || []).reduce((min, t) => {
         try {
           const d = new Date(t.date);
@@ -704,6 +704,7 @@ export default function App() {
         { id: "add-trade",  icon: LucideUpload,       label: t("nav.addTrade") },
         { id: "dashboard",  icon: LayoutDashboard,    label: t("nav.dashboard") },
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
+        { id: "notes",      icon: LucideFileText,     label: t("nav.notes") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
@@ -724,7 +725,6 @@ export default function App() {
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
-        { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
       ],
     },
   ];

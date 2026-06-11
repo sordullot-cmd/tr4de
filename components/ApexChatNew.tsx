@@ -240,7 +240,7 @@ export default function ApexChatNew({
       id: cleanString(t?.id),
       pnl: Number(t?.pnl) || 0,
       setup_name: cleanString(t?.setup_name || "Unknown"),
-      entry_time: cleanString(t?.entry_time || new Date().toISOString()),
+      entry_time: cleanString(t?.entry_time || t?.date || new Date().toISOString()),
       quantity: Number(t?.quantity) || 0,
       symbol: cleanString(t?.symbol || ""),
       direction: cleanString(t?.direction || ""),
@@ -391,7 +391,8 @@ export default function ApexChatNew({
         day: "numeric",
       });
       const tradesToday = trades.filter((t: any) => {
-        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        const raw = t?.entry_time || t?.date;
+        const d = raw ? new Date(raw) : null;
         return d && !Number.isNaN(d.getTime()) && d.toLocaleDateString("fr-FR") === todayStr;
       });
       finalText = buildDailyAnalysisPrompt(dateStr, tradesToday);
@@ -407,7 +408,8 @@ export default function ApexChatNew({
       weekEnd.setHours(23, 59, 59, 999);
 
       const tradesThisWeek = trades.filter((t: any) => {
-        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        const raw = t?.entry_time || t?.date;
+        const d = raw ? new Date(raw) : null;
         return d && !Number.isNaN(d.getTime()) && d >= weekStart && d <= weekEnd;
       });
 
@@ -415,16 +417,16 @@ export default function ApexChatNew({
       finalText = buildWeeklyAnalysisPrompt(dateRange, tradesThisWeek);
     } else if (text === PROMPT_FREE) {
       const validTrades = trades.filter((t: any) => {
-        const d = t?.entry_time ? new Date(t.entry_time) : null;
+        const raw = t?.entry_time || t?.date;
+        const d = raw ? new Date(raw) : null;
         return d && !Number.isNaN(d.getTime());
       });
       let periodLabel = "Historique complet";
       if (validTrades.length) {
-        const sorted = [...validTrades].sort(
-          (a: any, b: any) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime()
-        );
-        const first = new Date(sorted[0].entry_time).toLocaleDateString("fr-FR");
-        const last = new Date(sorted[sorted.length - 1].entry_time).toLocaleDateString("fr-FR");
+        const tradeTime = (t: any) => new Date(t?.entry_time || t?.date).getTime();
+        const sorted = [...validTrades].sort((a: any, b: any) => tradeTime(a) - tradeTime(b));
+        const first = new Date(sorted[0].entry_time || sorted[0].date).toLocaleDateString("fr-FR");
+        const last = new Date(sorted[sorted.length - 1].entry_time || sorted[sorted.length - 1].date).toLocaleDateString("fr-FR");
         periodLabel = `${first} → ${last}`;
       }
       finalText = buildFreeAnalysisPrompt(periodLabel, validTrades, dailyNotes);

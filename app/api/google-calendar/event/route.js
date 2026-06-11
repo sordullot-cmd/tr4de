@@ -28,7 +28,14 @@ export async function POST(req) {
 
     if (action === "delete") {
       if (!eventId) return json({ error: "no_event_id" }, 400);
-      await cal.events.delete({ calendarId: "primary", eventId });
+      try {
+        await cal.events.delete({ calendarId: "primary", eventId });
+      } catch (err) {
+        // Déjà supprimé / introuvable côté Google : l'objectif est atteint.
+        const code = err?.code || err?.response?.status;
+        if (code === 404 || code === 410) return json({ ok: true });
+        throw err;
+      }
       return json({ ok: true });
     }
 

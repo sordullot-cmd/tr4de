@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Download } from "lucide-react";
+import { Download, BookOpen } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
@@ -387,9 +387,12 @@ export default function JournalPage({ trades = [] }) {
           })}
         </div>
       ) : (
-        <div style={{ background: T.white, border: `2px dashed ${T.border}`, borderRadius: 12, padding: "40px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: T.text }}>{t("journal.empty")}</div>
-          <p style={{ color: T.textSub }}>{t("journal.emptySub")}</p>
+        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "40px 40px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: T.accentBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+            <BookOpen size={22} strokeWidth={1.75} color={T.text} />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 6, letterSpacing: -0.1 }}>{t("journal.empty")}</div>
+          <div style={{ fontSize: 13, color: T.textSub, maxWidth: 380, lineHeight: 1.5 }}>{t("journal.emptySub")}</div>
         </div>
       )}
     </div>

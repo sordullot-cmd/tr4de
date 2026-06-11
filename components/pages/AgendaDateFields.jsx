@@ -53,8 +53,8 @@ export function DateField({ value, min, onChange }) {
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
   const today = startOfDay(new Date());
@@ -119,7 +119,7 @@ export function DateField({ value, min, onChange }) {
 }
 
 /* ─────────────── Champ heure : déclencheur + liste maison ─────────────── */
-export function TimeField({ value, onChange }) {
+export function TimeField({ value, onChange, placeholder = "", triggerStyle }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   const listRef = React.useRef(null);
@@ -127,8 +127,8 @@ export function TimeField({ value, onChange }) {
   React.useEffect(() => {
     if (!open) return;
     const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
   // À l'ouverture, fait défiler la liste jusqu'à l'heure sélectionnée.
@@ -142,10 +142,10 @@ export function TimeField({ value, onChange }) {
   const slots = Array.from({ length: 96 }, (_, i) => `${pad(Math.floor(i / 4))}:${pad((i % 4) * 15)}`);
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={triggerBtn}>
-        {value}
-        <ChevronDown size={14} color={T.textMut} style={{ marginLeft: 2 }} />
+    <div ref={ref} style={{ position: "relative", display: triggerStyle ? "block" : "inline-block" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={{ ...triggerBtn, ...triggerStyle }}>
+        <span style={{ color: value ? T.text : T.textMut }}>{value || placeholder}</span>
+        <ChevronDown size={14} color={T.textMut} style={{ marginLeft: triggerStyle ? "auto" : 2 }} />
       </button>
       {open && (
         <div ref={listRef} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 12px 32px rgba(0,0,0,0.16)", width: 110, maxHeight: 240, overflowY: "auto" }}>

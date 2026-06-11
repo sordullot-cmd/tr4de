@@ -88,7 +88,8 @@ export function buildWeeklyAnalysisPrompt(
   // Regrouper par jour pour le résumé attendu par le prompt
   const byDay = new Map<string, any[]>();
   trades.forEach((t) => {
-    const d = t?.entry_time ? new Date(t.entry_time) : null;
+    const raw = t?.entry_time || t?.date;
+    const d = raw ? new Date(raw) : null;
     if (!d || Number.isNaN(d.getTime())) return;
     const key = d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit" });
     if (!byDay.has(key)) byDay.set(key, []);

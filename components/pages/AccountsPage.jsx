@@ -278,13 +278,15 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
 
       {/* Liste des comptes */}
       {visibleAccounts.length === 0 ? (
-        <div style={{
-          border: `1px dashed ${T.border2}`, borderRadius: 12, padding: 40,
-          textAlign: "center", background: T.surface,
-        }}>
-          <p style={{ margin: 0, color: T.textSub, fontSize: 14 }}>
-            {t("accountsPage.empty")}
-          </p>
+        <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "40px 40px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: T.accentBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+            <Wallet size={22} strokeWidth={1.75} color={T.text} />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 6, letterSpacing: -0.1 }}>{t("accountsPage.empty")}</div>
+          <div style={{ fontSize: 13, color: T.textSub, marginBottom: 20, maxWidth: 380, lineHeight: 1.5 }}>{t("accountsPage.emptySub")}</div>
+          <button onClick={() => setPage?.("add-trade")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", border: `1px solid ${T.text}`, fontFamily: "var(--font-sans)" }}>
+            <Plus size={14} strokeWidth={2} /> {t("accountsPage.newAccount")}
+          </button>
         </div>
       ) : (
         <div className="anim-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>

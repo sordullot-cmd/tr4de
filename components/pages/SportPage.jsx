@@ -7,7 +7,7 @@ import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import {
   Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight,
   TrendingUp, Trophy, Flame, Calendar, Clock,
-  Dumbbell, Activity, Bike, Footprints, Heart,
+  Dumbbell, BicepsFlexed, Bike, Footprints, Heart,
   Star, EyeOff, Save, BookOpen, GripVertical,
 } from "lucide-react";
 import { t, useLang } from "@/lib/i18n";
@@ -23,8 +23,8 @@ const T = {
 /* ─── Constantes ──────────────────────────────────────────────────── */
 
 const DISCIPLINES = [
-  { id: "musculation",  label: "Musculation",  Icon: Dumbbell,   color: "#0D0D0D" },
-  { id: "calisthenics", label: "Callisthénie", Icon: Activity,   color: "#3B82F6" },
+  { id: "musculation",  label: "Musculation",  Icon: Dumbbell,      color: "#F97316" },
+  { id: "calisthenics", label: "Callisthénie", Icon: BicepsFlexed,  color: "#3B82F6" },
   { id: "cardio",       label: "Cardio",       Icon: Bike,       color: "#16A34A" },
 ];
 
@@ -403,7 +403,7 @@ export default function SportPage() {
       </div>
 
       {/* KPIs — carte fusionnée */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
           <KpiCell label="Séances cette semaine" value={String(stats.sessionsThisWeek)} sub={`${stats.total} au total`} />
           <KpiCell label="Streak" value={`${stats.streak} j`} sub={stats.streak >= 2 ? "Garde le rythme" : "Lance ta série"} valueColor={stats.streak >= 2 ? T.amber : undefined}
@@ -442,7 +442,7 @@ export default function SportPage() {
           <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Historique des séances</h2>
           {filteredSessions.length === 0 ? (
             <div style={{
-              border: `1px dashed ${T.border}`, borderRadius: 12, padding: 28,
+              border: `1px dashed ${T.border}`, borderRadius: 16, padding: 28,
               textAlign: "center", background: T.white, color: T.textMut, fontSize: 13,
             }}>
               Aucune séance pour le moment. Crée ta première séance pour commencer à suivre ta progression.
@@ -475,7 +475,7 @@ export default function SportPage() {
                   value={chartExerciseName}
                   onChange={(e) => setChartExerciseName(e.target.value)}
                   style={{
-                    padding: "3px 8px", borderRadius: 6,
+                    padding: "3px 12px", borderRadius: 999,
                     border: `1px solid ${T.border}`, background: T.white,
                     fontSize: 11, color: T.text, fontFamily: "inherit", cursor: "pointer",
                     maxWidth: 160,
@@ -499,6 +499,7 @@ export default function SportPage() {
       {showForm && typeof document !== "undefined" && ReactDOM.createPortal(
         <SessionForm
           form={form} setForm={setForm} editingId={editingId} onClose={close} onSave={save}
+          onDelete={() => { if (editingId) { remove(editingId); close(); } }}
           customExercises={customExercises} setCustomExercises={setCustomExercises}
           hiddenExercises={hiddenExercises} setHiddenExercises={setHiddenExercises}
           favoriteExercises={favoriteExercises} setFavoriteExercises={setFavoriteExercises}
@@ -589,7 +590,7 @@ function SessionCard({ session: s, onEdit, onDelete }) {
 
   return (
     <div data-card style={{
-      background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+      background: T.white, border: `1px solid ${T.border}`, borderRadius: 16,
       overflow: "hidden",
     }}>
       <div
@@ -680,7 +681,7 @@ function SessionCard({ session: s, onEdit, onDelete }) {
             );
           })}
           {s.notes && (
-            <div style={{ marginTop: 10, padding: "8px 10px", background: T.bg, borderRadius: 6, fontSize: 11, color: T.textSub, fontStyle: "italic", lineHeight: 1.45 }}>
+            <div style={{ marginTop: 10, padding: "8px 10px", background: T.bg, borderRadius: 10, fontSize: 11, color: T.textSub, fontStyle: "italic", lineHeight: 1.45 }}>
               {s.notes}
             </div>
           )}
@@ -702,7 +703,7 @@ function iconBtn() {
 /* ─── Carte des records personnels ──────────────────────────────── */
 function PRsCard({ prs }) {
   return (
-    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" }}>
       {prs.length === 0 ? (
         <div style={{ padding: "24px 18px", textAlign: "center", color: T.textMut, fontSize: 12 }}>
           Aucun PR. Logge tes séries avec charges pour voir tes records.
@@ -754,7 +755,7 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
     : "";
 
   return (
-    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" }}>
       {data.length === 0 ? (
         <div style={{ padding: "32px 18px", textAlign: "center", color: T.textMut, fontSize: 12 }}>
           {allExerciseNames.length === 0
@@ -786,11 +787,37 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
 }
 
 /* ─── Modal du formulaire de séance ─────────────────────────────── */
-function SessionForm({ form, setForm, editingId, onClose, onSave, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises, customPresets = [], setCustomPresets }) {
+function SessionForm({ form, setForm, editingId, onClose, onSave, onDelete, customExercises, setCustomExercises, hiddenExercises, setHiddenExercises, favoriteExercises, setFavoriteExercises, customPresets = [], setCustomPresets }) {
   const [showPresets, setShowPresets] = useState(false);
   const [presetNamePrompt, setPresetNamePrompt] = useState(null); // null | string
   const [draggedExId, setDraggedExId] = useState(null);
   const [dragOverExId, setDragOverExId] = useState(null);
+
+  // Déplacement de la modale : on attrape l'en-tête et on la glisse librement
+  // à l'écran (comme une fenêtre), façon agenda.
+  const [winPos, setWinPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragRef = React.useRef(null);
+  const startWindowDrag = (e) => {
+    // Ne pas démarrer si on clique sur un bouton (ex. fermer).
+    if (e.target.closest("button")) return;
+    e.preventDefault();
+    setDragging(true);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: winPos.x, baseY: winPos.y };
+    const onMove = (ev) => {
+      const d = dragRef.current;
+      if (!d) return;
+      setWinPos({ x: d.baseX + (ev.clientX - d.startX), y: d.baseY + (ev.clientY - d.startY) });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      setDragging(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const allPresets = useMemo(
     () => (customPresets || []).map(p => ({ ...p, custom: true })),
@@ -909,17 +936,30 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
     <div {...backdropDismiss(onClose)}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
-        style={{ width: "min(640px, 100%)", maxHeight: "min(88vh, 820px)", display: "flex", flexDirection: "column", background: T.white, borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
-        {/* Header */}
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
-            {editingId ? "Modifier la séance" : "Nouvelle séance"}
-          </div>
-          <button onClick={onClose} aria-label="Fermer"
-            style={{ marginLeft: "auto", width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent", color: T.textSub, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = T.bg; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <X size={14} strokeWidth={1.75} />
+        style={{ width: "min(640px, 100%)", maxHeight: "min(88vh, 820px)", display: "flex", flexDirection: "column", background: T.white, borderRadius: 18, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", overflow: "hidden", fontFamily: "var(--font-sans)", transform: `translate(${winPos.x}px, ${winPos.y}px)` }}>
+        {/* Header — sert aussi de poignée pour déplacer la fenêtre */}
+        <div onMouseDown={startWindowDrag}
+          style={{ position: "relative", padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, cursor: "move", userSelect: "none" }}>
+          {/* Poignée de déplacement */}
+          <div style={{
+            position: "absolute", left: "50%", top: 7, transform: "translateX(-50%)",
+            width: 40, height: 4, borderRadius: 999,
+            background: dragging ? T.textMut : T.border,
+            transition: "background-color 120ms ease",
+          }} />
+          {editingId && (
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={onDelete} aria-label="Supprimer" title="Supprimer la séance"
+              style={{ marginLeft: "auto", width: 28, height: 28, borderRadius: "50%", border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background-color 120ms ease, color 120ms ease" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+              <Trash2 size={15} strokeWidth={1.9} />
+            </button>
+          )}
+          <button onMouseDown={(e) => e.stopPropagation()} onClick={onClose} aria-label="Fermer"
+            style={{ marginLeft: editingId ? 0 : "auto", width: 28, height: 28, borderRadius: "50%", border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background-color 120ms ease, color 120ms ease" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+            <X size={16} strokeWidth={1.9} />
           </button>
         </div>
 
@@ -948,7 +988,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                 <div style={{
                   display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
                   gap: 6, padding: 10,
-                  background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10,
+                  background: T.bg, border: `1px solid ${T.border}`, borderRadius: 14,
                   maxHeight: 220, overflowY: "auto",
                 }}>
                   {allPresets.length === 0 && (
@@ -961,7 +1001,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                     return (
                       <div key={p.id} style={{
                         position: "relative",
-                        background: T.white, border: `1px solid ${T.border}`, borderRadius: 8,
+                        background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
                         padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4,
                       }}>
                         <button type="button" onClick={() => applyPreset(p)}
@@ -1014,8 +1054,8 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                     onClick={() => setForm({ ...form, discipline: d.id })}
                     style={{
                       display: "flex", alignItems: "center", gap: 8,
-                      padding: "9px 11px", borderRadius: 8,
-                      border: `1px solid ${active ? d.color : T.border}`,
+                      padding: "9px 13px", borderRadius: 999,
+                      border: "1px solid transparent",
                       background: active ? `${d.color}10` : T.white,
                       color: T.text, cursor: "pointer", fontFamily: "inherit",
                       textAlign: "left",
@@ -1070,7 +1110,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                   style={{
                     background: T.bg,
                     border: `1px solid ${dragOverExId === ex.id ? T.accent : T.border}`,
-                    borderRadius: 10,
+                    borderRadius: 14,
                     padding: "10px 12px",
                     opacity: draggedExId === ex.id ? 0.5 : 1,
                     transition: "border-color 120ms, opacity 120ms",
@@ -1157,7 +1197,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
               placeholder="Sensations, énergie, ce que tu retiens…"
               rows={3}
-              style={{ ...input(), resize: "vertical", lineHeight: 1.45 }} />
+              style={{ ...input(), borderRadius: 14, resize: "vertical", lineHeight: 1.45 }} />
           </label>
         </div>
 
@@ -1218,20 +1258,21 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, customExercise
                 Modifications enregistrées automatiquement
               </span>
               <button onClick={onClose}
-                style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.text}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ padding: "7px 16px", height: 34, borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Fermer
               </button>
             </>
           ) : (
             <>
               <button onClick={onClose}
-                style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "transparent", color: T.textSub, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ padding: "7px 16px", height: 34, borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 Annuler
               </button>
               <button onClick={onSave}
                 disabled={!form.date}
                 style={{
-                  padding: "8px 16px", borderRadius: 8, border: "none",
+                  padding: "7px 16px", height: 34, borderRadius: 999,
+                  border: `1px solid ${form.date ? T.text : T.border}`,
                   background: form.date ? T.text : "#F0F0F0",
                   color: form.date ? T.white : T.textMut,
                   fontSize: 13, fontWeight: 600,
@@ -1259,7 +1300,7 @@ function Label({ children }) {
 
 function input() {
   return {
-    width: "100%", padding: "8px 12px", borderRadius: 8,
+    width: "100%", padding: "8px 14px", borderRadius: 999,
     border: `1px solid ${T.border}`, fontSize: 13, fontFamily: "inherit",
     outline: "none", color: T.text, background: T.white,
   };
@@ -1406,14 +1447,14 @@ function ExerciseNameCombobox({
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         placeholder="Rechercher un exercice…"
-        style={{ ...input(), padding: "6px 10px", fontWeight: 500, width: "100%" }}
+        style={{ ...input(), borderRadius: 10, padding: "6px 10px", fontWeight: 500, width: "100%" }}
       />
       {open && (matches.length > 0 || showAddRow) && (
         <div
           role="listbox"
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-            background: T.white, border: `1px solid ${T.border}`, borderRadius: 10,
+            background: T.white, border: `1px solid ${T.border}`, borderRadius: 14,
             boxShadow: "0 8px 24px rgba(0,0,0,0.10)", zIndex: 100,
             maxHeight: 280, overflowY: "auto", padding: 4, fontFamily: "var(--font-sans)",
           }}
@@ -1647,7 +1688,7 @@ function MiniCalendar({ value, viewDate, setViewDate, onPick }) {
 
   return (
     <div style={{
-      width: 280, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+      width: 280, background: T.white, border: `1px solid ${T.border}`, borderRadius: 16,
       boxShadow: "0 12px 32px rgba(0,0,0,0.10)", padding: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1710,7 +1751,7 @@ function SetInput({ value, onChange, placeholder, small }) {
       placeholder={placeholder}
       style={{
         flex: small ? "0 0 64px" : 1, minWidth: 0,
-        padding: "5px 9px", borderRadius: 6,
+        padding: "5px 9px", borderRadius: 10,
         border: `1px solid ${T.border}`, fontSize: 12,
         fontFamily: "inherit", outline: "none", color: T.text,
         background: T.white, fontVariantNumeric: "tabular-nums",

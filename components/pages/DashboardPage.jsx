@@ -8,6 +8,7 @@ import { getCurrencySymbol } from "@/lib/userPrefs";
 import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/contexts/AppContext";
+import { LayoutDashboard, Plus } from "lucide-react";
 
 export default function DashboardPage({ trades = [], allTrades = [], accounts = [], selectedAccountIds = [], strategies = [], setPage, setDateRangesByPage }) {
   useLang();
@@ -143,9 +144,15 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("dash.title")}</h1>
           <div id="tr4de-page-header-slot" style={{marginLeft:"auto"}} />
         </div>
-        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"60px 24px",textAlign:"center"}}>
-          <div style={{fontSize:18,fontWeight:600,marginBottom:8,color:T.text}}>{t("dash.noTrades")}</div>
-          <p style={{color:T.textSub}}>{t("dash.noTradesSub")}</p>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:"64px 40px",textAlign:"center",minHeight:"50vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
+          <div style={{width:48,height:48,borderRadius:12,background:T.accentBg,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+            <LayoutDashboard size={22} strokeWidth={1.75} color={T.text}/>
+          </div>
+          <div style={{fontSize:17,fontWeight:600,color:T.text,marginBottom:6,letterSpacing:-0.1}}>{t("dash.noTrades")}</div>
+          <div style={{fontSize:13,color:T.textSub,marginBottom:20,maxWidth:380,lineHeight:1.5}}>{t("dash.noTradesSub")}</div>
+          <button onClick={()=>setPage?.("add-trade")} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:999,background:T.white,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",border:`1px solid ${T.text}`,fontFamily:"var(--font-sans)"}}>
+            <Plus size={14} strokeWidth={2}/> {t("trades.importBtn").replace(/^\+\s*/, "")}
+          </button>
         </div>
       </div>
     );
