@@ -908,11 +908,37 @@ img, canvas {
   .tr4de-trades-layout { flex-direction: column !important; }
   .tr4de-trades-main { flex: 1 1 100% !important; max-height: none !important; }
 
+  /* Page Comptes : grille 2 colonnes → 1 colonne sur mobile (cartes lisibles) */
+  .tr4de-accounts-grid { grid-template-columns: 1fr !important; }
+
   /* Inputs / cards "centrés" qui forçaient maxWidth: 360 */
   [style*="max-width: 360"], [style*="maxWidth: 360"] { max-width: 100% !important; }
 
   /* Toolbars de page : header avec h1 + boutons → wrap propre */
   .anim-1 > div:first-child { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* Contrôles d'en-tête (DateRangePicker + sélecteur de comptes) injectés dans
+     le slot : pleine largeur sous le titre, passage à la ligne, jamais de
+     débordement horizontal (sinon les boutons sont coupés par overflow-x). */
+  #tr4de-page-header-slot {
+    margin-left: 0 !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+  #tr4de-page-header-slot > div {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+  #tr4de-page-header-slot > div > * {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Filet de sécurité : les boutons d'action d'en-tête ne dépassent jamais. */
+  .anim-1 > div:first-child button {
+    max-width: 100% !important;
+  }
 
   /* Journal de trading (mobile <768px) : carte sparkline + notes + tableau
      empilés verticalement. Carte en largeur limitée centrée, contenu droit

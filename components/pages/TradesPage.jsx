@@ -895,7 +895,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       {/* Symbol + checkbox conditionnelle + icone trending + badge groupe */}
                       <td style={{padding:"12px 14px",fontWeight:600,color:T.text,fontFamily:"var(--font-sans)",height:42,minWidth:130,width:130, paddingLeft: isChild ? 36 : 14}}>
                         <span style={{display:"inline-flex",alignItems:"center",gap:8,height:18,verticalAlign:"middle"}}>
-                          {!isChild && showCheckbox && (
+                          {!isChild && (
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -934,7 +934,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                 setSelectedIds(next);
                                 setLastSelectedIndex(i);
                               }}
-                              style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0}}
+                              style={{cursor:"pointer",width:14,height:14,accentColor:"#0D0D0D",margin:0,display:"block",verticalAlign:"middle",flexShrink:0,visibility: showCheckbox ? "visible" : "hidden"}}
                             />
                           )}
                           {isGroupParent ? (
@@ -1687,12 +1687,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           bottom:24,
           left:"50%",
           transform:"translateX(-50%)",
+          maxWidth:"calc(100vw - 24px)",
           background:"#FFFFFF",
           color:"#0D0D0D",
           borderRadius:12,
           padding:"10px 14px",
           display:"flex",
           alignItems:"center",
+          flexWrap:"wrap",
+          justifyContent:"center",
           gap:14,
           fontFamily:"var(--font-sans)",
           fontSize:13,

@@ -5,6 +5,7 @@ import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
   Clock, MapPin, AlignLeft, Bell, ChevronDown, Target, HelpCircle, Repeat,
+  Plus, CheckSquare, Square,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -156,6 +157,7 @@ function blankForm(day, startTime = "09:00", endTime = "10:00") {
     masterId: null, masterStart: null, // série (event récurrent) : renseignés à l'édition
     location: "", description: "", guests: "", addMeet: false, hadMeet: false,
     colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
+    pendingTasks: [], // tâches Google à créer à l'enregistrement (nouvel évènement)
   };
 }
 
@@ -219,6 +221,17 @@ function readTaskTimes() {
 }
 function writeTaskTimes(map) {
   try { localStorage.setItem(TASK_TIMES_KEY, JSON.stringify(map)); } catch {}
+}
+
+/* ─────────────── Tâches Google liées à un évènement ───────────────
+   Les tâches sont de VRAIES Google Tasks. On mémorise seulement l'association
+   évènement → ids de tâches (localStorage), indexée par id d'évènement. */
+const EVENT_TASK_LINKS_KEY = "tr4de_event_task_links";
+function readEventTaskLinks() {
+  try { return JSON.parse(localStorage.getItem(EVENT_TASK_LINKS_KEY) || "{}"); } catch { return {}; }
+}
+function writeEventTaskLinks(map) {
+  try { localStorage.setItem(EVENT_TASK_LINKS_KEY, JSON.stringify(map)); } catch {}
 }
 
 /** Convertit une Google Task (+ heure locale) en item affiché comme un évènement. */
@@ -515,6 +528,9 @@ export default function AgendaPage() {
   const [events, setEvents] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
   const [taskTimes, setTaskTimes] = React.useState({});
+  const [eventTaskLinks, setEventTaskLinks] = React.useState({}); // évènement → ids de tâches Google
+  const [modalTab, setModalTab] = React.useState("event"); // vue interne du modal évènement : "event" | "tasks"
+  const [taskDraft, setTaskDraft] = React.useState(""); // saisie d'ajout de tâche
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [modal, setModal] = React.useState(null); // form objet | null
@@ -608,6 +624,9 @@ export default function AgendaPage() {
   // Heures locales des tâches (localStorage).
   React.useEffect(() => { setTaskTimes(readTaskTimes()); }, []);
 
+  // Liens évènement → tâches Google (localStorage).
+  React.useEffect(() => { setEventTaskLinks(readEventTaskLinks()); }, []);
+
   // Vraies tâches Google (échec silencieux si scope/API pas encore prêts).
   const loadTasks = React.useCallback(async () => {
     if (!connected) return;
@@ -694,10 +713,11 @@ export default function AgendaPage() {
 
   const goToday = () => setCursor(startOfDay(new Date()));
   const openDay = (d) => { setCursor(startOfDay(d)); setView("day"); };
-  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false); setModal(blankForm(day || cursor, startTime, endTime)); };
+  const openCreate = (day, startTime, endTime) => { setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false); setModalTab("event"); setTaskDraft(""); setModal(blankForm(day || cursor, startTime, endTime)); };
   const openEdit = (item) => {
-    setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false);
-    setModal(item.isGTask ? formFromTaskItem(item, taskTimes) : formFromEvent(item));
+    setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false); setModalTab("event"); setTaskDraft("");
+    const base = item.isGTask ? formFromTaskItem(item, taskTimes) : formFromEvent(item);
+    setModal(base);
     // Évènement récurrent : la règle est portée par l'évènement maître (les
     // occurrences sont dépliées). On la récupère en arrière-plan pour pré-remplir.
     if (!item.isTask && item.recurringEventId) {
@@ -714,6 +734,68 @@ export default function AgendaPage() {
 
   // Met à jour partiellement la config de récurrence du form.
   const setRecur = (patch) => setModal((m) => ({ ...m, recur: { ...(m.recur || { preset: "once" }), ...patch } }));
+
+  // ─── Tâches Google liées à l'évènement en cours d'édition ───
+  // Échéance des tâches créées depuis un évènement = date de l'évènement.
+  const eventDueISO = (m) => (m?.date ? `${m.date}T00:00:00.000Z` : null);
+
+  // Tâches Google déjà liées à cet évènement (existant), résolues depuis l'état `tasks`.
+  const linkedTasksFor = React.useCallback(
+    (eventId) => {
+      if (!eventId) return [];
+      const ids = eventTaskLinks[eventId] || [];
+      return ids.map((id) => tasks.find((t) => t.id === id)).filter(Boolean);
+    },
+    [eventTaskLinks, tasks],
+  );
+
+  const linkTaskToEvent = (eventId, taskId) => {
+    const map = readEventTaskLinks();
+    const ids = new Set(map[eventId] || []);
+    ids.add(taskId);
+    map[eventId] = [...ids];
+    writeEventTaskLinks(map);
+    setEventTaskLinks(map);
+  };
+  const unlinkTaskFromEvent = (eventId, taskId) => {
+    const map = readEventTaskLinks();
+    map[eventId] = (map[eventId] || []).filter((id) => id !== taskId);
+    if (map[eventId].length === 0) delete map[eventId];
+    writeEventTaskLinks(map);
+    setEventTaskLinks(map);
+  };
+
+  // Ajoute une tâche depuis le panneau « Tâche » d'un évènement.
+  // Évènement existant → crée la vraie Google Task tout de suite et la lie.
+  // Nouvel évènement (pas encore d'id) → met en attente, créée à l'enregistrement.
+  const addEventTask = async (title) => {
+    const text = String(title || "").trim();
+    if (!text || !modal) return;
+    setTaskDraft("");
+    if (modal.id) {
+      try {
+        const r = await createTask({ title: text, due: eventDueISO(modal) });
+        const newId = r?.task?.id;
+        if (newId) linkTaskToEvent(modal.id, newId);
+        await loadTasks();
+      } catch (e) {
+        if (e?.message === "insufficient_scope") setError("insufficient_scope");
+        else setModalError(e?.message || "Erreur lors de l'ajout de la tâche");
+      }
+    } else {
+      setModal((m) => ({ ...m, pendingTasks: [...(m.pendingTasks || []), text] }));
+    }
+  };
+  const removePendingTask = (idx) => setModal((m) => ({ ...m, pendingTasks: (m.pendingTasks || []).filter((_, i) => i !== idx) }));
+  const toggleLinkedTask = async (task) => {
+    setTasks((prev) => prev.map((x) => (x.id === task.id ? { ...x, completed: !task.completed } : x)));
+    try { await toggleTask(task.id, !task.completed); } catch { loadTasks(); }
+  };
+  const deleteLinkedTask = async (task) => {
+    if (modal?.id) unlinkTaskFromEvent(modal.id, task.id);
+    setTasks((prev) => prev.filter((x) => x.id !== task.id));
+    try { await deleteTask(task.id); } catch { loadTasks(); }
+  };
 
   // Création dans le time-grid. Souris : clic-glissé pour tracer une plage (un
   // simple clic crée 1 h). Tactile/stylet : un tap crée un évènement d'1 h à
@@ -958,8 +1040,27 @@ export default function AgendaPage() {
           toSave = { ...modal, date: masterDate, endDate: masterDate };
         }
         const payload = { ...payloadFromForm(toSave), recurrence: buildRecurrence(toSave) };
-        if (targetId) await updateEvent(targetId, payload);
-        else await createEvent(payload);
+        let res;
+        if (targetId) res = await updateEvent(targetId, payload);
+        else res = await createEvent(payload);
+        // Tâches en attente (ajoutées sur un nouvel évènement) : on crée les
+        // vraies Google Tasks une fois l'id de l'évènement connu, puis on les lie.
+        const savedId = modal.id || res?.event?.id;
+        const pending = (modal.pendingTasks || []).map((s) => String(s).trim()).filter(Boolean);
+        if (savedId && pending.length) {
+          const map = readEventTaskLinks();
+          const ids = new Set(map[savedId] || []);
+          for (const title of pending) {
+            try {
+              const r = await createTask({ title, due: eventDueISO(modal) });
+              if (r?.task?.id) ids.add(r.task.id);
+            } catch (e) { /* tâche échouée : on continue les autres */ }
+          }
+          map[savedId] = [...ids];
+          writeEventTaskLinks(map);
+          setEventTaskLinks(map);
+          await loadTasks();
+        }
         setModal(null);
         await loadEvents();
       }
@@ -986,6 +1087,9 @@ export default function AgendaPage() {
         await loadTasks();
       } else {
         await deleteEvent(modal.id);
+        // Retire l'association évènement → tâches (les tâches Google restent).
+        const map = readEventTaskLinks();
+        if (map[modal.id]) { delete map[modal.id]; writeEventTaskLinks(map); setEventTaskLinks(map); }
         setModal(null);
         await loadEvents();
       }
@@ -1535,30 +1639,97 @@ export default function AgendaPage() {
                 style={{ width: "100%", border: "none", borderBottom: `2px solid ${T.border}`, outline: "none", fontFamily: "inherit", fontSize: 22, fontWeight: 400, color: T.text, padding: "6px 0", background: "transparent" }} />
             </div>
 
-            {/* Onglets Événement / Tâche (désactivés en édition d'un élément existant) */}
+            {/* Onglets Événement / Tâche.
+                - Évènement : bascule la vue interne (détails ↔ tâches Google liées).
+                - Tâche autonome (édition d'une Google Task) : simple libellé. */}
             <div style={{ display: "flex", gap: 6, padding: "12px 24px 4px 58px", alignItems: "center", flexWrap: "wrap" }}>
-              {[{ k: "event", label: "Événement" }, { k: "task", label: "Tâche" }].map(({ k, label }) => {
-                const active = modal.kind === k;
-                const locked = !!modal.id; // on ne convertit pas un élément déjà créé
-                return (
-                  <button key={k} type="button" disabled={locked && !active}
-                    onClick={() => !modal.id && setModal({ ...modal, kind: k })}
-                    style={{
-                      padding: "6px 14px", borderRadius: 999, border: "none", fontFamily: "inherit",
-                      fontSize: 13, fontWeight: active ? 600 : 400,
-                      background: active ? `${T.blue}1A` : "transparent",
-                      color: active ? T.blue : T.textMut,
-                      opacity: locked && !active ? 0.4 : 1,
-                      cursor: modal.id ? "default" : "pointer",
-                    }}>
-                    {label}
-                  </button>
-                );
-              })}
+              {modal.kind === "event" ? (
+                [{ k: "event", label: "Événement" }, { k: "tasks", label: "Tâche" }].map(({ k, label }) => {
+                  const active = modalTab === k;
+                  const count = k === "tasks" ? (linkedTasksFor(modal.id).length + (modal.pendingTasks || []).length) : 0;
+                  return (
+                    <button key={k} type="button" onClick={() => setModalTab(k)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        padding: "6px 14px", borderRadius: 999, border: "none", fontFamily: "inherit",
+                        fontSize: 13, fontWeight: active ? 600 : 400,
+                        background: active ? `${T.blue}1A` : "transparent",
+                        color: active ? T.blue : T.textMut, cursor: "pointer",
+                      }}>
+                      {label}
+                      {count > 0 && (
+                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 16, height: 16, padding: "0 5px", borderRadius: 999, background: active ? T.blue : T.textMut, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{count}</span>
+                      )}
+                    </button>
+                  );
+                })
+              ) : (
+                <span style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13, fontWeight: 600, background: `${T.blue}1A`, color: T.blue }}>Tâche</span>
+              )}
             </div>
 
             {/* Corps */}
             <div style={{ padding: "8px 24px 6px" }}>
+              {modal.kind === "event" && modalTab === "tasks" ? (
+                /* ─── Panneau « Tâche » : vraies Google Tasks liées à l'évènement ─── */
+                (() => {
+                  const linked = linkedTasksFor(modal.id);
+                  const pending = modal.pendingTasks || [];
+                  const empty = linked.length === 0 && pending.length === 0;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 140, paddingLeft: 34 }}>
+                      <div style={{ fontSize: 12, color: T.textMut }}>
+                        Tâches Google liées à cet évènement{modal.date ? ` · échéance ${formatDateLong(modal.date)}` : ""}
+                      </div>
+
+                      {/* Saisie d'ajout */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Plus size={16} strokeWidth={2} color={T.textMut} style={{ flexShrink: 0 }} />
+                        <input value={taskDraft} onChange={(e) => setTaskDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEventTask(taskDraft); } }}
+                          placeholder="Ajouter une tâche" style={{ ...rowInp }} />
+                        <button type="button" onClick={() => addEventTask(taskDraft)} disabled={!taskDraft.trim()}
+                          style={{ ...pillBtn, flexShrink: 0, opacity: taskDraft.trim() ? 1 : 0.5, cursor: taskDraft.trim() ? "pointer" : "default" }}>Ajouter</button>
+                      </div>
+
+                      {empty && <div style={{ fontSize: 13, color: T.textMut, padding: "8px 0" }}>Aucune tâche pour le moment.</div>}
+
+                      {/* Tâches Google réelles déjà liées */}
+                      {linked.map((tk) => (
+                        <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <button type="button" onClick={() => toggleLinkedTask(tk)} aria-label={tk.completed ? "Marquer non terminée" : "Marquer terminée"}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", color: tk.completed ? T.blue : T.textMut, display: "inline-flex", padding: 0, flexShrink: 0 }}>
+                            {tk.completed ? <CheckSquare size={18} strokeWidth={1.9} /> : <Square size={18} strokeWidth={1.9} />}
+                          </button>
+                          <span style={{ flex: 1, fontSize: 14, color: tk.completed ? T.textMut : T.text, textDecoration: tk.completed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.title}</span>
+                          <button type="button" onClick={() => deleteLinkedTask(tk)} aria-label="Supprimer la tâche" title="Supprimer"
+                            style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", padding: 2, borderRadius: 6, flexShrink: 0 }}>
+                            <Trash2 size={14} strokeWidth={1.9} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Tâches en attente (nouvel évènement pas encore enregistré) */}
+                      {pending.map((title, idx) => (
+                        <div key={`pending-${idx}`} style={{ display: "flex", alignItems: "center", gap: 10, opacity: 0.9 }}>
+                          <Square size={18} strokeWidth={1.9} color={T.textMut} style={{ flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 14, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+                          <span style={{ fontSize: 11, color: T.textMut, flexShrink: 0 }}>à créer</span>
+                          <button type="button" onClick={() => removePendingTask(idx)} aria-label="Retirer" title="Retirer"
+                            style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", padding: 2, borderRadius: 6, flexShrink: 0 }}>
+                            <IconX size={14} strokeWidth={2} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {!modal.id && (
+                        <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Les tâches seront créées dans Google Tasks à l'enregistrement de l'évènement.</div>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+              <>
               {/* Date / heures — résumé lisible, éditable au clic */}
               <FormRow icon={Clock} top={timeEdit}>
                 {!timeEdit ? (
@@ -1784,6 +1955,8 @@ export default function AgendaPage() {
                   )}
                 </div>
               </FormRow>
+              </>
+              )}
 
               {modalError && (
                 <div style={{ fontSize: 12, color: T.red, background: T.redBg, border: `1px solid ${T.redBd}`, borderRadius: 8, padding: "8px 10px", marginTop: 8 }}>{modalError}</div>

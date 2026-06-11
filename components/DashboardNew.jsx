@@ -704,7 +704,6 @@ export default function App() {
         { id: "add-trade",  icon: LucideUpload,       label: t("nav.addTrade") },
         { id: "dashboard",  icon: LayoutDashboard,    label: t("nav.dashboard") },
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
-        { id: "notes",      icon: LucideFileText,     label: t("nav.notes") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
@@ -723,6 +722,7 @@ export default function App() {
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
+        { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
       ],
@@ -1054,7 +1054,7 @@ export default function App() {
                 if (isProductivity) return null; // la page gère son propre header
                 return (
                   <HeaderSlotPortal>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end",maxWidth:"100%",minWidth:0}}>
                       {["dashboard","strategies","journal","trades","discipline"].includes(page) && (
                         <DateRangePicker
                           value={globalDateRange}

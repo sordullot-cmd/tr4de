@@ -1166,6 +1166,16 @@ export const parseCSV = (csvText: string, brokerHint: BrokerHint = null): Parsed
     return parseMT5CSV(csvText);
   }
 
+  // Format générique du site (Date, Symbol, Direction, Entry, Exit, PnL) :
+  // en-têtes sans ambiguïté → on l'utilise même si un broker est sélectionné,
+  // pour que le fichier d'exemple s'importe quel que soit le broker choisi.
+  if (firstLine.includes('symbol') && firstLine.includes('direction') &&
+      firstLine.includes('entry') && firstLine.includes('exit') &&
+      (firstLine.includes('pnl') || firstLine.includes('profit'))) {
+    console.log('Detected generic site CSV format');
+    return parseGenericCSV(csvText);
+  }
+
   // Use broker hint if provided
   if (brokerHint === 'tradovate' || brokerHint === 'ninjatrader' || brokerHint === 'rithmic') {
     console.log(`Using Tradovate-compatible parser via hint (${brokerHint})`);

@@ -289,7 +289,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
           </button>
         </div>
       ) : (
-        <div className="anim-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <div className="anim-stagger tr4de-accounts-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
           {[...visibleAccounts].sort((a, b) => {
             const sa = stats.get(a.id) || { trades: 0, pnl: 0 };
             const sb = stats.get(b.id) || { trades: 0, pnl: 0 };
