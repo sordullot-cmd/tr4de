@@ -934,7 +934,7 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, onDelete, cust
 
   return (
     <div {...backdropDismiss(onClose)}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      style={{ position: "fixed", inset: 0, background: "transparent", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
         style={{ width: "min(640px, 100%)", maxHeight: "min(88vh, 820px)", display: "flex", flexDirection: "column", background: T.white, borderRadius: 18, boxShadow: "0 6px 20px rgba(0,0,0,0.10)", overflow: "hidden", fontFamily: "var(--font-sans)", transform: `translate(${winPos.x}px, ${winPos.y}px)` }}>
         {/* Header — sert aussi de poignée pour déplacer la fenêtre */}

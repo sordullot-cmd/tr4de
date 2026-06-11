@@ -573,7 +573,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           {...backdropDismiss(() => setColumnsMenuOpen(false))}
           style={{
             position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0,0,0,0.45)",
+            background: "transparent",
             display: "flex", alignItems: "center", justifyContent: "center",
             padding: 16, animation: "fadeIn .15s ease",
           }}>

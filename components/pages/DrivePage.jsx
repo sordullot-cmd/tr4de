@@ -2944,7 +2944,7 @@ function DocEditor({ doc, onClose, onSaved, onRenamed }) {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.4)",
+        background: "transparent",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 20,
       }}
@@ -3200,7 +3200,7 @@ function ModalShell({ title, onClose, children }) {
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,0.4)",
+        background: "transparent",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
     >

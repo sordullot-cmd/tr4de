@@ -1178,7 +1178,7 @@ function AccountPlans({ accounts, trades }) {
       {/* Modal de création / édition */}
       {showForm && typeof document !== "undefined" && ReactDOM.createPortal(
         <div {...backdropDismiss(close)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          style={{ position: "fixed", inset: 0, background: "transparent", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
             style={{ width: "min(560px, 100%)", maxHeight: "min(85vh, 760px)", display: "flex", flexDirection: "column", background: "var(--color-card-bg, #FFFFFF)", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10 }}>

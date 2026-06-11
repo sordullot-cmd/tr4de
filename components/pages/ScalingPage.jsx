@@ -273,7 +273,7 @@ function AccountForm({ onClose, onSave }) {
   };
 
   return (
-    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 16, maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "var(--font-sans)" }}>
         <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>Nouveau compte</div>

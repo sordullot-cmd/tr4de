@@ -464,7 +464,7 @@ export default function DailyPlannerPage() {
               {...backdropDismiss(closeHabitForm)}
               style={{
                 position: "fixed", inset: 0,
-                background: "rgba(0,0,0,0.45)",
+                background: "transparent",
                 zIndex: 10000,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 padding: 16,
