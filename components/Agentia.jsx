@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { withNetPnl } from "@/lib/tradeFees";
 import ApexChat from "@/components/ApexChatNew";
 import AgentNotifications from "@/components/AgentNotifications";
 import TradeForm from "@/components/TradeForm";
@@ -149,8 +150,9 @@ export default function Agentia({ trades: initialTrades = [] }) {
         // Trades
         let mergedTrades = [];
         if (tradesRes.data?.length) {
-          setTrades(tradesRes.data);
-          mergedTrades = tradesRes.data;
+          const netData = withNetPnl(tradesRes.data);
+          setTrades(netData);
+          mergedTrades = netData;
         }
 
         // Stratégies : Supabase prioritaire, sinon on garde le local

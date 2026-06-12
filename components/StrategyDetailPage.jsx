@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getCurrencySymbol, rMultiple, fmtR } from "@/lib/userPrefs";
+import { withNetPnl } from "@/lib/tradeFees";
 import TradesPage from "@/components/pages/TradesPage";
 import LoadingScreen from "@/components/ui/LoadingScreen";
 import { t, useLang } from "@/lib/i18n";
@@ -62,11 +63,11 @@ export default function StrategyDetailPage({ setPage = () => {} }) {
       const tradesData = localStorage.getItem('tr4de_trades');
       if (tradesData) {
         try {
-          setTrades(JSON.parse(tradesData));
+          setTrades(withNetPnl(JSON.parse(tradesData)));
         } catch {
           // Fallback to apex_trades for backward compatibility
           const apexTrades = localStorage.getItem('apex_trades');
-          if (apexTrades) setTrades(JSON.parse(apexTrades));
+          if (apexTrades) setTrades(withNetPnl(JSON.parse(apexTrades)));
         }
       }
 

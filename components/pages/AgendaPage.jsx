@@ -1011,9 +1011,11 @@ export default function AgendaPage() {
     setSaving(true);
     setModalError(null);
     try {
-      if (modal.kind === "task") {
+      if (modal.kind === "task" || modalTab === "tasks") {
         const payload = taskPayloadFromForm(modal);
-        let taskId = modal.id;
+        // On édite une tâche existante seulement si le modal porte déjà une tâche ;
+        // sur l'onglet « Tâche » d'un évènement, on crée toujours une nouvelle tâche.
+        let taskId = modal.kind === "task" ? modal.id : null;
         if (taskId) await updateTask(taskId, payload);
         else { const r = await createTask(payload); taskId = r?.task?.id; }
         // Jour de planification + heure conservés côté tr4de : Google Tasks ne
@@ -1640,13 +1642,13 @@ export default function AgendaPage() {
             </div>
 
             {/* Onglets Événement / Tâche.
-                - Évènement : bascule la vue interne (détails ↔ tâches Google liées).
+                - Modal d'évènement : bascule le formulaire entre mode Événement et mode Tâche
+                  (le mode Tâche affiche date limite + masque la récurrence).
                 - Tâche autonome (édition d'une Google Task) : simple libellé. */}
             <div style={{ display: "flex", gap: 6, padding: "12px 24px 4px 58px", alignItems: "center", flexWrap: "wrap" }}>
               {modal.kind === "event" ? (
                 [{ k: "event", label: "Événement" }, { k: "tasks", label: "Tâche" }].map(({ k, label }) => {
                   const active = modalTab === k;
-                  const count = k === "tasks" ? (linkedTasksFor(modal.id).length + (modal.pendingTasks || []).length) : 0;
                   return (
                     <button key={k} type="button" onClick={() => setModalTab(k)}
                       style={{
@@ -1657,9 +1659,6 @@ export default function AgendaPage() {
                         color: active ? T.blue : T.textMut, cursor: "pointer",
                       }}>
                       {label}
-                      {count > 0 && (
-                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 16, height: 16, padding: "0 5px", borderRadius: 999, background: active ? T.blue : T.textMut, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{count}</span>
-                      )}
                     </button>
                   );
                 })
@@ -1668,67 +1667,9 @@ export default function AgendaPage() {
               )}
             </div>
 
-            {/* Corps */}
+            {/* Corps — formulaire complet (l'onglet « Tâche » affiche le même
+                formulaire en mode tâche : date limite + pas de récurrence). */}
             <div style={{ padding: "8px 24px 6px" }}>
-              {modal.kind === "event" && modalTab === "tasks" ? (
-                /* ─── Panneau « Tâche » : vraies Google Tasks liées à l'évènement ─── */
-                (() => {
-                  const linked = linkedTasksFor(modal.id);
-                  const pending = modal.pendingTasks || [];
-                  const empty = linked.length === 0 && pending.length === 0;
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 140, paddingLeft: 34 }}>
-                      <div style={{ fontSize: 12, color: T.textMut }}>
-                        Tâches Google liées à cet évènement{modal.date ? ` · échéance ${formatDateLong(modal.date)}` : ""}
-                      </div>
-
-                      {/* Saisie d'ajout */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Plus size={16} strokeWidth={2} color={T.textMut} style={{ flexShrink: 0 }} />
-                        <input value={taskDraft} onChange={(e) => setTaskDraft(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEventTask(taskDraft); } }}
-                          placeholder="Ajouter une tâche" style={{ ...rowInp }} />
-                        <button type="button" onClick={() => addEventTask(taskDraft)} disabled={!taskDraft.trim()}
-                          style={{ ...pillBtn, flexShrink: 0, opacity: taskDraft.trim() ? 1 : 0.5, cursor: taskDraft.trim() ? "pointer" : "default" }}>Ajouter</button>
-                      </div>
-
-                      {empty && <div style={{ fontSize: 13, color: T.textMut, padding: "8px 0" }}>Aucune tâche pour le moment.</div>}
-
-                      {/* Tâches Google réelles déjà liées */}
-                      {linked.map((tk) => (
-                        <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <button type="button" onClick={() => toggleLinkedTask(tk)} aria-label={tk.completed ? "Marquer non terminée" : "Marquer terminée"}
-                            style={{ border: "none", background: "transparent", cursor: "pointer", color: tk.completed ? T.blue : T.textMut, display: "inline-flex", padding: 0, flexShrink: 0 }}>
-                            {tk.completed ? <CheckSquare size={18} strokeWidth={1.9} /> : <Square size={18} strokeWidth={1.9} />}
-                          </button>
-                          <span style={{ flex: 1, fontSize: 14, color: tk.completed ? T.textMut : T.text, textDecoration: tk.completed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.title}</span>
-                          <button type="button" onClick={() => deleteLinkedTask(tk)} aria-label="Supprimer la tâche" title="Supprimer"
-                            style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", padding: 2, borderRadius: 6, flexShrink: 0 }}>
-                            <Trash2 size={14} strokeWidth={1.9} />
-                          </button>
-                        </div>
-                      ))}
-
-                      {/* Tâches en attente (nouvel évènement pas encore enregistré) */}
-                      {pending.map((title, idx) => (
-                        <div key={`pending-${idx}`} style={{ display: "flex", alignItems: "center", gap: 10, opacity: 0.9 }}>
-                          <Square size={18} strokeWidth={1.9} color={T.textMut} style={{ flexShrink: 0 }} />
-                          <span style={{ flex: 1, fontSize: 14, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
-                          <span style={{ fontSize: 11, color: T.textMut, flexShrink: 0 }}>à créer</span>
-                          <button type="button" onClick={() => removePendingTask(idx)} aria-label="Retirer" title="Retirer"
-                            style={{ border: "none", background: "transparent", cursor: "pointer", color: T.textMut, display: "inline-flex", padding: 2, borderRadius: 6, flexShrink: 0 }}>
-                            <IconX size={14} strokeWidth={2} />
-                          </button>
-                        </div>
-                      ))}
-
-                      {!modal.id && (
-                        <div style={{ fontSize: 11, color: T.textMut, marginTop: 4 }}>Les tâches seront créées dans Google Tasks à l'enregistrement de l'évènement.</div>
-                      )}
-                    </div>
-                  );
-                })()
-              ) : (
               <>
               {/* Date / heures — résumé lisible, éditable au clic */}
               <FormRow icon={Clock} top={timeEdit}>
@@ -1743,7 +1684,7 @@ export default function AgendaPage() {
                           : `${modal.startTime} – ${modal.endTime}`}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · {modal.kind === "task" ? "Une seule fois" : recurrenceLabel(modal.recur)}</div>
+                    <div style={{ fontSize: 12, color: T.textMut, marginTop: 2 }}>Fuseau horaire · {(modal.kind === "task" || modalTab === "tasks") ? "Une seule fois" : recurrenceLabel(modal.recur)}</div>
                   </button>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1783,8 +1724,8 @@ export default function AgendaPage() {
                 )}
               </FormRow>
 
-              {/* Récurrence (évènements uniquement) */}
-              {modal.kind !== "task" && (
+              {/* Récurrence (évènements uniquement — masquée en mode tâche) */}
+              {!(modal.kind === "task" || modalTab === "tasks") && (
                 <FormRow icon={Repeat}>
                   <div data-menu-root style={{ position: "relative" }}>
                     <button type="button" onClick={() => { setRecurOpen((o) => !o); setColorOpen(false); setRemindOpen(false); }} style={pillBtn}>
@@ -1885,7 +1826,7 @@ export default function AgendaPage() {
               )}
 
               {/* Lieu (évènement) / Date limite (tâche) */}
-              {modal.kind === "task" ? (
+              {(modal.kind === "task" || modalTab === "tasks") ? (
                 <FormRow icon={Target}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14, color: T.textMut }}>Date limite</span>
@@ -1956,7 +1897,6 @@ export default function AgendaPage() {
                 </div>
               </FormRow>
               </>
-              )}
 
               {modalError && (
                 <div style={{ fontSize: 12, color: T.red, background: T.redBg, border: `1px solid ${T.redBd}`, borderRadius: 8, padding: "8px 10px", marginTop: 8 }}>{modalError}</div>
@@ -1965,7 +1905,7 @@ export default function AgendaPage() {
 
             {/* Pied */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "14px 24px", borderTop: `1px solid ${T.border}` }}>
-              {modal.htmlLink && (
+              {modal.htmlLink && !(modal.kind === "task" || modalTab === "tasks") && (
                 <a href={modal.htmlLink} target="_blank" rel="noopener noreferrer" style={{ marginRight: "auto", fontSize: 12, color: T.blue, display: "inline-flex", alignItems: "center", gap: 5 }}>
                   <ExternalLink size={12} strokeWidth={2} /> Ouvrir dans Google
                 </a>

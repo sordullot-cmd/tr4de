@@ -96,7 +96,8 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
       // Volume / Fees / Executions
       const qty = Number(t.qty ?? t.quantity ?? t.size ?? t.contracts) || 0;
       totalVolume += qty;
-      totalFees += Number(t.fees ?? t.commission) || 0;
+      // Frais réellement déduits = brut − net (sinon valeur saisie manuellement).
+      totalFees += t.pnlGross != null ? (Number(t.pnlGross) - p) : (Number(t.fees ?? t.commission) || 0);
       totalExecutions += Number(t.executions ?? 0) || 1;
 
       // Open positions = pas d'exit
@@ -747,26 +748,20 @@ function EquityCompare({ trades, accounts, highlightId }) {
         ))}
 
         <defs>
-          {seriesFilled.map(s => (
+          {/* Dégradé uniquement pour le compte principal */}
+          {seriesFilled.filter(s => s.id === highlightId).map(s => (
             <linearGradient key={`g-${s.id}`} id={`acc-cmp-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity={s.id === highlightId ? 0.22 : 0.08} />
+              <stop offset="0%" stopColor={s.color} stopOpacity={0.22} />
               <stop offset="100%" stopColor={s.color} stopOpacity="0" />
             </linearGradient>
           ))}
         </defs>
 
-        {/* Aires + lignes : non-mis-en-avant en arrière-plan */}
+        {/* Lignes seules (sans dégradé) : comptes non principaux en arrière-plan */}
         {seriesFilled.filter(s => s.id !== highlightId).map(s => {
           const path = s.filled.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p.value).toFixed(1)}`).join(" ");
-          const baselineY = yFor(yMin);
-          const lastX = xFor(s.filled.length - 1).toFixed(1);
-          const firstX = xFor(0).toFixed(1);
-          const areaPath = `${path} L ${lastX} ${baselineY.toFixed(1)} L ${firstX} ${baselineY.toFixed(1)} Z`;
           return (
-            <g key={s.id}>
-              <path d={areaPath} fill={`url(#acc-cmp-grad-${s.id})`} stroke="none" />
-              <path d={path} fill="none" stroke={s.color} strokeWidth="1" strokeOpacity="0.4" strokeLinecap="round" strokeLinejoin="round" />
-            </g>
+            <path key={s.id} d={path} fill="none" stroke={s.color} strokeWidth="1" strokeOpacity="0.4" strokeLinecap="round" strokeLinejoin="round" />
           );
         })}
         {/* Compte courant en avant-plan */}

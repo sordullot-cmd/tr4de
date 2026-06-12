@@ -1,7 +1,8 @@
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/utils/errorUtils";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { withNetPnl } from "@/lib/tradeFees";
 
 /**
  * Hook pour gérer les détails de trades (notes, tags, etc.)
@@ -501,8 +502,13 @@ export function useTrades() {
     [user?.id]
   );
 
+  // Le state interne (et localStorage / Supabase) conserve le P&L BRUT ; on
+  // expose aux consommateurs un P&L NET de frais (brut préservé dans pnlGross).
+  // La transformation est idempotente, donc aucune écriture ne re-déduit.
+  const netTrades = useMemo(() => withNetPnl(trades), [trades]);
+
   return {
-    trades,
+    trades: netTrades,
     loading,
     error,
     addTrade,

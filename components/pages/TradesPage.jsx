@@ -11,15 +11,16 @@ import {
   ArrowDown as LucideArrowDown,
   SlidersHorizontal as LucideSlidersHorizontal,
   GripVertical as LucideGripVertical,
-  Target as LucideTarget,
-  FileText as LucideFileText,
   Image as LucideImage,
   Plus as LucidePlus,
+  Check as LucideCheck,
+  Repeat as LucideRepeat,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { rMultiple, fmtR } from "@/lib/userPrefs";
+import { calculateFees } from "@/lib/tradeFees";
 import { useAuth } from "@/lib/auth/supabaseAuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
@@ -144,6 +145,21 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   // Helper pour identifier un trade de maniere unique
   const tradeKey = (t) => t?.id != null ? `id:${t.id}` : `${t.date}_${t.symbol}_${t.entry}_${t.exit ?? ''}_${t.direction ?? ''}_${t.entryTime || ''}_${t.exitTime || ''}_${t.pnl ?? ''}`;
 
+  // --- Frais de commission (futures) ---------------------------------------
+  // Le P&L fourni par useTrades() est déjà NET de frais (le brut est conservé
+  // dans `pnlGross`). On ne re-déduit donc jamais ici.
+  //   - feesOf  : montant des frais du trade (pour la colonne "Frais")
+  //   - netPnlOf: P&L net (= t.pnl, déjà net)
+  const feesOf = (t) => {
+    if (t == null) return 0;
+    // Si le brut est connu, les frais réellement déduits = brut − net.
+    if (t.pnlGross != null && Number.isFinite(Number(t.pnlGross))) {
+      return Number(t.pnlGross) - (Number(t.pnl) || 0);
+    }
+    return calculateFees(t);
+  };
+  const netPnlOf = (t) => Number(t?.pnl) || 0;
+
   // Groupes "trades pris sur plusieurs comptes" (même symbole/sens/prix d'entrée à 1 min près)
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
 
@@ -191,6 +207,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       parent: g.children[0],
       children: g.children,
       pnlSum: g.children.reduce((s, x) => s + (Number(x.pnl) || 0), 0),
+      feesSum: g.children.reduce((s, x) => s + feesOf(x), 0),
+      netSum: g.children.reduce((s, x) => s + netPnlOf(x), 0),
     }));
   };
 
@@ -597,10 +615,11 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         losses: 0
       };
     }
+    const net = netPnlOf(t);
     symbolStats[t.symbol].trades.push(t);
-    symbolStats[t.symbol].totalPnL += t.pnl;
-    if (t.pnl > 0) symbolStats[t.symbol].wins++;
-    else if (t.pnl < 0) symbolStats[t.symbol].losses++;
+    symbolStats[t.symbol].totalPnL += net;
+    if (net > 0) symbolStats[t.symbol].wins++;
+    else if (net < 0) symbolStats[t.symbol].losses++;
   });
 
   // Find best and worst symbols
@@ -610,8 +629,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     if (stats.totalPnL < worstPnL) { worstPnL = stats.totalPnL; worstSymbol = sym; }
   });
 
-  const totalPnL = filteredTrades.reduce((s,t)=>s+t.pnl,0);
-  const totalWins = filteredTrades.filter(t=>t.pnl>0).length;
+  const totalPnL = filteredTrades.reduce((s,t)=>s+netPnlOf(t),0);
+  const totalWins = filteredTrades.filter(t=>netPnlOf(t)>0).length;
   const winRate = filteredTrades.length > 0 ? ((totalWins/filteredTrades.length)*100).toFixed(0) : 0;
   const symbolCount = Object.keys(symbolStats).length;
 
@@ -918,7 +937,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   for (const g of groups) {
                     const isGroup = g.children.length > 1;
                     const parentTrade = isGroup
-                      ? { ...g.parent, _children: g.children, _groupKey: g.key, _groupPnl: g.pnlSum }
+                      ? { ...g.parent, _children: g.children, _groupKey: g.key, _groupPnl: g.pnlSum, _groupFees: g.feesSum, _groupNet: g.netSum }
                       : g.parent;
                     rows.push({ trade: parentTrade, isGroupParent: isGroup, isChild: false, groupKey: g.key, groupSize: g.children.length });
                     if (isGroup && expandedGroups.has(g.key)) {
@@ -928,7 +947,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     }
                   }
                   return rows.map(({ trade: t, isGroupParent, isChild, groupKey, groupSize }, i) => {
-                  const ret = ((t.pnl/(t.entry*100))*100).toFixed(2);
+                  // Toutes les métriques dérivées (%, R, P&L net) sont calculées net de frais.
+                  const rowNet = t._groupNet != null ? t._groupNet : netPnlOf(t);
+                  const ret = ((rowNet/(t.entry*100))*100).toFixed(2);
                   const dateObj = new Date(t.date);
                   const openDate = dateObj.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
                   const openTime = fmtTime(t.entryTime || t.entry_time);
@@ -1081,8 +1102,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           return mm === 0 ? `${h}h` : `${h}h${String(mm).padStart(2,"0")}`;
                         })();
                         // Helpers pour les nouvelles colonnes
-                        const fees = Number(t.fees ?? t.commission) || 0;
-                        const netPnl = (Number(t.pnl) || 0) - fees;
+                        // Pour un parent de groupe : on somme les frais/net des enfants.
+                        const fees = t._groupFees != null ? t._groupFees : feesOf(t);
+                        const netPnl = t._groupNet != null ? t._groupNet : netPnlOf(t);
                         const tk = tradeKey(t);
                         const stratObj = strategies.find(s => s.id === tradeStrategies[tk]);
                         const noteText = (tradeNotes[tk] || "").trim();
@@ -1118,8 +1140,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub,textAlign:"center"})}>1</td>,
                           volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub,textAlign:"center"})}>2</td>,
                           pnl:       (() => { const p = t._groupPnl != null ? t._groupPnl : t.pnl; return <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:p>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{p>=0?"+":""}{fmt(p,false)}</td>; })(),
-                          pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
-                          r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:t.pnl>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple(t))}</td>,
+                          pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:rowNet>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
+                          r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:rowNet>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple({...t, pnl: rowNet}))}</td>,
                           duration:  <td key="duration" style={cellStyle("duration",{...tdBase,color:T.textSub,fontSize:12})}>{duration}</td>,
                           // Nouvelles cellules
                           fees:      <td key="fees" style={cellStyle("fees",{...tdBase,color:T.textSub,fontFamily:"var(--font-sans)",fontSize:12})}>{fees > 0 ? `$${fees.toFixed(2)}` : "—"}</td>,
@@ -1151,39 +1173,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           <div className="tr4de-trade-side hide-mobile" style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
-            <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",gap:16}}>
-                {[
-                  {id:"infos",label:t("trades.tab.infos"),Icon:LucideFileText},
-                  {id:"strategies",label:t("trades.tab.strategies"),Icon:LucideTarget}
-                ].map(tab=>{
-                  const Icon = tab.Icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={()=>setActiveTab(tab.id)}
-                      style={{
-                        padding:"6px 0",
-                        border:"none",
-                        background:"transparent",
-                        cursor:"pointer",
-                        display:"inline-flex",
-                        alignItems:"center",
-                        gap:6,
-                        fontSize:13,
-                        fontWeight:activeTab===tab.id?600:500,
-                        color:activeTab===tab.id?T.text:T.textMut,
-                        transition:"color .12s ease, border-color .12s ease",
-                        borderBottom:activeTab===tab.id?`2px solid #0D0D0D`:"2px solid transparent",
-                        paddingBottom:"6px",
-                        fontFamily:"var(--font-sans)",
-                      }}
-                    >
-                      <Icon size={14} strokeWidth={1.75} />
-                      {tab.label}
-                    </button>
-                  );
-                })}
+            <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:T.text,fontFamily:"var(--font-sans)"}}>Trade info</span>
               </div>
               <button onClick={()=>setSelectedTrade(null)} aria-label={t("trades.detail.close")} style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center"}}>
                 <LucideX size={16} strokeWidth={2} />
@@ -1195,27 +1187,76 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
             {/* SCROLL CONTENT */}
             <div style={{flex:1,overflow:"auto",display:"flex",flexDirection:"column"}}>
               
-              {/* INFOS TAB (NOTES) */}
-              {activeTab === "infos" && (
+              {/* INFOS */}
+              {(() => {
+                const tId = selectedTrade.id;
+                const dirRaw = String(selectedTrade.direction || "").toUpperCase();
+                const isLong = dirRaw.includes("LONG") || dirRaw === "BUY";
+                const entryTime = selectedTrade.entryTime || selectedTrade.entry_time || "";
+                const exitTime = selectedTrade.exitTime || selectedTrade.exit_time || "";
+                const rVal = rMultiple({ ...selectedTrade, pnl: netPnlOf(selectedTrade) });
+                const fmtDate = (d) => { if (!d) return "—"; const dt = new Date(d); return isNaN(dt.getTime()) ? String(d) : dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }); };
+                const pnlVal = Number(selectedTrade.pnl) || 0; // déjà net de frais
+                const pnlColor = pnlVal >= 0 ? T.green : T.red;
+                const dateTime = fmtDate(selectedTrade.date);
+                const timeStats = [
+                  { label: "Heure d'entrée", value: entryTime || "—" },
+                  { label: "Heure de sortie", value: exitTime || "—" },
+                ];
+                const insetSep = { borderBottom: `1px solid ${T.border}` };
+                return (
                 <>
+                  {/* HERO — données automatiques (P&L mis en avant) */}
+                  <div style={{order:-2,padding:"18px 16px 20px", ...insetSep}}>
+                    {/* Symbole · sens · horodatage */}
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                      <span style={{fontSize:16,fontWeight:700,color:T.text,letterSpacing:0.2}}>{selectedTrade.symbol || "—"}</span>
+                      <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:999,fontSize:11,fontWeight:600,background:isLong?`${T.green}14`:`${T.red}14`,color:isLong?T.green:T.red}}>
+                        {isLong ? <LucideTrendingUp size={11} strokeWidth={2.25}/> : <LucideArrowDown size={11} strokeWidth={2.25}/>}
+                        {isLong ? "Long" : "Short"}
+                      </span>
+                      <span style={{marginLeft:"auto",fontSize:12,color:T.textMut,whiteSpace:"nowrap"}}>{dateTime}</span>
+                    </div>
+                    {/* P&L héro + R-multiple */}
+                    <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                      <span style={{fontSize:30,fontWeight:700,letterSpacing:-0.4,color:pnlColor,lineHeight:1}}>{pnlVal>=0?"+":""}{fmt(pnlVal,true)}</span>
+                      {rVal != null && Number.isFinite(rVal) && (
+                        <span style={{fontSize:14,fontWeight:600,color:rVal>=0?T.green:T.red,letterSpacing:-0.1}}>{fmtR(rVal)}</span>
+                      )}
+                    </div>
+                    {/* Heures d'entrée / sortie */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"14px 16px",marginTop:18}}>
+                      {timeStats.map((s)=>(
+                        <div key={s.label}>
+                          <div style={{fontSize:11,color:T.textMut,marginBottom:3}}>{s.label}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:T.text}}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* RÈGLE RESPECTÉE (manuel) */}
+                  <div style={{padding:"16px 16px 6px"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Règle respectée</div>
+                  </div>
                   {/* CHECKLIST OUI/NON (remplace direction + horaires) */}
                   {checklistQuestions.map((q) => {
                     const ans = (tradeChecklist[selectedTrade.id] || {})[q.id];
                     return (
-                      <div key={q.id} style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
+                      <div key={q.id} style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontFamily:"var(--font-sans)"}}>
                         <div style={{fontSize:13,fontWeight:500,color:T.text}}>{q.label}</div>
-                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <div style={{display:"flex",gap:2,padding:3,background:T.accentBg,borderRadius:999,flexShrink:0}}>
                           {[{v:"yes",label:"Oui",color:T.green},{v:"no",label:"Non",color:T.red}].map((opt)=>{
                             const active = ans === opt.v;
                             return (
-                              <button key={opt.v} onClick={()=>setChecklistAnswer(selectedTrade,q.id,opt.v)}
+                              <button key={opt.v} type="button" onClick={()=>setChecklistAnswer(selectedTrade,q.id,opt.v)}
                                 style={{
-                                  padding:"5px 14px",borderRadius:999,
-                                  border:`1.5px solid ${active?opt.color:T.border}`,
-                                  background:active?`${opt.color}1A`:T.white,
+                                  padding:"5px 16px",borderRadius:999,border:"none",
+                                  background:active?T.white:"transparent",
                                   color:active?opt.color:T.textMut,
                                   fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
-                                  transition:"all .15s ease",
+                                  boxShadow:active?"0 1px 2px rgba(0,0,0,0.08)":"none",
+                                  transition:"color .15s ease, background .15s ease, box-shadow .15s ease",
                                 }}>
                                 {opt.label}
                               </button>
@@ -1226,21 +1267,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     );
                   })}
 
-                  {/* INFO ROW - P&L */}
-                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>P&L</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{selectedTrade.pnl>=0?"+":""}{fmt(selectedTrade.pnl,true)}</div>
-                  </div>
-
-                  {/* INFO ROW - R:R */}
-                  <div style={{padding:"12px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"var(--font-sans)"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>R:R</div>
-                    <div style={{fontSize:13,fontWeight:700,color:selectedTrade.pnl>=0?T.green:T.red}}>{fmtR(rMultiple(selectedTrade))}</div>
-                  </div>
-
                   {/* EMOTION TAGS — menu déroulant multi-sélection */}
-                  <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.emotionTags")}</div>
+                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>{t("trades.detail.emotionTags")}</div>
                     <TagMultiSelect
                       placeholder={t("trades.detail.emotionTags")}
                       allTags={allEmotionTags}
@@ -1249,16 +1278,6 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     />
                   </div>
 
-                  {/* ERROR TAGS — menu déroulant multi-sélection */}
-                  <div style={{padding:"16px 16px",backgroundImage:`linear-gradient(to right, transparent 16px, ${T.border} 16px, ${T.border} calc(100% - 16px), transparent calc(100% - 16px))`,backgroundSize:"100% 1px",backgroundPosition:"bottom",backgroundRepeat:"no-repeat"}} key={`error-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.errors")}</div>
-                    <TagMultiSelect
-                      placeholder={t("trades.detail.errors")}
-                      allTags={allErrorTags}
-                      selected={errorTags[selectedTrade.id] || []}
-                      onToggle={(id)=>toggleError(selectedTrade, id)}
-                    />
-                  </div>
 
                   {/* SCREENSHOT — placé sous les tags d'erreurs */}
                   {(() => {
@@ -1284,7 +1303,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     return (
                       <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                          <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase"}}>Screenshot</div>
+                          <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Screenshot</div>
                           {url && (
                             <div style={{display:"inline-flex",alignItems:"center",gap:4}}>
                               <label
@@ -1329,16 +1348,17 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               if (f) await handleFile(f);
                             }}
                             style={{
-                              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
-                              padding:"24px 12px",border:`1px dashed ${T.border}`,borderRadius:8,
+                              display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,
+                              padding:"28px 16px",border:`1.5px dashed ${T.border}`,borderRadius:12,
                               cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
-                              color:T.textMut,fontSize:12,fontWeight:400,
+                              color:T.textMut,fontSize:12,fontWeight:500,
                               outline: "none",
-                            }}
-                            onMouseEnter={(e)=>{if(!screenshotBusy) e.currentTarget.style.background="#F0F0F0"}}
-                            onMouseLeave={(e)=>{e.currentTarget.style.background=T.bg}}>
-                            <LucideImage size={22} strokeWidth={1.5} color={T.textMut} />
-                            <span>{screenshotBusy ? t("trades.detail.uploading") : t("trades.detail.dragImage")}</span>
+                              transition:"background .12s ease, border-color .12s ease",
+                            }}>
+                            <span style={{width:40,height:40,borderRadius:"50%",background:T.accentBg,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>
+                              <LucideImage size={18} strokeWidth={1.75} color={T.textSub} />
+                            </span>
+                            <span style={{fontSize:12,fontWeight:500,color:T.textSub}}>{screenshotBusy ? t("trades.detail.uploading") : t("trades.detail.dragImage")}</span>
                             <input type="file" accept="image/*" disabled={screenshotBusy}
                               onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; await handleFile(f); e.target.value = ""; }}
                               style={{display:"none"}} />
@@ -1348,9 +1368,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     );
                   })()}
 
-                  {/* NOTES */}
-                  <div style={{padding:"16px 16px",flex:1,display:"flex",flexDirection:"column"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase"}}>{t("trades.detail.notes")}</div>
+                  {/* NOTES (manuel) */}
+                  <div style={{padding:"16px 16px",display:"flex",flexDirection:"column"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>Notes</div>
                     <textarea
                       placeholder={t("trades.notePlaceholder")}
                       value={tradeNotes[selectedTrade.id] || ""}
@@ -1378,10 +1398,11 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     />
                   </div>
                 </>
-              )}
+                );
+              })()}
 
-              {/* STRATEGIES TAB */}
-              {activeTab === "strategies" && (() => {
+              {/* STRATÉGIE */}
+              {(() => {
                 const tradeId = selectedTrade.date + selectedTrade.symbol + selectedTrade.entry;
                 // Toutes les clés sous lesquelles ce trade peut être indexé (l'import en crée 3) :
                 // UUID Supabase, composite, composite normalisé. On les met TOUTES à jour pour
@@ -1414,45 +1435,35 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 const progressPercent = totalRulesCount > 0 ? (totalCheckedCount / totalRulesCount) * 100 : 0;
                 
                 return (
-                  <div style={{flex:1,display:"flex",flexDirection:"column",gap:16,padding:"16px",alignItems:"center",justifyContent:"flex-start",width:"100%",overflow:"auto",minHeight:500}}>
+                  <div style={{order:-1,padding:"16px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:12}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Stratégie</div>
                     {selectedIds.length === 0 ? (
                       <>
-                        <div style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",gap:14,paddingTop:48,fontFamily:"var(--font-sans)"}}>
-                          <div style={{
-                            width:44,height:44,borderRadius:"50%",
-                            background:"#F5F5F5",
-                            display:"flex",alignItems:"center",justifyContent:"center",
-                          }}>
-                            <LucideTarget size={20} strokeWidth={1.5} color="#5C5C5C" />
-                          </div>
-                          <div style={{fontSize:13,color:"#5C5C5C",textAlign:"center",maxWidth:240,lineHeight:1.4}}>
-                            {t("trades.detail.addStrategyEmpty")}
-                          </div>
-                        </div>
-                        <div style={{position:"relative",width:"100%",display:"flex",justifyContent:"center",marginTop:4}}>
+                        <div style={{position:"relative",width:"100%",display:"flex"}}>
                           <button
                             onClick={()=>setShowStrategyDropdown(!showStrategyDropdown)}
                             style={{
+                              width:"100%",
                               padding:"8px 16px",
-                              borderRadius:8,
-                              border:`1px solid #E5E5E5`,
-                              background:"#FFFFFF",
+                              borderRadius:999,
+                              border:`1px solid ${T.border}`,
+                              background:T.white,
                               fontSize:13,
                               fontWeight:500,
-                              color:"#0D0D0D",
+                              color:T.text,
                               cursor:"pointer",
-                              display:"inline-flex",
+                              display:"flex",
                               alignItems:"center",
-                              gap:8,
+                              justifyContent:"center",
+                              gap:6,
                               transition:"background .12s ease",
                               fontFamily:"var(--font-sans)",
-                              boxShadow:"0 1px 2px rgba(0,0,0,0.03)",
                             }}
-                            onMouseEnter={(e)=>{e.currentTarget.style.background="#FAFAFA"}}
-                            onMouseLeave={(e)=>{e.currentTarget.style.background="#FFFFFF"}}
+                            onMouseEnter={(e)=>{e.currentTarget.style.background=T.accentBg}}
+                            onMouseLeave={(e)=>{e.currentTarget.style.background=T.white}}
                           >
+                            <LucidePlus size={14} strokeWidth={2.25} />
                             {t("trades.detail.addStrategy")}
-                            <LucideChevronDown size={14} strokeWidth={1.75} />
                           </button>
                           
                           {/* STRATEGY DROPDOWN */}
@@ -1507,7 +1518,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     {(() => {
                       const selectedStrats = loadedStrategies.filter(s => selectedIds.includes(s.id));
                       return selectedStrats.length > 0 ? (
-                        <div style={{width:"100%",flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+                        <div style={{width:"100%",display:"flex",flexDirection:"column"}}>
                           {selectedStrats.map((strat,idx)=>{
                             const allRules = strat.groups.flatMap(g=>g.rules);
                             const checkedCount = allRules.filter(r=>{
@@ -1516,7 +1527,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             }).length;
                             const stratProgressPercent = allRules.length > 0 ? (checkedCount / allRules.length) * 100 : 0;
                             return (
-                              <div key={strat.id} style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
+                              <div key={strat.id} style={{display:"flex",flexDirection:"column"}}>
                                 <div style={{borderBottom:`1px solid ${T.border}`,paddingBottom:12}}>
                                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                                     <div style={{width:12,height:12,borderRadius:3,background:strat.color}}/>
@@ -1548,6 +1559,32 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                             fontFamily:"var(--font-sans)",
                                           }}
                                         >
+                                          <button
+                                            onClick={(e)=>{
+                                              e.stopPropagation();
+                                              // Retirer la stratégie courante puis ouvrir le sélecteur
+                                              const newTradeStrategies = {...tradeStrategies};
+                                              tradeKeys.forEach(k => {
+                                                const current = newTradeStrategies[k] || [];
+                                                newTradeStrategies[k] = current.filter(id => id !== strat.id);
+                                              });
+                                              setTradeStrategies(newTradeStrategies);
+                                              localStorage.setItem("tr4de_trade_strategies", JSON.stringify(newTradeStrategies));
+                                              setOpenStratMenuId(null);
+                                              setShowStrategyDropdown(true);
+                                            }}
+                                            style={{
+                                              display:"flex",alignItems:"center",gap:8,width:"100%",
+                                              padding:"8px 10px",borderRadius:6,border:"none",
+                                              background:"transparent",color:T.text,
+                                              fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                                            }}
+                                            onMouseEnter={(e)=>{e.currentTarget.style.background=T.accentBg}}
+                                            onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
+                                          >
+                                            <LucideRepeat size={14} strokeWidth={1.75} />
+                                            Changer de stratégie
+                                          </button>
                                           <button
                                             onClick={(e)=>{
                                               e.stopPropagation();
@@ -1590,25 +1627,38 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                   </div>
                                 </div>
 
-                                <div style={{flex:1,overflow:"auto",paddingTop:12}}>
+                                <div style={{paddingTop:12}}>
                                   {strat.groups.map(group=>(
-                                    <div key={group.id} style={{marginBottom:16}}>
-                                      <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8,textTransform:"uppercase"}}>{group.name}</div>
-                                      {group.rules.map(rule=>{
-                                        const ruleKey = `${selectedTrade.date}_${selectedTrade.symbol}_${selectedTrade.entry}_${selectedTrade.exit}_${selectedTrade.direction}_${strat.id}_${rule.id}`;
-                                        const isChecked = checkedRules[ruleKey] || false;
-                                        return (
-                                          <div key={rule.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,cursor:"pointer"}}>
-                                            <input 
-                                              type="checkbox" 
-                                              checked={isChecked}
-                                              onChange={()=>setCheckedRules({...checkedRules,[ruleKey]:!isChecked})}
-                                              style={{cursor:"pointer",width:16,height:16}}
-                                            />
-                                            <label style={{fontSize:11,color:T.text,cursor:"pointer",flex:1}}>{rule.text}</label>
-                                          </div>
-                                        );
-                                      })}
+                                    <div key={group.id} style={{marginBottom:14}}>
+                                      <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>{group.name}</div>
+                                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                                        {group.rules.map(rule=>{
+                                          const ruleKey = `${selectedTrade.date}_${selectedTrade.symbol}_${selectedTrade.entry}_${selectedTrade.exit}_${selectedTrade.direction}_${strat.id}_${rule.id}`;
+                                          const isChecked = checkedRules[ruleKey] || false;
+                                          const rc = T.text;
+                                          return (
+                                            <button key={rule.id} type="button" onClick={()=>setCheckedRules({...checkedRules,[ruleKey]:!isChecked})}
+                                              style={{
+                                                display:"inline-flex",alignItems:"center",gap:7,
+                                                padding:"6px 11px 6px 8px",borderRadius:999,border:"none",
+                                                background:T.accentBg,
+                                                cursor:"pointer",fontFamily:"inherit",
+                                                transition:"background .12s ease",
+                                              }}>
+                                              <span style={{
+                                                width:15,height:15,borderRadius:5,flexShrink:0,
+                                                display:"inline-flex",alignItems:"center",justifyContent:"center",
+                                                border:`1.5px solid ${isChecked?rc:T.border}`,
+                                                background:isChecked?rc:T.white,
+                                                transition:"border-color .12s ease, background .12s ease",
+                                              }}>
+                                                {isChecked && <LucideCheck size={11} strokeWidth={3} color="#fff" />}
+                                              </span>
+                                              <span style={{fontSize:12,fontWeight:isChecked?600:500,color:isChecked?T.text:T.textMut}}>{rule.text}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -1820,7 +1870,7 @@ function TagMultiSelect({ placeholder, allTags, selected, onToggle }) {
   return (
     <div ref={ref} style={{ position: "relative", fontFamily: "var(--font-sans)" }}>
       <button type="button" onClick={() => setOpen((o) => !o)}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", border: `1px solid ${T.border}`, borderRadius: 10, background: T.white, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", border: `1px solid ${T.border}`, borderRadius: 999, background: T.white, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
           {chosen.length === 0
             ? <span style={{ fontSize: 13, color: T.textMut }}>{placeholder}</span>

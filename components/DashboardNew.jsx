@@ -681,7 +681,8 @@ export default function App() {
                 user_id: userId,
                 account_id: newId,
                 date: tr.date, symbol: tr.symbol, direction: tr.direction,
-                entry: tr.entry, exit: tr.exit, pnl: tr.pnl,
+                // On réécrit le P&L BRUT (les frais sont recalculés au chargement).
+                entry: tr.entry, exit: tr.exit, pnl: tr.pnlGross != null ? tr.pnlGross : tr.pnl,
                 entry_time: tr.entry_time || null, exit_time: tr.exit_time || null,
               })));
             }
@@ -730,13 +731,35 @@ export default function App() {
 
   // Raccourcis clavier : Alt+1..9 pour naviguer entre les pages de la sidebar
   const flatNavIds = SIDEBAR_SECTIONS.flatMap(s => s.items.map(i => i.id));
-  useKeyboardShortcuts(
-    flatNavIds.slice(0, 9).map((id, i) => ({
+  // Ctrl+Tab : page suivante dans la navbar ; Ctrl+Shift+Tab : page précédente.
+  const goRelative = (delta) => {
+    if (flatNavIds.length === 0) return;
+    const idx = flatNavIds.indexOf(page);
+    const cur = idx < 0 ? 0 : idx;
+    const next = (cur + delta + flatNavIds.length) % flatNavIds.length;
+    setPage(flatNavIds[next]);
+    setMobileNavOpen(false);
+  };
+  useKeyboardShortcuts([
+    ...flatNavIds.slice(0, 9).map((id, i) => ({
       key: String(i + 1),
       alt: true,
       handler: (e) => { e.preventDefault(); setPage(id); setMobileNavOpen(false); },
-    }))
-  );
+    })),
+    {
+      key: "Tab",
+      ctrlOrCmd: true,
+      ignoreInInputs: false,
+      handler: (e) => { e.preventDefault(); goRelative(1); },
+    },
+    {
+      key: "Tab",
+      ctrlOrCmd: true,
+      shift: true,
+      ignoreInInputs: false,
+      handler: (e) => { e.preventDefault(); goRelative(-1); },
+    },
+  ]);
 
   const pages = {
     dashboard:  <DashboardPage trades={filteredTrades} allTrades={trades} accounts={accounts} selectedAccountIds={selectedAccountIds} strategies={strategies} setPage={setPage} setDateRangesByPage={setDateRangesByPage} />,
