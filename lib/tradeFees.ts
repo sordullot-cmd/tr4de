@@ -1,9 +1,10 @@
 // Frais de commission (futures) — barème centralisé pour tout le site.
 //
-// On suppose 1 contrat par trade (les données importées n'ont pas toujours de
-// colonne quantité). Le barème est exprimé en aller-retour (round-trip) :
+// Le barème est PAR CONTRAT, exprimé en aller-retour (round-trip) ; on multiplie
+// par la quantité de contrats du trade (micro ou mini), pas un montant fixe :
 //   - Micro (symbole préfixé "M" : MNQ, MES, M2K, MGC…) : 0,91 $/côté → 1,82 $ A/R
 //   - Mini / standard (NQ, ES, RTY, YM…)                : 2,88 $/côté → 5,76 $ A/R
+// Frais total = barème_par_contrat × quantité (défaut 1 si quantité inconnue).
 //
 // Le P&L exposé par useTrades() est NET de ces frais (le brut est conservé dans
 // `pnlGross`). Tous les consommateurs du site lisent donc directement le net.
@@ -34,7 +35,11 @@ export function calculateFees(trade: TradeLike | null | undefined): number {
   if (trade == null) return 0;
   const manual = Number(trade.fees ?? trade.commission);
   if (Number.isFinite(manual) && manual > 0) return manual;
-  return isMicroContract(trade.symbol) ? FEE_MICRO_ROUNDTRIP : FEE_MINI_ROUNDTRIP;
+  // Quantité de contrats (micro ou mini) ; défaut 1 si inconnue.
+  const qty = Number(trade.quantity ?? trade.qty ?? trade.lots ?? trade.lot_size);
+  const n = Number.isFinite(qty) && qty > 0 ? qty : 1;
+  const perContract = isMicroContract(trade.symbol) ? FEE_MICRO_ROUNDTRIP : FEE_MINI_ROUNDTRIP;
+  return perContract * n;
 }
 
 /**
