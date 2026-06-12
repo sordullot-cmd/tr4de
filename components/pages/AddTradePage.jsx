@@ -731,6 +731,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
           entry: t.entry,
           exit: t.exit,
           pnl: t.pnl,
+          quantity: t.quantity ?? t.qty ?? null,
+          volume: t.volume ?? null,
           entry_time: t.entryTime || t.entry_time || null,
           exit_time: t.exitTime || t.exit_time || null,
         }));
@@ -759,9 +761,17 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
 
         if (tradesToInsert.length === 0) continue;
 
-        const { error: insertError } = await supabase
+        let { error: insertError } = await supabase
           .from("apex_trades")
           .insert(tradesToInsert);
+
+        // Tolérance : si les colonnes quantity/volume n'existent pas encore en
+        // base (migration 028 non appliquée), on réessaie sans elles.
+        if (insertError && /could not find the '(quantity|volume)' column/i.test(insertError.message || "")) {
+          console.warn("⚠️ Colonnes quantity/volume absentes — réessai sans (applique la migration 028 pour les conserver)");
+          const stripped = tradesToInsert.map(({ quantity, volume, ...rest }) => rest);
+          ({ error: insertError } = await supabase.from("apex_trades").insert(stripped));
+        }
 
         if (insertError) {
           console.error("Error inserting trades:", insertError);

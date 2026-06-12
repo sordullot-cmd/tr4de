@@ -159,6 +159,16 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     return calculateFees(t);
   };
   const netPnlOf = (t) => Number(t?.pnl) || 0;
+  // Quantité de contrats/lots du trade (selon le champ disponible). null si inconnu.
+  const qtyOf = (t) => {
+    const q = Number(t?.quantity ?? t?.qty ?? t?.lots ?? t?.lot_size);
+    return Number.isFinite(q) && q > 0 ? q : null;
+  };
+  // Volume notionnel du trade. null si inconnu.
+  const volOf = (t) => {
+    const v = Number(t?.volume);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
 
   // Groupes "trades pris sur plusieurs comptes" (même symbole/sens/prix d'entrée à 1 min près)
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
@@ -209,6 +219,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       pnlSum: g.children.reduce((s, x) => s + (Number(x.pnl) || 0), 0),
       feesSum: g.children.reduce((s, x) => s + feesOf(x), 0),
       netSum: g.children.reduce((s, x) => s + netPnlOf(x), 0),
+      qtySum: g.children.reduce((s, x) => s + (qtyOf(x) || 0), 0),
+      volSum: g.children.reduce((s, x) => s + (volOf(x) || 0), 0),
     }));
   };
 
@@ -937,7 +949,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   for (const g of groups) {
                     const isGroup = g.children.length > 1;
                     const parentTrade = isGroup
-                      ? { ...g.parent, _children: g.children, _groupKey: g.key, _groupPnl: g.pnlSum, _groupFees: g.feesSum, _groupNet: g.netSum }
+                      ? { ...g.parent, _children: g.children, _groupKey: g.key, _groupPnl: g.pnlSum, _groupFees: g.feesSum, _groupNet: g.netSum, _groupQty: g.qtySum, _groupVolume: g.volSum }
                       : g.parent;
                     rows.push({ trade: parentTrade, isGroupParent: isGroup, isChild: false, groupKey: g.key, groupSize: g.children.length });
                     if (isGroup && expandedGroups.has(g.key)) {
@@ -1137,8 +1149,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           exitDate:  <td key="exitDate" style={cellStyle("exitDate",{...tdBase,color:T.textSub})}>{closeDate}</td>,
                           exitTime:  <td key="exitTime" style={cellStyle("exitTime",{...tdBase,color:T.textSub,fontSize:12})}>{closeTime}</td>,
                           exit:      <td key="exit" style={cellStyle("exit",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.exit.toFixed(2)}</td>,
-                          lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub,textAlign:"center"})}>1</td>,
-                          volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub,textAlign:"center"})}>2</td>,
+                          lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub,textAlign:"center"})}>{(() => { const q = t._groupQty != null && t._groupQty > 0 ? t._groupQty : qtyOf(t); return q != null ? q : "—"; })()}</td>,
+                          volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub,textAlign:"center"})}>{(() => { const v = t._groupVolume != null && t._groupVolume > 0 ? t._groupVolume : volOf(t); return v != null ? fmt(v, false) : "—"; })()}</td>,
                           pnl:       (() => { const p = t._groupPnl != null ? t._groupPnl : t.pnl; return <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:p>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{p>=0?"+":""}{fmt(p,false)}</td>; })(),
                           pnlPct:    <td key="pnlPct" style={cellStyle("pnlPct",{...tdBase,fontWeight:600,color:rowNet>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{ret>0?"+":""}{ret}%</td>,
                           r:         <td key="r" style={cellStyle("r",{...tdBase,fontWeight:600,color:rowNet>=0?T.green:T.red,fontFamily:"var(--font-sans)",fontSize:12,whiteSpace:"nowrap"})}>{fmtR(rMultiple({...t, pnl: rowNet}))}</td>,
