@@ -442,6 +442,45 @@ html, body, * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transpa
   scrollbar-color: rgba(0, 0, 0, 0.14) transparent;
 }
 
+/* === Tableau des trades : scrollbar bien visible (surtout l'horizontale) ===
+   Surcharge les scrollbars globales ultra-fines (4px) afin que la barre de
+   défilement horizontale du tableau soit clairement perceptible sur desktop. */
+.tr4de-trades-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(0, 0, 0, 0.32) rgba(0, 0, 0, 0.05);
+}
+.tr4de-trades-scroll::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}
+.tr4de-trades-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 999px !important;
+}
+.tr4de-trades-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.32) !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  border-radius: 999px !important;
+}
+.tr4de-trades-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5) !important;
+  background-clip: padding-box !important;
+}
+.tr4de-trades-scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+:root[data-theme="dark"] .tr4de-trades-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.32) rgba(255, 255, 255, 0.06);
+}
+:root[data-theme="dark"] .tr4de-trades-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+:root[data-theme="dark"] .tr4de-trades-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.32) !important;
+  background-clip: padding-box !important;
+}
+
 /* === Focus visible === */
 /* Contours rectangulaires de focus retirés sur l'ensemble du site (demande
    utilisateur). Note : supprime l'indicateur de focus clavier par défaut. */
@@ -907,6 +946,24 @@ img, canvas {
   /* TradesPage : table + détail latéral → stack vertical sur mobile */
   .tr4de-trades-layout { flex-direction: column !important; }
   .tr4de-trades-main { flex: 1 1 100% !important; max-height: none !important; }
+
+  /* Détail d'un trade : en mobile, on l'affiche en plein écran (overlay) au lieu
+     de le masquer — sinon cliquer sur un trade n'ouvrait rien. */
+  .tr4de-trade-side {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    z-index: 1000 !important;
+    animation: tr4deTradeSheetIn .22s cubic-bezier(.2, .8, .2, 1) both;
+  }
+  @keyframes tr4deTradeSheetIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
   /* Page Comptes : grille 2 colonnes → 1 colonne sur mobile (cartes lisibles) */
   .tr4de-accounts-grid { grid-template-columns: 1fr !important; }
