@@ -128,7 +128,6 @@ const css = `
 const fmt = (n, sign=false) => `${sign && n>0?"+":""}${n<0?"-":""}${getCurrencySymbol()}${Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
 // Bouton compte utilisateur dans la barre du haut (à droite du gris)
-import TopBarUserMenu from "./dashboard/TopBarUserMenu";
 
 // Portal: rend ses enfants dans le slot d'en-tête de page (id="tr4de-page-header-slot")
 // si présent. Permet aux pages d'inclure des éléments contrôlés depuis le layout.
@@ -255,9 +254,10 @@ export default function App() {
 
   // Construire l'objet affichage utilisateur à partir de l'utilisateur authentifié
   const displayUser = {
-    name: user?.email?.split('@')[0] || "Trader",
+    name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || "Trader",
     email: user?.email || "trader@taotrade.com",
-    initials: (user?.email?.split('@')[0] || "TR").substring(0, 2).toUpperCase()
+    initials: (user?.email?.split('@')[0] || "TR").substring(0, 2).toUpperCase(),
+    avatarUrl: user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null,
   };
 
   // Sauvegarder la sélection de comptes dans localStorage
@@ -725,6 +725,7 @@ export default function App() {
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
+        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];
@@ -998,6 +999,16 @@ export default function App() {
             });
           }}
           brand="tao trade"
+          user={{ name: displayUser.name, email: displayUser.email, initials: displayUser.initials, avatarUrl: displayUser.avatarUrl }}
+          onProfile={() => setPage("settings")}
+          onSettings={() => setPage("settings")}
+          onDarkMode={() => {
+            const cur = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+            const next = cur === "dark" ? "light" : "dark";
+            document.documentElement.dataset.theme = next;
+            try { localStorage.setItem("tr4de_theme", next); } catch {}
+          }}
+          onLogout={handleLogout}
           workspace={(() => {
             if (selectedAccountIds.length === 1) {
               const acc = accounts.find(a => a.id === selectedAccountIds[0]);
@@ -1039,20 +1050,6 @@ export default function App() {
             >
               <LucideMenu size={18} strokeWidth={1.75} />
             </button>
-            <div style={{marginLeft:"auto"}}>
-              <TopBarUserMenu
-                user={{ name: displayUser.name, initials: displayUser.initials }}
-                onLogout={handleLogout}
-                onSettings={() => setPage("settings")}
-                onProfile={() => setPage("settings")}
-                onDarkMode={() => {
-                  const cur = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-                  const next = cur === "dark" ? "light" : "dark";
-                  document.documentElement.dataset.theme = next;
-                  try { localStorage.setItem("tr4de_theme", next); } catch {}
-                }}
-              />
-            </div>
           </div>
           <div style={{flex:1,minHeight:0,padding: "0 8px 8px 0",display:"flex"}}>
             <div className="scroll-thin" style={{

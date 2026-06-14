@@ -176,6 +176,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [errorTags, setErrorTags] = useState({});
   // Réponses à la checklist Oui/Non par trade : { [tradeId]: { [questionId]: "yes" | "no" } }
   const [tradeChecklist, setTradeChecklist] = useState({});
+  // Unité de temps (timeframe) d'analyse par trade : { [tradeId]: "M15" }. Sélection unique.
+  const [tradeTimeframe, setTradeTimeframe] = useState({});
+  const TIMEFRAME_OPTIONS = ["M1", "M5", "M15", "H1", "H4"];
   // Liste complète des règles de la checklist (base + ajoutées), toutes
   // éditables/supprimables. Persistée globalement.
   const DEFAULT_CHECKLIST_RULES = [
@@ -399,6 +402,23 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     });
   };
 
+  // Sélectionne l'unité de temps (sélection unique) et la propage aux trades
+  // enfants d'un groupe. Re-cliquer la valeur active la retire (toggle).
+  const setTimeframeFor = (selectedTrade, tf) => {
+    const targets = childrenOf(selectedTrade);
+    setTradeTimeframe((prev) => {
+      const updated = { ...prev };
+      for (const child of targets) {
+        const cid = child.id;
+        if (!cid) continue;
+        if (updated[cid] === tf) delete updated[cid];
+        else updated[cid] = tf;
+      }
+      try { localStorage.setItem("tr4de_trade_timeframe", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
   // Bascule une émotion (multi-sélection) et propage aux trades enfants d'un groupe.
   const toggleEmotion = (selectedTrade, tagId) => {
     const tradeId = selectedTrade?.id;
@@ -538,6 +558,11 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       const savedChecklist = localStorage.getItem("tr4de_trade_checklist");
       if (savedChecklist) {
         setTradeChecklist(JSON.parse(savedChecklist));
+      }
+
+      const savedTimeframe = localStorage.getItem("tr4de_trade_timeframe");
+      if (savedTimeframe) {
+        setTradeTimeframe(JSON.parse(savedTimeframe));
       }
 
       const savedRules = localStorage.getItem("tr4de_checklist_rules_v2");
@@ -930,7 +955,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         <div ref={tradesMainRef} className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderTop: embedded ? "none" : `1px solid ${T.border}`,borderRadius: embedded ? "0 0 12px 12px" : 12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
 
-          <div className="tr4de-trades-scroll" style={{overflowX:"auto",overflowY:"auto",flex:1}}>
+          <div className="tr4de-trades-scroll" style={{overflowX:"scroll",overflowY:"auto",overscrollBehavior:"contain",flex:1,minHeight:0}}>
             <table style={{width:"max-content",minWidth:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:"var(--font-sans)"}}>
               <thead style={{position:"sticky",top:0,background:T.bg,zIndex:10}}>
                 <tr
@@ -1498,6 +1523,29 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       />
                     </div>
                   )}
+
+                  {/* UNITÉ DE TEMPS (timeframe d'analyse) — sélection unique, placée sous les règles */}
+                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>Unité de temps</div>
+                    <div style={{display:"flex",gap:2,padding:3,background:T.accentBg,borderRadius:999}}>
+                      {TIMEFRAME_OPTIONS.map((opt)=>{
+                        const active = (tradeTimeframe[selectedTrade.id] || "") === opt;
+                        return (
+                          <button key={opt} type="button" onClick={()=>setTimeframeFor(selectedTrade, opt)}
+                            style={{
+                              flex:1,padding:"6px 0",borderRadius:999,border:"none",
+                              background:active?T.white:"transparent",
+                              color:active?T.text:T.textMut,
+                              fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+                              boxShadow:active?"0 1px 2px rgba(0,0,0,0.08)":"none",
+                              transition:"color .15s ease, background .15s ease, box-shadow .15s ease",
+                            }}>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   {/* EMOTION TAGS — menu déroulant multi-sélection */}
                   <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>

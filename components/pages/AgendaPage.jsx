@@ -1104,7 +1104,7 @@ export default function AgendaPage() {
     }
   };
 
-  // Scroll auto vers 5h du matin à l'ouverture du time-grid (jour / semaine).
+  // Scroll auto vers l'heure actuelle à l'ouverture du time-grid (jour / semaine).
   // On réarme l'intention à chaque changement de vue/date…
   const scrollRef = React.useRef(null);
   const didScrollRef = React.useRef(false);
@@ -1124,15 +1124,19 @@ export default function AgendaPage() {
     clearTimeout(animTimerRef.current);
     cancelAnimationFrame(animRafRef.current);
     // Animation maison (le scrollTo natif "smooth" est trop court/saccadé) :
-    // la grille s'affiche à 00h, puis défile en douceur jusqu'à 5h avec une
-    // courbe easeInOutCubic sur ~900 ms.
+    // la grille s'affiche à 00h, puis défile en douceur jusqu'à l'heure
+    // actuelle avec une courbe easeInOutCubic sur ~900 ms.
+    // Cible : ligne « maintenant » placée avec ~2h de contexte au-dessus
+    // (le navigateur clampe scrollTop si on dépasse le bas de la grille).
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const target = Math.max(0, (nowMinutes / 60) * HOUR_H - 2 * HOUR_H);
     animTimerRef.current = setTimeout(() => {
       const el = scrollRef.current;
       if (!el) return;
-      // Sur mobile : pas d'animation de défilement, on positionne directement à 5h.
-      if (isMobile) { el.scrollTop = 5 * HOUR_H; return; }
+      // Sur mobile : pas d'animation de défilement, on positionne directement.
+      if (isMobile) { el.scrollTop = target; return; }
       const start = el.scrollTop;
-      const dist = 5 * HOUR_H - start;
+      const dist = target - start;
       const duration = 900;
       const t0 = performance.now();
       const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);

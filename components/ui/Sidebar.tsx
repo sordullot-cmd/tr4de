@@ -46,6 +46,7 @@ export interface SidebarProps {
     name: string;
     email?: string;
     initials: string;
+    avatarUrl?: string | null;
   };
   onUserMenu?: () => void;
   onProfile?: () => void;
@@ -246,13 +247,24 @@ export default function Sidebar(props: SidebarProps) {
             onMouseEnter={e => { if (!userMenuOpen) e.currentTarget.style.background = "var(--color-hover-bg)"; }}
             onMouseLeave={e => { if (!userMenuOpen) e.currentTarget.style.background = "transparent"; }}
           >
-            <div style={{
-              width: 26, height: 26, borderRadius: "50%", background: "#FFE0B2",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 700, color: "#9D5800", flexShrink: 0,
-            }}>
-              {user.initials}
-            </div>
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                referrerPolicy="no-referrer"
+                width={26}
+                height={26}
+                style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: 26, height: 26, borderRadius: "50%", background: "#FFE0B2",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, color: "#9D5800", flexShrink: 0,
+              }}>
+                {user.initials}
+              </div>
+            )}
             {!collapsed && (
               <div style={{ flex: 1, overflow: "hidden", textAlign: "left" }}>
                 <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
