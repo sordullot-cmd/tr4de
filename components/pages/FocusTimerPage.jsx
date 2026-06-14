@@ -140,6 +140,11 @@ export default function FocusTimerPage() {
     saveTimer({ mode, taskLabel, endAt, pausedRemaining, swStartAt, swPausedElapsed });
   }, [mode, taskLabel, endAt, pausedRemaining, swStartAt, swPausedElapsed]);
 
+  // Notifie la navbar du titre du chrono (pour l'afficher à la place de "Focus")
+  useEffect(() => {
+    try { window.dispatchEvent(new CustomEvent("tr4de-focus-label", { detail: taskLabel })); } catch {}
+  }, [taskLabel]);
+
   const logSession = (durationSec, label) => {
     if (durationSec <= 0) return;
     setSessions(prev => [{ id: Date.now(), date: todayIso(), label: label || "Session de focus", duration: durationSec, completedAt: new Date().toISOString() }, ...prev]);

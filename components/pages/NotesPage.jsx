@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus } from "lucide-react";
+import { Plus, Search, Trash2, Tag as TagIcon, Sparkles, X, ImagePlus, Pin, PinOff } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
@@ -160,6 +160,10 @@ export default function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const togglePin = (id) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() } : n));
+  };
+
   const removeNote = (id) => {
     const snapshot = notes.find(n => n.id === id);
     setNotes(prev => prev.filter(n => n.id !== id));
@@ -249,12 +253,15 @@ export default function NotesPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return notes.filter(n => {
+    const list = notes.filter(n => {
       const tags = parseTags(n.content);
       if (activeTag && !tags.includes(activeTag)) return false;
       if (!q) return true;
       return n.content.toLowerCase().includes(q);
     });
+    // Les notes épinglées remontent toujours en haut (tri stable : on conserve
+    // l'ordre d'origine au sein de chaque groupe).
+    return list.slice().sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
   }, [notes, query, activeTag]);
 
   const firstLine = (content) => (content || "").split("\n").find(l => l.trim()) || "(Sans titre)";
@@ -347,7 +354,10 @@ export default function NotesPage() {
                   onMouseEnter={(e) => { if (selectedId !== n.id) e.currentTarget.style.background = "#FAFAFA"; }}
                   onMouseLeave={(e) => { if (selectedId !== n.id) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstLine(n.content)}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                    {n.pinned && <Pin size={11} strokeWidth={2} style={{ flexShrink: 0, color: T.textMut, fill: T.textMut }} />}
+                    <div style={{ fontSize: 13, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstLine(n.content)}</div>
+                  </div>
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, color: T.textMut }}>{new Date(n.updatedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>
                     {tags.slice(0, 3).map(t => (
@@ -369,6 +379,14 @@ export default function NotesPage() {
                   <div style={{ fontSize: 11, color: T.textMut }}>Mis à jour {new Date(selected.updatedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <button onClick={() => togglePin(selected.id)}
+                    title={selected.pinned ? "Désépingler" : "Épingler en haut"}
+                    style={{ width: 28, height: 28, background: selected.pinned ? T.accentBg : "transparent", border: "none", color: selected.pinned ? T.text : T.textMut, cursor: "pointer", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.text; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = selected.pinned ? T.accentBg : "transparent"; e.currentTarget.style.color = selected.pinned ? T.text : T.textMut; }}
+                  >
+                    {selected.pinned ? <PinOff size={14} strokeWidth={1.75} /> : <Pin size={14} strokeWidth={1.75} />}
+                  </button>
                   <input
                     ref={fileInputRef}
                     type="file"

@@ -443,16 +443,9 @@ export default function App() {
     const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     return { start: iso(firstOfMonth), end: iso(lastOfMonth) };
   };
-  const [dateRangesByPage, setDateRangesByPage] = useState(() => {
-    try {
-      const saved = localStorage.getItem("tr4de_date_ranges_by_page");
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {};
-  });
-  React.useEffect(() => {
-    try { localStorage.setItem("tr4de_date_ranges_by_page", JSON.stringify(dateRangesByPage)); } catch {}
-  }, [dateRangesByPage]);
+  // Conservé en mémoire seulement : la sélection est gardée quand on change de
+  // page, mais un rechargement de la page réinitialise au défaut (mois en cours).
+  const [dateRangesByPage, setDateRangesByPage] = useState({});
   const globalDateRange = dateRangesByPage[page] || defaultDateRange(page);
   const setGlobalDateRange = (r) => setDateRangesByPage(prev => ({ ...prev, [page]: r }));
 
@@ -697,6 +690,26 @@ export default function App() {
     }
   };
 
+  // Titre du chrono Focus (affiché dans la navbar à la place de "Focus")
+  const [focusLabel, setFocusLabel] = useState("");
+  React.useEffect(() => {
+    const read = () => {
+      try {
+        const raw = localStorage.getItem("tr4de_focus_timer_v1");
+        const s = raw ? JSON.parse(raw) : null;
+        setFocusLabel((s?.taskLabel || "").trim());
+      } catch { setFocusLabel(""); }
+    };
+    read();
+    const onLabel = (e) => setFocusLabel((e?.detail || "").trim());
+    window.addEventListener("tr4de-focus-label", onLabel);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener("tr4de-focus-label", onLabel);
+      window.removeEventListener("storage", read);
+    };
+  }, []);
+
   const SIDEBAR_SECTIONS = [
     {
       label: t("nav.trading"),
@@ -725,7 +738,7 @@ export default function App() {
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
-        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
+        { id: "focus",         icon: LucideTimer,        label: focusLabel || t("nav.focus") },
       ],
     },
   ];
