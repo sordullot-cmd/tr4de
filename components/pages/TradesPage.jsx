@@ -31,7 +31,7 @@ import { useTradeEmotionTags, useTradeErrorTags } from "@/lib/hooks/useTradeEmot
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 
-export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades, embedded = false }) {
+export default function TradesPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades, embedded = false, maxRows = null, lockColumns = false }) {
   useLang();
   const { user } = useAuth();
   const { notes: notesFromHook, setNote: setNoteHook } = useTradeNotes();
@@ -138,6 +138,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     });
   };
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  // Mode embarqué (journal) : "voir plus" pour dépasser la limite maxRows.
+  const [embeddedShowAll, setEmbeddedShowAll] = useState(false);
   const [dragColId, setDragColId] = useState(null);
   const [dragGrabOffset, setDragGrabOffset] = useState(0);
   const [dragWidth, setDragWidth] = useState(0);
@@ -568,7 +570,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       const savedRules = localStorage.getItem("tr4de_checklist_rules_v2");
       if (savedRules) {
         const parsed = JSON.parse(savedRules);
-        if (Array.isArray(parsed) && parsed.length) setChecklistRules(parsed);
+        // On respecte aussi un tableau vide : si l'utilisateur a supprimé toutes
+        // ses règles, on n'affiche plus aucune case (et on ne réinjecte pas les
+        // règles par défaut).
+        if (Array.isArray(parsed)) setChecklistRules(parsed);
       } else {
         // Migration depuis l'ancienne clé (ne contenait que les règles ajoutées)
         const old = localStorage.getItem("tr4de_checklist_rules");
@@ -952,10 +957,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       <div className="tr4de-trades-layout" style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
         {/* LEFT - TRADES TABLE */}
-        <div ref={tradesMainRef} className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderTop: embedded ? "none" : `1px solid ${T.border}`,borderRadius: embedded ? "0 0 12px 12px" : 12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
+        <div ref={tradesMainRef} className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
 
-          <div className="tr4de-trades-scroll" style={{overflowX:"scroll",overflowY:"auto",overscrollBehavior:"contain",flex:1,minHeight:0}}>
+          <div className="tr4de-trades-scroll" style={{overflowX:embedded?"auto":"scroll",overflowY:"auto",overscrollBehavior:"contain",flex:1,minHeight:0}}>
             <table style={{width:"max-content",minWidth:"100%",borderCollapse:"collapse",fontSize:13,fontFamily:"var(--font-sans)"}}>
               <thead style={{position:"sticky",top:0,background:T.bg,zIndex:10}}>
                 <tr
@@ -1039,15 +1044,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       session:   { label: "Session" },
                       weekday:   { label: "Jour" },
                     };
-                    return columnOrder.filter(id => visibleColumns.includes(id)).map(id => {
+                    return columnOrder.filter(id => visibleColumns.includes(id) && !(embedded && ["entryDate","exitDate","pnlPct","weekday"].includes(id))).map(id => {
                       const h = labels[id]; if (!h) return null;
                       const isDragging = dragColId === id;
                       return (
                         <th
                           key={id}
                           data-col-id={id}
-                          draggable
-                          onDragStart={(e) => {
+                          draggable={!lockColumns}
+                          onDragStart={lockColumns ? undefined : (e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
                             e.dataTransfer.setData("text/plain", id);
                             e.dataTransfer.effectAllowed = "move";
@@ -1055,8 +1060,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             setDragGrabOffset(e.clientX - rect.left);
                             setDragWidth(rect.width);
                           }}
-                          onDragEnd={() => { persistColumns(columnOrder); setDragColId(null); }}
-                          title="Glisser pour réordonner"
+                          onDragEnd={lockColumns ? undefined : () => { persistColumns(columnOrder); setDragColId(null); }}
+                          title={lockColumns ? undefined : "Glisser pour réordonner"}
                           style={{
                             position: "relative",
                             padding: "12px 22px",
@@ -1064,14 +1069,14 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             color: T.textMut,
                             whiteSpace: "nowrap",
                             background: T.bg,
-                            cursor: "grab",
+                            cursor: lockColumns ? "default" : "grab",
                             opacity: isDragging ? 0.45 : 1,
                             userSelect: "none",
                           }}
                         >
                           {/* Poignée en position absolue dans le padding gauche : elle ne
                               décale pas le libellé, qui reste aligné sur les données. */}
-                          <LucideGripVertical size={11} strokeWidth={1.75} style={{ position: "absolute", left: 7, top: "50%", transform: "translateY(-50%)", color: T.textMut, opacity: 0.55 }} />
+                          {!lockColumns && <LucideGripVertical size={11} strokeWidth={1.75} style={{ position: "absolute", left: 7, top: "50%", transform: "translateY(-50%)", color: T.textMut, opacity: 0.55 }} />}
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                             {h.label}
                             {h.sorted && <LucideArrowDown size={11} strokeWidth={1.75} />}
@@ -1082,6 +1087,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   })()}
                   {/* Settings column header */}
                   <th style={{padding:"12px 8px",textAlign:"right",background:T.bg,width:32}}>
+                    {!lockColumns && (
                     <button
                       aria-label="Configurer colonnes"
                       onClick={(e) => { e.stopPropagation(); setColumnsMenuOpen(v => !v); }}
@@ -1091,6 +1097,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     >
                       <LucideSlidersHorizontal size={14} strokeWidth={1.75} />
                     </button>
+                    )}
                   </th>
                 </tr>
               </thead>
@@ -1129,7 +1136,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       }
                     }
                   }
-                  return rows.map(({ trade: t, isGroupParent, isChild, groupKey, groupSize }, i) => {
+                  // En mode embarqué : on borne le nombre de lignes visibles
+                  // (maxRows) avec un bouton "voir plus / voir moins".
+                  const rowsToShow = (maxRows != null && !embeddedShowAll) ? rows.slice(0, maxRows) : rows;
+                  const mapped = rowsToShow.map(({ trade: t, isGroupParent, isChild, groupKey, groupSize }, i) => {
                   // Toutes les métriques dérivées (%, R, P&L net) sont calculées net de frais.
                   const rowNet = t._groupNet != null ? t._groupNet : netPnlOf(t);
                   const ret = ((rowNet/(t.entry*100))*100).toFixed(2);
@@ -1339,13 +1349,34 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           session:   <td key="session" style={cellStyle("session",{...tdBase,color:T.textSub,fontSize:12})}>{sessionLabel}</td>,
                           weekday:   <td key="weekday" style={cellStyle("weekday",{...tdBase,color:T.textSub,fontSize:12,textTransform:"capitalize"})}>{weekdayLabel}</td>,
                         };
-                        return columnOrder.filter(id => visibleColumns.includes(id)).map(id => cells[id] || null);
+                        return columnOrder.filter(id => visibleColumns.includes(id) && !(embedded && ["entryDate","exitDate","pnlPct","weekday"].includes(id))).map(id => cells[id] || null);
                       })()}
                       {/* Cellule vide pour aligner avec le header settings */}
                       <td style={{padding:"12px 8px",width:32}} />
                     </tr>
                   );
                 });
+                if (maxRows != null && rows.length > maxRows) {
+                  const hidden = rows.length - maxRows;
+                  mapped.push(
+                    <tr key="__showmore">
+                      <td colSpan={visibleColumns.length + 2} style={{padding:0}}>
+                        <button
+                          onClick={() => setEmbeddedShowAll(v => !v)}
+                          aria-label={embeddedShowAll ? t("trades.voirMoins") : t("trades.voirPlus").replace("{n}", String(hidden))}
+                          style={{width:"100%",padding:"4px 0",background:"transparent",border:"none",borderTop:`1px solid ${T.border}`,cursor:"pointer",color:T.textMut,display:"flex",alignItems:"center",justifyContent:"center"}}
+                          onMouseEnter={(e)=>(e.currentTarget.style.color=T.text)}
+                          onMouseLeave={(e)=>(e.currentTarget.style.color=T.textMut)}
+                        >
+                          {embeddedShowAll
+                            ? <LucideX size={14} strokeWidth={2} />
+                            : <LucidePlus size={14} strokeWidth={2} />}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }
+                return mapped;
                 })()}
               </tbody>
             </table>
@@ -1356,14 +1387,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
             Mobile : rendu via un portal (plein écran) pour échapper au bloc englobant
             créé par l'animation .anim-1 (transform résiduel), sinon le fixed serait confiné. */}
         {selectedTrade && (() => {
+          // Mode embarqué (journal) : panneau "Trade info" plus compact
+          // (paddings et marges verticales réduits). Le même panneau, plus dense.
+          const compact = embedded;
           const panel = (
           <div className="tr4de-trade-side" style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
-            <div style={{padding:"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:13,fontWeight:600,color:T.text,fontFamily:"var(--font-sans)"}}>Trade info</span>
-              </div>
+            <div style={{padding:compact?"8px 14px":"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:600,color:T.text,fontFamily:"var(--font-sans)"}}>Trade info</span>
               <button onClick={()=>setSelectedTrade(null)} aria-label={t("trades.detail.close")} style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:4,display:"inline-flex",alignItems:"center"}}>
                 <LucideX size={16} strokeWidth={2} />
               </button>
@@ -1395,9 +1427,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 return (
                 <>
                   {/* HERO — données automatiques (P&L mis en avant) */}
-                  <div style={{order:-2,padding:"18px 16px 20px", ...insetSep}}>
+                  <div style={{order:-2,padding:compact?"8px 14px 8px":"18px 16px 20px", ...insetSep}}>
                     {/* Symbole · sens · horodatage */}
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:compact?5:14}}>
                       <span style={{fontSize:16,fontWeight:700,color:T.text,letterSpacing:0.2}}>{selectedTrade.symbol || "—"}</span>
                       <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:999,fontSize:11,fontWeight:600,background:isLong?`${T.green}14`:`${T.red}14`,color:isLong?T.green:T.red}}>
                         {isLong ? <LucideTrendingUp size={11} strokeWidth={2.25}/> : <LucideArrowDown size={11} strokeWidth={2.25}/>}
@@ -1405,14 +1437,21 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       </span>
                       <span style={{marginLeft:"auto",fontSize:12,color:T.textMut,whiteSpace:"nowrap"}}>{dateTime}</span>
                     </div>
-                    {/* P&L héro + R-multiple */}
+                    {/* P&L héro + R-multiple (+ note à droite en compact) */}
                     <div style={{display:"flex",alignItems:"baseline",gap:8}}>
-                      <span style={{fontSize:30,fontWeight:700,letterSpacing:-0.4,color:pnlColor,lineHeight:1}}>{pnlVal>=0?"+":""}{fmt(pnlVal,true)}</span>
+                      <span style={{fontSize:compact?24:30,fontWeight:700,letterSpacing:-0.4,color:pnlColor,lineHeight:1}}>{pnlVal>=0?"+":""}{fmt(pnlVal,true)}</span>
                       {rVal != null && Number.isFinite(rVal) && (
                         <span style={{fontSize:14,fontWeight:600,color:rVal>=0?T.green:T.red,letterSpacing:-0.1}}>{fmtR(rVal)}</span>
                       )}
+                      {compact && (
+                        <div style={{marginLeft:"auto",textAlign:"right",alignSelf:"center"}}>
+                          <div style={{fontSize:11,color:T.textMut,marginBottom:2}}>Note</div>
+                          <div style={{fontSize:13,fontWeight:700,color:tradeNote?tradeNote.color:T.textMut}}>{tradeNote ? `${tradeNote.score}/10` : "—"}</div>
+                        </div>
+                      )}
                     </div>
-                    {/* Heures d'entrée / sortie + note du trade */}
+                    {/* Heures d'entrée / sortie + note du trade (page Trades uniquement) */}
+                    {!compact && (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"14px 16px",marginTop:18,alignItems:"start"}}>
                       {timeStats.map((s)=>(
                         <div key={s.label}>
@@ -1425,10 +1464,11 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                         <div style={{fontSize:13,fontWeight:700,color:tradeNote?tradeNote.color:T.textMut}}>{tradeNote ? `${tradeNote.score}/10` : "—"}</div>
                       </div>
                     </div>
+                    )}
                   </div>
 
                   {/* RÈGLE RESPECTÉE (manuel) */}
-                  <div style={{padding:"16px 16px 6px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{padding:compact?"12px 14px 4px":"16px 16px 6px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Règle respectée</div>
                     <button type="button" onClick={()=>setAddingRule(true)} aria-label="Ajouter une règle"
                       style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:2,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"color .12s ease"}}
@@ -1449,7 +1489,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                         onDragEnd={()=>setDragRuleId(null)}
                         onMouseEnter={()=>setHoveredRuleId(q.id)}
                         onMouseLeave={()=>setHoveredRuleId(prev=>prev===q.id?null:prev)}
-                        style={{position:"relative",padding:"10px 16px 10px 26px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontFamily:"var(--font-sans)",opacity:dragRuleId===q.id?0.4:1,background:dragRuleId===q.id?T.accentBg:"transparent"}}>
+                        style={{position:"relative",padding:compact?"7px 14px 7px 22px":"10px 16px 10px 26px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,fontFamily:"var(--font-sans)",opacity:dragRuleId===q.id?0.4:1,background:dragRuleId===q.id?T.accentBg:"transparent"}}>
                         {hoveredRuleId === q.id && editingRuleId !== q.id && (
                           <div aria-hidden style={{position:"absolute",left:6,top:0,bottom:0,display:"flex",alignItems:"center",color:T.textMut,cursor:"grab"}}>
                             <LucideGripVertical size={14} strokeWidth={2} />
@@ -1510,7 +1550,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* AJOUTER UNE RÈGLE — champ affiché seulement au clic sur le + */}
                   {addingRule && (
-                    <div style={{minHeight:31,padding:"10px 16px 10px 26px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,fontFamily:"var(--font-sans)"}}>
+                    <div style={{minHeight:31,padding:compact?"7px 14px 7px 22px":"10px 16px 10px 26px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8,fontFamily:"var(--font-sans)"}}>
                       <input
                         type="text"
                         autoFocus
@@ -1525,8 +1565,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   )}
 
                   {/* UNITÉ DE TEMPS (timeframe d'analyse) — sélection unique, placée sous les règles */}
-                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>Unité de temps</div>
+                  <div style={{padding:compact?"12px 14px":"16px 16px",borderBottom:`1px solid ${T.border}`}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>Unité de temps</div>
                     <div style={{display:"flex",gap:2,padding:3,background:T.accentBg,borderRadius:999}}>
                       {TIMEFRAME_OPTIONS.map((opt)=>{
                         const active = (tradeTimeframe[selectedTrade.id] || "") === opt;
@@ -1548,8 +1588,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   </div>
 
                   {/* EMOTION TAGS — menu déroulant multi-sélection */}
-                  <div style={{padding:"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>{t("trades.detail.emotionTags")}</div>
+                  <div style={{padding:compact?"12px 14px":"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>{t("trades.detail.emotionTags")}</div>
                     <TagMultiSelect
                       placeholder={t("trades.detail.emotionTags")}
                       allTags={allEmotionTags}
@@ -1581,8 +1621,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       return null;
                     };
                     return (
-                      <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <div style={{padding:compact?"12px":"16px",borderBottom:`1px solid ${T.border}`}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:compact?6:10}}>
                           <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Screenshot</div>
                           {url && (
                             <div style={{display:"inline-flex",alignItems:"center",gap:4}}>
@@ -1629,7 +1669,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                             }}
                             style={{
                               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,
-                              padding:"28px 16px",border:`1.5px dashed ${T.border}`,borderRadius:12,
+                              padding:compact?"16px":"28px 16px",border:`1.5px dashed ${T.border}`,borderRadius:12,
                               cursor:screenshotBusy?"not-allowed":"pointer",background:T.bg,
                               color:T.textMut,fontSize:12,fontWeight:500,
                               outline: "none",
@@ -1649,8 +1689,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   })()}
 
                   {/* NOTES (manuel) */}
-                  <div style={{padding:"16px 16px",display:"flex",flexDirection:"column"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:10,textTransform:"uppercase",letterSpacing:0.5}}>Notes</div>
+                  <div style={{padding:compact?"12px 14px":"16px 16px",display:"flex",flexDirection:"column"}}>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>Notes</div>
                     <textarea
                       placeholder={t("trades.notePlaceholder")}
                       value={tradeNotes[noteKeyOf(selectedTrade)] ?? tradeNotes[selectedTrade.id] ?? ""}
@@ -1715,7 +1755,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 const progressPercent = totalRulesCount > 0 ? (totalCheckedCount / totalRulesCount) * 100 : 0;
                 
                 return (
-                  <div style={{order:-1,padding:"16px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{order:-1,padding:compact?"12px":"16px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:12}}>
                     <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Stratégie</div>
                     {selectedIds.length === 0 ? (
                       <>

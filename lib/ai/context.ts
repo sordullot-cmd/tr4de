@@ -60,6 +60,28 @@ export async function getUserStats(userId: string): Promise<UserStats> {
       console.warn("Erreur lors de la récupération des détails:", detailsError);
     }
 
+    return computeUserStats(trades, tradeDetails || []);
+  } catch (err) {
+    console.error("Erreur lors du calcul des statistiques:", err);
+    return getDefaultStats();
+  }
+}
+
+/**
+ * Calcule les statistiques globales à partir d'un tableau de trades déjà chargé
+ * (et de leurs détails émotionnels). Fonction pure, sans accès base de données :
+ * elle permet de bâtir les stats à partir des données envoyées par le client
+ * (localStorage / utilisateur anonyme) quand la table Supabase ne les contient pas.
+ *
+ * Champs de trade attendus: pnl, setup_name, entry_time, risk_reward_ratio, id.
+ * Champs de détail attendus: trade_id, emotion_tags.
+ */
+export function computeUserStats(trades: any[], tradeDetails: any[] = []): UserStats {
+  if (!Array.isArray(trades) || trades.length === 0) {
+    return getDefaultStats();
+  }
+
+  try {
     // === CALCUL DE BASE ===
     const winningTrades = trades.filter((t) => t.pnl && t.pnl > 0);
     const losingTrades = trades.filter((t) => t.pnl && t.pnl < 0);

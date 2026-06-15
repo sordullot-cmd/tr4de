@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Download, BookOpen } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
@@ -11,21 +11,14 @@ import { useTradeNotes } from "@/lib/hooks/useTradeNotes";
 import { useDailySessionNotes } from "@/lib/hooks/useDailySessionNotes";
 import { exportJournalPdf } from "@/lib/export/journalPdf";
 import DictatableTextarea from "@/components/MicDictateButton";
+import TradesPage from "@/components/pages/TradesPage";
 
-export default function JournalPage({ trades = [] }) {
+export default function JournalPage({ trades = [], strategies = [], onImportClick, onDeleteTrade, onClearTrades }) {
   useLang();
-  const { notes: tradeNotes, setNote: updateTradeNote } = useTradeNotes();
+  const { notes: tradeNotes } = useTradeNotes();
   const { notes: dailyNotes, setNote: updateDailyNote } = useDailySessionNotes();
 
-  const [expandedTrades, setExpandedTrades] = useState({});
-  const [expandedDays, setExpandedDays] = useState({});
-
-  const getTradeId = (trade) => trade.date + trade.symbol + trade.entry;
   const noteColor = (s) => (s >= 7 ? T.green : s >= 4 ? "#F97316" : T.red);
-  const qtyOf = (tr) => {
-    const q = Number(tr?.quantity ?? tr?.qty ?? tr?.lots ?? tr?.lot_size);
-    return Number.isFinite(q) && q > 0 ? q : null;
-  };
   const fmtTime = (v) => {
     if (!v) return "—";
     if (/^\d{1,2}:\d{2}/.test(String(v))) return String(v).slice(0, 5);
@@ -46,9 +39,6 @@ export default function JournalPage({ trades = [] }) {
     } catch (e) {}
   });
   const sortedDates = Object.keys(tradesByDate).sort().reverse();
-
-  const th = { padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 500, color: T.textMut, whiteSpace: "nowrap", background: T.bg };
-  const td = { padding: "8px 14px", fontSize: 13, color: T.text, whiteSpace: "nowrap" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
@@ -93,6 +83,7 @@ export default function JournalPage({ trades = [] }) {
             const avgNote = dayNoteScores.length ? Math.round(dayNoteScores.reduce((a, b) => a + b, 0) / dayNoteScores.length) : null;
             const dayR = dayTrades.reduce((s, tr) => { const r = rMultiple(tr); return s + (Number.isFinite(r) ? r : 0); }, 0);
 
+
             // Sparkline P&L cumulé
             let cumulative = 0;
             const sparklineData = dayTrades.map((tr) => (cumulative += tr.pnl || 0));
@@ -109,10 +100,6 @@ export default function JournalPage({ trades = [] }) {
             }).join(" ");
             const sparkColor = lastVal >= 0 ? T.green : T.red;
             const fillBaseY = lastVal >= 0 ? zeroY : h;
-
-            const isDayExpanded = !!expandedDays[dateStr];
-            const visibleTrades = isDayExpanded ? dayTrades : dayTrades.slice(0, 2);
-            const hiddenCount = dayTrades.length - visibleTrades.length;
 
             return (
               <div key={dateStr} className="tr4de-journal-row" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
@@ -167,95 +154,18 @@ export default function JournalPage({ trades = [] }) {
                     textareaStyle={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, fontSize: 13, color: T.text, background: T.white }}
                   />
 
-                  <div className="tr4de-table-wrap" style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                      <tr>
-                        <th style={th}>Heure</th>
-                        <th style={th}>Symbole</th>
-                        <th style={th}>Sens</th>
-                        <th style={{ ...th, textAlign: "center" }}>Lots</th>
-                        <th style={{ ...th, textAlign: "right" }}>P&L net</th>
-                        <th style={{ ...th, textAlign: "right" }}>R</th>
-                        <th style={{ ...th, textAlign: "center" }}>Note</th>
-                        <th style={{ ...th, textAlign: "center" }}>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleTrades.map((trade, i) => {
-                        const rowKey = `${dateStr}_${i}`;
-                        const tradeId = getTradeId(trade);
-                        const isExpanded = !!expandedTrades[rowKey];
-                        const hasNote = tradeNotes[tradeId] && tradeNotes[tradeId].trim().length > 0;
-                        const side = trade.side || trade.direction || "Long";
-                        const isLong = String(side).toUpperCase().includes("LONG") || String(side).toUpperCase() === "BUY";
-                        const r = rMultiple(trade);
-                        const note = computeTradeNote(trade);
-                        const lots = qtyOf(trade);
-
-                        return (
-                          <React.Fragment key={rowKey}>
-                            <tr
-                              onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                              style={{ borderBottom: `1px solid ${T.border}`, background: "transparent", transition: "background .12s ease" }}>
-                              <td style={{ ...td, color: T.textSub, fontSize: 12 }}>{fmtTime(trade.entryTime || trade.entry_time)}</td>
-                              <td style={{ ...td, fontWeight: 600 }}>{trade.symbol}</td>
-                              <td style={td}><span style={{ color: isLong ? T.green : T.red, fontWeight: 600 }}>{isLong ? "Long" : "Short"}</span></td>
-                              <td style={{ ...td, textAlign: "center", color: T.textSub }}>{lots != null ? lots : "—"}</td>
-                              <td style={{ ...td, textAlign: "right", color: trade.pnl >= 0 ? T.green : T.red, fontWeight: 600, fontFamily: "var(--font-sans)" }}>{trade.pnl >= 0 ? "+" : ""}{fmt(trade.pnl, true)}</td>
-                              <td style={{ ...td, textAlign: "right", fontSize: 12, color: (r != null && Number.isFinite(r)) ? (r >= 0 ? T.green : T.red) : T.textMut, fontFamily: "var(--font-sans)" }}>{fmtR(r)}</td>
-                              <td style={{ ...td, textAlign: "center", fontWeight: 700, color: note ? noteColor(note.score) : T.textMut }}>{note ? `${note.score}/10` : "—"}</td>
-                              <td style={{ ...td, textAlign: "center" }}>
-                                <button
-                                  onClick={() => setExpandedTrades((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }))}
-                                  aria-label={t("journal.tradeNote")}
-                                  style={{ background: hasNote ? T.accentBg : "transparent", border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 12, color: hasNote ? T.text : T.textMut, cursor: "pointer", transition: "background .12s ease, color .12s ease" }}
-                                  onMouseEnter={(e) => { if (!hasNote) e.currentTarget.style.color = T.text; }}
-                                  onMouseLeave={(e) => { if (!hasNote) e.currentTarget.style.color = T.textMut; }}
-                                >
-                                  {isExpanded ? "✕" : "✎"}
-                                </button>
-                              </td>
-                            </tr>
-                            {isExpanded && (
-                              <tr style={{ borderBottom: `1px solid ${T.border}`, background: T.bg }}>
-                                <td colSpan="8" style={{ padding: "12px 12px" }}>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    <div style={{ fontSize: 11, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.4 }}>{t("journal.notesFor").replace("{symbol}", trade.symbol)}</div>
-                                    <DictatableTextarea
-                                      placeholder={t("journal.tradeNote")}
-                                      value={tradeNotes[tradeId] || ""}
-                                      onChange={(next) => updateTradeNote(tradeId, next)}
-                                      height={60}
-                                      micSize={26}
-                                      micStyle={{ bottom: 6, right: 6 }}
-                                      textareaStyle={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, fontSize: 12, color: T.text, background: T.white }}
-                                    />
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                      {dayTrades.length > 2 && (
-                        <tr>
-                          <td colSpan="8" style={{ padding: 0 }}>
-                            <button
-                              onClick={() => setExpandedDays((prev) => ({ ...prev, [dateStr]: !prev[dateStr] }))}
-                              style={{ width: "100%", padding: "10px 12px", background: "transparent", border: "none", borderTop: `1px solid ${T.border}`, cursor: "pointer", fontSize: 11, color: T.textSub, fontFamily: "var(--font-sans)" }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = T.bg)}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                            >
-                              {isDayExpanded ? t("trades.voirMoins") : t("trades.voirPlus").replace("{n}", String(hiddenCount))}
-                            </button>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                  </div>
+                  {/* Tableau identique à la page Trades, borné à 2 lignes par
+                      jour (clic = panneau "Trade info"), colonnes verrouillées. */}
+                  <TradesPage
+                    embedded
+                    lockColumns
+                    maxRows={3}
+                    trades={dayTrades}
+                    strategies={strategies}
+                    onImportClick={onImportClick}
+                    onDeleteTrade={onDeleteTrade}
+                    onClearTrades={onClearTrades}
+                  />
                 </div>
               </div>
             );

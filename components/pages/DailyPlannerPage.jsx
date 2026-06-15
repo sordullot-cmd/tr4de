@@ -9,6 +9,7 @@ import { t, useLang } from "@/lib/i18n";
 import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import { TimeField } from "./AgendaDateFields";
 import { NavArrow, NavLabel } from "@/components/ui/DateNav";
+import MiniCalendar from "@/components/ui/MiniCalendar";
 import {
   Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
@@ -405,6 +406,12 @@ export default function DailyPlannerPage() {
     setDateKey(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
   };
 
+  // Sélecteur de date (popover calendrier) sur le libellé du jour.
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const pickDate = (d) => {
+    setDateKey(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+  };
+
   const energyColor = day.energy >= 8 ? T.green : day.energy >= 5 ? T.amber : T.red;
 
   // --- Tâches du jour ---
@@ -441,9 +448,19 @@ export default function DailyPlannerPage() {
               return (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <NavArrow direction="left" onClick={() => shiftDay(-1)} title="Jour précédent" />
-                  <NavLabel onClick={() => setDateKey(todayKey())} title="Revenir à aujourd'hui" minWidth={0}>
-                    {parts.weekday} {parts.day} {parts.month}
-                  </NavLabel>
+                  <div style={{ position: "relative", display: "inline-flex" }}>
+                    <NavLabel onClick={() => setDayPickerOpen((o) => !o)} title="Choisir une date" minWidth={0}>
+                      {parts.weekday} {parts.day} {parts.month}
+                    </NavLabel>
+                    {dayPickerOpen && (
+                      <MiniCalendar
+                        value={new Date(dateKey + "T00:00:00")}
+                        onSelect={pickDate}
+                        onClose={() => setDayPickerOpen(false)}
+                        align="left"
+                      />
+                    )}
+                  </div>
                   <NavArrow direction="right" onClick={() => shiftDay(1)} title="Jour suivant" />
                 </div>
               );

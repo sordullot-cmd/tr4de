@@ -140,11 +140,6 @@ export default function FocusTimerPage() {
     saveTimer({ mode, taskLabel, endAt, pausedRemaining, swStartAt, swPausedElapsed });
   }, [mode, taskLabel, endAt, pausedRemaining, swStartAt, swPausedElapsed]);
 
-  // Notifie la navbar du titre du chrono (pour l'afficher à la place de "Focus")
-  useEffect(() => {
-    try { window.dispatchEvent(new CustomEvent("tr4de-focus-label", { detail: taskLabel })); } catch {}
-  }, [taskLabel]);
-
   const logSession = (durationSec, label) => {
     if (durationSec <= 0) return;
     setSessions(prev => [{ id: Date.now(), date: todayIso(), label: label || "Session de focus", duration: durationSec, completedAt: new Date().toISOString() }, ...prev]);
@@ -324,7 +319,11 @@ export default function FocusTimerPage() {
             <style>{`@keyframes tr4de-chrono-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
               <div style={{ fontSize: 48, fontWeight: 700, color: T.text, letterSpacing: -1, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{fmtMMSS(remaining)}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 8 }}>{modeConf.label}</div>
+              {taskLabel.trim() ? (
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginTop: 8, maxWidth: 200, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{taskLabel.trim()}</div>
+              ) : (
+                <div style={{ fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 8 }}>{modeConf.label}</div>
+              )}
             </div>
           </div>
 

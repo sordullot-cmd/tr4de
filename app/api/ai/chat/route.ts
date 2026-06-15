@@ -2,7 +2,7 @@ import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { buildSystemPrompt, getUserStats } from "@/lib/ai/context";
+import { buildSystemPrompt, getUserStats, computeUserStats } from "@/lib/ai/context";
 
 export async function POST(request: NextRequest) {
   // Vérification clé OpenAI : si manquante, on retourne un message clair plutôt que "Server error 500"
@@ -180,9 +180,23 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Stats utilisateur + patterns persistés pour le system prompt
+    // Stats utilisateur + patterns persistés pour le system prompt.
+    // Les trades du payload (envoyés par le client) sont la source de vérité de
+    // ce que le trader voit à l'écran : en mode anonyme/localStorage, la table
+    // Supabase peut être vide sous l'user.id authentifié. On calcule donc les
+    // stats à partir du payload quand il contient des trades, et on ne retombe
+    // sur la requête serveur que s'il est vide.
     const effectiveUserId = user?.id || userId;
-    const userStats = await getUserStats(effectiveUserId);
+    const userStats =
+      Array.isArray(trades) && trades.length > 0
+        ? computeUserStats(
+            trades,
+            (journalNotes || []).map((n: any) => ({
+              trade_id: n.trade_id,
+              emotion_tags: n.emotion_tags,
+            }))
+          )
+        : await getUserStats(effectiveUserId);
 
     let patternsBlock = "";
     let memoryBlock = "";

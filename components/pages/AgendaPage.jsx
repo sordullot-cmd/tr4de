@@ -12,6 +12,7 @@ import { t, useLang } from "@/lib/i18n";
 import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
 import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import { DateField, TimeField } from "./AgendaDateFields";
+import MiniCalendar from "@/components/ui/MiniCalendar";
 
 /* ─────────────── Helpers date ─────────────── */
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -461,9 +462,14 @@ function layoutDay(evts, day) {
       const en = e.end ? new Date(e.end) : new Date(s.getTime() + 30 * 60000);
       let startMin = Math.max(0, (s - dayStart) / 60000);
       let endMin = Math.min(24 * 60, (en - dayStart) / 60000);
+      // Dates invalides → startMin/endMin = NaN. La comparaison `endMin <= startMin`
+      // est false avec des NaN, donc on les écarte explicitement pour ne pas
+      // injecter des positions/hauteurs NaN dans le rendu (source de freeze).
+      if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return null;
       if (endMin <= startMin) endMin = startMin + 30;
       return { ...e, startMin, endMin };
     })
+    .filter(Boolean)
     .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
 
   // Partage en colonnes (côte à côte) des éléments qui se chevauchent.
@@ -519,6 +525,7 @@ export default function AgendaPage() {
 
   const [view, setView] = React.useState("week");
   const [cursor, setCursor] = React.useState(() => startOfDay(new Date()));
+  const [datePickerOpen, setDatePickerOpen] = React.useState(false);
   // Horloge courante : sert à tracer la ligne « maintenant » et à griser le passé.
   const [now, setNow] = React.useState(() => new Date());
   React.useEffect(() => {
@@ -905,6 +912,8 @@ export default function AgendaPage() {
 
   // Applique la nouvelle plage horaire (MAJ optimiste puis appel API).
   const applyResize = async (ev, d, startMin, endMin) => {
+    // Minutes non finies (donnée corrompue) → on resynchronise sans rien écrire.
+    if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) { loadEvents(); return; }
     const toTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
     const endM = endMin >= 24 * 60 ? 24 * 60 - 1 : endMin; // 24:00 impossible → 23:59
     const dk = dateKey(d);
@@ -977,6 +986,8 @@ export default function AgendaPage() {
 
   // Applique la nouvelle position (jour + plage horaire) : MAJ optimiste puis API.
   const applyMove = async (ev, targetDayKey, startMin, endMin) => {
+    // Minutes non finies (donnée corrompue) → on resynchronise sans rien écrire.
+    if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) { loadEvents(); return; }
     const toTime = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
     const endM = endMin >= 24 * 60 ? 24 * 60 - 1 : endMin; // 24:00 impossible → 23:59
     if (ev.isTask) {
@@ -1194,16 +1205,55 @@ export default function AgendaPage() {
               <ChevronRight size={16} strokeWidth={2} />
             </button>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
-            {monthYearLabel(view, cursor)}
-          </span>
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              onClick={() => setDatePickerOpen((o) => !o)}
+              title="Choisir une date"
+              style={{
+                fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: -0.1,
+                background: "transparent", border: "none", cursor: "pointer",
+                padding: "4px 8px", borderRadius: 8, fontFamily: "var(--font-sans)",
+                transition: "background .12s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              {monthYearLabel(view, cursor)}
+            </button>
+            {datePickerOpen && (
+              <MiniCalendar
+                value={cursor}
+                onSelect={(d) => setCursor(startOfDay(d))}
+                onClose={() => setDatePickerOpen(false)}
+                align="left"
+              />
+            )}
+          </div>
         </>
       )}
-      {/* Mobile : pas de boutons, juste le libellé du mois pour le repère. */}
+      {/* Mobile : pas de flèches ; le libellé ouvre le sélecteur de date. */}
       {connected && isMobile && (
-        <span style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1 }}>
-          {monthYearLabel(view, cursor)}
-        </span>
+        <div style={{ position: "relative", display: "inline-flex" }}>
+          <button
+            onClick={() => setDatePickerOpen((o) => !o)}
+            title="Choisir une date"
+            style={{
+              fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1,
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: "4px 8px", borderRadius: 8, fontFamily: "var(--font-sans)",
+            }}
+          >
+            {monthYearLabel(view, cursor)}
+          </button>
+          {datePickerOpen && (
+            <MiniCalendar
+              value={cursor}
+              onSelect={(d) => setCursor(startOfDay(d))}
+              onClose={() => setDatePickerOpen(false)}
+              align="left"
+            />
+          )}
+        </div>
       )}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         {connected && !isMobile && (

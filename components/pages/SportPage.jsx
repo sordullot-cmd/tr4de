@@ -182,6 +182,14 @@ const fmtDate = (iso) => {
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/* Vitesse moyenne en km/h à partir d'une distance (km) et d'un temps (min). */
+const computeSpeed = (distance, time) => {
+  const d = parseFloat(distance);
+  const t = parseFloat(time);
+  if (!d || !t || t <= 0) return null;
+  return Math.round((d / (t / 60)) * 10) / 10;
+};
+
 /* ─── Page ────────────────────────────────────────────────────────── */
 
 export default function SportPage() {
@@ -229,13 +237,18 @@ export default function SportPage() {
         name: e.name.trim(),
         category: e.category || "full_body",
         sets: (e.sets || []).filter(set => set.reps !== "" || set.weight !== "" || set.distance !== "" || set.time !== "")
-          .map(set => ({
-            id: set.id,
-            reps: parseFloat(set.reps) || null,
-            weight: parseFloat(set.weight) || null,
-            distance: parseFloat(set.distance) || null,
-            time: parseFloat(set.time) || null,
-          })),
+          .map(set => {
+            const distance = parseFloat(set.distance) || null;
+            const time = parseFloat(set.time) || null;
+            return {
+              id: set.id,
+              reps: parseFloat(set.reps) || null,
+              weight: parseFloat(set.weight) || null,
+              distance,
+              time,
+              speed: computeSpeed(distance, time),
+            };
+          }),
       })),
   });
   const save = () => {
@@ -358,6 +371,20 @@ export default function SportPage() {
     if (!chartExerciseName && allExerciseNames.length > 0) setChartExerciseName(allExerciseNames[0]);
   }, [allExerciseNames, chartExerciseName]);
 
+  /* L'exercice sélectionné est-il un exo cardio ? (détecté via la discipline
+     de la séance ou la catégorie de l'exercice). Détermine la métrique tracée :
+     vitesse km/h pour le cardio, charge kg pour la muscu/callisthénie. */
+  const chartExerciseIsCardio = useMemo(() => {
+    for (const s of (sessions || [])) {
+      for (const ex of (s.exercises || [])) {
+        if (ex.name?.trim() === chartExerciseName && (s.discipline === "cardio" || ex.category === "cardio")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [sessions, chartExerciseName]);
+
   /* ─── Données du graphique d'évolution ─────────────────────── */
   const chartData = useMemo(() => {
     if (!chartExerciseName) return [];
@@ -365,18 +392,29 @@ export default function SportPage() {
     for (const s of (sessions || [])) {
       for (const ex of (s.exercises || [])) {
         if (ex.name?.trim() !== chartExerciseName) continue;
-        let bestWeight = 0, bestReps = 0;
-        for (const set of (ex.sets || [])) {
-          if (set.weight && set.weight > bestWeight) {
-            bestWeight = set.weight;
-            bestReps = set.reps || 0;
+        if (chartExerciseIsCardio) {
+          // Cardio : meilleure vitesse (km/h) de la séance.
+          let bestSpeed = 0;
+          for (const set of (ex.sets || [])) {
+            const sp = set.speed != null ? set.speed : computeSpeed(set.distance, set.time);
+            if (sp && sp > bestSpeed) bestSpeed = sp;
           }
+          if (bestSpeed > 0) points.push({ date: s.date, value: bestSpeed });
+        } else {
+          // Muscu/callisthénie : charge max (kg) de la séance.
+          let bestWeight = 0, bestReps = 0;
+          for (const set of (ex.sets || [])) {
+            if (set.weight && set.weight > bestWeight) {
+              bestWeight = set.weight;
+              bestReps = set.reps || 0;
+            }
+          }
+          if (bestWeight > 0) points.push({ date: s.date, value: bestWeight, reps: bestReps });
         }
-        if (bestWeight > 0) points.push({ date: s.date, weight: bestWeight, reps: bestReps });
       }
     }
     return points.sort((a, b) => a.date.localeCompare(b.date));
-  }, [sessions, chartExerciseName]);
+  }, [sessions, chartExerciseName, chartExerciseIsCardio]);
 
   /* ─── Filtrage ──────────────────────────────────────────────── */
   const filteredSessions = useMemo(() => {
@@ -490,6 +528,7 @@ export default function SportPage() {
               selected={chartExerciseName}
               onChangeSelected={setChartExerciseName}
               data={chartData}
+              unit={chartExerciseIsCardio ? "km/h" : "kg"}
             />
           </div>
         </div>
@@ -667,15 +706,25 @@ function SessionCard({ session: s, onEdit, onDelete }) {
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{ex.name}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {(ex.sets || []).map((set, si) => (
-                    <div key={set.id || si} style={{ fontSize: 11, color: T.textSub, fontVariantNumeric: "tabular-nums" }}>
-                      <span style={{ color: T.textMut, marginRight: 8 }}>Série {si + 1}</span>
-                      {set.reps != null && <span>{set.reps} reps</span>}
-                      {set.weight != null && <span> · {set.weight} kg</span>}
-                      {set.distance != null && <span> · {set.distance} km</span>}
-                      {set.time != null && <span> · {set.time} min</span>}
-                    </div>
-                  ))}
+                  {(ex.sets || []).map((set, si) => {
+                    if (s.discipline === "cardio") {
+                      const speed = set.speed != null ? set.speed : computeSpeed(set.distance, set.time);
+                      return (
+                        <div key={set.id || si} style={{ fontSize: 11, color: T.textSub, fontVariantNumeric: "tabular-nums" }}>
+                          {set.distance != null && <span>{set.distance} km</span>}
+                          {set.time != null && <span>{set.distance != null ? " · " : ""}{set.time} min</span>}
+                          {speed != null && <span> · {speed} km/h</span>}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={set.id || si} style={{ fontSize: 11, color: T.textSub, fontVariantNumeric: "tabular-nums" }}>
+                        <span style={{ color: T.textMut, marginRight: 8 }}>Série {si + 1}</span>
+                        {set.reps != null && <span>{set.reps} reps</span>}
+                        {set.weight != null && <span> · {set.weight} kg</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -734,18 +783,18 @@ function PRsCard({ prs }) {
 }
 
 /* ─── Graphique de progression (simple SVG line) ────────────────── */
-function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
+function ProgressChart({ allExerciseNames, selected, onChangeSelected, data, unit = "kg" }) {
   const VB_W = 600, VB_H = 200, padL = 8, padR = 36, padT = 14, padB = 24;
   const chartW = VB_W - padL - padR;
   const chartH = VB_H - padT - padB;
 
-  const maxW = Math.max(...data.map(d => d.weight), 1);
+  const maxW = Math.max(...data.map(d => d.value), 1);
   const minW = 0;
   const span = maxW - minW || 1;
 
   const points = data.map((d, i) => {
     const x = padL + (data.length === 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
-    const y = padT + chartH - ((d.weight - minW) / span) * chartH;
+    const y = padT + chartH - ((d.value - minW) / span) * chartH;
     return { x, y, ...d };
   });
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
@@ -759,7 +808,7 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
       {data.length === 0 ? (
         <div style={{ padding: "32px 18px", textAlign: "center", color: T.textMut, fontSize: 12 }}>
           {allExerciseNames.length === 0
-            ? "Logge des séances avec charges pour voir l'évolution."
+            ? "Logge des séances pour voir l'évolution."
             : "Pas encore assez de points pour cet exercice."}
         </div>
       ) : (
@@ -778,7 +827,7 @@ function ProgressChart({ allExerciseNames, selected, onChangeSelected, data }) {
           </svg>
           {/* Y label max */}
           <div style={{ position: "absolute", top: 8, right: 6, fontSize: 10, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
-            {Math.round(maxW)} kg
+            {Math.round(maxW)} {unit}
           </div>
         </div>
       )}
@@ -927,6 +976,20 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, onDelete, cust
       exercises: (prev.exercises || []).map(e => e.id === eid
         ? { ...e, sets: (e.sets || []).filter(set => set.id !== sid) }
         : e),
+    }));
+  };
+  // Cardio : pas de notion de série. On édite une ligne unique (distance + temps)
+  // sur le premier set de l'exercice, qu'on crée au besoin.
+  const updateCardio = (eid, patch) => {
+    setForm(prev => ({
+      ...prev,
+      exercises: (prev.exercises || []).map(e => {
+        if (e.id !== eid) return e;
+        const sets = (e.sets && e.sets.length)
+          ? e.sets
+          : [{ id: Date.now() + Math.floor(Math.random() * 1000) }];
+        return { ...e, sets: [{ ...sets[0], ...patch }, ...sets.slice(1)] };
+      }),
     }));
   };
 
@@ -1151,40 +1214,54 @@ function SessionForm({ form, setForm, editingId, onClose, onSave, onDelete, cust
                       <Trash2 size={11} strokeWidth={1.75} />
                     </button>
                   </div>
-                  {/* Sets */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {(ex.sets || []).map((set, si) => (
-                      <div key={set.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 22, fontSize: 10, color: T.textMut, fontWeight: 500 }}>S{si + 1}</span>
-                        {isCardio ? (
-                          <>
-                            <SetInput value={set.distance} onChange={(v) => updateSet(ex.id, set.id, { distance: v })} placeholder="km" />
-                            <SetInput value={set.time} onChange={(v) => updateSet(ex.id, set.id, { time: v })} placeholder="min" />
-                          </>
-                        ) : (
-                          <>
+                  {isCardio ? (() => {
+                    /* Cardio : une seule ligne — distance, temps, et vitesse km/h calculée. */
+                    const set = (ex.sets && ex.sets[0]) || {};
+                    const speed = computeSpeed(set.distance, set.time);
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <SetInput value={set.distance ?? ""} onChange={(v) => updateCardio(ex.id, { distance: v })} placeholder="km" />
+                        <SetInput value={set.time ?? ""} onChange={(v) => updateCardio(ex.id, { time: v })} placeholder="min" />
+                        <div style={{
+                          flex: 1, minWidth: 0, height: 30, borderRadius: 10,
+                          border: `1px solid ${T.border}`, background: T.bg,
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+                          color: speed != null ? T.text : T.textMut,
+                        }}>
+                          {speed != null ? `${speed} km/h` : "km/h"}
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <>
+                      {/* Sets */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {(ex.sets || []).map((set, si) => (
+                          <div key={set.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ width: 22, fontSize: 10, color: T.textMut, fontWeight: 500 }}>S{si + 1}</span>
                             <SetInput value={set.reps} onChange={(v) => updateSet(ex.id, set.id, { reps: v })} placeholder="reps" />
                             <SetInput value={set.weight} onChange={(v) => updateSet(ex.id, set.id, { weight: v })} placeholder="kg" />
-                          </>
-                        )}
-                        <button type="button" onClick={() => removeSet(ex.id, set.id)} aria-label="Supprimer la série"
-                          style={{ ...iconBtn(), width: 22, height: 22 }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
-                          <X size={10} strokeWidth={2} />
-                        </button>
+                            <button type="button" onClick={() => removeSet(ex.id, set.id)} aria-label="Supprimer la série"
+                              style={{ ...iconBtn(), width: 22, height: 22 }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = T.red; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.textMut; }}>
+                              <X size={10} strokeWidth={2} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => addSet(ex.id)}
-                    style={{
-                      marginTop: 6, padding: "3px 10px", borderRadius: 999,
-                      border: `1px dashed ${T.border}`, background: T.white,
-                      color: T.textMut, fontSize: 10, fontWeight: 500, cursor: "pointer",
-                      fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 4,
-                    }}>
-                    <Plus size={10} strokeWidth={2} /> Ajouter une série
-                  </button>
+                      <button type="button" onClick={() => addSet(ex.id)}
+                        style={{
+                          marginTop: 6, padding: "3px 10px", borderRadius: 999,
+                          border: `1px dashed ${T.border}`, background: T.white,
+                          color: T.textMut, fontSize: 10, fontWeight: 500, cursor: "pointer",
+                          fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 4,
+                        }}>
+                        <Plus size={10} strokeWidth={2} /> Ajouter une série
+                      </button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

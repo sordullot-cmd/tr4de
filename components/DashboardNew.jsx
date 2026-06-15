@@ -27,6 +27,7 @@ import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
+import DemoTradePage from "@/components/pages/DemoTradePage";
 import DrivePage from "@/components/pages/DrivePage";
 import AgendaPage from "@/components/pages/AgendaPage";
 import CalendarPage from "@/components/pages/CalendarPage";
@@ -87,6 +88,7 @@ import {
   Wallet as LucideWallet,
   Dumbbell as LucideDumbbell,
   FolderOpen as LucideFolderOpen,
+  FlaskConical as LucideFlaskConical,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -690,26 +692,6 @@ export default function App() {
     }
   };
 
-  // Titre du chrono Focus (affiché dans la navbar à la place de "Focus")
-  const [focusLabel, setFocusLabel] = useState("");
-  React.useEffect(() => {
-    const read = () => {
-      try {
-        const raw = localStorage.getItem("tr4de_focus_timer_v1");
-        const s = raw ? JSON.parse(raw) : null;
-        setFocusLabel((s?.taskLabel || "").trim());
-      } catch { setFocusLabel(""); }
-    };
-    read();
-    const onLabel = (e) => setFocusLabel((e?.detail || "").trim());
-    window.addEventListener("tr4de-focus-label", onLabel);
-    window.addEventListener("storage", read);
-    return () => {
-      window.removeEventListener("tr4de-focus-label", onLabel);
-      window.removeEventListener("storage", read);
-    };
-  }, []);
-
   const SIDEBAR_SECTIONS = [
     {
       label: t("nav.trading"),
@@ -720,6 +702,7 @@ export default function App() {
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
+        { id: "demo",       icon: LucideFlaskConical, label: "Démo" },
       ],
     },
     {
@@ -738,7 +721,7 @@ export default function App() {
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
-        { id: "focus",         icon: LucideTimer,        label: focusLabel || t("nav.focus") },
+        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];
@@ -781,7 +764,7 @@ export default function App() {
     trades:     <TradesPage trades={filteredTrades} strategies={strategies} onImportClick={() => setPage("add-trade")} onDeleteTrade={handleDeleteTrade} onClearTrades={handleClearTrades} />,
     "trade-chart": <TradeChartPage trades={filteredTrades} />,
     calendar:   <CalendarPage trades={filteredTrades} accountType={accountType} evalAccountSize={selectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} setPage={setPage} setDateRangesByPage={setDateRangesByPage} />,
-    journal: <JournalPage trades={filteredTrades} />,
+    journal: <JournalPage trades={filteredTrades} strategies={strategies} onImportClick={() => setPage("add-trade")} onDeleteTrade={handleDeleteTrade} onClearTrades={handleClearTrades} />,
     discipline: <DisciplinePage trades={filteredTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
@@ -796,6 +779,7 @@ export default function App() {
     sport: <SportPage />,
     reading: <ReadingListPage />,
     notes: <NotesPage />,
+    demo: <DemoTradePage strategies={strategies} />,
     drive: <DrivePage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
@@ -1080,7 +1064,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "demo"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header
