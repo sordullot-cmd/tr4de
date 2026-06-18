@@ -34,6 +34,10 @@ const RULE_TYPES = [
   { value: "max_daily_loss",        label: "Stop-loss journalier",   hint: "Cesser après une perte cumulée",          Icon: TrendingUp },
   { value: "no_reentry_after_loss", label: "Cooldown après perte",   hint: "Pause obligatoire post-trade perdant",    Icon: Lock },
   { value: "min_rr",                label: "RR minimum",             hint: "Risk/Reward plancher sur les winners",    Icon: Zap },
+  { value: "max_loss_per_trade",    label: "Perte max par trade",    hint: "Cap sur la perte d'un seul trade",        Icon: TrendingUp },
+  { value: "max_consecutive_losses",label: "Pertes consécutives",    hint: "Stop après N pertes d'affilée",           Icon: AlertTriangle },
+  { value: "min_time_between_trades",label: "Délai entre trades",     hint: "Espacement minimum entre deux trades",    Icon: Clock },
+  { value: "max_hold_time",         label: "Durée max de trade",     hint: "Ne pas tenir une position trop longtemps",Icon: Clock },
   { value: "journaling",            label: "Journal quotidien",      hint: "Journaliser ses trades chaque jour",      Icon: NotebookPen },
 ];
 
@@ -514,6 +518,26 @@ function RuleBuilder({ rules, addRule, updateRule, deleteRule }) {
         return (
           <input type="number" min={0} step={0.1} placeholder="RR minimum (ex: 1.5)" value={params.minRR ?? ""}
             onChange={e => setParams(p => ({ ...p, minRR: e.target.value }))} style={inp()} />
+        );
+      case "max_loss_per_trade":
+        return (
+          <input type="number" min={1} placeholder="Perte max par trade ($)" value={params.max ?? ""}
+            onChange={e => setParams(p => ({ ...p, max: e.target.value }))} style={inp()} />
+        );
+      case "max_consecutive_losses":
+        return (
+          <input type="number" min={1} placeholder="Pertes consécutives max" value={params.max ?? ""}
+            onChange={e => setParams(p => ({ ...p, max: e.target.value }))} style={inp()} />
+        );
+      case "min_time_between_trades":
+        return (
+          <input type="number" min={1} placeholder="Délai min entre trades (minutes)" value={params.minutes ?? ""}
+            onChange={e => setParams(p => ({ ...p, minutes: e.target.value }))} style={inp()} />
+        );
+      case "max_hold_time":
+        return (
+          <input type="number" min={1} placeholder="Durée max par trade (minutes)" value={params.minutes ?? ""}
+            onChange={e => setParams(p => ({ ...p, minutes: e.target.value }))} style={inp()} />
         );
       case "journaling":
         return (

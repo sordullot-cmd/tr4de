@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Plus, Trash2, FlaskConical, TrendingUp, ArrowDown, X } from "lucide-react";
+import React, { useMemo, useState, useRef } from "react";
+import { Plus, FlaskConical, TrendingUp, ArrowDown, X, ImagePlus } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { fmt } from "@/lib/ui/format";
 import { useLang } from "@/lib/i18n";
+import TradesPage from "@/components/pages/TradesPage";
 
 const STORAGE_KEY = "tr4de_demo_trades";
 const TIMEFRAME_OPTIONS = ["M1", "M5", "M15", "H1", "H4"];
@@ -33,6 +34,9 @@ const emptyDraft = () => ({
   exit: "",
   quantity: "",
   pnl: "",
+  rr: "",
+  description: "",
+  image: null,
   timeframe: "",
   emotions: [],
   errors: [],
@@ -84,11 +88,42 @@ function TagField({ tags, inputValue, setInputValue, onAdd, onRemove, placeholde
 
 export default function DemoTradePage({ strategies = [] }) {
   useLang();
-  // Stockage isolé des vrais trades (localStorage dédié).
+  // Stockage isolé des trades démo (localStorage dédié).
   const [trades, setTrades] = useState(loadDemoTrades);
   const [draft, setDraft] = useState(emptyDraft);
   const [emotionInput, setEmotionInput] = useState("");
   const [errorInput, setErrorInput] = useState("");
+  // Le formulaire s'ouvre désormais dans une modale via le bouton "Ajouter un trade".
+  const [formOpen, setFormOpen] = useState(false);
+  // Dropdown du sélecteur de stratégie (style panneau Trade info).
+  const [stratOpen, setStratOpen] = useState(false);
+  const imageInputRef = useRef(null);
+
+  // Lit une image, la redimensionne (max 1200px, JPEG) puis la stocke en base64.
+  // Le redimensionnement évite de saturer le localStorage des trades démo.
+  const handleImageFile = (file) => {
+    if (!file || !file.type?.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        setDraft((d) => ({ ...d, image: canvas.toDataURL("image/jpeg", 0.8) }));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const persist = (next) => {
     setTrades(next);
@@ -101,6 +136,15 @@ export default function DemoTradePage({ strategies = [] }) {
   };
 
   const canAdd = draft.symbol.trim().length > 0 && num(draft.pnl) != null;
+
+  const openForm = () => {
+    setDraft(emptyDraft());
+    setEmotionInput("");
+    setErrorInput("");
+    setStratOpen(false);
+    setFormOpen(true);
+  };
+  const closeForm = () => setFormOpen(false);
 
   const addTag = (field, value, clear) => {
     const v = String(value).trim();
@@ -123,6 +167,9 @@ export default function DemoTradePage({ strategies = [] }) {
       exit: num(draft.exit),
       quantity: num(draft.quantity),
       pnl: num(draft.pnl),
+      rr: num(draft.rr),
+      description: draft.description.trim(),
+      image: draft.image || null,
       timeframe: draft.timeframe || null,
       emotions: draft.emotions,
       errors: draft.errors,
@@ -132,12 +179,17 @@ export default function DemoTradePage({ strategies = [] }) {
       createdAt: new Date().toISOString(),
     };
     persist([trade, ...trades]);
-    setDraft({ ...emptyDraft(), date: trade.date, symbol: trade.symbol });
+    setDraft(emptyDraft());
     setEmotionInput("");
     setErrorInput("");
+    setFormOpen(false);
   };
 
-  const removeTrade = (id) => persist(trades.filter((t) => t.id !== id));
+  // TradesPage appelle onDeleteTrade(trade) ; on retrouve la ligne par son id.
+  const removeTrade = (t) => {
+    const id = t && typeof t === "object" ? t.id : t;
+    persist(trades.filter((x) => x.id !== id));
+  };
 
   const stats = useMemo(() => {
     const n = trades.length;
@@ -147,19 +199,17 @@ export default function DemoTradePage({ strategies = [] }) {
     return { n, totalPnl, winRate };
   }, [trades]);
 
-  const sorted = useMemo(
-    () => trades.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt))),
-    [trades]
-  );
+  // ---- styles formulaire (épuré) ----
+  const inputStyle = { width: "100%", padding: "10px 12px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 14, outline: "none", fontFamily: "inherit", color: T.text, background: T.white };
+  const fieldLabel = { fontSize: 12, fontWeight: 600, color: T.textMut, marginBottom: 7, display: "block" };
 
-  // ---- styles ----
-  const sectionPad = "14px 16px";
-  const sep = { borderBottom: `1px solid ${T.border}` };
-  const label = { fontSize: 11, fontWeight: 600, color: T.textMut, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 };
-  const inputStyle = { width: "100%", padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white };
-  const fieldLabel = { fontSize: 11, color: T.textMut, marginBottom: 5, display: "block" };
-  const th = { padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: T.textMut, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4 };
-  const td = { padding: "10px 12px", fontSize: 13, color: T.text, whiteSpace: "nowrap" };
+  // Bouton "Ajouter un trade" (réutilisé dans le header et l'empty state).
+  const addButton = (
+    <button type="button" onClick={openForm}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
+      <Plus size={14} strokeWidth={2} /> Ajouter un trade
+    </button>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
@@ -167,7 +217,10 @@ export default function DemoTradePage({ strategies = [] }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>Trades démo</h1>
         <span style={{ fontSize: 12, color: T.textMut }}>Trades fictifs (non pris) — pour s’entraîner et en apprendre. Séparés de tes vrais trades.</span>
-        <div id="tr4de-page-header-slot" style={{ marginLeft: "auto" }} />
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {addButton}
+          <div id="tr4de-page-header-slot" />
+        </div>
       </div>
 
       {/* STATS */}
@@ -184,163 +237,180 @@ export default function DemoTradePage({ strategies = [] }) {
         ))}
       </div>
 
-      {/* FORMULAIRE — visuel proche du panneau "Trade info" (sections séparées) */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 8, ...sep }}>
-          <FlaskConical size={16} strokeWidth={1.75} color={T.text} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Nouveau trade démo</span>
-        </div>
-
-        {/* Données de base */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-            <div>
-              <label style={fieldLabel}>Date</label>
-              <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} style={inputStyle} />
+      {/* LAYOUT : tableau à gauche · panneau formulaire à droite (même emplacement
+          que le panneau "Trade info" de la page Trades). */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {trades.length === 0 ? (
+            <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "48px 40px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: T.accentBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+                <FlaskConical size={22} strokeWidth={1.75} color={T.text} />
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: T.text, marginBottom: 6, letterSpacing: -0.1 }}>Aucun trade démo</div>
+              <div style={{ fontSize: 13, color: T.textSub, marginBottom: 20, maxWidth: 380, lineHeight: 1.5 }}>Ajoute un trade fictif pour t’entraîner — il n’apparaît pas dans tes vrais trades.</div>
+              {addButton}
             </div>
-            <div>
-              <label style={fieldLabel}>Symbole</label>
-              <input type="text" value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} placeholder="ES, NQ, EURUSD…" style={inputStyle} />
+          ) : (
+            <TradesPage trades={trades} strategies={strategies} embedded onDeleteTrade={removeTrade} />
+          )}
+        </div>
+
+        {/* PANNEAU FORMULAIRE — visuel calqué sur le bloc "Trade info" */}
+        {formOpen && (() => {
+          const isLong = draft.direction === "Long";
+          const pnlNum = num(draft.pnl);
+          const pnlColor = draft.pnl === "" || pnlNum == null ? T.text : (pnlNum >= 0 ? T.green : T.red);
+          const sectionSep = { padding: "14px 16px", borderBottom: `1px solid ${T.border}` };
+          const miniLabel = { fontSize: 11, color: T.textMut, marginBottom: 4, display: "block" };
+          const heroNumInput = { width: "100%", padding: "4px 0", border: "none", borderBottom: `1px solid ${T.border}`, borderRadius: 0, fontSize: 26, fontWeight: 700, letterSpacing: -0.4, outline: "none", fontFamily: "var(--font-sans)", color: pnlColor, background: "transparent" };
+          return (
+          <div className="tr4de-trade-side" style={{ flex: "0 0 360px", width: 360, alignSelf: "flex-start", maxHeight: "calc(100vh - 200px)", background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+            {/* HEADER (identique au panneau Trade info) */}
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: T.text, fontFamily: "var(--font-sans)" }}>Nouveau trade démo</span>
+              <button type="button" onClick={closeForm} aria-label="Fermer" style={{ background: "transparent", border: "none", cursor: "pointer", color: T.textMut, padding: 4, display: "inline-flex", alignItems: "center" }}>
+                <X size={16} strokeWidth={2} />
+              </button>
             </div>
-            <div>
-              <label style={fieldLabel}>Sens</label>
-              <Pills
-                options={[{ v: "Long", color: T.green, Icon: TrendingUp, label: "Long" }, { v: "Short", color: T.red, Icon: ArrowDown, label: "Short" }]}
-                value={draft.direction}
-                onSelect={(v) => setDraft({ ...draft, direction: v })}
-              />
-            </div>
-            <div>
-              <label style={fieldLabel}>Prix d’entrée</label>
-              <input type="number" step="any" value={draft.entry} onChange={(e) => setDraft({ ...draft, entry: e.target.value })} placeholder="—" style={inputStyle} />
-            </div>
-            <div>
-              <label style={fieldLabel}>Prix de sortie</label>
-              <input type="number" step="any" value={draft.exit} onChange={(e) => setDraft({ ...draft, exit: e.target.value })} placeholder="—" style={inputStyle} />
-            </div>
-            <div>
-              <label style={fieldLabel}>Lots / Contrats</label>
-              <input type="number" step="any" value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} placeholder="—" style={inputStyle} />
-            </div>
-            <div>
-              <label style={fieldLabel}>P&amp;L (net)</label>
-              <input type="number" step="any" value={draft.pnl} onChange={(e) => setDraft({ ...draft, pnl: e.target.value })} placeholder="ex: 120 ou -45" style={inputStyle} />
-            </div>
-          </div>
-        </div>
 
-        {/* Unité de temps */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={label}>Unité de temps</div>
-          <Pills
-            options={TIMEFRAME_OPTIONS.map((tf) => ({ v: tf, label: tf }))}
-            value={draft.timeframe}
-            onSelect={(v) => setDraft({ ...draft, timeframe: draft.timeframe === v ? "" : v })}
-          />
-        </div>
+            {/* CONTENU SCROLLABLE */}
+            <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
 
-        {/* Émotions */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={label}>Émotions ressenties</div>
-          <TagField tags={draft.emotions} inputValue={emotionInput} setInputValue={setEmotionInput} onAdd={(v) => addTag("emotions", v, setEmotionInput)} onRemove={(v) => removeTag("emotions", v)} placeholder="ex: FOMO, confiance, stress… (Entrée pour ajouter)" color={T.blue} />
-        </div>
+              {/* HERO ÉDITABLE — même mise en page que le hero du panneau Trade info */}
+              <div style={{ padding: "16px 16px 18px", borderBottom: `1px solid ${T.border}` }}>
+                {/* Symbole · sens · date */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <input type="text" autoFocus value={draft.symbol} onChange={(e) => setDraft({ ...draft, symbol: e.target.value })} placeholder="Symbole"
+                    style={{ width: 120, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: 0.2, fontFamily: "var(--font-sans)", padding: 0 }} />
+                  <button type="button" onClick={() => setDraft({ ...draft, direction: isLong ? "Short" : "Long" })}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer", background: isLong ? `${T.green}14` : `${T.red}14`, color: isLong ? T.green : T.red, fontFamily: "inherit" }}>
+                    {isLong ? <TrendingUp size={11} strokeWidth={2.25} /> : <ArrowDown size={11} strokeWidth={2.25} />}
+                    {isLong ? "Long" : "Short"}
+                  </button>
+                  <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                    style={{ marginLeft: "auto", border: "none", outline: "none", background: "transparent", fontSize: 12, color: T.textMut, fontFamily: "inherit", textAlign: "right" }} />
+                </div>
+                {/* P&L (héro) + RR */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 14, alignItems: "flex-end" }}>
+                  <div>
+                    <label style={miniLabel}>P&amp;L net</label>
+                    <input type="number" step="any" value={draft.pnl} onChange={(e) => setDraft({ ...draft, pnl: e.target.value })} placeholder="0" style={heroNumInput} />
+                  </div>
+                  <div>
+                    <label style={miniLabel}>RR</label>
+                    <input type="number" step="any" value={draft.rr} onChange={(e) => setDraft({ ...draft, rr: e.target.value })} placeholder="—"
+                      style={{ width: "100%", padding: "4px 0", border: "none", borderBottom: `1px solid ${T.border}`, borderRadius: 0, fontSize: 16, fontWeight: 600, outline: "none", fontFamily: "var(--font-sans)", color: T.text, background: "transparent" }} />
+                  </div>
+                </div>
+              </div>
 
-        {/* Erreurs */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={label}>Erreurs commises</div>
-          <TagField tags={draft.errors} inputValue={errorInput} setInputValue={setErrorInput} onAdd={(v) => addTag("errors", v, setErrorInput)} onRemove={(v) => removeTag("errors", v)} placeholder="ex: entrée trop tôt, SL trop serré… (Entrée pour ajouter)" color={T.red} />
-        </div>
+              {/* Capture d'écran — juste sous le hero */}
+              <div style={sectionSep}>
+                <label style={fieldLabel}>Capture d’écran</label>
+                <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={(e) => { handleImageFile(e.target.files?.[0]); e.target.value = ""; }} />
+                {draft.image ? (
+                  <div style={{ position: "relative", display: "inline-block" }}>
+                    <img src={draft.image} alt="Aperçu de la capture" style={{ display: "block", maxWidth: "100%", maxHeight: 180, borderRadius: 10, border: `1px solid ${T.border}` }} />
+                    <button type="button" onClick={() => setDraft({ ...draft, image: null })} aria-label="Retirer l’image"
+                      style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: 999, background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => imageInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = T.text; }}
+                    onDragLeave={(e) => { e.currentTarget.style.borderColor = T.border; }}
+                    onDrop={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = T.border; handleImageFile(e.dataTransfer.files?.[0]); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "20px 16px", border: `1px dashed ${T.border}`, borderRadius: 10, background: T.bg, cursor: "pointer", color: T.textSub, transition: "border-color .12s ease" }}>
+                    <ImagePlus size={20} strokeWidth={1.75} />
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>Glisser une image ou cliquer pour ajouter</span>
+                  </div>
+                )}
+              </div>
 
-        {/* Stratégie */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={label}>Stratégie</div>
-          <select value={draft.strategyId} onChange={(e) => setDraft({ ...draft, strategyId: e.target.value })}
-            style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}>
-            <option value="">— Aucune —</option>
-            {strategies.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Note */}
-        <div style={{ padding: sectionPad, ...sep }}>
-          <div style={label}>Note / ce que j’en apprends</div>
-          <textarea value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Pourquoi ce trade, ce que tu retiens…" rows={3}
-            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px" }}>
-          <button type="button" onClick={addTrade} disabled={!canAdd}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", height: 36, borderRadius: 999, background: canAdd ? T.text : T.bg, border: `1px solid ${canAdd ? T.text : T.border}`, color: canAdd ? "#fff" : T.textMut, fontSize: 13, fontWeight: 600, cursor: canAdd ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
-            <Plus size={14} strokeWidth={2} /> Ajouter le trade démo
-          </button>
-        </div>
-      </div>
-
-      {/* LISTE DES TRADES DÉMO */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ padding: "12px 14px", borderBottom: `1px solid ${T.border}`, fontSize: 13, fontWeight: 600, color: T.text }}>Mes trades démo</div>
-        {sorted.length === 0 ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", color: T.textSub, fontSize: 13 }}>
-            Aucun trade démo pour le moment — ajoute-en un avec le formulaire ci-dessus.
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                <tr>
-                  <th style={th}>Date</th>
-                  <th style={th}>Symbole</th>
-                  <th style={th}>Sens</th>
-                  <th style={{ ...th, textAlign: "right" }}>Entrée</th>
-                  <th style={{ ...th, textAlign: "right" }}>Sortie</th>
-                  <th style={{ ...th, textAlign: "center" }}>Lots</th>
-                  <th style={{ ...th, textAlign: "right" }}>P&amp;L</th>
-                  <th style={{ ...th, textAlign: "center" }}>TF</th>
-                  <th style={th}>Stratégie</th>
-                  <th style={th}>Tags</th>
-                  <th style={th}>Note</th>
-                  <th style={{ ...th, textAlign: "center", width: 40 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((t, i) => {
-                  const isLong = String(t.direction).toLowerCase().includes("long");
-                  return (
-                    <tr key={t.id} style={{ borderBottom: i < sorted.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                      <td style={{ ...td, color: T.textSub, fontSize: 12 }}>{new Date(t.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "2-digit" })}</td>
-                      <td style={{ ...td, fontWeight: 600 }}>{t.symbol}</td>
-                      <td style={td}><span style={{ color: isLong ? T.green : T.red, fontWeight: 600 }}>{isLong ? "Long" : "Short"}</span></td>
-                      <td style={{ ...td, textAlign: "right", color: T.textSub }}>{t.entry != null ? t.entry : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", color: T.textSub }}>{t.exit != null ? t.exit : "—"}</td>
-                      <td style={{ ...td, textAlign: "center", color: T.textSub }}>{t.quantity != null ? t.quantity : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontWeight: 600, color: (t.pnl || 0) >= 0 ? T.green : T.red, fontFamily: "var(--font-sans)" }}>{(t.pnl || 0) >= 0 ? "+" : ""}{fmt(t.pnl || 0, true)}</td>
-                      <td style={{ ...td, textAlign: "center", color: T.textSub }}>{t.timeframe || "—"}</td>
-                      <td style={{ ...td, color: T.textSub, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }} title={t.strategyName || ""}>{t.strategyName || "—"}</td>
-                      <td style={{ ...td }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 200 }}>
-                          {(t.emotions || []).map((e) => <span key={`e-${e}`} style={{ fontSize: 10, fontWeight: 600, color: T.blue, background: `${T.blue}14`, padding: "1px 6px", borderRadius: 999 }}>{e}</span>)}
-                          {(t.errors || []).map((e) => <span key={`x-${e}`} style={{ fontSize: 10, fontWeight: 600, color: T.red, background: `${T.red}14`, padding: "1px 6px", borderRadius: 999 }}>{e}</span>)}
-                          {(t.emotions || []).length === 0 && (t.errors || []).length === 0 && <span style={{ color: T.textMut }}>—</span>}
-                        </div>
-                      </td>
-                      <td style={{ ...td, color: T.textSub, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }} title={t.note}>{t.note || "—"}</td>
-                      <td style={{ ...td, textAlign: "center" }}>
-                        <button type="button" onClick={() => removeTrade(t.id)} aria-label="Supprimer"
-                          style={{ background: "transparent", border: "none", cursor: "pointer", color: T.textMut, padding: 4, borderRadius: 6, display: "inline-flex", alignItems: "center" }}
+              {/* Stratégie — bouton + dropdown identiques au panneau Trade info */}
+              <div style={{ ...sectionSep, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: T.textMut, textTransform: "uppercase", letterSpacing: 0.5 }}>Stratégie</div>
+                {(() => {
+                  const selected = strategies.find((s) => String(s.id) === String(draft.strategyId));
+                  if (selected) {
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 12, height: 12, borderRadius: 3, background: selected.color || T.accent, flexShrink: 0 }} />
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.name}</div>
+                        <button type="button" onClick={() => setDraft({ ...draft, strategyId: "" })} aria-label="Enlever la stratégie"
+                          style={{ background: "transparent", border: "none", cursor: "pointer", color: T.textMut, padding: 4, display: "inline-flex", alignItems: "center", borderRadius: 6 }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = T.red; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = T.textMut; }}>
-                          <Trash2 size={14} strokeWidth={1.75} />
+                          <X size={14} strokeWidth={2} />
                         </button>
-                      </td>
-                    </tr>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ position: "relative", width: "100%", display: "flex" }}>
+                      <button type="button" onClick={() => setStratOpen((v) => !v)}
+                        style={{ width: "100%", padding: "8px 16px", borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, fontSize: 13, fontWeight: 500, color: T.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "background .12s ease", fontFamily: "var(--font-sans)" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
+                        <Plus size={14} strokeWidth={2.25} /> Ajouter une stratégie
+                      </button>
+                      {stratOpen && (
+                        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 8, background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 100, maxHeight: 200, overflowY: "auto" }}>
+                          {strategies.length === 0 ? (
+                            <div style={{ padding: 12, textAlign: "center", fontSize: 11, color: T.textSub }}>Aucune stratégie</div>
+                          ) : (
+                            strategies.map((strat) => (
+                              <button key={strat.id} type="button" onClick={() => { setDraft({ ...draft, strategyId: strat.id }); setStratOpen(false); }}
+                                style={{ width: "100%", padding: "8px 12px", borderBottom: `1px solid ${T.border}`, background: T.white, border: "none", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6, transition: "all .2s" }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = T.accentBg; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = T.white; }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 3, background: strat.color || T.accent }} />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: T.text }}>{strat.name}</div>
+                                  <div style={{ fontSize: 9, color: T.textSub }}>{strat.groups?.length || 0} groupe(s)</div>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
+                })()}
+              </div>
+
+              {/* Description */}
+              <div style={sectionSep}>
+                <label style={fieldLabel}>Description</label>
+                <input type="text" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="ex: cassure du range d’ouverture" style={inputStyle} />
+              </div>
+
+              {/* Note */}
+              <div style={sectionSep}>
+                <label style={fieldLabel}>Note / ce que j’en apprends</label>
+                <textarea value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Pourquoi ce trade, ce que tu retiens…" rows={3}
+                  style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+              </div>
+            </div>
+
+            {/* ACTIONS (pied du panneau) */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: `1px solid ${T.border}` }}>
+              <button type="button" onClick={closeForm}
+                style={{ padding: "0 14px", height: 36, borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+              <button type="button" onClick={addTrade} disabled={!canAdd}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "0 16px", height: 36, borderRadius: 999, background: canAdd ? T.text : T.bg, border: `1px solid ${canAdd ? T.text : T.border}`, color: canAdd ? "#fff" : T.textMut, fontSize: 13, fontWeight: 600, cursor: canAdd ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+                <Plus size={14} strokeWidth={2} /> Ajouter
+              </button>
+            </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

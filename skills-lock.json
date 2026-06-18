@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "skills": {
+    "audit-website": {
+      "source": "squirrelscan/skills",
+      "sourceType": "github",
+      "computedHash": "82588484b29316f3106185374cc6aedf409c38a0698d49f7034c9b5ec07a1aa7"
+    },
+    "trade-journal": {
+      "source": "agiprolabs/claude-trading-skills",
+      "sourceType": "github",
+      "skillPath": "skills/trade-journal/SKILL.md",
+      "computedHash": "465fa2b765e88b6d331deda186ecb3997823b0bf332564f582a76be73efefffb"
+    }
+  }
+}

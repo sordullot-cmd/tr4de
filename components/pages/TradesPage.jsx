@@ -957,7 +957,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
       <div className="tr4de-trades-layout" style={{display:"flex",gap:16,alignItems:"flex-start"}}>
 
         {/* LEFT - TRADES TABLE */}
-        <div ref={tradesMainRef} className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 376px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
+        <div ref={tradesMainRef} className="tr4de-trades-main" style={{flex:selectedTrade?"0 0 calc(100% - 476px)":"1",minWidth:0,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",display:"flex",flexDirection:"column",maxHeight:"calc(100vh - 200px)"}}>
           
 
           <div className="tr4de-trades-scroll" style={{overflowX:embedded?"auto":"scroll",overflowY:"auto",overscrollBehavior:"contain",flex:1,minHeight:0}}>
@@ -1142,7 +1142,8 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   const mapped = rowsToShow.map(({ trade: t, isGroupParent, isChild, groupKey, groupSize }, i) => {
                   // Toutes les métriques dérivées (%, R, P&L net) sont calculées net de frais.
                   const rowNet = t._groupNet != null ? t._groupNet : netPnlOf(t);
-                  const ret = ((rowNet/(t.entry*100))*100).toFixed(2);
+                  const entryNum = Number(t.entry);
+                  const ret = (Number.isFinite(entryNum) && entryNum !== 0) ? ((rowNet/(entryNum*100))*100).toFixed(2) : "0.00";
                   const dateObj = new Date(t.date);
                   const openDate = dateObj.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'});
                   const openTime = fmtTime(t.entryTime || t.entry_time);
@@ -1332,10 +1333,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                           side:      <td key="side" style={cellStyle("side",{...tdBase,fontWeight:500,color:T.text,fontSize:13})}>{t.direction}</td>,
                           entryDate: <td key="entryDate" style={cellStyle("entryDate",{...tdBase,color:T.textSub})}>{openDate}</td>,
                           entryTime: <td key="entryTime" style={cellStyle("entryTime",{...tdBase,color:T.textSub,fontSize:12})}>{openTime}</td>,
-                          entry:     <td key="entry" style={cellStyle("entry",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.entry.toFixed(2)}</td>,
+                          entry:     <td key="entry" style={cellStyle("entry",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>{Number.isFinite(Number(t.entry)) ? `$${Number(t.entry).toFixed(2)}` : "—"}</td>,
                           exitDate:  <td key="exitDate" style={cellStyle("exitDate",{...tdBase,color:T.textSub})}>{closeDate}</td>,
                           exitTime:  <td key="exitTime" style={cellStyle("exitTime",{...tdBase,color:T.textSub,fontSize:12})}>{closeTime}</td>,
-                          exit:      <td key="exit" style={cellStyle("exit",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>${t.exit.toFixed(2)}</td>,
+                          exit:      <td key="exit" style={cellStyle("exit",{...tdBase,color:T.text,fontFamily:"var(--font-sans)",fontSize:13})}>{Number.isFinite(Number(t.exit)) ? `$${Number(t.exit).toFixed(2)}` : "—"}</td>,
                           lots:      <td key="lots" style={cellStyle("lots",{...tdBase,color:T.textSub})}>{(() => { const q = t._groupQty != null && t._groupQty > 0 ? t._groupQty : qtyOf(t); return q != null ? q : "—"; })()}</td>,
                           volume:    <td key="volume" style={cellStyle("volume",{...tdBase,color:T.textSub})}>{(() => { const v = t._groupVolume != null && t._groupVolume > 0 ? t._groupVolume : volOf(t); return v != null ? fmt(v, false) : "—"; })()}</td>,
                           pnl:       (() => { const p = t._groupPnl != null ? t._groupPnl : t.pnl; return <td key="pnl" style={cellStyle("pnl",{...tdBase,fontWeight:600,color:p>=0?T.green:T.red,fontFamily:"var(--font-sans)"})}>{p>=0?"+":""}{fmt(p,false)}</td>; })(),
@@ -1391,7 +1392,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
           // (paddings et marges verticales réduits). Le même panneau, plus dense.
           const compact = embedded;
           const panel = (
-          <div className="tr4de-trade-side" style={{width:360,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div className="tr4de-trade-side" style={{width:460,maxHeight:"calc(100vh - 200px)",background:T.white,border:`1px solid ${T.border}`,borderRadius:12,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             
             {/* HEADER WITH TABS */}
             <div style={{padding:compact?"8px 14px":"12px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1469,7 +1470,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* RÈGLE RESPECTÉE (manuel) */}
                   <div style={{padding:compact?"12px 14px 4px":"16px 16px 6px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Règle respectée</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"lowercase",letterSpacing:0.5}}>Règle respectée</div>
                     <button type="button" onClick={()=>setAddingRule(true)} aria-label="Ajouter une règle"
                       style={{background:"transparent",border:"none",cursor:"pointer",color:T.textMut,padding:2,display:"inline-flex",alignItems:"center",borderRadius:6,transition:"color .12s ease"}}
                       onMouseEnter={(e)=>{e.currentTarget.style.color=T.text}}
@@ -1566,7 +1567,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* UNITÉ DE TEMPS (timeframe d'analyse) — sélection unique, placée sous les règles */}
                   <div style={{padding:compact?"12px 14px":"16px 16px",borderBottom:`1px solid ${T.border}`}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>Unité de temps</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"lowercase",letterSpacing:0.5}}>Unité de temps</div>
                     <div style={{display:"flex",gap:2,padding:3,background:T.accentBg,borderRadius:999}}>
                       {TIMEFRAME_OPTIONS.map((opt)=>{
                         const active = (tradeTimeframe[selectedTrade.id] || "") === opt;
@@ -1589,7 +1590,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* EMOTION TAGS — menu déroulant multi-sélection */}
                   <div style={{padding:compact?"12px 14px":"16px 16px",borderBottom:`1px solid ${T.border}`}} key={`emotion-${selectedTrade.date}-${selectedTrade.symbol}-${selectedTrade.entry}`}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>{t("trades.detail.emotionTags")}</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"lowercase",letterSpacing:0.5}}>{t("trades.detail.emotionTags")}</div>
                     <TagMultiSelect
                       placeholder={t("trades.detail.emotionTags")}
                       allTags={allEmotionTags}
@@ -1623,7 +1624,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     return (
                       <div style={{padding:compact?"12px":"16px",borderBottom:`1px solid ${T.border}`}}>
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:compact?6:10}}>
-                          <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Screenshot</div>
+                          <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"lowercase",letterSpacing:0.5}}>Screenshot</div>
                           {url && (
                             <div style={{display:"inline-flex",alignItems:"center",gap:4}}>
                               <label
@@ -1690,7 +1691,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
 
                   {/* NOTES (manuel) */}
                   <div style={{padding:compact?"12px 14px":"16px 16px",display:"flex",flexDirection:"column"}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"uppercase",letterSpacing:0.5}}>Notes</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,marginBottom:compact?6:10,textTransform:"lowercase",letterSpacing:0.5}}>Notes</div>
                     <textarea
                       placeholder={t("trades.notePlaceholder")}
                       value={tradeNotes[noteKeyOf(selectedTrade)] ?? tradeNotes[selectedTrade.id] ?? ""}
@@ -1704,7 +1705,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                       }}
                       style={{
                         flex:1,
-                        minHeight:100,
+                        minHeight:220,
                         border:`1px solid ${T.border}`,
                         borderRadius:8,
                         padding:12,
@@ -1740,7 +1741,17 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 ));
                 // Source de vérité pour l'UI : union de toutes les stratégies trouvées sur n'importe quelle clé
                 const selectedIds = Array.from(new Set(tradeKeys.flatMap(k => tradeStrategies[k] || [])));
-                
+
+                // Classement du menu déroulant : stratégies triées par nombre de trades
+                // (décroissant), comme sur la page Stratégies.
+                const stratTradeCountMap = {};
+                loadedStrategies.forEach((s) => { stratTradeCountMap[s.id] = 0; });
+                trades.forEach((tr) => {
+                  const ids = Array.from(new Set(indexKeysOf(tr).flatMap((k) => tradeStrategies[k] || []))).map(String);
+                  ids.forEach((id) => { if (Object.prototype.hasOwnProperty.call(stratTradeCountMap, id)) stratTradeCountMap[id]++; });
+                });
+                const dropdownStrategies = [...loadedStrategies].sort((a, b) => (stratTradeCountMap[b.id] || 0) - (stratTradeCountMap[a.id] || 0));
+
                 // Calculate total rules checked across all selected strategies
                 const allSelectedStrats = loadedStrategies.filter(s => selectedIds.includes(s.id));
                 const totalRulesCount = allSelectedStrats.reduce((sum, s) => sum + (s.groups?.flatMap(g => g.rules) || []).length, 0);
@@ -1756,7 +1767,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 
                 return (
                   <div style={{order:-1,padding:compact?"12px":"16px",borderBottom:`1px solid ${T.border}`,display:"flex",flexDirection:"column",gap:12}}>
-                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"uppercase",letterSpacing:0.5}}>Stratégie</div>
+                    <div style={{fontSize:11,fontWeight:600,color:T.textMut,textTransform:"lowercase",letterSpacing:0.5}}>Stratégie</div>
                     {selectedIds.length === 0 ? (
                       <>
                         <div style={{position:"relative",width:"100%",display:"flex"}}>
@@ -1802,10 +1813,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               maxHeight:200,
                               overflowY:"auto"
                             }}>
-                              {loadedStrategies.length === 0 ? (
+                              {dropdownStrategies.length === 0 ? (
                                 <div style={{padding:12,textAlign:"center",fontSize:11,color:T.textSub}}>{t("trades.detail.noStrategy")}</div>
                               ) : (
-                                loadedStrategies.map(strat=>{
+                                dropdownStrategies.map(strat=>{
                                   const isSelected = selectedIds.includes(strat.id);
                                   return (
                                     <button key={strat.id} onClick={()=>{
@@ -1950,7 +1961,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                 <div style={{paddingTop:12}}>
                                   {strat.groups.map(group=>(
                                     <div key={group.id} style={{marginBottom:14}}>
-                                      <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>{group.name}</div>
+                                      <div style={{fontSize:11,fontWeight:600,color:T.text,marginBottom:8,textTransform:"lowercase",letterSpacing:0.5}}>{group.name}</div>
                                       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                                         {group.rules.map(rule=>{
                                           const ruleKey = `${selectedTrade.date}_${selectedTrade.symbol}_${selectedTrade.entry}_${selectedTrade.exit}_${selectedTrade.direction}_${strat.id}_${rule.id}`;

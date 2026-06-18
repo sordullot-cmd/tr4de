@@ -911,7 +911,7 @@ img, canvas {
   table th, table td { padding-left: 8px !important; padding-right: 8px !important; }
 
   /* Flex rows qui utilisent un panneau latéral fixe : stack vertical */
-  [style*="calc(100% - 376px)"] { flex: 1 1 auto !important; max-width: 100% !important; }
+  [style*="calc(100% - 476px)"] { flex: 1 1 auto !important; max-width: 100% !important; }
 
   /* KPI / cartes numériques : value font-size réduite */
   [style*="font-size: 28"], [style*="fontSize: 28"] { font-size: 20px !important; }

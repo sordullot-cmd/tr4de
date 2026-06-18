@@ -692,8 +692,14 @@ export default function App() {
     }
   };
 
-  const SIDEBAR_SECTIONS = [
+  // 🔒 TRADING MASQUÉ TEMPORAIREMENT — passer HIDE_TRADING à false pour
+  // réafficher toute la catégorie trading (sections "Trading" et "Analyse").
+  // Aucun code n'est supprimé : tout est conservé et simplement filtré.
+  const HIDE_TRADING = true;
+
+  const ALL_SIDEBAR_SECTIONS = [
     {
+      category: "trading",
       label: t("nav.trading"),
       items: [
         { id: "add-trade",  icon: LucideUpload,       label: t("nav.addTrade") },
@@ -702,10 +708,10 @@ export default function App() {
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
-        { id: "demo",       icon: LucideFlaskConical, label: "Démo" },
       ],
     },
     {
+      category: "trading",
       label: t("nav.analyse"),
       items: [
         { id: "journal",    icon: NotebookPen,        label: t("nav.journal"), badge: filteredTrades.filter(tr => {try { const d = new Date(tr.date); return getLocalDateString(d) === getLocalDateString(); } catch (e) { return false; }}).length },
@@ -714,6 +720,7 @@ export default function App() {
       ],
     },
     {
+      category: "productivity",
       label: t("nav.productivity"),
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
@@ -725,6 +732,25 @@ export default function App() {
       ],
     },
   ];
+
+  const SIDEBAR_SECTIONS = HIDE_TRADING
+    ? ALL_SIDEBAR_SECTIONS.filter((s) => s.category !== "trading")
+    : ALL_SIDEBAR_SECTIONS;
+
+  // Pages liées au trading : inaccessibles tant que HIDE_TRADING est actif.
+  const HIDDEN_TRADING_PAGES = [
+    "dashboard", "add-trade", "calendar", "trades", "trade-chart",
+    "accounts", "account-detail", "strategies", "strategy-detail",
+    "backtest", "brokers", "journal", "discipline", "agent", "demo",
+  ];
+
+  // Redirige hors d'une page trading masquée (lien direct, hash #dashboard,
+  // page par défaut, etc.) vers la première page de productivité.
+  useEffect(() => {
+    if (HIDE_TRADING && HIDDEN_TRADING_PAGES.includes(page)) {
+      setPage("daily-planner");
+    }
+  }, [page]);
 
   // Raccourcis clavier : Alt+1..9 pour naviguer entre les pages de la sidebar
   const flatNavIds = SIDEBAR_SECTIONS.flatMap(s => s.items.map(i => i.id));
@@ -1100,7 +1126,7 @@ export default function App() {
                   display: (page === "add-trade" || page === "agent") ? "flex" : undefined,
                 }}
               >
-                {pages[page] || pages.dashboard}
+                {pages[page] || (HIDE_TRADING ? pages["daily-planner"] : pages.dashboard)}
               </div>
             </div>
           </div>

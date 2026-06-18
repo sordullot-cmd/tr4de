@@ -58,7 +58,11 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   const [errorTags, setErrorTags] = React.useState({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
-  const [selectedDay, setSelectedDay] = React.useState(null);
+  // Tableau "Performance" : dimension de regroupement + bucket sélectionné (cross-filtre).
+  const [perfDim, setPerfDim] = React.useState("weekday");
+  const [selectedBucket, setSelectedBucket] = React.useState(null);
+  // Réinitialise la sélection quand on change de dimension.
+  React.useEffect(() => { setSelectedBucket(null); }, [perfDim]);
   const [hoveredChart, setHoveredChart] = React.useState(null);
   const [tooltipPos, setTooltipPos] = React.useState({ x: 0, y: 0 });
 
@@ -158,18 +162,97 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     );
   }
 
-  // P&L par jour de la semaine (sur tous les trades, tous mois confondus).
-  // Utilise plus bas par la table "Performance par jour".
-  const pnlByDay = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[]};
-  trades.forEach(t => {
-    try {
-      const d = new Date(t.date);
-      if (!isNaN(d.getTime())) {
-        const dayOfWeek = d.getDay();
-        if (pnlByDay[dayOfWeek]) pnlByDay[dayOfWeek].push(t);
+  // --- Tableau "Performance" configurable par dimension ---
+  // Dimensions disponibles pour regrouper les trades (sur tous les trades,
+  // tous mois confondus, comme l'ancienne table "Performance par jour").
+  const PERF_DIMS = [
+    { key: "weekday",   label: t("dash.dimWeekday") },
+    { key: "symbol",    label: t("dash.dimSymbol") },
+    { key: "session",   label: t("dash.dimSession") },
+    { key: "hour",      label: t("dash.dimHour") },
+    { key: "direction", label: t("dash.dimDirection") },
+  ];
+  const wdNames = [t("wd.sunday"),t("wd.monday"),t("wd.tuesday"),t("wd.wednesday"),t("wd.thursday"),t("wd.friday"),t("wd.saturday")];
+  // Extrait l'heure d'entrée (0-23) en couvrant tous les formats rencontrés :
+  // entry_time / entryTime / time, en "HH:MM[:SS]" ou en ISO, et à défaut
+  // la composante horaire de `date` si elle est présente.
+  const entryHourOf = (tr) => {
+    const cand = tr.entry_time || tr.entryTime || tr.time || tr.exit_time || tr.exitTime;
+    if (cand != null) {
+      const s = String(cand).trim();
+      // ISO complet (avec date) → heure via Date
+      if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s)) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d.getHours();
       }
-    } catch (e) {}
-  });
+      // "HH:MM" ou "HH:MM:SS"
+      const m = s.match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        if (h >= 0 && h <= 23) return h;
+      }
+    }
+    // Fallback : `date` au format ISO avec heure
+    const ds = String(tr.date || "");
+    if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(ds)) {
+      const d = new Date(ds);
+      if (!isNaN(d.getTime())) return d.getHours();
+    }
+    return null;
+  };
+  // Renvoie {key, label, order} du bucket d'un trade pour la dimension donnée,
+  // ou null si le trade n'a pas l'info nécessaire (ex. pas d'heure d'entrée).
+  const bucketOf = (tr, dim) => {
+    if (dim === "weekday") {
+      const d = new Date(tr.date);
+      if (isNaN(d.getTime())) return null;
+      const g = d.getDay(); // 0=dimanche … 6=samedi
+      const name = wdNames[g];
+      const label = name.charAt(0).toUpperCase() + name.slice(1);
+      return { key: "wd" + g, label, order: (g + 6) % 7 }; // lundi en premier
+    }
+    if (dim === "symbol") {
+      const s = String(tr.symbol || "").toUpperCase().trim();
+      return s ? { key: s, label: s, order: s } : null;
+    }
+    if (dim === "direction") {
+      const raw = String(tr.direction || tr.side || "").toLowerCase();
+      if (raw.startsWith("l") || raw.includes("buy"))  return { key: "Long",  label: t("common.long"),  order: 0 };
+      if (raw.startsWith("s") || raw.includes("sell")) return { key: "Short", label: t("common.short"), order: 1 };
+      return null;
+    }
+    const h = entryHourOf(tr);
+    if (h === null) return null;
+    if (dim === "hour") {
+      return { key: "h" + h, label: String(h).padStart(2, "0") + "h", order: h };
+    }
+    if (dim === "session") {
+      // Sessions basées sur l'heure d'entrée (heure locale telle qu'exportée).
+      if (h < 6)       return { key: "asia",    label: t("dash.sessAsia"),    order: 0 };
+      if (h < 12)      return { key: "london",  label: t("dash.sessLondon"),  order: 1 };
+      if (h < 18)      return { key: "newyork", label: t("dash.sessNewYork"), order: 2 };
+      return { key: "evening", label: t("dash.sessEvening"), order: 3 };
+    }
+    return null;
+  };
+  // Buckets de la dimension active : { key, label, order, trades[] }, triés.
+  const perfBuckets = (() => {
+    const map = new Map();
+    (trades || []).forEach((tr) => {
+      const b = bucketOf(tr, perfDim);
+      if (!b) return;
+      let e = map.get(b.key);
+      if (!e) { e = { key: b.key, label: b.label, order: b.order, trades: [] }; map.set(b.key, e); }
+      e.trades.push(tr);
+    });
+    return [...map.values()].sort((a, b) => {
+      if (typeof a.order === "number" && typeof b.order === "number") return a.order - b.order;
+      return String(a.order).localeCompare(String(b.order));
+    });
+  })();
+  const selectedBucketObj = selectedBucket !== null
+    ? perfBuckets.find((b) => b.key === selectedBucket) || null
+    : null;
 
   // Trades du mois affiche dans le calendrier — servent de base pour toutes
   // les stats du dashboard.
@@ -183,10 +266,10 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     }
   });
 
-  // Si un jour de la semaine est selectionne dans "Performance par jour",
-  // toutes les stats de la page se restreignent a ce jour-la.
-  const filteredTrades = selectedDay !== null
-    ? (pnlByDay[selectedDay] || [])
+  // Si un bucket est sélectionné dans le tableau "Performance",
+  // toutes les stats de la page se restreignent à ce bucket.
+  const filteredTrades = selectedBucketObj
+    ? selectedBucketObj.trades
     : monthTrades;
 
   const totalPnL = filteredTrades.reduce((s,t)=>s+t.pnl,0);
@@ -462,10 +545,6 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     if (t.pnl > 0) symbolStats[t.symbol].wins++;
   });
   const topSymbols = Object.entries(symbolStats).sort((a,b)=>b[1].trades-a[1].trades).slice(0,5);
-  
-  // Prepare day labels
-  const dayLabelsFull = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-  const dayLabelsFr = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,fontFamily:"var(--font-sans)"}} className="anim-1">
@@ -1264,12 +1343,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedDay !== null ? t("trades.tradesOfDay").replace("{day}", [t("wd.monday"),t("wd.tuesday"),t("wd.wednesday"),t("wd.thursday"),t("wd.friday"),t("wd.saturday"),t("wd.sunday")][selectedDay]) : t("dash.recentTrades")}</div>
+            <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:2}}>{selectedBucketObj ? selectedBucketObj.label : t("dash.recentTrades")}</div>
             <div style={{fontSize:12,color:T.textSub,marginBottom:8}}>
-              {selectedDay !== null 
-                ? `${(pnlByDay[selectedDay] || []).length} trades`
-                : `${filteredTrades.length} trades`
-              }
+              {`${(selectedBucketObj ? selectedBucketObj.trades : filteredTrades).length} trades`}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 0.6fr",gap:8,fontSize:10,fontWeight:600,color:T.textMut,paddingBottom:8,borderBottom:`1px solid ${T.border}`}}>
               <div>{t("dash.asset")}</div>
@@ -1287,8 +1363,8 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               const weekEnd = new Date(weekStart);
               weekEnd.setDate(weekStart.getDate() + 7);
 
-              const source = selectedDay !== null ? (pnlByDay[selectedDay] || []) : filteredTrades;
-              const weekTrades = selectedDay !== null
+              const source = selectedBucketObj ? selectedBucketObj.trades : filteredTrades;
+              const weekTrades = selectedBucketObj
                 ? source
                 : source.filter(t => {
                     const d = new Date(t.date);
@@ -1342,12 +1418,20 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
       {/* DAY OF WEEK TABLE */}
       <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",height:340}}>
         <div style={{padding:"16px",borderBottom:`1px solid ${T.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:8}}>{t("dash.perfByDay")}</div>
-          <div style={{fontSize:12,color:T.textSub}}>{selectedDay !== null ? `P&L ${dayLabelsFr[selectedDay]}` : "P&L cette semaine"}: <span style={{fontWeight:600,color:(() => {
-            if (selectedDay !== null) {
-              const dayTrades = pnlByDay[selectedDay] || [];
-              const dayPnL = dayTrades.reduce((s,t)=>s+t.pnl,0);
-              return dayPnL >= 0 ? T.green : T.red;
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:8}}>
+            <div style={{fontSize:14,fontWeight:700,color:T.text}}>{t("dash.perf")}</div>
+            <select
+              value={perfDim}
+              onChange={(e)=>setPerfDim(e.target.value)}
+              style={{fontSize:12,fontWeight:600,color:T.text,background:T.white,border:`1px solid ${T.border}`,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontFamily:"var(--font-sans)",outline:"none"}}
+            >
+              {PERF_DIMS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
+            </select>
+          </div>
+          <div style={{fontSize:12,color:T.textSub}}>{selectedBucketObj ? `P&L ${selectedBucketObj.label}` : "P&L cette semaine"}: <span style={{fontWeight:600,color:(() => {
+            if (selectedBucketObj) {
+              const bPnL = selectedBucketObj.trades.reduce((s,t)=>s+t.pnl,0);
+              return bPnL >= 0 ? T.green : T.red;
             } else {
               const weekStart = new Date();
               weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -1359,10 +1443,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             }
           })()}}>
             {(() => {
-              if (selectedDay !== null) {
-                const dayTrades = pnlByDay[selectedDay] || [];
-                const dayPnL = dayTrades.reduce((s,t)=>s+t.pnl,0);
-                return (dayPnL >= 0 ? "+" : "") + fmt(dayPnL, true);
+              if (selectedBucketObj) {
+                const bPnL = selectedBucketObj.trades.reduce((s,t)=>s+t.pnl,0);
+                return (bPnL >= 0 ? "+" : "") + fmt(bPnL, true);
               } else {
                 const weekStart = new Date();
                 weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -1379,36 +1462,38 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:`none`,background:"transparent"}}>
-                {[t("dash.day"),t("common.trades"),"% "+t("common.total"),t("common.winRate"),t("dash.avgGain"),t("dash.avgLossHdr"),t("dash.expectancy")].map(h=>(
+                {[(PERF_DIMS.find(d=>d.key===perfDim)?.label || t("dash.day")),t("common.trades"),"% "+t("common.total"),t("common.winRate"),t("dash.avgGain"),t("dash.avgLossHdr"),t("dash.expectancy")].map(h=>(
                   <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:600,color:T.textMut,borderBottom:`1px solid ${T.border}`}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {(() => {
-                const days = dayLabelsFull.map((day, idx) => idx).filter(idx => idx < 5);
-                if (selectedDay !== null) {
-                  days.sort((a, b) => a === selectedDay ? -1 : b === selectedDay ? 1 : 0);
+                if (perfBuckets.length === 0) {
+                  return <tr><td colSpan={7} style={{padding:"24px 14px",textAlign:"center",color:T.textMut,fontSize:12}}>{t("dash.noDataDim")}</td></tr>;
                 }
-                return days.map((idx) => {
-                  const day = dayLabelsFull[idx];
-                  const dayLabels = [t("wd.monday"),t("wd.tuesday"),t("wd.wednesday"),t("wd.thursday"),t("wd.friday"),t("wd.saturday"),t("wd.sunday")].map(s => s.charAt(0).toUpperCase() + s.slice(1));
-                  const dayTrades = pnlByDay[idx] || [];
-                  const dayPnL = dayTrades.reduce((s,t)=>s+t.pnl,0);
-                  const dayWins = dayTrades.filter(t=>t.pnl>0).length;
-                  const dayWinRate = dayTrades.length ? ((dayWins/dayTrades.length)*100).toFixed(0) : "0";
-                  const dayAvgWin = dayWins ? dayTrades.filter(t=>t.pnl>0).reduce((s,t)=>s+t.pnl,0)/dayWins : 0;
-                  const dayAvgLoss = dayTrades.length-dayWins ? dayTrades.filter(t=>t.pnl<0).reduce((s,t)=>s+t.pnl,0)/(dayTrades.length-dayWins) : 0;
-                  const isSelected = selectedDay === idx;
-                  const isHidden = selectedDay !== null && selectedDay !== idx;
-                  return <tr key={day} onClick={()=>setSelectedDay(isSelected ? null : idx)} style={{borderBottom:isHidden?`none`:`1px solid ${T.border}`,cursor:"pointer",background:"transparent",display:isHidden?"none":"table-row",transition:"background 0.2s"}}>
-                    <td style={{padding:"10px 14px",fontWeight:600,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayLabels[idx]}</td>
-                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayTrades.length}</td>
-                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{((dayTrades.length/Math.max(monthTrades.length,1))*100).toFixed(1)}%</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:dayTrades.length===0?T.textMut:(dayWinRate>=50?T.green:T.red),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{dayWinRate}%</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:dayAvgWin===0?T.textMut:T.green,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgWin,true)}</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:dayAvgLoss===0?T.textMut:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayAvgLoss,true)}</td>
-                    <td style={{padding:"10px 14px",fontWeight:600,color:(()=>{const v=dayPnL/Math.max(dayTrades.length,1);return v>0?T.green:v<0?T.red:T.textMut;})(),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(dayPnL/Math.max(dayTrades.length,1),true)}</td>
+                const totalCount = perfBuckets.reduce((s,b)=>s+b.trades.length,0) || 1;
+                const ordered = [...perfBuckets];
+                if (selectedBucket !== null) {
+                  ordered.sort((a, b) => a.key === selectedBucket ? -1 : b.key === selectedBucket ? 1 : 0);
+                }
+                return ordered.map((bucket) => {
+                  const bTrades = bucket.trades;
+                  const bPnL = bTrades.reduce((s,t)=>s+t.pnl,0);
+                  const bWins = bTrades.filter(t=>t.pnl>0).length;
+                  const bWinRate = bTrades.length ? ((bWins/bTrades.length)*100).toFixed(0) : "0";
+                  const bAvgWin = bWins ? bTrades.filter(t=>t.pnl>0).reduce((s,t)=>s+t.pnl,0)/bWins : 0;
+                  const bAvgLoss = bTrades.length-bWins ? bTrades.filter(t=>t.pnl<0).reduce((s,t)=>s+t.pnl,0)/(bTrades.length-bWins) : 0;
+                  const isSelected = selectedBucket === bucket.key;
+                  const isHidden = selectedBucket !== null && selectedBucket !== bucket.key;
+                  return <tr key={bucket.key} onClick={()=>setSelectedBucket(isSelected ? null : bucket.key)} style={{borderBottom:isHidden?`none`:`1px solid ${T.border}`,cursor:"pointer",background:isSelected?T.accentBg:"transparent",display:isHidden?"none":"table-row",transition:"background 0.2s"}}>
+                    <td style={{padding:"10px 14px",fontWeight:600,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{bucket.label}</td>
+                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{bTrades.length}</td>
+                    <td style={{padding:"10px 14px",color:T.textSub,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{((bTrades.length/totalCount)*100).toFixed(1)}%</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:bTrades.length===0?T.textMut:(bWinRate>=50?T.green:T.red),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{bWinRate}%</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:bAvgWin===0?T.textMut:T.green,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(bAvgWin,true)}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:bAvgLoss===0?T.textMut:T.red,borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(bAvgLoss,true)}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600,color:(()=>{const v=bPnL/Math.max(bTrades.length,1);return v>0?T.green:v<0?T.red:T.textMut;})(),borderBottom:isHidden?`none`:`1px solid ${T.border}`}}>{fmt(bPnL/Math.max(bTrades.length,1),true)}</td>
                   </tr>;
                 });
               })()}

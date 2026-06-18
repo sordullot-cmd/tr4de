@@ -16,6 +16,10 @@ export type RuleType =
   | "max_daily_loss"
   | "no_reentry_after_loss"
   | "min_rr"
+  | "max_loss_per_trade"
+  | "max_consecutive_losses"
+  | "min_time_between_trades"
+  | "max_hold_time"
   | "journaling";
 
 export interface ComplianceRule {
@@ -25,11 +29,11 @@ export interface ComplianceRule {
   created_at: string;   // ISO
   effective_at: string; // ISO — created_at + 24h, modifs aussi remettent à +24h
   params: {
-    max?: number;            // position_limit, max_trades_per_day, max_daily_loss
+    max?: number;            // position_limit, max_trades_per_day, max_daily_loss, max_loss_per_trade, max_consecutive_losses
     minTime?: string;        // time_window — "HH:MM"
     maxTime?: string;        // time_window — "HH:MM"
     symbols?: string[];      // instrument_ban / instrument_only
-    minutes?: number;        // no_reentry_after_loss
+    minutes?: number;        // no_reentry_after_loss, min_time_between_trades, max_hold_time
     minRR?: number;          // min_rr
   };
   /** Override humain. Sinon `describeRule()` génère un libellé. */
@@ -90,6 +94,10 @@ export function describeRule(rule: ComplianceRule): string {
     case "max_daily_loss": return `Stop trading après ${p.max ?? "?"} de perte journalière`;
     case "no_reentry_after_loss": return `Cooldown ${p.minutes ?? "?"} min après un trade perdant`;
     case "min_rr":         return `RR minimum ${p.minRR ?? "?"}`;
+    case "max_loss_per_trade": return `Perte max ${p.max ?? "?"} par trade`;
+    case "max_consecutive_losses": return `Max ${p.max ?? "?"} pertes consécutives`;
+    case "min_time_between_trades": return `Min ${p.minutes ?? "?"} min entre deux trades`;
+    case "max_hold_time":  return `Durée max ${p.minutes ?? "?"} min par trade`;
     case "journaling":     return `Journal quotidien`;
   }
 }
@@ -253,6 +261,63 @@ export function evaluateTrade(
         const d = minRR - rr;
         return { ...base, distance: d, distance_label: `RR ${rr.toFixed(2)}`,
           message: `RR ${rr.toFixed(2)} (min ${minRR})` };
+      }
+      return null;
+    }
+    case "max_loss_per_trade": {
+      const max = rule.params.max ?? Infinity;
+      const pnl = Number(trade.pnl) || 0;
+      const loss = -pnl;
+      if (loss > max) {
+        const over = loss - max;
+        return { ...base, distance: over, distance_label: `${Math.round(over)} over`,
+          message: `Perte de -${Math.round(loss)} sur ce trade (limite -${max})` };
+      }
+      return null;
+    }
+    case "max_consecutive_losses": {
+      const max = rule.params.max ?? Infinity;
+      const pnl = Number(trade.pnl) || 0;
+      if (pnl >= 0) return null; // le trade courant doit être perdant
+      // Compter la série de pertes consécutives finissant sur le trade courant.
+      let streak = 0;
+      for (let i = ctx.index; i >= 0; i--) {
+        if ((Number(ctx.dayTrades[i].pnl) || 0) < 0) streak++;
+        else break;
+      }
+      if (streak > max) {
+        const over = streak - max;
+        return { ...base, distance: over, distance_label: `${streak}ᵉ perte d'affilée`,
+          message: `${streak} pertes consécutives (limite ${max})` };
+      }
+      return null;
+    }
+    case "min_time_between_trades": {
+      const minMin = rule.params.minutes ?? 0;
+      const prev = ctx.dayTrades[ctx.index - 1];
+      if (!prev) return null;
+      const prevEntry = parseTimeToMin(prev.entry_time);
+      const curEntry = parseTimeToMin(trade.entry_time);
+      if (prevEntry == null || curEntry == null) return null;
+      const gap = curEntry - prevEntry;
+      if (gap < minMin) {
+        const d = minMin - gap;
+        return { ...base, distance: d, distance_label: `${d} min trop tôt`,
+          message: `Trade ${gap} min après le précédent (min ${minMin} min)` };
+      }
+      return null;
+    }
+    case "max_hold_time": {
+      const maxMin = rule.params.minutes ?? Infinity;
+      const entryMin = parseTimeToMin(trade.entry_time);
+      const exitMin = parseTimeToMin(trade.exit_time);
+      if (entryMin == null || exitMin == null) return null;
+      let held = exitMin - entryMin;
+      if (held < 0) held += 24 * 60; // passage minuit
+      if (held > maxMin) {
+        const over = held - maxMin;
+        return { ...base, distance: over, distance_label: `+${over} min`,
+          message: `Position tenue ${held} min (max ${maxMin} min)` };
       }
       return null;
     }

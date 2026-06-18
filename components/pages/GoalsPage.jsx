@@ -64,6 +64,14 @@ const CATEGORIES = [
   { id: "work",      label: "Travail",       color: "#64748B", icon: Briefcase },
   { id: "code",      label: "Dev",           color: "#6366F1", icon: Code },
 ];
+// 🔒 Catégorie Trading masquée temporairement dans les Objectifs (sélection,
+// onglet de filtre, sources de suivi trading et objectifs existants trading).
+// Passer HIDE_TRADING_CATEGORY à false pour tout réafficher. Aucune donnée
+// n'est supprimée — les objectifs trading sont seulement filtrés à l'affichage.
+const HIDE_TRADING_CATEGORY = true;
+const VISIBLE_CATEGORIES = HIDE_TRADING_CATEGORY
+  ? CATEGORIES.filter((c) => c.id !== "trading")
+  : CATEGORIES;
 // Sources de suivi. `trading: true` = calculé à partir des trades et filtré
 // sur l'horizon de l'objectif. Ces types ne sont proposés qu'en catégorie
 // "Trading".
@@ -273,7 +281,7 @@ export default function GoalsPage() {
   };
 
   // Modal d'ajout/édition
-  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live", accountIdFilter: "all" };
+  const emptyForm = { label: "", level: "normal", category: VISIBLE_CATEGORIES[0]?.id || "personal", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live", accountIdFilter: "all" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -467,11 +475,18 @@ export default function GoalsPage() {
     return `${prefix}${n}${suffix}`;
   };
 
+  // Objectifs visibles : on masque ceux de catégorie "trading" tant que
+  // HIDE_TRADING_CATEGORY est actif (données conservées, simple filtre d'affichage).
+  const displayGoals = useMemo(
+    () => (HIDE_TRADING_CATEGORY ? goals.filter(g => g.category !== "trading") : goals),
+    [goals]
+  );
+
   // KPIs
   const kpis = useMemo(() => {
-    const total = goals.length;
+    const total = displayGoals.length;
     let achieved = 0, onTrack = 0, atRisk = 0;
-    for (const g of goals) {
+    for (const g of displayGoals) {
       const { pct } = compute(g);
       const dl = daysLeft(g.deadline);
       if (pct >= 100) achieved++;
@@ -480,11 +495,11 @@ export default function GoalsPage() {
     }
     return { total, achieved, onTrack, atRisk };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goals, trades]);
+  }, [displayGoals, trades]);
 
   // Filtre catégorie
   const [catFilter, setCatFilter] = useState("all"); // all | trading | personal
-  const filtered = catFilter === "all" ? goals : goals.filter(g => (g.category || "trading") === catFilter);
+  const filtered = catFilter === "all" ? displayGoals : displayGoals.filter(g => (g.category || "trading") === catFilter);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
@@ -501,7 +516,7 @@ export default function GoalsPage() {
       <div className="tr4de-goals-layout" style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Stats strip (style timeline) */}
-      <StatStrip kpis={kpis} goals={goals} compute={compute} />
+      <StatStrip kpis={kpis} goals={displayGoals} compute={compute} />
 
       {/* Séparateur entre les KPIs et la liste des objectifs */}
       <div style={{ height: 1, background: T.border, margin: "0 16px" }} />
@@ -519,13 +534,13 @@ export default function GoalsPage() {
       <div style={{ display: "flex", gap: 6, padding: "0 16px", flexWrap: "wrap" }}>
         {(() => {
           const tabs = [{ id: "all", label: "Tous", icon: null }];
-          CATEGORIES.forEach(c => {
-            const count = goals.filter(g => (g.category || "trading") === c.id).length;
+          VISIBLE_CATEGORIES.forEach(c => {
+            const count = displayGoals.filter(g => (g.category || "trading") === c.id).length;
             if (count > 0) tabs.push(c);
           });
           return tabs.map(c => {
             const Icon = c.icon;
-            const count = c.id === "all" ? goals.length : goals.filter(g => (g.category || "trading") === c.id).length;
+            const count = c.id === "all" ? displayGoals.length : displayGoals.filter(g => (g.category || "trading") === c.id).length;
             return (
               <button key={c.id} onClick={() => setCatFilter(c.id)}
                 style={{
@@ -782,7 +797,7 @@ export default function GoalsPage() {
                   })()}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
-                  {CATEGORIES.map(c => {
+                  {VISIBLE_CATEGORIES.map(c => {
                     const Icon = c.icon;
                     const active = form.category === c.id;
                     return (

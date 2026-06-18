@@ -71,7 +71,7 @@ interface AppProviderProps {
   initialPage?: string;
 }
 
-export function AppProvider({ children, initialPage = "dashboard" }: AppProviderProps) {
+export function AppProvider({ children, initialPage = "daily-planner" }: AppProviderProps) {
   const { user } = useAuth();
   const tradesApi = useTrades();
   const strategiesApi = useStrategies();
