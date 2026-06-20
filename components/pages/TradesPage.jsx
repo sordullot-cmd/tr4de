@@ -9,6 +9,8 @@ import {
   Trash2 as LucideTrash2,
   TrendingUp as LucideTrendingUp,
   ArrowDown as LucideArrowDown,
+  ArrowUp as LucideArrowUp,
+  ArrowDownUp as LucideArrowDownUp,
   SlidersHorizontal as LucideSlidersHorizontal,
   GripVertical as LucideGripVertical,
   Image as LucideImage,
@@ -138,6 +140,19 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     });
   };
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+
+  // Tri des trades : critère + direction, persistés côté compte (comme les colonnes).
+  const SORT_OPTIONS = [
+    { id: "date",     label: "Date" },
+    { id: "symbol",   label: "Symbole" },
+    { id: "strategy", label: "Stratégie" },
+    { id: "pnl",      label: "P&L" },
+    { id: "side",     label: "Sens" },
+    { id: "lots",     label: "Lots" },
+  ];
+  const [sortBy, setSortBy] = useCloudState("tr4de_trades_sort_by", "trades_sort_by", "date");
+  const [sortDir, setSortDir] = useCloudState("tr4de_trades_sort_dir", "trades_sort_dir", "desc");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   // Mode embarqué (journal) : "voir plus" pour dépasser la limite maxRows.
   const [embeddedShowAll, setEmbeddedShowAll] = useState(false);
   const [dragColId, setDragColId] = useState(null);
@@ -170,6 +185,18 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [openStratMenuId]);
+
+  // Fermer le menu de tri au clic exterieur
+  React.useEffect(() => {
+    if (!sortMenuOpen) return;
+    const handler = (e) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-sort-menu]')) setSortMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [sortMenuOpen]);
   const [tradeNotes, setTradeNotes] = useState({});
   const [tradeStrategies, setTradeStrategies] = useState({});
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
@@ -280,6 +307,15 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const volOf = (t) => {
     const v = Number(t?.volume);
     return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  // Premier nom de stratégie assignée au trade (pour le tri). "" si aucune.
+  const firstStrategyName = (tr) => {
+    const stratIds = Array.from(new Set(indexKeysOf(tr).flatMap(k => tradeStrategies[k] || [])));
+    for (const id of stratIds) {
+      const name = (strategies.find(x => x.id === id) || loadedStrategies.find(x => x.id === id))?.name;
+      if (name) return name;
+    }
+    return "";
   };
 
   // Groupes "trades pris sur plusieurs comptes" (même symbole/sens/prix d'entrée à 1 min près)
@@ -851,6 +887,40 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:12,flexWrap:"wrap"}}>
           <h1 style={{fontSize:17,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1,fontFamily:"var(--font-sans)"}}>{t("trades.title")}</h1>
           <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontFamily:"var(--font-sans)"}}>
+            {/* Trier les trades */}
+            <div style={{position:"relative",fontFamily:"var(--font-sans)"}} data-sort-menu>
+              <button
+                onClick={(e)=>{ e.stopPropagation(); setSortMenuOpen(v=>!v); }}
+                title="Trier les trades"
+                style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 14px",height:34,borderRadius:999,background:sortMenuOpen?T.bg:T.white,border:`1px solid ${T.border}`,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}
+              >
+                <LucideArrowDownUp size={14} strokeWidth={1.75} />
+                <span>Trier&nbsp;: {(SORT_OPTIONS.find(o=>o.id===sortBy)||SORT_OPTIONS[0]).label}</span>
+                {sortDir==="asc" ? <LucideArrowUp size={13} strokeWidth={2} /> : <LucideArrowDown size={13} strokeWidth={2} />}
+              </button>
+              {sortMenuOpen && (
+                <div style={{position:"absolute",top:"calc(100% + 6px)",right:0,zIndex:50,minWidth:210,background:T.white,border:`1px solid ${T.border}`,borderRadius:12,boxShadow:"0 12px 32px rgba(0,0,0,0.14)",padding:6,display:"flex",flexDirection:"column",gap:2}}>
+                  {SORT_OPTIONS.map(o=>{
+                    const active = sortBy===o.id;
+                    return (
+                      <button key={o.id}
+                        onClick={()=>{ if(active){ setSortDir(d=>d==="asc"?"desc":"asc"); } else { setSortBy(o.id); } }}
+                        style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,border:"none",background:active?T.bg:"transparent",color:T.text,fontSize:13,fontWeight:active?600:500,cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}
+                        onMouseEnter={(e)=>{ if(!active) e.currentTarget.style.background=T.bg; }}
+                        onMouseLeave={(e)=>{ if(!active) e.currentTarget.style.background="transparent"; }}
+                      >
+                        <span style={{flex:1}}>{o.label}</span>
+                        {active && (sortDir==="asc" ? <LucideArrowUp size={13} strokeWidth={2} color={T.textSub} /> : <LucideArrowDown size={13} strokeWidth={2} color={T.textSub} />)}
+                      </button>
+                    );
+                  })}
+                  <div style={{borderTop:`1px solid ${T.border}`,margin:"4px 0 2px"}} />
+                  <div style={{padding:"4px 10px",fontSize:11,color:T.textMut}}>
+                    Clique le critère actif pour inverser l'ordre.
+                  </div>
+                </div>
+              )}
+            </div>
             <button onClick={onImportClick} style={{padding:"7px 16px",height:34,borderRadius:999,background:"#0D0D0D",border:"1px solid #0D0D0D",color:"#FFFFFF",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"var(--font-sans)"}}>{t("trades.importBtn")}</button>
           </div>
           <div id="tr4de-page-header-slot" />
@@ -1114,13 +1184,34 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                   };
                   // Construire les groupes d'abord, puis aplatir en rangées (parent + enfants si dépliés)
                   const groups = buildGroups(filteredTrades, 60);
+                  // Valeur de tri d'un groupe selon le critère choisi.
+                  const sortVal = (g) => {
+                    const p = g.parent;
+                    switch (sortBy) {
+                      case "symbol":   return String(p.symbol || "").toUpperCase();
+                      case "strategy": return firstStrategyName(p).toUpperCase();
+                      case "pnl":      return g.netSum != null ? g.netSum : netPnlOf(p);
+                      case "side":     return String(p.direction || "").toUpperCase();
+                      case "lots":     return g.qtySum != null && g.qtySum > 0 ? g.qtySum : (qtyOf(p) || 0);
+                      case "date":
+                      default: {
+                        const d = String(p.date || "").slice(0, 10);
+                        const time = p.exitTime || p.exit_time || "00:00:00";
+                        return `${d}T${time}`;
+                      }
+                    }
+                  };
+                  const sortMul = sortDir === "asc" ? 1 : -1;
                   groups.sort((a, b) => {
-                    const dateA = String(a.parent.date || "").slice(0, 10);
-                    const dateB = String(b.parent.date || "").slice(0, 10);
-                    if (dateA !== dateB) return dateB.localeCompare(dateA);
-                    const timeA = a.parent.exitTime || a.parent.exit_time || "00:00:00";
-                    const timeB = b.parent.exitTime || b.parent.exit_time || "00:00:00";
-                    return String(timeB).localeCompare(String(timeA));
+                    const va = sortVal(a), vb = sortVal(b);
+                    let cmp;
+                    if (typeof va === "number" && typeof vb === "number") cmp = va - vb;
+                    else cmp = String(va).localeCompare(String(vb), "fr", { numeric: true });
+                    if (cmp !== 0) return cmp * sortMul;
+                    // Départage stable : date la plus récente d'abord
+                    const da = String(a.parent.date || "").slice(0, 10);
+                    const db = String(b.parent.date || "").slice(0, 10);
+                    return db.localeCompare(da);
                   });
                   // Aplatir : pour chaque groupe → ligne parent (groupRow=true si N>1) + enfants si déplié
                   const rows = [];
