@@ -10,6 +10,7 @@ import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import { TimeField } from "./AgendaDateFields";
 import { NavArrow, NavLabel } from "@/components/ui/DateNav";
 import MiniCalendar from "@/components/ui/MiniCalendar";
+import { RPG_STORAGE_KEY, RPG_CLOUD_KEY, DEFAULT_CATEGORIES, CatIcon, habitCategoryIds, CATEGORY_PALETTE } from "@/lib/lifeRpgCategories";
 import {
   Plus, Check, Trash2,
   Battery, Flame, Clock, MapPin, Target as TargetIcon, X, Pencil,
@@ -90,8 +91,12 @@ const primaryBtn = (small = false) => ({
 });
 
 const STORAGE_PLANNER = "tr4de_daily_planner";
-const STORAGE_HABITS = "tr4de_habits";
-const STORAGE_HABITS_HISTORY = "tr4de_habits_history";
+export const STORAGE_HABITS = "tr4de_habits";
+export const STORAGE_HABITS_HISTORY = "tr4de_habits_history";
+// Clés cloud (Supabase) des habitudes — partagées avec la page « Vie RPG »
+// pour que les deux pages lisent/écrivent la même source de vérité.
+export const CLOUD_HABITS = "habits";
+export const CLOUD_HABITS_HISTORY = "habits_history";
 
 const todayKey = () => {
   const d = new Date();
@@ -209,7 +214,7 @@ const ICON_LIBRARY = {
   cart: ShoppingCart, target: TargetIcon, star: Star, skull: Skull, ghost: Ghost,
 };
 
-function iconFor(h) {
+export function iconFor(h) {
   if (h && h.icon && ICON_LIBRARY[h.icon]) return ICON_LIBRARY[h.icon];
   return autoIcon(h?.name);
 }
@@ -241,13 +246,13 @@ const DESC_RULES = [
   { re: /(respir|breath)/i,                                 desc: "Exercices de respiration" },
   { re: /(prière|priere|pray|gratitude)/i,                  desc: "Moment de gratitude" },
 ];
-function autoDescription(name) {
+export function autoDescription(name) {
   if (!name) return "";
   for (const r of DESC_RULES) if (r.re.test(name)) return r.desc;
   return "";
 }
 
-const defaultHabits = () => {
+export const defaultHabits = () => {
   const mk = (id, name) => ({ id, name, description: autoDescription(name) });
   return [
     mk(1, "Lecture"),
@@ -300,8 +305,29 @@ export default function DailyPlannerPage() {
   const updateDay = (patch) => setPlannerStore(prev => ({ ...prev, [dateKey]: { ...day, ...patch } }));
 
   // Habits — synchronisées Supabase
-  const [habits, setHabits] = useCloudState(STORAGE_HABITS, "habits", defaultHabits());
-  const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, "habits_history", {});
+  const [habits, setHabits] = useCloudState(STORAGE_HABITS, CLOUD_HABITS, defaultHabits());
+  const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, CLOUD_HABITS_HISTORY, {});
+
+  // Catégories (« cartes ») de la page Vie RPG — en lecture seule ici, pour
+  // permettre de rattacher optionnellement une habitude à une carte. L'édition
+  // des catégories elles-mêmes se fait dans la page Vie RPG.
+  const [rpgState] = useCloudState(RPG_STORAGE_KEY, RPG_CLOUD_KEY, { categories: DEFAULT_CATEGORIES });
+  const rpgCategories = Array.isArray(rpgState.categories) ? rpgState.categories : DEFAULT_CATEGORIES;
+
+  // Couleur d'une habitude = couleur de sa 1re carte « Vie RPG » rattachée
+  // (s'il y en a une). Sert à colorer la pastille d'icône et la case à cocher.
+  const catColorMap = useMemo(() => {
+    const m = {};
+    for (const c of rpgCategories) m[c.id] = c.color;
+    return m;
+  }, [rpgCategories]);
+  const habitColor = (h) => {
+    for (const id of habitCategoryIds(h)) if (catColorMap[id]) return catColorMap[id];
+    // Repli : couleur stable dérivée de l'id, pour qu'une habitude sans carte
+    // rattachée reste colorée (et garde la même couleur d'un rendu à l'autre).
+    const n = Math.abs(Number(h?.id) || String(h?.id || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+    return CATEGORY_PALETTE[n % CATEGORY_PALETTE.length];
+  };
 
   const { pushUndo } = useUndo();
   const [dragHabitId, setDragHabitId] = useState(null);
@@ -355,18 +381,17 @@ export default function DailyPlannerPage() {
   // Habit form (add + edit)
   const [habitFormOpen, setHabitFormOpen] = useState(false);
   const [editingHabitId, setEditingHabitId] = useState(null);
-  const emptyHabit = { name: "", description: "", time: "", location: "", icon: "" };
+  const emptyHabit = { name: "", description: "", time: "", location: "", icon: "", attributes: [] };
   const [habitDraft, setHabitDraft] = useState(emptyHabit);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   // Glisser-déposer du formulaire (comme le calendrier)
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
   const [modalDragging, setModalDragging] = useState(false);
-  const [dragHover, setDragHover] = useState(false);
   const modalDragRef = React.useRef(null);
-  const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setDragHover(false); setHabitFormOpen(true); };
-  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "", icon: h.icon || "" }); setEditingHabitId(h.id); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setDragHover(false); setHabitFormOpen(true); };
+  const openCreateHabit = () => { setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setHabitFormOpen(true); };
+  const openEditHabit = (h) => { setHabitDraft({ name: h.name, description: h.description || "", time: h.time || "", location: h.location || "", icon: h.icon || "", attributes: habitCategoryIds(h) }); setEditingHabitId(h.id); setIconPickerOpen(false); setModalPos({ x: 0, y: 0 }); setHabitFormOpen(true); };
   const startModalDrag = (e) => {
-    if (e.button !== 0) return;
+    if (e.target.closest("button")) return; // pas de drag en cliquant un bouton
     e.preventDefault();
     const start = { mx: e.clientX, my: e.clientY, x: modalPos.x, y: modalPos.y };
     modalDragRef.current = start;
@@ -390,10 +415,12 @@ export default function DailyPlannerPage() {
     if (!nm) return;
     const desc = habitDraft.description.trim() || autoDescription(nm);
     const iconKey = habitDraft.icon && ICON_LIBRARY[habitDraft.icon] ? habitDraft.icon : "";
+    const attributes = Array.isArray(habitDraft.attributes) ? habitDraft.attributes.filter(Boolean) : [];
     if (editingHabitId) {
-      setHabits(prev => prev.map(h => h.id === editingHabitId ? { ...h, name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey } : h));
+      // `attribute: undefined` retire l'ancien champ unique hérité (rétrocompat).
+      setHabits(prev => prev.map(h => h.id === editingHabitId ? { ...h, name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey, attributes, attribute: undefined } : h));
     } else {
-      setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey }]);
+      setHabits(prev => [...prev, { id: Date.now(), name: nm, description: desc, time: habitDraft.time, location: habitDraft.location.trim(), icon: iconKey, attributes }]);
     }
     setHabitFormOpen(false); setHabitDraft(emptyHabit); setEditingHabitId(null); setIconPickerOpen(false);
   };
@@ -504,22 +531,19 @@ export default function DailyPlannerPage() {
                   transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
                 }}
               >
-                {/* Barre du haut = poignée de déplacement (grise au survol) + boutons */}
+                {/* Barre du haut = poignée de déplacement (façon Sport) + boutons */}
                 <div onMouseDown={startModalDrag} title="Glisser pour déplacer la fenêtre"
-                  onMouseEnter={() => setDragHover(true)} onMouseLeave={() => setDragHover(false)}
                   style={{
                     position: "relative",
                     padding: "10px 16px 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2,
-                    cursor: modalDragging ? "grabbing" : "grab", userSelect: "none",
+                    cursor: "move", userSelect: "none",
                     borderTopLeftRadius: 12, borderTopRightRadius: 12,
-                    background: (dragHover || modalDragging) ? "rgba(0,0,0,0.035)" : "transparent",
-                    transition: "background-color 120ms ease",
                   }}>
                   {/* Poignée de déplacement (barre grise centrée) */}
                   <div style={{
                     position: "absolute", left: "50%", top: 7, transform: "translateX(-50%)",
                     width: 40, height: 4, borderRadius: 999,
-                    background: (dragHover || modalDragging) ? T.textMut : T.border,
+                    background: modalDragging ? T.textMut : T.border,
                     transition: "background-color 120ms ease",
                   }} />
                   <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
@@ -647,6 +671,32 @@ export default function DailyPlannerPage() {
                       rows={3}
                       style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, outline: "none", fontFamily: "inherit", color: T.text, background: T.white, resize: "vertical", lineHeight: 1.5 }} />
                   </div>
+
+                  {/* Cartes Vie RPG — liens optionnels (plusieurs possibles) */}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: T.textSub, display: "block", marginBottom: 6 }}>
+                      Cartes Vie RPG <span style={{ color: T.textMut, fontWeight: 400 }}>· optionnel · plusieurs possibles</span>
+                    </label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {rpgCategories.map((c) => {
+                        const sel = Array.isArray(habitDraft.attributes) ? habitDraft.attributes : [];
+                        const active = sel.includes(c.id);
+                        const toggle = () => setHabitDraft({ ...habitDraft, attributes: active ? sel.filter(x => x !== c.id) : [...sel, c.id] });
+                        return (
+                          <button key={c.id} type="button" onClick={toggle}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 999, border: `1px solid ${active ? c.color : T.border}`, background: active ? `${c.color}14` : T.white, color: active ? c.color : T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            {active
+                              ? <Check size={13} strokeWidth={2.5} color={c.color} />
+                              : <CatIcon name={c.icon} size={13} strokeWidth={1.9} color={T.textMut} />}
+                            {c.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: T.textMut, marginTop: 6, lineHeight: 1.4 }}>
+                      Rattache cette habitude à une ou plusieurs cartes de la page « Vie RPG » : son XP alimente chaque catégorie cochée.
+                    </div>
+                  </div>
                 </div>
 
                 {/* Pied */}
@@ -670,6 +720,7 @@ export default function DailyPlannerPage() {
               {habits.map(h => {
                 const done = !!(habitHistory[h.id] && habitHistory[h.id][dateKey]);
                 const Ico = iconFor(h);
+                const color = habitColor(h);
                 return (
                   <div key={h.id}
                     draggable
@@ -711,12 +762,13 @@ export default function DailyPlannerPage() {
                       const ed = e.currentTarget.querySelector("[data-habit-edit]"); if (ed) ed.style.opacity = 0;
                     }}
                   >
-                    {/* Icon bubble (gris neutre, plus de vert) */}
+                    {/* Pastille d'icône — teintée de la couleur de la carte Vie RPG rattachée */}
                     <div style={{
                       width: 34, height: 34, borderRadius: "50%",
-                      background: T.bg,
+                      background: done ? T.bg : (color ? `${color}1A` : T.bg),
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0, color: done ? T.textMut : T.text,
+                      flexShrink: 0, color: done ? T.textMut : (color || T.text),
+                      transition: "background .15s ease, color .15s ease",
                     }}>
                       <Ico size={15} strokeWidth={2} />
                     </div>
@@ -761,8 +813,8 @@ export default function DailyPlannerPage() {
                     <button onClick={() => toggleHabit(h.id)}
                       style={{
                         width: 18, height: 18, borderRadius: 5,
-                        border: done ? "none" : `2px solid ${T.border2 || "#D4D4D4"}`,
-                        background: done ? T.green : T.white,
+                        border: done ? "none" : `2px solid ${color || T.border2 || "#D4D4D4"}`,
+                        background: done ? (color || T.green) : T.white,
                         cursor: "pointer",
                         display: "inline-flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0, transition: "all .15s ease",

@@ -27,8 +27,8 @@ import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
-import DemoTradePage from "@/components/pages/DemoTradePage";
 import DrivePage from "@/components/pages/DrivePage";
+import LifeRpgPage from "@/components/pages/LifeRpgPage";
 import AgendaPage from "@/components/pages/AgendaPage";
 import CalendarPage from "@/components/pages/CalendarPage";
 import JournalPage from "@/components/pages/JournalPage";
@@ -73,7 +73,7 @@ import {
   ArrowDown as LucideArrowDown,
   SlidersHorizontal as LucideSlidersHorizontal,
   Check as LucideCheck,
-  Star,
+  Mountain,
   Pencil,
   Plus,
   GripVertical,
@@ -88,7 +88,6 @@ import {
   Wallet as LucideWallet,
   Dumbbell as LucideDumbbell,
   FolderOpen as LucideFolderOpen,
-  FlaskConical as LucideFlaskConical,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -702,7 +701,6 @@ export default function App() {
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
-        { id: "demo",       icon: LucideFlaskConical, label: "Démo" },
       ],
     },
     {
@@ -719,6 +717,7 @@ export default function App() {
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
+        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
@@ -779,8 +778,8 @@ export default function App() {
     sport: <SportPage />,
     reading: <ReadingListPage />,
     notes: <NotesPage />,
-    demo: <DemoTradePage strategies={strategies} />,
     drive: <DrivePage />,
+    "life-rpg": <LifeRpgPage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
@@ -1064,7 +1063,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "demo"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "life-rpg"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

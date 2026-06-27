@@ -1,0 +1,1108 @@
+"use client";
+
+/**
+ * LifeRpgPage — « Gamification de vie ».
+ *
+ * Page de productivité qui transforme les HABITUDES DU QUOTIDIEN en jeu de rôle.
+ * Il n'existe plus de « quêtes » propres à cette page : les quêtes SONT les
+ * habitudes de la page « Habitudes » (clés cloud `habits` / `habits_history`),
+ * partagées entre les deux pages. Cocher une habitude (depuis l'une ou l'autre)
+ * fait gagner de l'XP et des pièces, monter de niveau et progresser dans les
+ * catégories (Force, Intellect, Social, Discipline… + catégories perso).
+ *
+ * Modèle de données :
+ *  - XP, pièces gagnées, niveaux, attributs par catégorie, streaks et nombre de
+ *    complétions sont DÉRIVÉS de `habits_history` (chaque jour coché = la
+ *    récompense de la difficulté de l'habitude). Aucune valeur de progression
+ *    n'est persistée → jamais de double comptage, synchronisation parfaite.
+ *  - La méta « RPG » de chaque habitude (catégorie `attribute` + `difficulty`)
+ *    vit directement sur l'objet habitude (clé `habits`) : une seule source de
+ *    vérité, invisible côté page « Habitudes ».
+ *  - Seuls les échanges de récompenses (`redemptions`) et les catégories
+ *    (`categories`, avec leurs objectifs chiffrés) sont persistés dans `life_rpg`.
+ *
+ * Vue unique « Aventure » : héros, cartes de catégorie (identité, objectif
+ * chiffré, habitudes rattachées) affichées sur une ligne défilable, habitudes,
+ * visualisation, récompenses et badges. Les catégories se créent / éditent
+ * directement depuis leurs cartes (carte « Nouvelle catégorie » en bout de ligne).
+ */
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactDOM from "react-dom";
+import {
+  Plus, X, Trash2, Pencil, Sparkles, Target, UserRound, ListChecks, TrendingUp, Check, Flame,
+} from "lucide-react";
+import { useCloudState } from "@/lib/hooks/useCloudState";
+import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import { useApp } from "@/lib/contexts/AppContext";
+import { useUndo } from "@/lib/contexts/UndoContext";
+import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
+import { getLocalDateString } from "@/lib/dateUtils";
+import { t, useLang } from "@/lib/i18n";
+import {
+  STORAGE_HABITS, STORAGE_HABITS_HISTORY, CLOUD_HABITS, CLOUD_HABITS_HISTORY,
+  defaultHabits, autoDescription,
+} from "@/components/pages/DailyPlannerPage";
+import {
+  GOALS_STORAGE_KEY, GOALS_CLOUD_KEY, computeGoalProgress, goalUnitOf, fmtGoalVal,
+} from "@/components/pages/GoalsPage";
+import {
+  RPG_STORAGE_KEY as STORAGE_KEY, RPG_CLOUD_KEY as CLOUD_KEY,
+  CATEGORY_ICON_KEYS as ICON_KEYS, CatIcon,
+  CATEGORY_PALETTE as PALETTE, DEFAULT_CATEGORIES, habitCategoryIds,
+} from "@/lib/lifeRpgCategories";
+
+const T = {
+  white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
+  text: "#0D0D0D", textSub: "#5C5C5C", textMut: "#8E8E8E",
+  accent: "#0D0D0D", accentBg: "#F0F0F0",
+  green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
+};
+
+// Difficulté → récompense. Plus c'est dur, plus ça rapporte d'XP et de pièces.
+const DIFFICULTIES = [
+  { id: "easy",   label: "Facile",    xp: 10, coins: 5,  color: "#8E8E8E" },
+  { id: "normal", label: "Normale",   xp: 25, coins: 12, color: "#3B82F6" },
+  { id: "hard",   label: "Difficile", xp: 50, coins: 25, color: "#F59E0B" },
+];
+const DIFF_BY_ID = Object.fromEntries(DIFFICULTIES.map(d => [d.id, d]));
+const DEFAULT_DIFF = DIFF_BY_ID.normal;
+
+/* ---------- Helpers habitudes / temps ---------- */
+// Jour précédent (clé "YYYY-MM-DD") sans dépendre du fuseau via Date(iso).
+function dayBefore(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
+  return getLocalDateString(dt);
+}
+// Série en cours : jours consécutifs cochés en terminant aujourd'hui (ou hier
+// si pas encore coché aujourd'hui — la série n'est pas « cassée » avant le soir).
+function currentStreak(set) {
+  const today = getLocalDateString();
+  let cursor = set.has(today) ? today : (set.has(dayBefore(today)) ? dayBefore(today) : null);
+  if (!cursor) return 0;
+  let s = 0;
+  while (set.has(cursor)) { s++; cursor = dayBefore(cursor); }
+  return s;
+}
+// Plus longue série de jours consécutifs (clés triées en ordre croissant).
+function bestStreakOf(sortedKeys) {
+  let best = 0, run = 0, prev = null;
+  for (const k of sortedKeys) {
+    run = (prev && dayBefore(k) === prev) ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = k;
+  }
+  return best;
+}
+// Une habitude est-elle déjà cochée aujourd'hui ?
+function isDoneToday(history, id) {
+  return !!(history[id] && history[id][getLocalDateString()]);
+}
+// Jour suivant (clé "YYYY-MM-DD").
+function dayAfter(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  return getLocalDateString(dt);
+}
+
+/* ---------- Multiplicateur de série & pénalité ---------- */
+// Multiplicateur progressif plafonné : +10 % par jour de série, max ×3.
+// Série 1 → ×1, série 11 → ×2, série 21+ → ×3.
+const STREAK_MULT_STEP = 0.1;
+const STREAK_MULT_MAX = 3;
+function streakMultiplier(streak) {
+  return Math.min(STREAK_MULT_MAX, 1 + STREAK_MULT_STEP * Math.max(0, streak - 1));
+}
+// Pénalité À LA RUPTURE d'une série (une seule fois quand on casse une série),
+// proportionnelle à la série perdue et plafonnée : `diff.xp × min(série, cap)`.
+// Une pause longue ne coûte donc qu'UNE pénalité, pas une par jour.
+const STREAK_PENALTY_CAP = 5;
+function streakBreakPenalty(streak, baseXp) {
+  return streak > 0 ? baseXp * Math.min(streak, STREAK_PENALTY_CAP) : 0;
+}
+// Affichage compact d'un multiplicateur : ×2 et non ×2.0, mais ×1,4 conservé.
+function fmtMult(m) {
+  return (m % 1 === 0 ? String(m) : m.toFixed(1)).replace(".", ",");
+}
+
+/* ---------- Courbe de niveau ---------- */
+// XP nécessaire pour passer du niveau L au niveau L+1 : 100 + (L-1)*50.
+function xpForLevel(level) { return 100 + (level - 1) * 50; }
+function levelInfo(totalXp) {
+  let level = 1;
+  let remaining = Math.max(0, totalXp);
+  while (remaining >= xpForLevel(level)) {
+    remaining -= xpForLevel(level);
+    level += 1;
+  }
+  const needed = xpForLevel(level);
+  return { level, intoLevel: remaining, neededForNext: needed, pct: Math.round((remaining / needed) * 100) };
+}
+
+// Niveau d'une catégorie DÉRIVÉ de son XP (habitudes + objectifs liés). Non
+// plafonné : courbe générique progressive (facile au début, de plus en plus dur).
+function categoryLevel(xp) {
+  const info = levelInfo(Math.max(0, xp || 0));
+  return { level: info.level, intoLevel: info.intoLevel, neededForNext: info.neededForNext, levelPct: info.pct };
+}
+
+// « Niveau continu » : niveau entier + fraction de progression vers le suivant.
+// Donne une courbe lisse et croissante pour le graphique de progression.
+function levelValue(xp) {
+  const li = levelInfo(Math.max(0, xp || 0));
+  return li.level + (li.neededForNext > 0 ? li.intoLevel / li.neededForNext : 0);
+}
+
+// Série temporelle d'XP CUMULÉE (global + par catégorie), à partir des seules
+// complétions d'habitudes (les seules datées). Renvoie les jours triés et, pour
+// chacun, le cumul d'XP global et par catégorie.
+function computeXpSeries(habits, history, categories) {
+  const dayGlobal = {};   // "YYYY-MM-DD" -> xp NET ce jour (gains × multiplicateur − pénalités)
+  const dayCat = {};      // catId -> { "YYYY-MM-DD" -> xp net }
+  const today = getLocalDateString();
+  for (const h of habits) {
+    const diff = DIFF_BY_ID[h.difficulty] || DEFAULT_DIFF;
+    const ids = habitCategoryIds(h);
+    const done = new Set(Object.keys(history[h.id] || {}).filter(k => (history[h.id] || {})[k]));
+    const keys = [...done].sort();
+    if (!keys.length) continue;
+    let streak = 0, day = keys[0], guard = 0;
+    while (guard++ < 100000) {
+      let delta = 0;
+      if (done.has(day)) { streak += 1; delta = Math.round(diff.xp * streakMultiplier(streak)); }
+      else if (day !== today) { delta = -streakBreakPenalty(streak, diff.xp); streak = 0; }
+      if (delta !== 0) {
+        dayGlobal[day] = (dayGlobal[day] || 0) + delta;
+        for (const cid of ids) (dayCat[cid] = dayCat[cid] || {})[day] = (dayCat[cid][day] || 0) + delta;
+      }
+      if (day === today) break;
+      day = dayAfter(day);
+    }
+  }
+  const days = Object.keys(dayGlobal).sort();
+  let acc = 0;
+  const globalCum = days.map(k => (acc += dayGlobal[k]));
+  const catCum = {};
+  for (const c of categories) {
+    let a = 0;
+    catCum[c.id] = days.map(k => (a += (dayCat[c.id]?.[k] || 0)));
+  }
+  return { days, globalCum, catCum };
+}
+
+/* ---------- Dérivation de la progression ---------- */
+// Recalcule toute la progression à partir de deux sources INDÉPENDANTES (donc
+// jamais de double comptage) :
+//  - les complétions d'habitudes (dérivées de `history`) → XP/pièces du quotidien ;
+//  - les OBJECTIFS de la page « Objectifs » rattachés à une catégorie
+//    (`rpgCategory` + `rpgXp`) → XP AU PRORATA de leur avancement (50 % = 50 %).
+// Pure et déterministe.
+function computeProgress(habits, history, goals = [], trades = [], accounts = []) {
+  const attributes = {};
+  let totalXp = 0, coinsEarned = 0, totalCompletions = 0, bestStreak = 0;
+  const perHabit = {};
+  const activityLog = [];
+  for (const h of habits) {
+    const diff = DIFF_BY_ID[h.difficulty] || DEFAULT_DIFF;
+    const map = history[h.id] || {};
+    const done = new Set(Object.keys(map).filter(k => map[k]));
+    const keys = [...done].sort();
+    const completions = keys.length;
+    const catIds = habitCategoryIds(h);
+    totalCompletions += completions;
+    coinsEarned += completions * diff.coins;
+    const cur = currentStreak(done);
+    const bst = bestStreakOf(keys);
+    if (bst > bestStreak) bestStreak = bst;
+    perHabit[h.id] = { completions, streak: cur, best: bst };
+    // Parcourt chaque jour de la 1re complétion à aujourd'hui :
+    //  - jour coché → diff.xp × multiplicateur(série en cours) → pousse aux séries ;
+    //  - jour raté (passé, hors aujourd'hui) → perte de diff.xp + série remise à 0.
+    if (completions > 0) {
+      const today = getLocalDateString();
+      let streak = 0, day = keys[0], guard = 0;
+      while (guard++ < 100000) {
+        if (done.has(day)) {
+          streak += 1;
+          const gain = Math.round(diff.xp * streakMultiplier(streak));
+          totalXp += gain;
+          for (const cid of catIds) attributes[cid] = (attributes[cid] || 0) + gain;
+          activityLog.push({ ts: `${day}T12:00:00`, label: h.name, xp: gain, attribute: catIds[0] || null });
+        } else if (day !== today) {
+          // Rupture de série : une seule pénalité (proportionnelle, plafonnée).
+          const pen = streakBreakPenalty(streak, diff.xp);
+          if (pen > 0) {
+            totalXp -= pen;
+            for (const cid of catIds) attributes[cid] = (attributes[cid] || 0) - pen;
+          }
+          streak = 0;
+        }
+        if (day === today) break;
+        day = dayAfter(day);
+      }
+    }
+  }
+  // XP des objectifs liés : prorata de l'avancement (pct) × `rpgXp`.
+  for (const g of flattenGoals(goals)) {
+    const xpFull = Math.max(0, parseInt(g.rpgXp, 10) || 0);
+    if (!g.rpgCategory || xpFull <= 0) continue;
+    const { pct } = computeGoalProgress(g, trades, accounts);
+    const gained = Math.round((pct / 100) * xpFull);
+    if (gained <= 0) continue;
+    totalXp += gained;
+    attributes[g.rpgCategory] = (attributes[g.rpgCategory] || 0) + gained;
+  }
+  // Les pénalités peuvent rendre une valeur négative : on borne à 0.
+  for (const k in attributes) attributes[k] = Math.max(0, attributes[k]);
+  activityLog.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+  return { attributes, totalXp: Math.max(0, totalXp), coinsEarned, totalCompletions, bestStreak, perHabit, activityLog };
+}
+// Aplatit l'arbre des objectifs (top-level + sous-objectifs imbriqués).
+function flattenGoals(goals) {
+  const out = [];
+  const walk = (arr) => {
+    for (const g of arr || []) {
+      out.push(g);
+      if (Array.isArray(g.subtasks) && g.subtasks.length) walk(g.subtasks);
+    }
+  };
+  walk(goals);
+  return out;
+}
+// Applique `patch` à l'objectif d'id `id` (récursif sur les sous-objectifs).
+function patchGoal(goals, id, patch) {
+  return (Array.isArray(goals) ? goals : []).map(g => {
+    if (g.id === id) return { ...g, ...patch };
+    if (Array.isArray(g.subtasks) && g.subtasks.length) return { ...g, subtasks: patchGoal(g.subtasks, id, patch) };
+    return g;
+  });
+}
+
+/* ---------- État par défaut ---------- */
+function defaultState() {
+  return {
+    categories: DEFAULT_CATEGORIES,
+    rewards: [
+      { id: 1, label: "Épisode de série",  cost: 30 },
+      { id: 2, label: "Sortie restaurant", cost: 150 },
+    ],
+    redemptions: [],      // { ts, label, cost }
+    questsMigrated: true, // les nouveaux comptes n'ont pas d'anciennes quêtes
+  };
+}
+
+// Anciennes quêtes par défaut — pour migrer les comptes existants qui n'avaient
+// jamais personnalisé leurs quêtes (état hérité sans champ `quests`).
+const LEGACY_DEFAULT_QUESTS = [
+  { id: 1, label: "Séance de sport",   attribute: "force",      difficulty: "hard" },
+  { id: 2, label: "Lire 20 pages",     attribute: "intellect",  difficulty: "normal" },
+  { id: 3, label: "Appeler un proche", attribute: "social",     difficulty: "easy" },
+  { id: 4, label: "Méditer 10 min",    attribute: "discipline", difficulty: "easy" },
+];
+
+/* ---------- Page ---------- */
+export default function LifeRpgPage() {
+  useLang();
+  const { setPage } = useApp();
+  const [state, setState] = useCloudState(STORAGE_KEY, CLOUD_KEY, defaultState());
+  // Habitudes partagées avec la page « Habitudes » (même source de vérité).
+  const [habits, setHabits] = useCloudState(STORAGE_HABITS, CLOUD_HABITS, defaultHabits());
+  const [habitHistory, setHabitHistory] = useCloudState(STORAGE_HABITS_HISTORY, CLOUD_HABITS_HISTORY, {});
+  // Objectifs partagés avec la page « Objectifs » : ceux rattachés à une
+  // catégorie (rpgCategory) alimentent son XP au prorata de leur avancement.
+  const [goals, setGoals] = useCloudState(GOALS_STORAGE_KEY, GOALS_CLOUD_KEY, []);
+  const tradesHook = useTrades();
+  const trades = useMemo(() => tradesHook?.trades || [], [tradesHook?.trades]);
+  const accountsHook = useTradingAccounts();
+  const accounts = useMemo(() => accountsHook?.accounts || [], [accountsHook?.accounts]);
+  const { pushUndo } = useUndo();
+
+  // Migration : les anciennes sauvegardes n'avaient pas de `categories`.
+  useEffect(() => {
+    if (!Array.isArray(state.categories)) {
+      setState(prev => ({ ...prev, categories: DEFAULT_CATEGORIES }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Migration unique : convertit les anciennes quêtes du RPG en habitudes.
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
+    if (state.questsMigrated) return;
+
+    // Comptes existants : on lit les quêtes persistées ; à défaut (état hérité
+    // sans champ `quests`) on prend les anciennes quêtes par défaut.
+    const quests = Array.isArray(state.quests) && state.quests.length > 0
+      ? state.quests
+      : (state.quests === undefined ? LEGACY_DEFAULT_QUESTS : []);
+
+    if (quests.length === 0) {
+      setState(prev => ({ ...prev, questsMigrated: true, quests: undefined }));
+      return;
+    }
+
+    const existing = new Set(habits.map(h => (h.name || "").trim().toLowerCase()));
+    const base = Date.now();
+    const additions = [];
+    quests.forEach((q, i) => {
+      const nm = (q.label || "").trim();
+      if (!nm || existing.has(nm.toLowerCase())) return;
+      existing.add(nm.toLowerCase());
+      additions.push({
+        id: base + i,
+        name: nm,
+        description: autoDescription(nm),
+        icon: "",
+        attributes: q.attribute ? [q.attribute] : [],
+        difficulty: q.difficulty,
+        completedAt: q.completedAt,
+      });
+    });
+
+    if (additions.length) {
+      setHabits(prev => [...prev, ...additions.map(a => ({
+        id: a.id, name: a.name, description: a.description, icon: a.icon,
+        attributes: a.attributes, difficulty: a.difficulty,
+      }))]);
+      setHabitHistory(prev => {
+        const next = { ...prev };
+        for (const a of additions) {
+          if (!a.completedAt) continue;
+          const dt = new Date(a.completedAt);
+          if (isNaN(dt.getTime())) continue;
+          const k = getLocalDateString(dt);
+          next[a.id] = { ...(next[a.id] || {}), [k]: true };
+        }
+        return next;
+      });
+    }
+    setState(prev => ({ ...prev, questsMigrated: true, quests: undefined }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const categories = Array.isArray(state.categories) ? state.categories : DEFAULT_CATEGORIES;
+  const catById = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
+  const fallbackCat = { id: "_none", label: "Sans catégorie", color: T.textMut, icon: "star", identity: "", roleModel: "", roleModelWhy: "" };
+  const getCat = (id) => catById[id] || fallbackCat;
+
+  const habitsList = useMemo(() => (Array.isArray(habits) ? habits : []), [habits]);
+  const goalsList = useMemo(() => (Array.isArray(goals) ? goals : []), [goals]);
+
+  // Coche / décoche une habitude pour aujourd'hui (réversible via l'historique).
+  const toggleHabit = (id) => {
+    const day = getLocalDateString();
+    const apply = () => setHabitHistory(prev => {
+      const h = { ...(prev[id] || {}) };
+      if (h[day]) delete h[day]; else h[day] = true;
+      return { ...prev, [id]: h };
+    });
+    apply();
+    pushUndo({ label: "Habitude", undo: async () => apply(), redo: async () => apply() });
+  };
+  const progress = useMemo(() => computeProgress(habitsList, habitHistory, goalsList, trades, accounts), [habitsList, habitHistory, goalsList, trades, accounts]);
+  // Objectifs liés, regroupés par catégorie, avec leur avancement (pour les cartes).
+  const goalsByCat = useMemo(() => {
+    const map = {};
+    for (const g of flattenGoals(goalsList)) {
+      if (!g.rpgCategory) continue;
+      const { current, target, pct } = computeGoalProgress(g, trades, accounts);
+      const xpFull = Math.max(0, parseInt(g.rpgXp, 10) || 0);
+      (map[g.rpgCategory] = map[g.rpgCategory] || []).push({
+        id: g.id, label: g.label, pct, current, target, unit: goalUnitOf(g),
+        xpGained: Math.round((pct / 100) * xpFull), xpFull,
+      });
+    }
+    return map;
+  }, [goalsList, trades, accounts]);
+  const lvl = useMemo(() => levelInfo(progress.totalXp), [progress.totalXp]);
+
+  // Journal d'activité = complétions dérivées + échanges de récompenses.
+  const log = useMemo(() => {
+    const reds = (state.redemptions || []).map(r => ({ ts: r.ts, label: `🎁 ${r.label}`, xp: 0, attribute: null, spent: r.cost }));
+    return [...progress.activityLog, ...reds].sort((a, b) => (a.ts < b.ts ? 1 : -1));
+  }, [progress.activityLog, state.redemptions]);
+
+  /* --- Actions : catégories --- */
+  // Sauvegarde automatique d'une catégorie (création ou édition), sans fermer le
+  // formulaire : appelée à chaque modification de champ. Upsert par id ; on ne
+  // crée une nouvelle catégorie qu'une fois qu'elle a un nom.
+  const upsertCategory = (form) => {
+    setState(prev => {
+      const cats = Array.isArray(prev.categories) ? prev.categories : DEFAULT_CATEGORIES;
+      const fields = {
+        label: (form.label || "").trim(), color: form.color, icon: form.icon,
+        identity: (form.identity || "").trim(),
+        roleModel: (form.roleModel || "").trim(),
+        roleModelWhy: (form.roleModelWhy || "").trim(),
+      };
+      const exists = cats.some(c => c.id === form.id);
+      if (exists) {
+        return { ...prev, categories: cats.map(c => c.id === form.id ? { ...c, ...fields } : c) };
+      }
+      if (!fields.label) return prev; // pas de création tant qu'il n'y a pas de nom
+      return { ...prev, categories: [...cats, { id: form.id, ...fields }] };
+    });
+  };
+
+
+  const removeCategory = (id) => {
+    const cats = categories;
+    if (cats.length <= 1) return; // on garde toujours au moins une catégorie
+    const snapCats = state.categories;
+    const snapHabits = habits;
+    // On retire la catégorie supprimée de la liste des cartes de chaque habitude.
+    const dropCat = (prev) => prev.map(h => habitCategoryIds(h).includes(id)
+      ? { ...h, attributes: habitCategoryIds(h).filter(x => x !== id), attribute: undefined }
+      : h);
+    setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+    setHabits(dropCat);
+    pushUndo({
+      label: "Suppression de la catégorie",
+      undo: async () => { setState(prev => ({ ...prev, categories: snapCats })); setHabits(snapHabits); },
+      redo: async () => {
+        setState(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+        setHabits(dropCat);
+      },
+    });
+  };
+
+  /* --- Modales & vue --- */
+  const [categoryModal, setCategoryModal] = useState(null);
+
+  const openNewCategory = () => setCategoryModal({ id: `cat_${Date.now()}`, isNew: true, label: "", color: PALETTE[0], icon: "star", identity: "", roleModel: "", roleModelWhy: "" });
+  const editCategory = (c) => setCategoryModal({ id: c.id, isNew: false, label: c.label, color: c.color, icon: c.icon, identity: c.identity || "", roleModel: c.roleModel || "", roleModelWhy: c.roleModelWhy || "" });
+
+  // Fermeture du formulaire : nettoie une catégorie tout juste créée mais restée
+  // sans nom (cas « ouvert puis abandonné »).
+  const closeCategory = () => {
+    const cur = categoryModal;
+    if (cur && cur.isNew && cur.id) {
+      setState(prev => {
+        const cats = prev.categories || [];
+        const c = cats.find(x => x.id === cur.id);
+        if (c && !(c.label || "").trim() && cats.length > 1) {
+          return { ...prev, categories: cats.filter(x => x.id !== cur.id) };
+        }
+        return prev;
+      });
+    }
+    setCategoryModal(null);
+  };
+
+  /* --- Rattachement / détachement d'objectifs depuis le menu déroulant d'une
+         carte. Cocher = rattacher (XP par défaut), décocher = détacher.
+         Pour créer un nouvel objectif, on va sur la page Objectifs. --- */
+  const DEFAULT_RPG_XP = 500;
+  const toggleObjectiveLink = (catId, goalId) => {
+    setGoals(prev => {
+      const cur = flattenGoals(prev).find(g => g.id === goalId);
+      const linkedHere = cur && cur.rpgCategory === catId;
+      return patchGoal(prev, goalId, linkedHere
+        ? { rpgCategory: null, rpgXp: 0 }
+        : { rpgCategory: catId, rpgXp: DEFAULT_RPG_XP });
+    });
+  };
+  // Détache un objectif (utilisé par le « × » sur la barre de progression).
+  const detachObjective = (goalId) => setGoals(prev => patchGoal(prev, goalId, { rpgCategory: null, rpgXp: 0 }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "var(--font-sans)" }} className="anim-1">
+      {/* En-tête */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1 }}>{t("nav.lifeRpg")}</h1>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* Niveau global — ligne compacte : « Nv X » + barre inline + XP */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: T.text, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>Nv {lvl.level}</span>
+            <div style={{ width: 110, height: 6, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
+              <div style={{ width: `${lvl.pct}%`, height: "100%", background: T.text, borderRadius: 999, transition: "width .5s ease" }} />
+            </div>
+            <span style={{ fontSize: 11, color: T.textMut, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{lvl.intoLevel} / {lvl.neededForNext} XP</span>
+          </div>
+          <button onClick={openNewCategory} style={btnPrimary()}><Plus size={14} strokeWidth={2} /> Nouvelle catégorie</button>
+        </div>
+      </div>
+
+          {/* Cartes « Personnage » (catégories détaillées) — grille pleine largeur :
+              les cartes s'étirent pour occuper toute la largeur (auto-fit + 1fr). */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+            {[...categories].sort((a, b) => (progress.attributes[b.id] || 0) - (progress.attributes[a.id] || 0)).map(cat => (
+              <PortraitCard key={cat.id} cat={cat}
+                xp={progress.attributes[cat.id] || 0}
+                habits={habitsList.filter(h => habitCategoryIds(h).includes(cat.id))}
+                linkedGoals={goalsByCat[cat.id] || []}
+                allObjectives={flattenGoals(goalsList)}
+                onToggleObjective={(goalId) => toggleObjectiveLink(cat.id, goalId)}
+                onCreateObjective={() => setPage("goals")}
+                onDetachObjective={detachObjective}
+                onEdit={() => editCategory(cat)}
+                onDelete={categories.length > 1 ? () => removeCategory(cat.id) : null} />
+            ))}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)", gap: 16, alignItems: "stretch" }} className="tr4de-rpg-grid">
+            <Section title="Habitudes" icon={ListChecks}>
+              {habitsList.length === 0 ? (
+                <Empty label="Aucune habitude. Ajoutez-en depuis la page « Habitudes »." />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {habitsList.map((h, i) => {
+                    const cs = habitCategoryIds(h).map(getCat);
+                    const done = isDoneToday(habitHistory, h.id);
+                    const st = progress.perHabit[h.id]?.streak || 0;
+                    const mult = streakMultiplier(st);
+                    return (
+                      <div key={h.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < habitsList.length - 1 ? `1px solid ${T.border}` : "none" }}>
+                        <button onClick={() => toggleHabit(h.id)} title={done ? "Décocher pour aujourd'hui" : "Compléter aujourd'hui"}
+                          style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${done ? T.green : T.border}`, background: done ? T.green : T.white, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                          {done && <Check size={10} strokeWidth={3} />}
+                        </button>
+                        <span style={{ fontSize: 13, color: T.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</span>
+                        {st >= 2 && (
+                          <span title={`Série de ${st} jours · XP ×${fmtMult(mult)}`}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, fontSize: 11, fontWeight: 700, color: T.amber, background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 999, padding: "2px 8px", fontVariantNumeric: "tabular-nums" }}>
+                            <Flame size={11} strokeWidth={2.25} /> {st} · ×{fmtMult(mult)}
+                          </span>
+                        )}
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                          {cs.map(c => (
+                            <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: c.color, fontWeight: 600 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.color }} />
+                              {c.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Section>
+            <Section title="Activité récente" icon={Sparkles} fill>
+              <ActivityLog log={log} getCat={getCat} />
+            </Section>
+          </div>
+
+          <LevelChart habits={habitsList} history={habitHistory} categories={categories} />
+
+      {categoryModal && <CategoryModal initial={categoryModal} onSave={upsertCategory} onClose={closeCategory} onGoToObjectives={() => { closeCategory(); setPage("goals"); }} />}
+
+      <style>{`@media (max-width: 760px) { .tr4de-rpg-grid { grid-template-columns: 1fr !important; } } .tr4de-portrait > * + * { margin-top: 18px; padding-top: 18px; border-top: 1px solid #F0F0F0; } .tr4de-portrait > *:nth-child(3) { margin-top: 20px; padding-top: 0; border-top: none; }`}</style>
+    </div>
+  );
+}
+
+function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], onToggleObjective, onCreateObjective, onDetachObjective, onEdit, onDelete }) {
+  const cl = categoryLevel(xp);
+  const [hover, setHover] = useState(false);
+  return (
+    <div className="tr4de-portrait" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, background: T.white, display: "flex", flexDirection: "column", gap: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: `${cat.color}1A`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <CatIcon name={cat.icon} size={18} strokeWidth={1.75} color={cat.color} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</div>
+          <div style={{ fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>Niveau {cl.level} · {xp} XP</div>
+        </div>
+        {/* Boutons modifier / supprimer : masqués, visibles au survol de la carte */}
+        <div style={{ display: "flex", gap: 2, flexShrink: 0, opacity: hover ? 1 : 0, pointerEvents: hover ? "auto" : "none", transition: "opacity .15s ease" }}>
+          <button onClick={onEdit} title="Modifier" style={iconBtnSm()}><Pencil size={12} strokeWidth={1.75} /></button>
+          {onDelete && <button onClick={onDelete} title="Supprimer" style={iconBtnSm()}><Trash2 size={12} strokeWidth={1.75} /></button>}
+        </div>
+      </div>
+
+      {/* Progression de niveau (illimitée, courbe progressive) */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: T.textMut, marginBottom: 5 }}>
+          <span>Vers le niveau {cl.level + 1}</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{cl.intoLevel} / {cl.neededForNext} XP</span>
+        </div>
+        <div style={{ height: 8, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
+          <div style={{ width: `${cl.levelPct}%`, height: "100%", background: cat.color, borderRadius: 999, transition: "width .5s ease" }} />
+        </div>
+      </div>
+
+      {/* Identité future : qui je veux devenir */}
+      {cat.identity ? (
+        <div style={{ fontSize: 13, color: T.textSub, fontStyle: "italic", lineHeight: 1.45, borderLeft: `3px solid ${cat.color}`, paddingLeft: 10 }}>« {cat.identity} »</div>
+      ) : (
+        <div style={{ fontSize: 12, color: T.textMut, fontStyle: "italic" }}>{"Aucune identité définie — cliquez sur ✎ pour décrire qui vous voulez devenir."}</div>
+      )}
+
+      {/* Personne à qui je veux ressembler (modèle) — couleur atténuée, moins visible que l'objectif */}
+      {cat.roleModel && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "12px 14px", borderRadius: 12, background: `${cat.color}08`, border: `1px solid ${cat.color}1C` }}>
+          <div style={{ width: 30, height: 30, borderRadius: 999, background: `${cat.color}14`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <UserRound size={15} strokeWidth={1.75} color={cat.color} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: cat.color, marginBottom: 3, opacity: 0.85 }}>Mon modèle</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{cat.roleModel}</div>
+            {cat.roleModelWhy && <div style={{ fontSize: 11.5, color: T.textSub, marginTop: 3, lineHeight: 1.45 }}>{cat.roleModelWhy}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Objectifs liés depuis la page « Objectifs » (rpgCategory). La progression
+          se gère sur la page Objectifs ; ici elle donne l'XP au prorata. On peut
+          créer un objectif directement (il devient un vrai objectif rattaché). */}
+      <div>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: T.textMut, marginBottom: 8 }}>Objectifs</div>
+        {linkedGoals.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {linkedGoals.map(g => {
+              const reached = g.pct >= 100;
+              return (
+                <div key={g.id}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.label}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: reached ? T.green : T.textSub, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtGoalVal(g.current, g.unit)} / {fmtGoalVal(g.target, g.unit)}</span>
+                    {onDetachObjective && (
+                      <button onClick={() => onDetachObjective(g.id)} title="Retirer de cette catégorie"
+                        style={{ ...iconBtnSm(), width: 18, height: 18, opacity: hover ? 1 : 0, pointerEvents: hover ? "auto" : "none", transition: "opacity .15s ease" }}>
+                        <X size={12} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }} title={`+${g.xpGained} / ${g.xpFull} XP`}>
+                    <div style={{ flex: 1, height: 6, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
+                      <div style={{ width: `${g.pct}%`, height: "100%", background: reached ? T.green : cat.color, borderRadius: 999, transition: "width .5s ease" }} />
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: reached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>{reached ? "100%" : `${Math.round(g.pct)}%`}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {onToggleObjective && (
+          <div style={{ marginTop: linkedGoals.length > 0 ? 10 : 0 }}>
+            <ObjectiveMultiSelect objectives={allObjectives} catId={cat.id} color={cat.color}
+              onToggle={onToggleObjective} onCreate={onCreateObjective} compact={linkedGoals.length > 0} />
+          </div>
+        )}
+      </div>
+
+
+      {/* Habitudes rattachées */}
+      <div>
+        <div style={{ fontSize: 11, color: T.textMut, marginBottom: 6 }}>{habits.length} habitude{habits.length > 1 ? "s" : ""} rattachée{habits.length > 1 ? "s" : ""}</div>
+        {habits.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {habits.slice(0, 6).map(h => (
+              <span key={h.id} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 999, background: T.bg, border: `1px solid ${T.border}`, color: T.textSub, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</span>
+            ))}
+            {habits.length > 6 && <span style={{ fontSize: 11, color: T.textMut, alignSelf: "center" }}>+{habits.length - 6}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Menu déroulant multi-sélection des objectifs (même principe que les émotions
+// du formulaire de trade) : un déclencheur, puis une liste cochable de TOUS les
+// objectifs. Cocher rattache à la catégorie, décocher détache. Ferme au clic
+// dehors. Dernière entrée : créer un objectif (redirige vers la page Objectifs).
+function ObjectiveMultiSelect({ objectives, catId, color, onToggle, onCreate, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const [hov, setHov] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  // En mode compact (des objectifs sont déjà rattachés), le déclencheur s'efface :
+  // simple lien discret « + Ajouter », qui ne s'illumine qu'au survol ou à l'ouverture.
+  return (
+    <div ref={ref} style={{ position: "relative", fontFamily: "var(--font-sans)" }}>
+      {compact ? (
+        <button type="button" onClick={() => setOpen(o => !o)}
+          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 4px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: (open || hov) ? T.textSub : T.textMut, opacity: (open || hov) ? 1 : 0.65, transition: "color .15s ease, opacity .15s ease" }}>
+          <Plus size={13} strokeWidth={2} style={{ flexShrink: 0, transform: open ? "rotate(45deg)" : "none", transition: "transform .15s ease" }} />
+          Ajouter
+        </button>
+      ) : (
+        <button type="button" onClick={() => setOpen(o => !o)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", border: `1px solid ${T.border}`, borderRadius: 999, background: T.white, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+          <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: T.textSub }}>Ajouter un objectif</span>
+          <Plus size={14} strokeWidth={2} color={T.textMut} style={{ flexShrink: 0, transform: open ? "rotate(45deg)" : "none", transition: "transform .15s ease" }} />
+        </button>
+      )}
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 10px 30px rgba(0,0,0,0.14)", maxHeight: 260, overflowY: "auto" }}>
+          {objectives.map(g => {
+            const here = g.rpgCategory === catId;
+            const elsewhere = !!g.rpgCategory && !here;
+            return (
+              <button key={g.id} type="button" onClick={() => onToggle(g.id)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", borderRadius: 8, background: here ? T.accentBg : "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                onMouseEnter={e => { if (!here) e.currentTarget.style.background = T.bg; }}
+                onMouseLeave={e => { if (!here) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1.5px solid ${here ? color : T.border}`, background: here ? color : T.white, color: "#fff" }}>{here && <Check size={11} strokeWidth={3} />}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.label || "Objectif"}</span>
+                {elsewhere && <span style={{ fontSize: 9.5, color: T.textMut, flexShrink: 0 }}>rattaché ailleurs</span>}
+              </button>
+            );
+          })}
+          {onCreate && (
+            <button type="button" onClick={() => { setOpen(false); onCreate(); }}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginTop: objectives.length ? 4 : 0, borderTop: objectives.length ? `1px solid ${T.border}` : "none", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: T.textSub, fontSize: 12.5, fontWeight: 600 }}>
+              <Plus size={14} strokeWidth={2} /> Créer un objectif
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ---------- Graphique de progression du niveau ---------- */
+function LevelChart({ habits, history, categories }) {
+  const [tab, setTab] = useState("global"); // global | category
+  const { days, globalCum, catCum } = useMemo(
+    () => computeXpSeries(habits, history, categories),
+    [habits, history, categories],
+  );
+
+  const lines = useMemo(() => {
+    if (tab === "global") {
+      return [{ id: "global", label: "Global", color: T.text, values: globalCum.map(levelValue) }];
+    }
+    return categories
+      .map(c => {
+        const cum = catCum[c.id] || [];
+        return { id: c.id, label: c.label, color: c.color, values: cum.map(levelValue), total: cum[cum.length - 1] || 0 };
+      })
+      .filter(l => l.total > 0);
+  }, [tab, globalCum, catCum, categories]);
+
+  const tabBtn = (id, label) => (
+    <button key={id} onClick={() => setTab(id)}
+      style={{ padding: "4px 12px", borderRadius: 999, border: "none", background: tab === id ? T.white : "transparent", color: tab === id ? T.text : T.textSub, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: tab === id ? "0 1px 2px rgba(0,0,0,.08)" : "none" }}>
+      {label}
+    </button>
+  );
+  const action = (
+    <div style={{ display: "inline-flex", gap: 4, padding: 3, background: T.accentBg, borderRadius: 999 }}>
+      {tabBtn("global", "Global")}
+      {tabBtn("category", "Par catégorie")}
+    </div>
+  );
+
+  return (
+    <Section title="Progression du niveau" icon={TrendingUp} action={action}>
+      {days.length === 0 || lines.length === 0 ? (
+        <Empty label="Complétez des habitudes pour voir votre progression." />
+      ) : (
+        <>
+          <LineChartSvg days={days} lines={lines} />
+          {tab === "category" && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
+              {lines.map(l => (
+                <span key={l.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: T.textSub }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 3, background: l.color }} /> {l.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Section>
+  );
+}
+
+// Petit graphique en lignes (1 à N séries), valeurs = niveau continu.
+function LineChartSvg({ days, lines }) {
+  const VB_W = 1000, VB_H = 200, padL = 8, padR = 34, padT = 12, padB = 22;
+  const chartW = VB_W - padL - padR, chartH = VB_H - padT - padB;
+  const n = days.length;
+  const maxY = Math.max(2, ...lines.flatMap(l => l.values));
+  const xOf = (i) => padL + (n <= 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+  const yOf = (v) => padT + chartH - (v / maxY) * chartH;
+  const pathFor = (vals) => vals.map((v, i) => `${i === 0 ? "M" : "L"} ${xOf(i)} ${yOf(v)}`).join(" ");
+
+  const tickStep = Math.max(1, Math.ceil(maxY / 4));
+  const yticks = []; for (let l = 0; l <= maxY; l += tickStep) yticks.push(l);
+  const step = Math.max(1, Math.ceil(n / 6));
+  const xset = new Set([0, n - 1]); for (let i = 0; i < n; i += step) xset.add(i);
+  const xidx = [...xset].sort((a, b) => a - b);
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none" style={{ width: "100%", height: 220, display: "block", fontFamily: "var(--font-sans)" }}>
+        {yticks.map(l => { const y = yOf(l); return <line key={l} x1={padL} y1={y} x2={padL + chartW} y2={y} stroke={T.border} strokeWidth="0.5" vectorEffect="non-scaling-stroke" />; })}
+        {lines.map(l => (
+          <path key={l.id} d={pathFor(l.values)} fill="none" stroke={l.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        ))}
+        {n === 1 && lines.map(l => <circle key={l.id} cx={xOf(0)} cy={yOf(l.values[0])} r="3" fill={l.color} />)}
+      </svg>
+      <div style={{ position: "absolute", top: 0, right: 0, width: padR, height: "100%", pointerEvents: "none" }}>
+        {yticks.map(l => { const topPct = (yOf(l) / VB_H) * 100; return <div key={l} style={{ position: "absolute", top: `${topPct}%`, right: 4, transform: "translateY(-50%)", fontSize: 10, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>N{l}</div>; })}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: padB, pointerEvents: "none" }}>
+        {xidx.map(i => {
+          const leftPct = (xOf(i) / VB_W) * 100;
+          const [, m, dd] = days[i].split("-");
+          const tf = i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)";
+          return <div key={days[i]} style={{ position: "absolute", left: `${leftPct}%`, bottom: 2, transform: tf, fontSize: 10, color: T.textMut, whiteSpace: "nowrap" }}>{dd}/{m}</div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ActivityLog({ log, getCat }) {
+  if (!log || log.length === 0) return <Empty label="Aucune activité pour le moment." />;
+  const shown = log.slice(0, 30);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {shown.map((e, i) => {
+        const cat = e.attribute ? getCat(e.attribute) : null;
+        const when = new Date(e.ts);
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, padding: "6px 0", borderBottom: i < shown.length - 1 ? `1px solid ${T.border}` : "none" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: cat ? cat.color : T.amber, flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.label}</span>
+            {e.xp > 0 && <span style={{ color: T.textSub, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>+{e.xp} XP</span>}
+            {e.spent > 0 && <span style={{ color: T.red, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>−{e.spent} 🪙</span>}
+            <span style={{ color: T.textMut, fontSize: 10, flexShrink: 0 }}>{when.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Modales ---------- */
+function CategoryModal({ initial, onSave, onClose, onGoToObjectives }) {
+  const [form, setForm] = useState(initial);
+  // Sélecteur d'icône + couleur, déplié en cliquant sur l'icône à côté du nom.
+  const [showStyle, setShowStyle] = useState(false);
+  // Sauvegarde automatique : chaque modification est persistée (petit debounce).
+  // Le tout premier rendu (valeurs initiales) est ignoré, et on « flush » la
+  // dernière valeur à la fermeture pour ne rien perdre.
+  const onSaveRef = useRef(onSave);
+  const formRef = useRef(form);
+  useEffect(() => { onSaveRef.current = onSave; formRef.current = form; });
+  const skipFirst = useRef(true);
+  useEffect(() => {
+    if (skipFirst.current) { skipFirst.current = false; return; }
+    const tid = setTimeout(() => onSaveRef.current(formRef.current), 300);
+    return () => clearTimeout(tid);
+  }, [form]);
+  useEffect(() => () => onSaveRef.current(formRef.current), []);
+  return (
+    <Overlay onClose={onClose} title={initial.isNew ? "Nouvelle catégorie" : "Modifier la catégorie"}>
+      <Field label="Nom de la catégorie">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => setShowStyle(v => !v)} title="Changer l'icône et la couleur"
+            style={{ width: 40, height: 40, borderRadius: 10, background: `${form.color}1A`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: showStyle ? `1.5px solid ${form.color}` : "1.5px solid transparent", padding: 0, cursor: "pointer" }}>
+            <CatIcon name={form.icon} size={18} strokeWidth={1.75} color={form.color} />
+          </button>
+          <input autoFocus value={form.label} onChange={e => setForm({ ...form, label: e.target.value })}
+            placeholder="ex : Spiritualité" style={input()} />
+        </div>
+      </Field>
+
+      {showStyle && (
+        <div style={{ marginTop: -4, marginBottom: 14, padding: 12, borderRadius: 10, background: T.bg, border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div style={objLbl}>Couleur</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {PALETTE.map(c => (
+                <button key={c} onClick={() => setForm({ ...form, color: c })} title={c}
+                  style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: form.color === c ? `2px solid ${T.text}` : `2px solid transparent`, cursor: "pointer", boxShadow: `0 0 0 1px ${T.border}` }} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={objLbl}>Icône</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6 }}>
+              {ICON_KEYS.map(key => {
+                const active = form.icon === key;
+                return (
+                  <button key={key} onClick={() => setForm({ ...form, icon: key })}
+                    style={{ aspectRatio: "1", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: `1px solid ${active ? form.color : T.border}`, background: active ? `${form.color}14` : T.white, cursor: "pointer" }}>
+                    <CatIcon name={key} size={15} strokeWidth={1.75} color={active ? form.color : T.textSub} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Field label="Qui je veux devenir dans le futur">
+        <AutoTextarea value={form.identity} onChange={e => setForm({ ...form, identity: e.target.value })}
+          placeholder="ex : Je suis quelqu'un qui médite et cultive la gratitude chaque jour."
+          minRows={2} />
+      </Field>
+
+      <Field label="La personne à qui je veux ressembler">
+        <input value={form.roleModel} onChange={e => setForm({ ...form, roleModel: e.target.value })}
+          placeholder="ex : un mentor, un athlète, un proche inspirant…" style={input()} />
+      </Field>
+
+      <Field label="Ce que j'admire chez cette personne (optionnel)">
+        <textarea value={form.roleModelWhy} onChange={e => setForm({ ...form, roleModelWhy: e.target.value })}
+          placeholder="ex : sa rigueur, sa bienveillance, sa constance au quotidien…"
+          rows={2} style={{ ...input(), resize: "vertical", lineHeight: 1.4 }} />
+      </Field>
+
+      <Field label="Objectifs">
+        <button onClick={onGoToObjectives}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          <Target size={14} strokeWidth={1.9} /> Gérer les objectifs
+        </button>
+      </Field>
+
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: T.textMut }}>
+          <Check size={12} strokeWidth={2.5} color={T.green} /> Enregistré automatiquement
+        </span>
+        <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: 999, border: `1px solid ${T.text}`, background: T.text, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Fermer</button>
+      </div>
+    </Overlay>
+  );
+}
+
+/* ---------- Primitifs UI ---------- */
+function Section({ title, icon: Icon, action, children, bare, fill }) {
+  const wrap = bare
+    ? { padding: 0 }
+    : { background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 };
+  // `fill` : la carte occupe toute la hauteur de la cellule (grille) et son
+  // contenu défile à l'intérieur — utile pour qu'elle épouse la colonne voisine.
+  if (fill) Object.assign(wrap, { height: "100%", display: "flex", flexDirection: "column", minHeight: 0, boxSizing: "border-box" });
+  return (
+    <div style={wrap}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexShrink: 0 }}>
+        {Icon && <Icon size={15} strokeWidth={1.75} color={T.text} />}
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: T.text, margin: 0 }}>{title}</h2>
+        {action && <div style={{ marginLeft: "auto" }}>{action}</div>}
+      </div>
+      {fill ? (
+        // Contenu en position absolue : il ne contribue PAS à la hauteur de la
+        // ligne (c'est donc la colonne voisine qui la pilote) tout en remplissant
+        // la carte, avec défilement interne.
+        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+          <div style={{ position: "absolute", inset: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>{children}</div>
+        </div>
+      ) : children}
+    </div>
+  );
+}
+
+function Empty({ label }) {
+  return <div style={{ padding: "24px 12px", textAlign: "center", fontSize: 12, color: T.textMut }}>{label}</div>;
+}
+
+function Overlay({ title, children, onClose }) {
+  // Rendu via un portail sur document.body : la div racine de la page est
+  // animée (transform), ce qui ferait d'elle le bloc conteneur d'un élément
+  // `position: fixed` et décalerait la modale. Le portail l'en sort.
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef(null);
+  if (typeof document === "undefined") return null;
+
+  // Déplacement de la fenêtre par l'en-tête (exactement comme la page Sport).
+  const startWindowDrag = (e) => {
+    if (e.target.closest("button")) return; // pas de drag en cliquant un bouton
+    e.preventDefault();
+    setDragging(true);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseX: pos.x, baseY: pos.y };
+    const onMove = (ev) => {
+      const d = dragRef.current; if (!d) return;
+      setPos({ x: d.baseX + (ev.clientX - d.startX), y: d.baseY + (ev.clientY - d.startY) });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      setDragging(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return ReactDOM.createPortal(
+    // `backdropDismiss` : ne ferme QUE si le clic commence ET finit sur le fond
+    // (plus de fermeture quand on relâche la souris hors du formulaire / drag).
+    <div {...backdropDismiss(onClose)}
+      style={{ position: "fixed", inset: 0, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+      {/* Pas d'animation `transform` sur le modal : elle écraserait le translate du drag. */}
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true"
+        style={{ width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", background: T.white, borderRadius: 14, padding: 20, fontFamily: "var(--font-sans)", border: `1px solid ${T.border}`, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", transform: `translate(${pos.x}px, ${pos.y}px)` }}>
+        {/* En-tête = poignée de déplacement (barre grise centrée), façon Sport. */}
+        <div onMouseDown={startWindowDrag} title="Glisser pour déplacer la fenêtre"
+          style={{ position: "relative", display: "flex", alignItems: "center", marginBottom: 16, paddingTop: 8, cursor: "move", userSelect: "none" }}>
+          <div style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)", width: 40, height: 4, borderRadius: 999, background: dragging ? T.textMut : T.border, transition: "background-color 120ms ease" }} />
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0 }}>{title}</h3>
+          <button onMouseDown={e => e.stopPropagation()} onClick={onClose} style={{ ...iconBtn(), marginLeft: "auto" }}><X size={16} strokeWidth={1.75} /></button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500, marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+// Zone de texte qui s'agrandit automatiquement avec son contenu (pas de scroll
+// interne) : hauteur de départ = `minRows` lignes, puis croît ligne par ligne.
+function AutoTextarea({ value, onChange, placeholder, minRows = 3, style }) {
+  const ref = useRef(null);
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  // Resynchronise la hauteur quand la valeur change (saisie, ouverture en édition).
+  useEffect(() => { resize(); }, [value]);
+  return (
+    <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder}
+      rows={minRows} onInput={resize}
+      style={{ ...input(), resize: "none", overflow: "hidden", lineHeight: 1.5, ...style }} />
+  );
+}
+
+
+/* ---------- Styles partagés ---------- */
+function btnPrimary() {
+  return { marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 };
+}
+function iconBtn() {
+  return { width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+}
+// Variante compacte (cartes de catégorie) — apparaît au survol.
+function iconBtnSm() {
+  return { width: 22, height: 22, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+}
+// Petit libellé au-dessus des champs de la modale de catégorie.
+const objLbl = { fontSize: 11, color: T.textSub, fontWeight: 500, marginBottom: 4 };
+function input() {
+  return { width: "100%", padding: "9px 12px", border: `1px solid ${T.border}`, borderRadius: 8, background: T.white, fontSize: 14, color: T.text, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
+}

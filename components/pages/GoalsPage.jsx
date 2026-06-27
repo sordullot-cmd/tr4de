@@ -13,6 +13,10 @@ import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { t, useLang } from "@/lib/i18n";
+import {
+  RPG_STORAGE_KEY, RPG_CLOUD_KEY, DEFAULT_CATEGORIES as RPG_DEFAULT_CATEGORIES,
+  CatIcon as RpgCatIcon,
+} from "@/lib/lifeRpgCategories";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
@@ -21,7 +25,9 @@ const T = {
   green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
 };
 
-const STORAGE_KEY = "tr4de_goals_v2";
+export const GOALS_STORAGE_KEY = "tr4de_goals_v2";
+export const GOALS_CLOUD_KEY = "goals";
+const STORAGE_KEY = GOALS_STORAGE_KEY;
 
 const HORIZONS = [
   { id: "week",  label: "Cette semaine", short: "semaine" },
@@ -54,7 +60,7 @@ const UNITS = [
 const CATEGORIES = [
   { id: "trading",   label: "Trading",       color: "#16A34A", icon: TrendingUp },
   { id: "personal",  label: "Personnel",     color: "#EF4444", icon: Heart },
-  { id: "sport",     label: "Sport",         color: "#F59E0B", icon: Dumbbell },
+  { id: "sport",     label: "Sport",         color: "#EF4444", icon: Dumbbell },
   { id: "reading",   label: "Lecture",       color: "#8B5CF6", icon: BookOpen },
   { id: "relations", label: "Relations",     color: "#EC4899", icon: Users },
   { id: "learning",  label: "Apprentissage", color: "#3B82F6", icon: GraduationCap },
@@ -115,6 +121,83 @@ function daysLeft(deadline) {
   const d = new Date(deadline + "T23:59:59");
   if (isNaN(d.getTime())) return null;
   return Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+}
+
+// Fenêtre temporelle selon l'horizon (pour les métriques trading).
+function rangeOf(horizon) {
+  if (horizon === "day") return dayRange();
+  if (horizon === "week") return weekRange();
+  if (horizon === "year") return yearRange();
+  return monthRange();
+}
+
+// Calcule { current, target, pct } d'un objectif. Pur : dépend uniquement de
+// l'objectif et des données passées (trades, comptes). Réutilisé tel quel par la
+// page « Vie RPG » pour dériver l'XP des catégories rattachées.
+export function computeGoalProgress(g, trades = [], accounts = []) {
+  const tgt = parseFloat(g.target) || 0;
+  const at = AUTO_TYPES.find(a => a.id === g.autoType);
+  const horizonForCompute = at?.horizon || g.horizon || "month";
+  const { start, end } = rangeOf(horizonForCompute);
+  const accountFilter = g.accountIdFilter && g.accountIdFilter !== "all" ? g.accountIdFilter : null;
+  const scopedTrades = accountFilter
+    ? (trades || []).filter(t => String(t.account_id) === String(accountFilter))
+    : (trades || []);
+  let current = 0;
+  if (g.autoType === "manual") current = parseFloat(g.manual) || 0;
+  else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(scopedTrades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
+  else if (g.autoType === "winrate") {
+    const list = tradesInRange(scopedTrades, start, end);
+    const w = list.filter(t => (t.pnl || 0) > 0).length;
+    const l = list.filter(t => (t.pnl || 0) < 0).length;
+    current = (w + l) > 0 ? (w / (w + l)) * 100 : 0;
+  }
+  else if (g.autoType === "trades") current = tradesInRange(scopedTrades, start, end).length;
+  else if (g.autoType === "account_type") {
+    const wanted = g.accountTypeFilter || "live";
+    current = (accounts || []).filter(a => (a.account_type || "live") === wanted).length;
+  }
+  else if (g.autoType === "max_dd") {
+    const list = tradesInRange(scopedTrades, start, end).sort((a, b) => new Date(a.date) - new Date(b.date));
+    let peak = 0, cum = 0, mdd = 0;
+    for (const tr of list) { cum += (tr.pnl || 0); if (cum > peak) peak = cum; if (peak - cum > mdd) mdd = peak - cum; }
+    current = mdd;
+  }
+  const pct = tgt === 0 ? 0 : Math.max(0, Math.min(100, (current / tgt) * 100));
+  return { current, target: tgt, pct };
+}
+
+// { prefix, suffix } pour formater la valeur d'un objectif (pur, exporté).
+export function goalUnitOf(g) {
+  if (g.autoType !== "manual") {
+    const u = AUTO_TYPES.find(a => a.id === g.autoType)?.unit || "";
+    if (u === "$") return { prefix: getCurrencySymbol(), suffix: "" };
+    if (u === "%") return { prefix: "", suffix: "%" };
+    return { prefix: "", suffix: "" };
+  }
+  const unit = UNITS.find(u => u.id === (g.unit || "count")) || UNITS[0];
+  if (unit.isMoney) return { prefix: getCurrencySymbol(), suffix: "" };
+  if (unit.isCustom) return { prefix: "", suffix: g.customUnit ? ` ${g.customUnit}` : "" };
+  return { prefix: "", suffix: unit.suffix };
+}
+// Formate un nombre : au-delà de 10 000, on abrège en milliers avec « k »
+// (ex. 10000 -> « 10k », 12500 -> « 12,5k »). En dessous, valeur complète.
+function fmtGoalNum(x) {
+  const abs = Math.abs(x);
+  if (abs >= 10000) {
+    return `${(abs / 1000).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k`;
+  }
+  return abs.toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+export function fmtGoalVal(v, u) {
+  if (typeof u === "string") {
+    if (u === "%") return `${Math.round(v)}%`;
+    if (u === "") return fmtGoalNum(Math.round(v));
+    return `${u}${fmtGoalNum(v)}`;
+  }
+  const { prefix = "", suffix = "" } = u || {};
+  return `${prefix}${fmtGoalNum(v)}${suffix}`;
 }
 
 // Walk the goals tree (top level + 1 level of nested goal-subtasks) and apply
@@ -243,6 +326,11 @@ export default function GoalsPage() {
   const [goals, setGoals] = useCloudState(STORAGE_KEY, "goals", defaultGoals());
   const { pushUndo } = useUndo();
 
+  // Catégories Vie RPG persistées (pour rattacher un objectif à une catégorie
+  // et lui faire alimenter l'XP du RPG au prorata de l'avancement).
+  const [rpgState] = useCloudState(RPG_STORAGE_KEY, RPG_CLOUD_KEY, { categories: RPG_DEFAULT_CATEGORIES });
+  const rpgCategories = Array.isArray(rpgState?.categories) ? rpgState.categories : RPG_DEFAULT_CATEGORIES;
+
   // Migration : anciens autoType et anciens levels -> nouveaux
   useEffect(() => {
     const autoMap  = { trades_month: "trades" };
@@ -273,13 +361,13 @@ export default function GoalsPage() {
   };
 
   // Modal d'ajout/édition
-  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live", accountIdFilter: "all" };
+  const emptyForm = { label: "", level: "normal", category: "trading", autoType: "manual", target: "", deadline: "", unit: "count", customUnit: "", accountTypeFilter: "live", accountIdFilter: "all", rpgCategory: "", rpgXp: "" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setShowForm(true); };
-  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", customUnit: g.customUnit || "", accountTypeFilter: g.accountTypeFilter || "live", accountIdFilter: g.accountIdFilter || "all" }); setEditingId(g.id); setShowForm(true); };
+  const openEdit = (g) => { setForm({ label: g.label, level: g.level || "normal", category: g.category || "trading", autoType: g.autoType || "manual", target: String(g.target), deadline: g.deadline || "", unit: g.unit || "count", customUnit: g.customUnit || "", accountTypeFilter: g.accountTypeFilter || "live", accountIdFilter: g.accountIdFilter || "all", rpgCategory: g.rpgCategory || "", rpgXp: g.rpgXp != null ? String(g.rpgXp) : "" }); setEditingId(g.id); setShowForm(true); };
   const close = () => { setForm(emptyForm); setEditingId(null); setShowForm(false); };
 
   // Auto-save : dès qu'un champ change et qu'il y a assez d'infos, on enregistre
@@ -289,6 +377,9 @@ export default function GoalsPage() {
     if (!form.label.trim() || !form.target) return;
     const horizon = horizonFromDeadline(form.deadline);
     const handle = setTimeout(() => {
+      // Lien Vie RPG : catégorie rattachée + XP versée (au prorata) à 100 %.
+      const rpgCategory = form.rpgCategory || null;
+      const rpgXp = rpgCategory ? Math.max(0, parseInt(form.rpgXp, 10) || 0) : 0;
       if (editingId) {
         setGoals(prev => updateGoalById(prev, editingId, g => ({
           ...g, label: form.label.trim(), horizon, level: form.level,
@@ -297,6 +388,7 @@ export default function GoalsPage() {
           customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
           accountIdFilter: form.accountIdFilter,
+          rpgCategory, rpgXp,
         })));
       } else {
         // Créer le nouveau goal et passer immédiatement en mode édition
@@ -309,6 +401,7 @@ export default function GoalsPage() {
           customUnit: form.customUnit || "",
           accountTypeFilter: form.accountTypeFilter,
           accountIdFilter: form.accountIdFilter,
+          rpgCategory, rpgXp,
           manual: 0,
         }]);
         setEditingId(id);
@@ -381,6 +474,10 @@ export default function GoalsPage() {
   const adjustManual = (gid, delta) =>
     setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, manual: Math.max(0, (parseFloat(g.manual) || 0) + delta) })));
 
+  // Fixe la progression manuelle à une valeur absolue (saisie au clavier).
+  const setManual = (gid, value) =>
+    setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, manual: Math.max(0, parseFloat(value) || 0) })));
+
   const setSubtasksFor = (gid, nextSubtasks) =>
     setGoals(prev => updateGoalById(prev, gid, g => ({ ...g, subtasks: nextSubtasks })));
 
@@ -399,73 +496,10 @@ export default function GoalsPage() {
     });
   };
 
-  // Compute current/target/pct pour un goal
-  // L'horizon détermine la fenêtre temporelle pour les métriques trading.
-  const rangeOf = (horizon) => {
-    if (horizon === "day") return dayRange();
-    if (horizon === "week") return weekRange();
-    if (horizon === "year") return yearRange();
-    return monthRange();
-  };
-  const compute = (g) => {
-    const tgt = parseFloat(g.target) || 0;
-    const at = AUTO_TYPES.find(a => a.id === g.autoType);
-    // Si l'autoType impose un horizon (pnl_day/week/month/year), on l'utilise.
-    const horizonForCompute = at?.horizon || g.horizon || "month";
-    const { start, end } = rangeOf(horizonForCompute);
-    // Filtrage par compte spécifique (ou type) si demandé
-    const accountFilter = g.accountIdFilter && g.accountIdFilter !== "all" ? g.accountIdFilter : null;
-    const scopedTrades = accountFilter
-      ? (trades || []).filter(t => String(t.account_id) === String(accountFilter))
-      : trades;
-    let current = 0;
-    if (g.autoType === "manual") current = parseFloat(g.manual) || 0;
-    else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(scopedTrades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
-    else if (g.autoType === "winrate") {
-      const list = tradesInRange(scopedTrades, start, end);
-      const w = list.filter(t => (t.pnl || 0) > 0).length;
-      const l = list.filter(t => (t.pnl || 0) < 0).length;
-      current = (w + l) > 0 ? (w / (w + l)) * 100 : 0;
-    }
-    else if (g.autoType === "trades") current = tradesInRange(scopedTrades, start, end).length;
-    else if (g.autoType === "account_type") {
-      const wanted = g.accountTypeFilter || "live";
-      current = (accounts || []).filter(a => (a.account_type || "live") === wanted).length;
-    }
-    else if (g.autoType === "max_dd") {
-      const list = tradesInRange(scopedTrades, start, end).sort((a, b) => new Date(a.date) - new Date(b.date));
-      let peak = 0, cum = 0, mdd = 0;
-      for (const tr of list) { cum += (tr.pnl || 0); if (cum > peak) peak = cum; if (peak - cum > mdd) mdd = peak - cum; }
-      current = mdd;
-    }
-    const pct = tgt === 0 ? 0 : Math.max(0, Math.min(100, (current / tgt) * 100));
-    return { current, target: tgt, pct };
-  };
-
-  // Renvoie { prefix, suffix } pour formater la valeur
-  const unitOf = (g) => {
-    if (g.autoType !== "manual") {
-      const u = AUTO_TYPES.find(a => a.id === g.autoType)?.unit || "";
-      if (u === "$") return { prefix: getCurrencySymbol(), suffix: "" };
-      if (u === "%") return { prefix: "", suffix: "%" };
-      return { prefix: "", suffix: "" };
-    }
-    const unit = UNITS.find(u => u.id === (g.unit || "count")) || UNITS[0];
-    if (unit.isMoney) return { prefix: getCurrencySymbol(), suffix: "" };
-    if (unit.isCustom) return { prefix: "", suffix: g.customUnit ? ` ${g.customUnit}` : "" };
-    return { prefix: "", suffix: unit.suffix };
-  };
-  const fmtVal = (v, u) => {
-    // u peut être soit l'ancien string (compat), soit { prefix, suffix }
-    if (typeof u === "string") {
-      if (u === "%") return `${Math.round(v)}%`;
-      if (u === "") return Math.round(v).toLocaleString("fr-FR");
-      return `${u}${Math.abs(v).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-    }
-    const { prefix = "", suffix = "" } = u || {};
-    const n = Math.abs(v).toLocaleString("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    return `${prefix}${n}${suffix}`;
-  };
+  // Compute current/target/pct pour un goal — délègue au helper module pur.
+  const compute = (g) => computeGoalProgress(g, trades, accounts);
+  const unitOf = goalUnitOf;
+  const fmtVal = fmtGoalVal;
 
   // KPIs
   const kpis = useMemo(() => {
@@ -584,6 +618,7 @@ export default function GoalsPage() {
                     onEdit={openEdit} onDelete={remove} onDuplicate={duplicate} onTogglePin={togglePin}
                     onSetPinnedOpen={setGoalPinnedOpen}
                     onAdjustManual={adjustManual}
+                    onSetManual={setManual}
                     onSubtasksChange={setSubtasksFor}
                     drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
                     drawerOpen={showForm}
@@ -614,6 +649,7 @@ export default function GoalsPage() {
                         compute={compute} unitOf={unitOf} fmtVal={fmtVal}
                         onEdit={openEdit} onDelete={remove} onDuplicate={duplicate} onTogglePin={togglePin}
                         onAdjustManual={adjustManual}
+                        onSetManual={setManual}
                         onSubtasksChange={setSubtasksFor}
                         drag={drag} setDrag={setDrag} onDrop={reorderOrNest}
                         drawerOpen={showForm}
@@ -883,7 +919,7 @@ export default function GoalsPage() {
                 const unit = UNITS.find(u => u.id === (form.unit || "count")) || UNITS[0];
                 const suffix = unit.isMoney ? getCurrencySymbol() : (unit.isCustom ? (form.customUnit ? ` ${form.customUnit}` : "") : unit.suffix);
                 return (
-                  <StackField label="Progression actuelle" last>
+                  <StackField label="Progression actuelle">
                     <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
                       <input type="number" value={g.manual || 0}
                         className="no-spin"
@@ -900,6 +936,38 @@ export default function GoalsPage() {
                   </StackField>
                 );
               })()}
+
+              {/* Lien Vie RPG (tout en bas) — pills comme la page Habitudes.
+                  Rattache l'objectif à une carte de la page Vie RPG : sa
+                  progression donne de l'XP à cette catégorie, au prorata. */}
+              <StackField label="Catégorie Vie RPG (XP)" last>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {rpgCategories.map((c) => {
+                      const active = form.rpgCategory === c.id;
+                      return (
+                        <button key={c.id} type="button"
+                          onClick={() => setForm({ ...form, rpgCategory: active ? "" : c.id })}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 999, border: `1px solid ${active ? c.color : T.border}`, background: active ? `${c.color}14` : T.white, color: active ? c.color : T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          {active
+                            ? <Check size={13} strokeWidth={2.5} color={c.color} />
+                            : <RpgCatIcon name={c.icon} size={13} strokeWidth={1.9} color={T.textMut} />}
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.rpgCategory && (
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <input type="number" min={0} value={form.rpgXp}
+                        onChange={(e) => setForm({ ...form, rpgXp: e.target.value })}
+                        placeholder="500" className="no-spin"
+                        style={{ width: 80, padding: "6px 10px", border: `1px solid ${T.border}`, borderRadius: 999, background: T.bg, fontSize: 12, fontWeight: 600, color: T.text, fontFamily: "inherit", outline: "none", textAlign: "center", MozAppearance: "textfield", appearance: "textfield" }} />
+                      <span style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>XP à 100 %</span>
+                    </div>
+                  )}
+                </div>
+              </StackField>
             </div>
 
           </div>
@@ -992,7 +1060,7 @@ function StatCell({ icon: Icon, label, subLabel, value, isLast }) {
   );
 }
 
-function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, drawerOpen }) {
+function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSetManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, drawerOpen }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, letterSpacing: -0.1, padding: "0 16px 8px" }}>{title}</div>
@@ -1005,6 +1073,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
           onTogglePin={onTogglePin}
           onSetPinnedOpen={onSetPinnedOpen}
           onAdjustManual={onAdjustManual}
+          onSetManual={onSetManual}
           onSubtasksChange={onSubtasksChange}
           doneSection={doneSection}
           drag={drag} setDrag={setDrag} onDrop={onDrop}
@@ -1015,7 +1084,7 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
   );
 }
 
-function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
+function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSetManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
   const { current, target, pct } = compute(g);
@@ -1058,6 +1127,28 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
   const longPressTimer = useRef(null);
   const pressedRef = useRef(false);
   const subtasks = g.subtasks || [];
+
+  // Objectifs manuels : la molette sur la valeur « courant / cible » fait
+  // avancer (vers le haut) ou reculer (vers le bas) la progression, sans ouvrir
+  // le formulaire. Listener non-passif pour pouvoir bloquer le scroll de la page.
+  const valueRef = useRef(null);
+  useEffect(() => {
+    const el = valueRef.current;
+    if (!el || g.autoType !== "manual" || !onAdjustManual) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onAdjustManual(g.id, e.deltaY < 0 ? 1 : -1);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [g.autoType, g.id, onAdjustManual]);
+
+  // Édition au clavier de la progression manuelle (clic sur le chiffre courant).
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const startEdit = () => { setDraft(String(current ?? 0)); setEditing(true); };
+  const commitEdit = () => { if (onSetManual) onSetManual(g.id, draft); setEditing(false); };
 
   const isDragging = drag?.sourceId === g.id;
   const isOver = drag?.overId === g.id && drag?.sourceId && drag.sourceId !== g.id;
@@ -1236,9 +1327,39 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
         </div>
 
         <div style={{ fontSize: 12, color: T.text }}>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtVal(current, unit)}</span>
-          <span style={{ color: T.textMut, margin: "0 3px" }}>/</span>
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtVal(target, unit)}</span>
+          <span ref={valueRef}
+            title={g.autoType === "manual" && !editing ? "Clic pour saisir · molette ↕ pour ajuster" : undefined}
+            style={{
+              display: "inline-block",
+              cursor: g.autoType === "manual" && !editing ? "ns-resize" : "default",
+              padding: g.autoType === "manual" ? "1px 5px" : 0,
+              margin: g.autoType === "manual" ? "0 -5px" : 0,
+              borderRadius: 5,
+              background: g.autoType === "manual" && hover && !editing ? T.accentBg : "transparent",
+              transition: "background .12s ease",
+            }}>
+            {g.autoType === "manual" && editing ? (
+              <input
+                type="number" autoFocus value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Enter") commitEdit();
+                  else if (e.key === "Escape") setEditing(false);
+                }}
+                onBlur={commitEdit}
+                style={{ width: 52, padding: "1px 4px", border: `1px solid ${T.text}`, borderRadius: 4, background: T.white, fontSize: 12, fontWeight: 600, color: T.text, fontFamily: "inherit", outline: "none", textAlign: "center", MozAppearance: "textfield", appearance: "textfield" }}
+              />
+            ) : (
+              <span
+                onPointerDown={g.autoType === "manual" ? (e) => e.stopPropagation() : undefined}
+                onClick={g.autoType === "manual" ? (e) => { e.stopPropagation(); startEdit(); } : undefined}
+                style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtVal(current, unit)}</span>
+            )}
+            <span style={{ color: T.textMut, margin: "0 3px" }}>/</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtVal(target, unit)}</span>
+          </span>
           <div style={{ height: 3, background: T.accentBg, borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${pct}%`, background: isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
           </div>
@@ -1332,6 +1453,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
                       onTogglePin={onTogglePin}
                       onSetPinnedOpen={onSetPinnedOpen}
                       onAdjustManual={onAdjustManual}
+                      onSetManual={onSetManual}
                       onSubtasksChange={onSubtasksChange}
                       drag={drag} setDrag={setDrag} onDrop={onDrop}
                       drawerOpen={drawerOpen}
