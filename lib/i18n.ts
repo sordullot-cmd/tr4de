@@ -68,6 +68,8 @@ const FR: Dict = {
   "nav.drive": "Drive",
   "nav.reading": "Liste de lecture",
   "nav.lifeRpg": "Quête de soi",
+  "nav.blueprint": "Plan de réussite",
+  "nav.eloquence": "Éloquence",
 
   // Common
   "common.save": "Enregistrer",
@@ -811,6 +813,8 @@ const EN: Dict = {
   "nav.drive": "Drive",
   "nav.reading": "Reading List",
   "nav.lifeRpg": "Quest for Self",
+  "nav.blueprint": "Success Blueprint",
+  "nav.eloquence": "Eloquence",
 
   // Common
   "common.save": "Save",

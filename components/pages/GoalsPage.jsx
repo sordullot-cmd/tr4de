@@ -122,6 +122,20 @@ function daysLeft(deadline) {
   if (isNaN(d.getTime())) return null;
   return Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
 }
+// Nombre de jours OUVRÉS (lun-ven) entre deux dates. Les marchés étant fermés le
+// week-end, le rythme des objectifs trading se calcule sur ces seuls jours.
+function businessDaysBetween(from, to) {
+  if (!(from instanceof Date) || !(to instanceof Date) || to <= from) return 0;
+  const cur = new Date(from); cur.setHours(0, 0, 0, 0);
+  const end = new Date(to);   end.setHours(0, 0, 0, 0);
+  let count = 0;
+  while (cur < end) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
 
 // Fenêtre temporelle selon l'horizon (pour les métriques trading).
 function rangeOf(horizon) {
@@ -165,6 +179,77 @@ export function computeGoalProgress(g, trades = [], accounts = []) {
   }
   const pct = tgt === 0 ? 0 : Math.max(0, Math.min(100, (current / tgt) * 100));
   return { current, target: tgt, pct };
+}
+
+// Statut de RYTHME (« pace ») d'un objectif : compare l'avancement réel à
+// l'avancement ATTENDU si l'on progressait linéairement sur la fenêtre de temps
+// de l'objectif. C'est ce qui transforme une cible passive en boussole : « suis-je
+// en avance ou en retard sur le tempo nécessaire pour tenir l'échéance ? ».
+// Pur et déterministe (hormis l'instant présent). Renvoie null quand il n'y a
+// pas de fenêtre temporelle exploitable (ni horizon trading ni deadline), ou
+// pour le drawdown (logique inversée, le pace n'a pas de sens).
+//   - Objectif trading auto → fenêtre = celle de son horizon (jour/semaine/mois/année).
+//   - Objectif manuel/autre avec deadline → fenêtre = [création, deadline].
+export function computeGoalPace(g, current, target, pct) {
+  if (!g || g.autoType === "max_dd") return null;
+  const at = AUTO_TYPES.find(a => a.id === g.autoType);
+  let start, end;
+  // La DEADLINE fixée par l'utilisateur PRIME toujours : le rythme doit se
+  // calculer sur cette durée (« 10 000 € en 30 j » → / 30 j). Sinon, pour un
+  // objectif trading créé en fin de mois, on diviserait par les 2-3 jours
+  // restants de la fenêtre civile → rythme requis aberrant (≈ 3k/jour).
+  if (g.deadline) {
+    end = new Date(g.deadline + "T23:59:59");
+    start = g.createdAt ? new Date(g.createdAt) : new Date(g.id);
+  } else if (at?.trading) {
+    const r = rangeOf(at.horizon || g.horizon || "month");
+    start = r.start; end = r.end;
+  } else {
+    return null;
+  }
+  if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  const total = end.getTime() - start.getTime();
+  if (total <= 0) return null;
+
+  const now = Date.now();
+  const timeFrac = Math.max(0, Math.min(1, (now - start.getTime()) / total));
+  const progressFrac = target > 0 ? Math.max(0, Math.min(1, current / target)) : 0;
+  const expectedPct = Math.round(timeFrac * 100);
+  const delta = progressFrac - timeFrac; // > 0 = en avance, < 0 = en retard
+
+  // Rythme requis sur le temps restant pour atteindre la cible — seulement pour
+  // les métriques ADDITIVES (un win rate ou un type de compte ne « s'accumule »
+  // pas par jour, le rythme n'aurait aucun sens).
+  const additive = g.autoType === "manual" || g.autoType === "trades" || (g.autoType || "").startsWith("pnl");
+  const isTrading = !!at?.trading || g.category === "trading";
+  // En trading, les marchés sont fermés le week-end : on ne compte que les jours
+  // OUVRÉS, une « semaine » = 5 jours de bourse et un « mois » ≈ 21. Hors trading,
+  // on garde les jours calendaires (semaine = 7, mois = 30).
+  const daysLeftForRate = isTrading ? businessDaysBetween(new Date(now), end) : (end.getTime() - now) / 86400000;
+  const wDiv = isTrading ? 5 : 7;
+  const mDiv = isTrading ? 21 : 30;
+  const remaining = Math.max(0, target - current);
+  let requiredRate = null, rateUnit = null;
+  if (additive && daysLeftForRate > 0.5 && remaining > 0) {
+    // Choisit l'unité de temps la plus FINE qui reste lisible (rythme ≥ 1) :
+    // par jour si possible, sinon par semaine, sinon par mois. Évite à la fois
+    // les « 0,03/jour » illisibles et les « 3k/jour » aberrants des gros écarts.
+    const perDay = remaining / daysLeftForRate;
+    if (perDay >= 1)             { requiredRate = perDay;        rateUnit = "jour"; }
+    else if (perDay * wDiv >= 1) { requiredRate = perDay * wDiv; rateUnit = "semaine"; }
+    else                         { requiredRate = perDay * mDiv; rateUnit = "mois"; }
+    // Arrondi propre : entier au-delà de 10, sinon une décimale (jamais de centimes).
+    requiredRate = requiredRate >= 10 ? Math.round(requiredRate) : Math.round(requiredRate * 10) / 10;
+  }
+
+  let status, color, label;
+  if (pct >= 100)            { status = "done";    color = "#16A34A"; label = "Atteint"; }
+  else if (timeFrac >= 1)    { status = "ended";   color = "#EF4444"; label = "Échéance passée"; }
+  else if (delta >= 0.05)    { status = "ahead";   color = "#16A34A"; label = "En avance"; }
+  else if (delta <= -0.05)   { status = "behind";  color = "#F59E0B"; label = "En retard"; }
+  else                       { status = "ontrack"; color = "#3B82F6"; label = "Dans les temps"; }
+
+  return { status, color, label, expectedPct, timeFrac, progressFrac, requiredRate, rateUnit };
 }
 
 // { prefix, suffix } pour formater la valeur d'un objectif (pur, exporté).
@@ -541,7 +626,7 @@ export default function GoalsPage() {
       <div style={{ height: 1, background: T.border, margin: "0 16px" }} />
 
       {/* Column headers */}
-      <div className="tr4de-goals-headers" style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px", gap: 12, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
+      <div className="tr4de-goals-headers" style={{ display: "grid", gridTemplateColumns: "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 124px", gap: 12, padding: "0 16px", fontSize: 11, color: T.textMut, fontWeight: 500 }}>
         <div>Créé le</div>
         <div>Objectif</div>
         <div>Échéance</div>
@@ -1010,6 +1095,19 @@ function StatStrip({ kpis, goals, compute }) {
     ? Math.round(active.reduce((s, g) => s + compute(g).pct, 0) / active.length)
     : 0;
 
+  // Bilan de rythme sur les objectifs actifs : combien sont en retard sur le
+  // tempo nécessaire pour tenir leur échéance.
+  const behindCount = active.reduce((n, g) => {
+    const { current, target, pct } = compute(g);
+    const p = computeGoalPace(g, current, target, pct);
+    return n + (p && (p.status === "behind" || p.status === "ended") ? 1 : 0);
+  }, 0);
+  const paceLabel = active.length === 0
+    ? "—"
+    : behindCount > 0
+      ? `${behindCount} en retard sur le rythme`
+      : "Tout dans les temps";
+
   // Taux de succès global
   const successRate = kpis.total > 0 ? Math.round((kpis.achieved / kpis.total) * 100) : 0;
 
@@ -1024,7 +1122,7 @@ function StatStrip({ kpis, goals, compute }) {
       <StatCell
         icon={TrendingUp}
         label="Progression moyenne"
-        subLabel={`${active.length} objectif${active.length > 1 ? "s" : ""} en cours`}
+        subLabel={paceLabel}
         value={`${avgProgress}%`}
       />
       <StatCell
@@ -1092,6 +1190,8 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
   const dl = daysLeft(g.deadline);
   const isAchieved = doneSection || (g.autoType === "max_dd" ? current <= target : pct >= 100);
   const atRisk = !isAchieved && dl !== null && dl < 3 && pct < 80;
+  // Rythme : avancement réel vs avancement attendu sur la fenêtre de l'objectif.
+  const pace = computeGoalPace(g, current, target, pct);
 
   // Date de création courte (format 09:05 si created same day, ou dd MMM)
   const createdLabel = (() => {
@@ -1237,8 +1337,8 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
         style={{
           display: "grid",
           gridTemplateColumns: nested
-            ? "minmax(0, 1fr) minmax(80px, 130px) minmax(110px, 160px) 50px"
-            : "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 60px",
+            ? "minmax(0, 1fr) minmax(80px, 130px) minmax(110px, 160px) 120px"
+            : "minmax(70px, 110px) minmax(0, 1fr) minmax(90px, 160px) minmax(110px, 160px) 124px",
           gap: nested ? 10 : 12,
           alignItems: "center",
           padding: nested ? "8px 10px" : "12px 16px",
@@ -1312,7 +1412,15 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
                   </span>
                 );
               })()}
-              {atRisk && <span style={{ color: T.amber, marginLeft: 2, fontWeight: 600 }}>· à risque</span>}
+              {!isAchieved && pace ? (
+                <span title={pace.expectedPct > 0 && pace.expectedPct < 100 ? `Rythme attendu : ${pace.expectedPct}% à ce stade` : undefined}
+                  style={{
+                    fontSize: 10, fontWeight: 600,
+                    padding: "2px 8px", borderRadius: 999,
+                    color: pace.color, background: pace.color + "18",
+                    flexShrink: 0,
+                  }}>{pace.label}</span>
+              ) : (atRisk && <span style={{ color: T.amber, marginLeft: 2, fontWeight: 600 }}>· à risque</span>)}
             </div>
           </div>
         </div>
@@ -1360,9 +1468,29 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
             <span style={{ color: T.textMut, margin: "0 3px" }}>/</span>
             <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtVal(target, unit)}</span>
           </span>
-          <div style={{ height: 3, background: T.accentBg, borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
+          <div style={{ position: "relative", marginTop: 8 }}>
+            {/* Repère « où je devrais en être » : petit triangle POSÉ au-dessus de
+                la barre (ne la traverse pas), pointant vers le niveau attendu. */}
+            {!isAchieved && pace && pace.expectedPct > 0 && pace.expectedPct < 100 && (
+              <div title={`Tu devrais être à ${pace.expectedPct}% à ce stade`}
+                style={{
+                  position: "absolute", top: -5, left: `${pace.expectedPct}%`, transform: "translateX(-50%)",
+                  width: 0, height: 0,
+                  borderLeft: "3px solid transparent", borderRight: "3px solid transparent",
+                  borderTop: `4px solid ${T.textMut}`,
+                }} />
+            )}
+            <div style={{ height: 3, background: T.accentBg, borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
+            </div>
           </div>
+          {/* Rythme requis pour tenir l'échéance (métriques additives uniquement). */}
+          {!isAchieved && pace?.requiredRate != null && (
+            <div title="Ce qu'il reste à accomplir, réparti sur le temps restant jusqu'à l'échéance (jours de bourse pour le trading : le week-end ne compte pas)"
+              style={{ fontSize: 9.5, color: T.textMut, fontWeight: 500, marginTop: 4, fontVariantNumeric: "tabular-nums", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              ≈ {fmtVal(pace.requiredRate, unit)}/{pace.rateUnit === "semaine" ? "sem." : pace.rateUnit === "mois" ? "mois" : "j"} requis
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", alignItems: "center" }}>
@@ -1424,7 +1552,7 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
       {open && (
         <div style={{
           margin: nested ? "0 0 4px" : "0 16px 8px",
-          padding: nested ? "8px 10px" : "12px 14px 12px",
+          padding: nested ? "8px 10px" : "4px 14px 12px",
           background: nested ? "#F4F4F4" : "#FAFAFA",
           borderRadius: 8,
           borderTop: `1px solid ${T.border}`,
@@ -2113,7 +2241,7 @@ function RoadmapStrip({ subtasks, deadline, createdAt }) {
   };
 
   return (
-    <div style={{ marginBottom: 12, padding: "10px 12px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+    <div style={{ marginBottom: 18, padding: "10px 12px", background: T.white, border: `1px solid ${T.border}`, borderRadius: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 10, color: T.textMut, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
         <span>{start.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>
         <span>{end.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</span>

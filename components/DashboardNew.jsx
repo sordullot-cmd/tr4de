@@ -29,6 +29,8 @@ import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
 import DrivePage from "@/components/pages/DrivePage";
 import LifeRpgPage from "@/components/pages/LifeRpgPage";
+import BlueprintPage from "@/components/pages/BlueprintPage";
+import EloquencePage from "@/components/pages/EloquencePage";
 import AgendaPage from "@/components/pages/AgendaPage";
 import CalendarPage from "@/components/pages/CalendarPage";
 import JournalPage from "@/components/pages/JournalPage";
@@ -74,6 +76,7 @@ import {
   SlidersHorizontal as LucideSlidersHorizontal,
   Check as LucideCheck,
   Mountain,
+  Route as LucideRoute,
   Pencil,
   Plus,
   GripVertical,
@@ -88,6 +91,7 @@ import {
   Wallet as LucideWallet,
   Dumbbell as LucideDumbbell,
   FolderOpen as LucideFolderOpen,
+  Mic as LucideMic,
 } from "lucide-react";
 
 /* ─── TOKENS (OpenAI palette) ──────────────────────────────────────── */
@@ -714,11 +718,13 @@ export default function App() {
     {
       label: t("nav.productivity"),
       items: [
+        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
-        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
+        { id: "eloquence",     icon: LucideMic,          label: t("nav.eloquence") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
+        { id: "blueprint",     icon: LucideRoute,        label: t("nav.blueprint") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
         { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
@@ -780,6 +786,8 @@ export default function App() {
     notes: <NotesPage />,
     drive: <DrivePage />,
     "life-rpg": <LifeRpgPage />,
+    blueprint: <BlueprintPage />,
+    eloquence: <EloquencePage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
       const journalNotesArr = Object.entries(agentTradeNotes || {})
@@ -1063,7 +1071,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "life-rpg"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "life-rpg", "blueprint"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

@@ -685,7 +685,7 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], o
         {onToggleObjective && (
           <div style={{ marginTop: linkedGoals.length > 0 ? 10 : 0 }}>
             <ObjectiveMultiSelect objectives={allObjectives} catId={cat.id} color={cat.color}
-              onToggle={onToggleObjective} onCreate={onCreateObjective} compact={linkedGoals.length > 0} />
+              onToggle={onToggleObjective} onCreate={onCreateObjective} compact />
           </div>
         )}
       </div>
