@@ -6,6 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import { AlertTriangle } from "lucide-react";
 
+// Détecte qu'on tourne dans la webview Tauri (app desktop) et non dans un
+// navigateur normal. __TAURI_INTERNALS__ est toujours injecté par le runtime
+// Tauri, indépendamment de withGlobalTauri.
+const isTauri = () =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+// URL de retour pour le flow OAuth desktop : un scheme custom capté par
+// tauri-plugin-deep-link. Doit être déclaré dans tauri.conf.json ET ajouté
+// aux "Redirect URLs" de Supabase (Authentication → URL Configuration).
+const TAURI_REDIRECT = "taotrade://auth/callback";
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,16 +35,82 @@ export default function LoginPage() {
     checkAuth();
   }, [router, supabase.auth]);
 
+  // Dans l'app desktop (Tauri), Google refuse l'OAuth lancé depuis une webview
+  // embarquée ("disallowed_useragent"). On ouvre donc le flux dans le navigateur
+  // système, et Supabase nous renvoie le code d'autorisation via le deep link
+  // taotrade://auth/callback, capté ci-dessous, qu'on échange contre une session.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    let active = true;
+    (async () => {
+      try {
+        const { onOpenUrl } = await import("@tauri-apps/plugin-deep-link");
+        const fn = await onOpenUrl(async (urls) => {
+          try {
+            const url = urls?.[0];
+            if (!url) return;
+            const parsed = new URL(url);
+            const code = parsed.searchParams.get("code");
+            if (!code) {
+              const desc = parsed.searchParams.get("error_description");
+              throw new Error(desc || "Aucun code d'autorisation reçu");
+            }
+            const { error: exchangeError } =
+              await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) throw exchangeError;
+            router.push("/dashboard");
+          } catch (err) {
+            console.error("[google-login][tauri][callback]", err);
+            setError(err instanceof Error ? err.message : "Erreur de connexion");
+            setLoading(false);
+          }
+        });
+        if (active) unlisten = fn;
+        else fn();
+      } catch (err) {
+        console.error("[google-login][tauri][listen]", err);
+      }
+    })();
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [router, supabase.auth]);
+
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       setError("");
-      const { error: authError } = await supabase.auth.signInWithOAuth({
+
+      if (isTauri()) {
+        // Flow desktop : pas de redirection de la webview, on ouvre le navigateur.
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        const { data, error: authError } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: TAURI_REDIRECT, skipBrowserRedirect: true },
+        });
+        if (authError) throw authError;
+        if (!data?.url) throw new Error("Impossible de démarrer la connexion Google.");
+        await openUrl(data.url);
+        // loading reste actif : le retour se fait via le listener deep link.
+        return;
+      }
+
+      // Flow navigateur classique : supabase-js redirige automatiquement
+      // window.location vers Google quand data.url est renvoyé.
+      const { data, error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (authError) throw authError;
+      if (!data?.url) {
+        throw new Error(
+          "Impossible de démarrer la connexion Google (aucune URL renvoyée). Vérifie que le provider Google est activé dans Supabase."
+        );
+      }
     } catch (err) {
+      console.error("[google-login]", err);
       setError(err instanceof Error ? err.message : "Erreur de connexion");
       setLoading(false);
     }

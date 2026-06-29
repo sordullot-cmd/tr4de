@@ -10,6 +10,9 @@
     "notification:default",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    "deep-link:default",
+    "opener:default",
+    "opener:allow-open-url"
   ]
 }

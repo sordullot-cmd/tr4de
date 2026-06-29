@@ -7,6 +7,13 @@
     "frontendDist": "https://tao-trade.vercel.app/",
     "devUrl": "https://tao-trade.vercel.app/"
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["taotrade"]
+      }
+    }
+  },
   "app": {
     "windows": [
       {
