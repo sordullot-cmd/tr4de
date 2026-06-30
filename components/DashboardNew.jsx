@@ -23,13 +23,11 @@ import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
 import GoalsPage from "@/components/pages/GoalsPage";
 import DailyPlannerPage from "@/components/pages/DailyPlannerPage";
-import FocusTimerPage from "@/components/pages/FocusTimerPage";
 import SportPage from "@/components/pages/SportPage";
 import ReadingListPage from "@/components/pages/ReadingListPage";
 import NotesPage from "@/components/pages/NotesPage";
 import DrivePage from "@/components/pages/DrivePage";
 import LifeRpgPage from "@/components/pages/LifeRpgPage";
-import BlueprintPage from "@/components/pages/BlueprintPage";
 import EloquencePage from "@/components/pages/EloquencePage";
 import AgendaPage from "@/components/pages/AgendaPage";
 import CalendarPage from "@/components/pages/CalendarPage";
@@ -76,7 +74,6 @@ import {
   SlidersHorizontal as LucideSlidersHorizontal,
   Check as LucideCheck,
   Mountain,
-  Route as LucideRoute,
   Pencil,
   Plus,
   GripVertical,
@@ -85,7 +82,6 @@ import {
   CalendarDays as LucideCalendarDays,
   CalendarClock as LucideCalendarClock,
   Flame as LucideFlame,
-  Timer as LucideTimer,
   BookOpen as LucideBookOpen,
   Menu as LucideMenu,
   Wallet as LucideWallet,
@@ -718,15 +714,13 @@ export default function App() {
     {
       label: t("nav.productivity"),
       items: [
-        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
+        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "eloquence",     icon: LucideMic,          label: t("nav.eloquence") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
-        { id: "blueprint",     icon: LucideRoute,        label: t("nav.blueprint") },
         { id: "sport",         icon: LucideDumbbell,     label: "Sport" },
-        { id: "focus",         icon: LucideTimer,        label: t("nav.focus") },
       ],
     },
   ];
@@ -780,13 +774,11 @@ export default function App() {
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     agenda: <AgendaPage />,
-    focus: <FocusTimerPage />,
     sport: <SportPage />,
     reading: <ReadingListPage />,
     notes: <NotesPage />,
     drive: <DrivePage />,
     "life-rpg": <LifeRpgPage />,
-    blueprint: <BlueprintPage />,
     eloquence: <EloquencePage />,
     agent: (() => {
       // Convertir la map { [tradeId]: "note" } en tableau pour l'API
@@ -1071,7 +1063,7 @@ export default function App() {
             }}>
               {(() => {
                 // Pages de productivité : pas de DateRangePicker ni de sélecteur de comptes.
-                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "focus", "reading", "sport", "notes", "drive", "life-rpg", "blueprint"];
+                const PRODUCTIVITY_PAGES = ["daily-planner", "agenda", "goals", "reading", "sport", "notes", "drive", "life-rpg"];
                 const isProductivity = PRODUCTIVITY_PAGES.includes(page);
                 if (page === "add-trade") return null;
                 if (isProductivity) return null; // la page gère son propre header

@@ -22,6 +22,14 @@ import {
 export const RPG_STORAGE_KEY = "tr4de_life_rpg";
 export const RPG_CLOUD_KEY = "life_rpg";
 
+// Lien « tâche d'agenda → cartes Vie RPG » (+ état de complétion), partagé entre
+// la page Agenda (qui l'écrit) et la page Vie RPG (qui le lit pour l'XP). On
+// l'indexe par id de Google Task : { [taskId]: { categories, completedAt, title } }.
+export const TASK_RPG_STORAGE_KEY = "tr4de_agenda_task_rpg";
+export const TASK_RPG_CLOUD_KEY = "agenda_task_rpg";
+// XP gagnée pour une tâche terminée, par catégorie liée (≈ une habitude « normale »).
+export const TASK_XP = 25;
+
 // Catégories (« cartes ») rattachées à une habitude. Une habitude peut être
 // liée à PLUSIEURS cartes. Rétrocompatible avec l'ancien champ `attribute`
 // (id unique) : on le convertit en tableau à un élément.

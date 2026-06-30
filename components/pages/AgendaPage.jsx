@@ -5,14 +5,19 @@ import {
   Calendar as CalendarIcon, ChevronLeft, ChevronRight,
   LogOut, AlertTriangle, Plug, Trash2, X as IconX, ExternalLink,
   Clock, MapPin, AlignLeft, Bell, ChevronDown, Target, HelpCircle, Repeat,
-  Plus, CheckSquare, Square,
+  Plus, CheckSquare, Square, Check, Sparkles,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
+import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useIsMobile } from "@/lib/hooks/useBreakpoint";
 import { DateField, TimeField } from "./AgendaDateFields";
 import MiniCalendar from "@/components/ui/MiniCalendar";
+import {
+  RPG_STORAGE_KEY, RPG_CLOUD_KEY, DEFAULT_CATEGORIES, CatIcon,
+  TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY,
+} from "@/lib/lifeRpgCategories";
 
 /* ─────────────── Helpers date ─────────────── */
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -158,6 +163,7 @@ function blankForm(day, startTime = "09:00", endTime = "10:00") {
     masterId: null, masterStart: null, // série (event récurrent) : renseignés à l'édition
     location: "", description: "", guests: "", addMeet: false, hadMeet: false,
     colorId: null, transparency: "opaque", visibility: "default", reminder: 10,
+    rpgCategories: [], // cartes Vie RPG liées (tâche) : XP à la complétion
     pendingTasks: [], // tâches Google à créer à l'enregistrement (nouvel évènement)
   };
 }
@@ -273,6 +279,7 @@ function formFromTaskItem(item, times) {
     location: "", description: item.description || "",
     guests: "", addMeet: false, hadMeet: false, colorId: item.colorId || null,
     transparency: "opaque", visibility: "default", reminder: 10,
+    rpgCategories: [], // renseigné par openEdit depuis le store `taskRpg`
   };
 }
 
@@ -535,6 +542,12 @@ export default function AgendaPage() {
   const [events, setEvents] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
   const [taskTimes, setTaskTimes] = React.useState({});
+  // Cartes Vie RPG (lecture seule ici — éditées sur la page « Vie RPG ») et
+  // liaison « tâche → cartes » (+ complétion) que cette page écrit et que la
+  // page Vie RPG lit pour créditer l'XP.
+  const [rpgState] = useCloudState(RPG_STORAGE_KEY, RPG_CLOUD_KEY, { categories: DEFAULT_CATEGORIES });
+  const rpgCategories = Array.isArray(rpgState.categories) ? rpgState.categories : DEFAULT_CATEGORIES;
+  const [taskRpg, setTaskRpg] = useCloudState(TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, {});
   const [eventTaskLinks, setEventTaskLinks] = React.useState({}); // évènement → ids de tâches Google
   const [modalTab, setModalTab] = React.useState("event"); // vue interne du modal évènement : "event" | "tasks"
   const [taskDraft, setTaskDraft] = React.useState(""); // saisie d'ajout de tâche
@@ -710,8 +723,16 @@ export default function AgendaPage() {
   // Bascule l'état "terminé" (tâche Google ou évènement-tâche legacy).
   const onToggleDone = async (item) => {
     if (item.isGTask) {
-      setTasks((prev) => prev.map((x) => (x.id === item.id ? { ...x, completed: !item.done } : x)));
-      try { await toggleTask(item.id, !item.done); } catch { loadTasks(); }
+      const nowDone = !item.done;
+      setTasks((prev) => prev.map((x) => (x.id === item.id ? { ...x, completed: nowDone } : x)));
+      // Tâche liée à des cartes Vie RPG : on horodate la complétion (ou on la
+      // retire) pour que la page Vie RPG crédite/décrédite l'XP correspondante.
+      setTaskRpg((prev) => {
+        const entry = prev[item.id];
+        if (!entry) return prev; // pas de lien RPG → rien à faire
+        return { ...prev, [item.id]: { ...entry, title: item.summary || entry.title || "", completedAt: nowDone ? new Date().toISOString() : null } };
+      });
+      try { await toggleTask(item.id, nowDone); } catch { loadTasks(); }
     } else {
       setEvents((prev) => prev.map((x) => (x.id === item.id ? { ...x, done: !x.done } : x)));
       try { await setEventDone(item.id, !item.done); } catch { loadEvents(); }
@@ -724,6 +745,7 @@ export default function AgendaPage() {
   const openEdit = (item) => {
     setModalError(null); setColorOpen(false); setRemindOpen(false); setRecurOpen(false); setTimeEdit(false); setModalTab("event"); setTaskDraft("");
     const base = item.isGTask ? formFromTaskItem(item, taskTimes) : formFromEvent(item);
+    if (item.isGTask) base.rpgCategories = taskRpg[item.id]?.categories || [];
     setModal(base);
     // Évènement récurrent : la règle est portée par l'évènement maître (les
     // occurrences sont dépliées). On la récupère en arrière-plan pour pré-remplir.
@@ -1038,6 +1060,25 @@ export default function AgendaPage() {
             : { day: modal.date, startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null };
           writeTaskTimes(times);
           setTaskTimes(times);
+          // Liaison aux cartes Vie RPG : on (dé)pose le lien et on préserve un
+          // éventuel horodatage de complétion déjà connu (sinon on l'amorce
+          // selon l'état « terminé » courant de la tâche).
+          const cats = Array.isArray(modal.rpgCategories) ? modal.rpgCategories.filter(Boolean) : [];
+          const finalTaskId = taskId;
+          setTaskRpg((prev) => {
+            const next = { ...prev };
+            if (cats.length) {
+              const existing = next[finalTaskId] || {};
+              next[finalTaskId] = {
+                categories: cats,
+                title: modal.summary || existing.title || "",
+                completedAt: existing.completedAt ?? (modal.done ? new Date().toISOString() : null),
+              };
+            } else if (next[finalTaskId]) {
+              delete next[finalTaskId];
+            }
+            return next;
+          });
         }
         setModal(null);
         await loadTasks();
@@ -1096,6 +1137,7 @@ export default function AgendaPage() {
         delete times[modal.id];
         writeTaskTimes(times);
         setTaskTimes(times);
+        setTaskRpg((prev) => { if (!prev[modal.id]) return prev; const n = { ...prev }; delete n[modal.id]; return n; });
         setModal(null);
         await loadTasks();
       } else {
@@ -1950,6 +1992,38 @@ export default function AgendaPage() {
                   )}
                 </div>
               </FormRow>
+
+              {/* Quêtes de soi (cartes Vie RPG) — tâches uniquement : terminer la
+                  tâche crédite de l'XP à chaque carte liée. */}
+              {(modal.kind === "task" || modalTab === "tasks") && (
+                <FormRow icon={Sparkles} top>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: T.textSub, marginBottom: 8 }}>
+                      Quêtes de soi <span style={{ color: T.textMut, fontWeight: 400 }}>{"· optionnel · gagne de l'XP"}</span>
+                    </div>
+                    {rpgCategories.length === 0 ? (
+                      <div style={{ fontSize: 12, color: T.textMut }}>Crée des cartes sur la page « Vie RPG » pour les lier ici.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {rpgCategories.map((c) => {
+                          const sel = Array.isArray(modal.rpgCategories) ? modal.rpgCategories : [];
+                          const active = sel.includes(c.id);
+                          const toggle = () => setModal({ ...modal, rpgCategories: active ? sel.filter((x) => x !== c.id) : [...sel, c.id] });
+                          return (
+                            <button key={c.id} type="button" onClick={toggle}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 999, border: `1px solid ${active ? c.color : T.border}`, background: active ? `${c.color}14` : T.white, color: active ? c.color : T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                              {active
+                                ? <Check size={13} strokeWidth={2.5} color={c.color} />
+                                : <CatIcon name={c.icon} size={13} strokeWidth={1.9} color={T.textMut} />}
+                              {c.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </FormRow>
+              )}
               </>
 
               {modalError && (

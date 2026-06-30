@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Mic, Square, Volume2, Loader2, Check, ChevronRight,
-  Sparkles, RefreshCw, Lightbulb, TrendingUp, BookOpen, MessageCircle, Target,
+  Sparkles, RefreshCw, Lightbulb,
 } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useAudioRecorder } from "@/lib/hooks/useAudioRecorder";
@@ -433,7 +433,7 @@ function ReadingTab({ onSession }) {
             <button
               key={tx.id}
               type="button"
-              onClick={() => { setSelectedId(tx.id); setResult(null); }}
+              onClick={() => { setSelectedId(active ? null : tx.id); setResult(null); }}
               style={{
                 ...card, textAlign: "left", cursor: "pointer", width: 240, fontFamily: "inherit",
                 borderColor: active ? T.text : T.border, borderWidth: active ? 2 : 1,
@@ -545,11 +545,25 @@ function FreeSpeechTab({ onSession, presetTopic, clearPreset }) {
 /* ═══════════════════════════════════════════════════════════
    ONGLET — Sujets (générateur)
    ═══════════════════════════════════════════════════════════ */
+// Retrouve le framework de structure correspondant au libellé suggéré d'un sujet.
+function findFramework(label) {
+  if (!label) return null;
+  const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const t = norm(label);
+  if (!t) return null;
+  return (
+    STRUCTURE_FRAMEWORKS.find((f) => norm(f.name) === t) ||
+    STRUCTURE_FRAMEWORKS.find((f) => t.includes(norm(f.name)) || norm(f.name).includes(t)) ||
+    null
+  );
+}
+
 function TopicsTab({ onPractice }) {
   const [theme, setTheme] = useState(TOPIC_THEMES[0].key);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [openStructure, setOpenStructure] = useState(null); // index de la carte dont la structure est déroulée
 
   const generate = async () => {
     setLoading(true);
@@ -607,20 +621,54 @@ function TopicsTab({ onPractice }) {
 
       {/* Cartes de sujets */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {topics.map((tp, i) => (
-          <div key={i} style={{ ...card, width: 280, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{tp.title}</div>
-            {tp.angle && <div style={{ fontSize: 13, color: T.textSub, lineHeight: 1.4 }}>{tp.angle}</div>}
-            {tp.suggestedStructure && (
-              <span style={{ alignSelf: "flex-start", fontSize: 11, fontWeight: 700, color: T.blue, background: "#EFF6FF", padding: "2px 8px", borderRadius: 999 }}>
-                {tp.suggestedStructure}
-              </span>
-            )}
-            <button type="button" style={{ ...ghost(false), marginTop: 4, alignSelf: "flex-start" }} onClick={() => onPractice(tp.title)}>
-              <Mic size={14} /> S'entraîner sur ce sujet
-            </button>
-          </div>
-        ))}
+        {topics.map((tp, i) => {
+          const fw = findFramework(tp.suggestedStructure);
+          const open = openStructure === i;
+          return (
+            <div key={i} style={{ ...card, width: 280, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{tp.title}</div>
+              {tp.angle && <div style={{ fontSize: 13, color: T.textSub, lineHeight: 1.4 }}>{tp.angle}</div>}
+
+              {tp.suggestedStructure && (fw ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenStructure(open ? null : i)}
+                  title="Voir le déroulé de la structure"
+                  style={{
+                    alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4,
+                    fontSize: 11, fontWeight: 700, color: T.blue, background: "#EFF6FF",
+                    padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  <ChevronRight size={12} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 150ms ease" }} />
+                  {tp.suggestedStructure}
+                </button>
+              ) : (
+                <span style={{ alignSelf: "flex-start", fontSize: 11, fontWeight: 700, color: T.blue, background: "#EFF6FF", padding: "2px 8px", borderRadius: 999 }}>
+                  {tp.suggestedStructure}
+                </span>
+              ))}
+
+              {/* Déroulé complet de la structure conseillée */}
+              {fw && open && (
+                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: T.textSub, lineHeight: 1.4 }}>{fw.description}</div>
+                  <ol style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 5 }}>
+                    {fw.steps.map((s, k) => (
+                      <li key={k} style={{ fontSize: 12.5, color: T.textSub, lineHeight: 1.4 }}>
+                        <span style={{ fontWeight: 700, color: T.text }}>{s.label}</span>{s.hint ? ` — ${s.hint}` : ""}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              <button type="button" style={{ ...ghost(false), marginTop: 4, alignSelf: "flex-start" }} onClick={() => onPractice(tp.title)}>
+                <Mic size={14} /> S'entraîner sur ce sujet
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -689,7 +737,7 @@ function DictionTab({ onSession }) {
               <button
                 key={tw.id}
                 type="button"
-                onClick={() => { setSelectedId(tw.id); setResult(null); }}
+                onClick={() => { setSelectedId(active ? null : tw.id); setResult(null); }}
                 style={{ ...card, width: 300, textAlign: "left", cursor: "pointer", fontFamily: "inherit", borderColor: active ? T.text : T.border, borderWidth: active ? 2 : 1, background: active ? T.accentBg : T.white }}
               >
                 <div style={{ marginBottom: 6 }}><LevelBadge level={tw.level} /></div>
@@ -762,7 +810,7 @@ function StructureTab({ onSession }) {
             <button
               key={f.id}
               type="button"
-              onClick={() => { setSelectedId(f.id); setResult(null); }}
+              onClick={() => { setSelectedId(active ? null : f.id); setResult(null); }}
               style={{ ...card, width: 300, textAlign: "left", cursor: "pointer", fontFamily: "inherit", borderColor: active ? T.text : T.border, borderWidth: active ? 2 : 1, background: active ? T.accentBg : T.white }}
             >
               <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{f.name}</div>
@@ -832,118 +880,130 @@ function StructureTab({ onSession }) {
 const lead = { fontSize: 14, color: T.textSub, lineHeight: 1.5, margin: 0 };
 const blockTitle = { fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 6 };
 
-/* ─────────────── Tableau de bord de progression ─────────────── */
-function ProgressDashboard({ sessions }) {
-  if (!sessions || sessions.length === 0) {
-    return (
-      <div style={{ fontSize: 13, color: T.textMut, marginBottom: 4 }}>
-        Commence ta première session pour suivre ta progression.
-      </div>
-    );
-  }
-  const n = sessions.length;
-  const avg = Math.round(sessions.reduce((a, s) => a + (s.overall || 0), 0) / n);
-  const best = Math.max(...sessions.map((s) => s.overall || 0));
-  const wpms = sessions.map((s) => s.wpm || 0).filter((w) => w > 0);
-  const avgWpm = wpms.length ? Math.round(wpms.reduce((a, b) => a + b, 0) / wpms.length) : 0;
+/* ─────────────── Types d'exercice suivis ───────────────
+ * Le score global est propre à chaque type (et au cumul global). Les sessions
+ * sont déjà persistées avec leur `mode`, donc rien à stocker en plus — on
+ * ventile simplement l'historique par catégorie. */
+const SESSION_MODES = [
+  { id: EXERCISE_MODES.reading,    label: "Lecture" },
+  { id: EXERCISE_MODES.freeSpeech, label: "Discours libre" },
+  { id: EXERCISE_MODES.diction,    label: "Diction" },
+  { id: EXERCISE_MODES.structure,  label: "Structure" },
+];
 
-  const stats = [
-    { label: "Sessions", value: n, icon: <MessageCircle size={16} color={T.textMut} /> },
-    { label: "Score moyen", value: avg, icon: <Target size={16} color={scoreColor(avg)} />, color: scoreColor(avg) },
-    { label: "Meilleur score", value: best, icon: <TrendingUp size={16} color={scoreColor(best)} />, color: scoreColor(best) },
-    { label: "Débit moyen", value: avgWpm ? `${avgWpm} mpm` : "—", icon: <BookOpen size={16} color={T.textMut} /> },
-  ];
-
-  return (
-    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      {stats.map((s, i) => (
-        <div key={i} style={{ ...metricBox, minWidth: 130, background: T.white }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>{s.icon}<span style={metricLabel}>{s.label}</span></div>
-          <div style={{ ...metricVal, color: s.color || T.text }}>{s.value}</div>
-        </div>
-      ))}
-    </div>
-  );
+// Tendance d'une série : moyenne de la 2nde moitié (récent) moins la 1re (ancien).
+function seriesTrend(vals) {
+  if (!vals || vals.length < 2) return null;
+  const mid = Math.floor(vals.length / 2);
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  return Math.round(mean(vals.slice(mid)) - mean(vals.slice(0, mid)));
 }
 
 /* ─────────────── Progression détaillée par critère ───────────────
- * Montre, pour chaque axe noté, la moyenne et la tendance (sessions récentes vs
- * anciennes), plus un mini-graphique de l'évolution du score global. */
-function ProgressByAxis({ sessions }) {
-  // Au moins 2 sessions pour parler de progression.
-  if (!sessions || sessions.length < 2) return null;
+ * Bloc de suivi du type d'exercice actuellement affiché (pas de sélecteur : il
+ * suit l'onglet actif). On montre le score global propre à ce type (moyenne,
+ * dernier, record, tendance + courbe) puis la moyenne et la tendance de chaque
+ * critère. */
+function ProgressByAxis({ sessions, mode }) {
+  // Seuls les types d'exercice notés ont un suivi (« Sujets » n'enregistre rien).
+  const catLabel = SESSION_MODES.find((m) => m.id === mode)?.label;
+  if (!catLabel) return null;
 
-  // Ordre chronologique (l'historique est stocké du plus récent au plus ancien).
-  const chrono = [...sessions].reverse();
-  const allAxes = [...SCORE_AXES, FIDELITY_AXIS];
+  if (!sessions || sessions.length === 0) {
+    return (
+      <div style={{ fontSize: 13, color: T.textMut, marginTop: 4 }}>
+        Commence ta première session pour suivre ta progression sur « {catLabel} ».
+      </div>
+    );
+  }
 
-  // Tendance d'une série : compare la moyenne de la 2nde moitié (récent) à la 1re.
-  const trend = (vals) => {
-    if (vals.length < 2) return null;
-    const mid = Math.floor(vals.length / 2);
-    const older = vals.slice(0, mid);
-    const recent = vals.slice(mid);
-    const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
-    return Math.round(mean(recent) - mean(older));
-  };
+  // Sessions de ce type d'exercice, remises en ordre chronologique
+  // (l'historique est stocké du plus récent au plus ancien).
+  const filtered = sessions.filter((s) => s.mode === mode);
+  const chrono = [...filtered].reverse();
+  const n = filtered.length;
+
   const mean = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
 
+  // Score global unique de la catégorie.
+  const overalls = chrono.map((s) => s.overall || 0);
+  const avg = mean(overalls);
+  const best = n ? Math.max(...overalls) : null;
+  const last = n ? overalls[overalls.length - 1] : null;
+  const delta = seriesTrend(overalls);
+
+  // Moyenne + tendance par critère, calculées sur cette même catégorie.
+  const allAxes = [...SCORE_AXES, FIDELITY_AXIS];
   const rows = allAxes
     .map((ax) => {
       const vals = chrono
         .map((s) => (s.scores ? s.scores[ax.id] : null))
         .filter((v) => typeof v === "number");
       if (vals.length < 1) return null;
-      return { ax, avg: mean(vals), delta: trend(vals), count: vals.length, last: vals[vals.length - 1] };
+      return { ax, avg: mean(vals), delta: seriesTrend(vals) };
     })
     .filter(Boolean);
 
-  // Série du score global pour le sparkline.
-  const overalls = chrono.map((s) => s.overall || 0);
-
   return (
-    <details style={{ ...card, padding: 0, overflow: "hidden" }}>
-      <summary style={{ cursor: "pointer", padding: "14px 18px", display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: T.text, listStyle: "none" }}>
-        <TrendingUp size={16} color={T.text} />
-        Progression par critère
-        <span style={{ fontSize: 12, color: T.textMut, fontWeight: 500 }}>· {sessions.length} sessions</span>
-      </summary>
-
-      <div style={{ padding: "0 18px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* Mini-graphique du score global dans le temps */}
-        <div>
-          <div style={{ ...metricLabel, marginBottom: 6 }}>Score global au fil du temps</div>
-          <Sparkline values={overalls} />
-        </div>
-
-        {/* Tendance par axe */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {rows.map(({ ax, avg, delta }) => (
-            <div key={ax.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 96, fontSize: 13, color: T.textSub, fontWeight: 600 }} title={ax.desc}>{ax.label}</div>
-              <div style={{ flex: 1, height: 8, background: T.accentBg, borderRadius: 999, overflow: "hidden" }}>
-                <div style={{ width: `${avg}%`, height: "100%", background: scoreColor(avg), borderRadius: 999 }} />
-              </div>
-              <div style={{ width: 30, textAlign: "right", fontSize: 13, fontWeight: 700, color: scoreColor(avg) }}>{avg}</div>
-              <div style={{ width: 52, textAlign: "right", fontSize: 12, fontWeight: 700 }}>
-                {delta == null ? (
-                  <span style={{ color: T.textMut }}>—</span>
-                ) : delta > 0 ? (
-                  <span style={{ color: T.green }}>▲ +{delta}</span>
-                ) : delta < 0 ? (
-                  <span style={{ color: T.red }}>▼ {delta}</span>
-                ) : (
-                  <span style={{ color: T.textMut }}>= 0</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "28px 18px 18px", marginTop: 28, borderTop: `1px solid ${T.border}` }}>
+      {n === 0 ? (
+        <div style={{ fontSize: 13, color: T.textMut }}>Pas encore de session pour « {catLabel} ».</div>
+      ) : (
+        <>
+          {/* Score global unique de la catégorie sélectionnée */}
+          <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+            <div style={{
+              width: 84, height: 84, borderRadius: "50%", flexShrink: 0,
+              background: scoreColor(avg), color: "#fff",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            }}>
+              <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{avg}</span>
+              <span style={{ fontSize: 10, opacity: 0.85, marginTop: 2 }}>moyenne</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 13, color: T.textSub, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+                <span>{n} session{n > 1 ? "s" : ""}</span>
+                <span>Dernier <strong style={{ color: scoreColor(last) }}>{last}</strong></span>
+                <span>Record <strong style={{ color: scoreColor(best) }}>{best}</strong></span>
+                {delta != null && (
+                  delta > 0 ? <span style={{ color: T.green, fontWeight: 700 }}>▲ +{delta}</span>
+                  : delta < 0 ? <span style={{ color: T.red, fontWeight: 700 }}>▼ {delta}</span>
+                  : <span style={{ color: T.textMut, fontWeight: 700 }}>= 0</span>
                 )}
               </div>
+              <Sparkline values={overalls} />
             </div>
-          ))}
-        </div>
-        <div style={{ fontSize: 11, color: T.textMut }}>
-          Moyenne sur toutes les sessions · tendance = écart entre tes sessions récentes et plus anciennes.
-        </div>
-      </div>
-    </details>
+          </div>
+
+          {/* Tendance par critère */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {rows.map(({ ax, avg: a, delta: d }) => (
+              <div key={ax.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 96, fontSize: 13, color: T.textSub, fontWeight: 600 }} title={ax.desc}>{ax.label}</div>
+                <div style={{ flex: 1, height: 8, background: T.accentBg, borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ width: `${a}%`, height: "100%", background: scoreColor(a), borderRadius: 999 }} />
+                </div>
+                <div style={{ width: 30, textAlign: "right", fontSize: 13, fontWeight: 700, color: scoreColor(a) }}>{a}</div>
+                <div style={{ width: 52, textAlign: "right", fontSize: 12, fontWeight: 700 }}>
+                  {d == null ? (
+                    <span style={{ color: T.textMut }}>—</span>
+                  ) : d > 0 ? (
+                    <span style={{ color: T.green }}>▲ +{d}</span>
+                  ) : d < 0 ? (
+                    <span style={{ color: T.red }}>▼ {d}</span>
+                  ) : (
+                    <span style={{ color: T.textMut }}>= 0</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: T.textMut }}>
+            Moyenne sur les sessions de « {catLabel} » · tendance = écart entre tes sessions récentes et plus anciennes.
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1025,10 +1085,6 @@ export default function EloquencePage() {
         </span>
       </div>
 
-      {/* Tableau de bord de progression */}
-      <ProgressDashboard sessions={sessions} />
-      <ProgressByAxis sessions={sessions} />
-
       {/* Onglets — segment control (style du projet) */}
       <div style={{ display: "flex", overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
         <div style={{ display: "inline-flex", gap: 4, padding: 3, background: T.accentBg, borderRadius: 999 }}>
@@ -1063,6 +1119,9 @@ export default function EloquencePage() {
       {tab === EXERCISE_MODES.topics && <TopicsTab onPractice={practiceTopic} />}
       {tab === EXERCISE_MODES.diction && <DictionTab onSession={recordSession} />}
       {tab === EXERCISE_MODES.structure && <StructureTab onSession={recordSession} />}
+
+      {/* Suivi de progression du type d'exercice affiché (score global propre à l'onglet) */}
+      <ProgressByAxis sessions={sessions} mode={tab} />
     </div>
   );
 }

@@ -5,10 +5,10 @@ import ReactDOM from "react-dom";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import {
-  Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight,
-  TrendingUp, Trophy, Flame, Calendar, Clock,
+  Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight, ChevronLeft,
+  Calendar, Clock,
   Dumbbell, BicepsFlexed, Bike, Footprints, Heart,
-  Star, EyeOff, Save, BookOpen, GripVertical,
+  Star, EyeOff, Save, BookOpen, GripVertical, Camera, ImagePlus,
 } from "lucide-react";
 import { t, useLang } from "@/lib/i18n";
 
@@ -203,7 +203,10 @@ export default function SportPage() {
   const [hiddenExercises, setHiddenExercises] = useCloudState("tr4de_sport_hidden_exercises", "sport_hidden_exercises", []);
   const [favoriteExercises, setFavoriteExercises] = useCloudState("tr4de_sport_favorite_exercises", "sport_favorite_exercises", []);
   const [customPresets, setCustomPresets] = useCloudState("tr4de_sport_custom_presets", "sport_custom_presets", []);
+  // Photos de progression physique ({ id, date, dataUrl, weight?, note? }).
+  const [progressPhotos, setProgressPhotos] = useCloudState("tr4de_sport_progress_photos", "sport_progress_photos", []);
 
+  const [tab, setTab] = useState("workout"); // "workout" | "photos"
   const [filterDiscipline, setFilterDiscipline] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
 
@@ -426,97 +429,152 @@ export default function SportPage() {
     return [...list].sort((a, b) => b.date.localeCompare(a.date));
   }, [sessions, filterDiscipline, filterCategory]);
 
+  const hasAnyFilter = filterDiscipline !== "all" || filterCategory !== "all";
+
+  /* ─── Regroupement de l'historique par mois ──────────────────── */
+  const monthGroups = useMemo(() => {
+    const map = new Map();
+    for (const s of filteredSessions) {
+      const key = s.date.slice(0, 7);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(s);
+    }
+    return Array.from(map.entries()).map(([key, list]) => ({
+      key,
+      label: new Date(key + "-01T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+      sessions: list,
+    }));
+  }, [filteredSessions]);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-1">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.1, fontFamily: "var(--font-sans)" }}>
-          {t("sport.pageTitle")}
-        </h1>
-        <button onClick={openCreate}
-          style={{ marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Plus size={14} strokeWidth={2} /> Nouvelle séance
-        </button>
-        <div id="tr4de-page-header-slot" />
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }} className="anim-1">
+      {/* Header — titre + action */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 600, color: T.text, margin: 0, letterSpacing: -0.4, fontFamily: "var(--font-sans)" }}>
+            {t("sport.pageTitle")}
+          </h1>
+          <p style={{ fontSize: 12.5, color: T.textMut, margin: "5px 0 0" }}>
+            {stats.total === 0
+              ? "Suis tes séances, tes records et ta progression."
+              : `${stats.total} séance${stats.total > 1 ? "s" : ""} enregistrée${stats.total > 1 ? "s" : ""}`}
+          </p>
+        </div>
+        {tab === "workout" && (
+          <button onClick={openCreate}
+            style={{ marginLeft: "auto", padding: "9px 17px", height: 38, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Plus size={14} strokeWidth={2} /> Nouvelle séance
+          </button>
+        )}
+        <div id="tr4de-page-header-slot" style={{ marginLeft: tab === "workout" ? 0 : "auto" }} />
       </div>
 
-      {/* KPIs — carte fusionnée */}
-      <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiCell label="Séances cette semaine" value={String(stats.sessionsThisWeek)} sub={`${stats.total} au total`} />
-          <KpiCell label="Streak" value={`${stats.streak} j`} sub={stats.streak >= 2 ? "Garde le rythme" : "Lance ta série"} valueColor={stats.streak >= 2 ? T.amber : undefined}
-            icon={stats.streak >= 2 ? Flame : undefined} />
-          <KpiCell label="Records personnels" value={String(prs.length)} sub={prs[0] ? `${prs[0].name} · ${prs[0].weight} kg` : "Logge des séries"} icon={Trophy} />
-          <KpiCell label="Volume semaine" value={`${Math.round(stats.volumeWeek).toLocaleString("fr-FR")} kg`} sub="kg × reps" last />
-        </div>
+      {/* Onglets */}
+      <div style={{ display: "inline-flex", gap: 4, padding: 3, background: T.accentBg, borderRadius: 999, alignSelf: "flex-start" }}>
+        {[{ id: "workout", label: "Entraînement" }, { id: "photos", label: "Photos" }].map(tb => {
+          const active = tab === tb.id;
+          return (
+            <button key={tb.id} type="button" onClick={() => setTab(tb.id)}
+              style={{
+                padding: "6px 16px", borderRadius: 999, border: "none",
+                background: active ? T.white : "transparent",
+                color: active ? T.text : T.textSub,
+                fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
+                boxShadow: active ? "0 1px 2px rgba(0,0,0,.08)" : "none",
+                transition: "all 120ms ease",
+              }}>
+              {tb.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filtres : discipline et catégorie sur des lignes distinctes,
-          précédés d'un libellé pour clarifier ce qu'on filtre. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut, minWidth: 80 }}>Discipline</span>
-          <FilterPills
-            value={filterDiscipline}
-            onChange={setFilterDiscipline}
-            options={[{ id: "all", label: "Toutes" }, ...DISCIPLINES.map(d => ({ id: d.id, label: d.label }))]}
-          />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: T.textMut, minWidth: 80 }}>Catégorie</span>
-          <FilterPills
-            value={filterCategory}
-            onChange={setFilterCategory}
-            options={[{ id: "all", label: "Toutes" }, ...CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color }))]}
-          />
-        </div>
-      </div>
+      {tab === "photos" && (
+        <PhotosTab photos={progressPhotos} setPhotos={setProgressPhotos} />
+      )}
 
-      {/* Layout en 2 colonnes : sessions à gauche, PR + chart à droite */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", gap: 16, alignItems: "start" }}>
+      {/* Layout en 2 colonnes : timeline à gauche, panneau collant à droite */}
+      {tab === "workout" && (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.7fr) minmax(300px, 1fr)", gap: 24, alignItems: "start" }}>
 
-        {/* Colonne gauche : historique */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Historique des séances</h2>
+        {/* Colonne gauche : filtres + timeline mensuelle */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <SectionTitle>Historique</SectionTitle>
+            <span style={{ fontSize: 11, color: T.textMut, fontVariantNumeric: "tabular-nums" }}>
+              {filteredSessions.length}{hasAnyFilter ? ` / ${(sessions || []).length}` : ""} séance{filteredSessions.length > 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <FilterPills
+              value={filterDiscipline}
+              onChange={setFilterDiscipline}
+              options={[{ id: "all", label: "Toutes disciplines" }, ...DISCIPLINES.map(d => ({ id: d.id, label: d.label, color: d.color }))]}
+            />
+            <FilterPills
+              value={filterCategory}
+              onChange={setFilterCategory}
+              options={[{ id: "all", label: "Toutes catégories" }, ...CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color }))]}
+            />
+          </div>
+
           {filteredSessions.length === 0 ? (
             <div style={{
-              border: `1px dashed ${T.border}`, borderRadius: 16, padding: 28,
-              textAlign: "center", background: T.white, color: T.textMut, fontSize: 13,
+              border: `1px dashed ${T.border}`, borderRadius: 16, padding: 36,
+              textAlign: "center", background: T.white, color: T.textMut, fontSize: 13, lineHeight: 1.6,
             }}>
-              Aucune séance pour le moment. Crée ta première séance pour commencer à suivre ta progression.
+              {hasAnyFilter
+                ? "Aucune séance ne correspond à ces filtres."
+                : "Aucune séance pour le moment. Crée ta première séance pour commencer à suivre ta progression."}
             </div>
           ) : (
-            <div className="anim-stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {filteredSessions.map(s => (
-                <SessionCard
-                  key={s.id}
-                  session={s}
-                  onEdit={() => openEdit(s)}
-                  onDelete={() => remove(s.id)}
-                />
+            <div className="anim-stagger" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              {monthGroups.map(group => (
+                <div key={group.key}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: T.text, textTransform: "capitalize" }}>{group.label}</span>
+                    <span style={{ fontSize: 11, color: T.textMut }}>· {group.sessions.length} séance{group.sessions.length > 1 ? "s" : ""}</span>
+                  </div>
+                  <div style={{ position: "relative", paddingLeft: 26 }}>
+                    {/* Trait vertical de la timeline */}
+                    <div style={{ position: "absolute", left: 8, top: 4, bottom: 4, width: 2, background: T.border, borderRadius: 2 }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {group.sessions.map(s => {
+                        const disc = DISCIPLINES.find(d => d.id === s.discipline) || DISCIPLINES[0];
+                        return (
+                          <div key={s.id} style={{ position: "relative" }}>
+                            {/* Nœud de la timeline */}
+                            <span style={{
+                              position: "absolute", left: -23, top: 21, width: 12, height: 12, borderRadius: "50%",
+                              background: T.white, border: `2px solid ${disc.color}`, boxSizing: "border-box", zIndex: 1,
+                            }} />
+                            <SessionCard session={s} onEdit={() => openEdit(s)} onDelete={() => remove(s.id)} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Colonne droite : PRs + chart */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Records personnels</h2>
-            <PRsCard prs={prs} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* Colonne droite : panneau collant (progression puis records) */}
+        <div style={{ position: "sticky", top: 8, display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <h2 style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0 }}>Progression</h2>
+              <SectionTitle>Progression</SectionTitle>
               {allExerciseNames.length > 0 && (
                 <select
                   value={chartExerciseName}
                   onChange={(e) => setChartExerciseName(e.target.value)}
                   style={{
-                    padding: "3px 12px", borderRadius: 999,
+                    padding: "4px 12px", borderRadius: 999,
                     border: `1px solid ${T.border}`, background: T.white,
                     fontSize: 11, color: T.text, fontFamily: "inherit", cursor: "pointer",
-                    maxWidth: 160,
+                    maxWidth: 170,
                   }}
                 >
                   {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
@@ -531,8 +589,14 @@ export default function SportPage() {
               unit={chartExerciseIsCardio ? "km/h" : "kg"}
             />
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <SectionTitle>Records personnels</SectionTitle>
+            <PRsCard prs={prs} />
+          </div>
         </div>
       </div>
+      )}
 
       {/* Modal de création / édition */}
       {showForm && typeof document !== "undefined" && ReactDOM.createPortal(
@@ -555,22 +619,265 @@ function toISOLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/* ─── Cellule KPI ────────────────────────────────────────────────── */
-function KpiCell({ label, value, sub, valueColor, icon: Icon, last }) {
+/* ─── Titre de section ───────────────────────────────────────────── */
+function SectionTitle({ children }) {
   return (
-    <div style={{
-      padding: "16px 18px", minWidth: 0,
-      borderRight: last ? "none" : `1px solid ${T.border}`,
+    <h2 style={{
+      fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, margin: 0,
     }}>
-      <div style={{ fontSize: 11, color: T.textMut, fontWeight: 500, marginBottom: 6, display: "inline-flex", alignItems: "center", gap: 5 }}>
-        {Icon && <Icon size={11} strokeWidth={1.75} />}
-        {label}
+      {children}
+    </h2>
+  );
+}
+
+/* ─── Compression d'image côté client (canvas) ──────────────────────
+ * Redimensionne la photo (côté max ≈ 720px) et la ré-encode en JPEG pour
+ * garder un dataURL léger, stockable dans le state cloud / localStorage. */
+function compressImage(file, maxSize = 720, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode"));
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        try { resolve(canvas.toDataURL("image/jpeg", quality)); }
+        catch (e) { reject(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function photoInput() {
+  return {
+    width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 10,
+    padding: "9px 11px", fontSize: 13, color: T.text, fontFamily: "inherit", outline: "none", background: T.white,
+  };
+}
+
+function navArrow(side) {
+  return {
+    position: "absolute", [side]: 10, top: "50%", transform: "translateY(-50%)",
+    width: 38, height: 38, borderRadius: "50%", border: "none",
+    background: "rgba(255,255,255,0.92)", color: T.text, cursor: "pointer",
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 1px 5px rgba(0,0,0,0.18)", zIndex: 2,
+  };
+}
+
+/* ─── Onglet « Photos » — suivi de l'évolution physique ─────────── */
+function PhotosTab({ photos, setPhotos }) {
+  const inputRef = React.useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [viewerId, setViewerId] = useState(null);
+
+  const sorted = useMemo(
+    () => [...(photos || [])].sort((a, b) => (b.date || "").localeCompare(a.date || "")),
+    [photos]
+  );
+
+  const onPick = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    setBusy(true);
+    try {
+      const added = [];
+      for (const f of files) {
+        if (!f.type.startsWith("image/")) continue;
+        try {
+          const dataUrl = await compressImage(f);
+          added.push({ id: Date.now() + Math.floor(Math.random() * 1e6), date: todayISO(), dataUrl, weight: "", note: "" });
+        } catch { /* ignore l'image en échec */ }
+      }
+      if (added.length) setPhotos(prev => [...added, ...(prev || [])]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const update = (id, patch) => setPhotos(prev => (prev || []).map(p => p.id === id ? { ...p, ...patch } : p));
+  const del = (id) => { setPhotos(prev => (prev || []).filter(p => p.id !== id)); setViewerId(cur => cur === id ? null : cur); };
+
+  // Regroupement par mois (en conservant l'ordre récent → ancien de `sorted`).
+  const monthGroups = useMemo(() => {
+    const map = new Map();
+    for (const p of sorted) {
+      const key = (p.date || "").slice(0, 7) || "—";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    }
+    return Array.from(map.entries()).map(([key, items]) => ({
+      key,
+      label: key === "—" ? "Sans date" : new Date(key + "-01T00:00:00").toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+      items,
+    }));
+  }, [sorted]);
+
+  const viewerIndex = sorted.findIndex(p => p.id === viewerId);
+  const viewer = viewerIndex >= 0 ? sorted[viewerIndex] : null;
+  const go = (dir) => {
+    if (viewerIndex < 0) return;
+    const ni = viewerIndex + dir;
+    if (ni >= 0 && ni < sorted.length) setViewerId(sorted[ni].id);
+  };
+
+  // Navigation clavier dans la visionneuse (← / → / Échap).
+  useEffect(() => {
+    if (viewerIndex < 0) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+      else if (e.key === "Escape") setViewerId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerIndex, sorted]);
+
+  // Swipe tactile (gauche/droite).
+  const touchX = React.useRef(null);
+  const onTouchStart = (e) => { touchX.current = e.touches[0]?.clientX ?? null; };
+  const onTouchEnd = (e) => {
+    if (touchX.current == null) return;
+    const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
+    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+    touchX.current = null;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={onPick} style={{ display: "none" }} />
+
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <SectionTitle>Évolution physique</SectionTitle>
+          <p style={{ fontSize: 12, color: T.textMut, margin: "5px 0 0" }}>
+            Ajoute des photos régulières pour visualiser ta transformation.
+          </p>
+        </div>
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+          style={{ padding: "9px 16px", height: 38, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ImagePlus size={15} strokeWidth={2} /> {busy ? "Ajout…" : "Ajouter des photos"}
+        </button>
       </div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: valueColor || T.text, letterSpacing: -0.3, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: T.textMut, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}
+
+      {sorted.length === 0 ? (
+        <button type="button" onClick={() => inputRef.current?.click()}
+          style={{ border: `1px dashed ${T.border}`, borderRadius: 16, padding: 44, textAlign: "center", background: T.white, color: T.textMut, fontSize: 13, lineHeight: 1.6, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+          <Camera size={26} strokeWidth={1.5} />
+          Aucune photo pour l'instant. Clique pour ajouter ta première photo de progression.
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {monthGroups.map(group => (
+            <div key={group.key}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.text, textTransform: "capitalize" }}>{group.label}</span>
+                <span style={{ fontSize: 11, color: T.textMut }}>· {group.items.length} photo{group.items.length > 1 ? "s" : ""}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+                {group.items.map(p => (
+                  <button key={p.id} type="button" onClick={() => setViewerId(p.id)}
+                    style={{ position: "relative", padding: 0, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", background: T.bg, cursor: "pointer", fontFamily: "inherit", aspectRatio: "3 / 4" }}>
+                    <img src={p.dataUrl} alt={fmtDate(p.date)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "18px 10px 8px", background: "linear-gradient(to top, rgba(0,0,0,0.62), transparent)", textAlign: "left" }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", textTransform: "capitalize" }}>{fmtDate(p.date)}</div>
+                      {p.weight !== "" && p.weight != null && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.85)" }}>{p.weight} kg</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Visionneuse plein écran + détails éditables */}
+      {viewer && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div {...backdropDismiss(() => setViewerId(null))}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.62)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true"
+            style={{ width: "min(900px, 100%)", maxHeight: "92vh", display: "flex", flexWrap: "wrap", background: T.white, borderRadius: 18, overflow: "hidden", fontFamily: "var(--font-sans)" }}>
+            <div
+              onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+              style={{ position: "relative", flex: "1 1 320px", minWidth: 0, display: "flex", alignItems: "stretch", justifyContent: "center", background: "#000" }}>
+              <img src={viewer.dataUrl} alt={fmtDate(viewer.date)} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
+              {/* Compteur */}
+              {sorted.length > 1 && (
+                <div style={{ position: "absolute", top: 10, left: 12, padding: "3px 9px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  {viewerIndex + 1} / {sorted.length}
+                </div>
+              )}
+              {/* Flèches de navigation */}
+              {viewerIndex > 0 && (
+                <button type="button" onClick={() => go(-1)} aria-label="Photo précédente" style={navArrow("left")}>
+                  <ChevronLeft size={20} strokeWidth={2} />
+                </button>
+              )}
+              {viewerIndex < sorted.length - 1 && (
+                <button type="button" onClick={() => go(1)} aria-label="Photo suivante" style={navArrow("right")}>
+                  <ChevronRight size={20} strokeWidth={2} />
+                </button>
+              )}
+            </div>
+            <div style={{ flex: "0 0 280px", maxWidth: "100%", display: "flex", flexDirection: "column", overflowY: "auto", borderLeft: `1px solid ${T.border}`, background: T.bg }}>
+              {/* En-tête : date en titre + fermeture */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, padding: "18px 18px 14px", borderBottom: `1px solid ${T.border}`, background: T.white }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: T.textMut }}>Progression</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: T.text, textTransform: "capitalize", marginTop: 3, lineHeight: 1.2 }}>{fmtDate(viewer.date)}</div>
+                </div>
+                <button type="button" onClick={() => setViewerId(null)} aria-label="Fermer"
+                  style={{ flex: "0 0 auto", width: 30, height: 30, borderRadius: "50%", border: `1px solid ${T.border}`, background: T.white, color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <X size={16} strokeWidth={1.9} />
+                </button>
+              </div>
+
+              {/* Poids — métrique mise en avant */}
+              <div style={{ padding: "16px 18px 0" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "14px 16px", borderRadius: 14, background: T.white, border: `1px solid ${T.border}` }}>
+                  <input type="number" value={viewer.weight ?? ""} onChange={(e) => update(viewer.id, { weight: e.target.value })} placeholder="—"
+                    style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 28, fontWeight: 700, color: T.text, fontFamily: "inherit", padding: 0, fontVariantNumeric: "tabular-nums" }} />
+                  <span style={{ flex: "0 0 auto", fontSize: 14, fontWeight: 600, color: T.textMut }}>kg</span>
+                </div>
+              </div>
+
+              {/* Champs éditables */}
+              <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: T.textMut }}>Date</span>
+                  <input type="date" value={viewer.date || ""} onChange={(e) => update(viewer.id, { date: e.target.value })} style={photoInput()} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: T.textMut }}>Note</span>
+                  <textarea value={viewer.note ?? ""} onChange={(e) => update(viewer.id, { note: e.target.value })} rows={4} placeholder="Sensation, mensurations…" style={{ ...photoInput(), resize: "vertical", lineHeight: 1.5 }} />
+                </label>
+              </div>
+
+              {/* Suppression */}
+              <button type="button" onClick={() => del(viewer.id)}
+                style={{ margin: "auto 18px 18px", padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.white, color: T.red, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <Trash2 size={13} strokeWidth={1.9} /> Supprimer la photo
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
+
 
 /* ─── Filtres en pills ──────────────────────────────────────────── */
 function FilterPills({ value, onChange, options }) {

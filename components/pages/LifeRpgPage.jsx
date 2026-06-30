@@ -50,6 +50,7 @@ import {
   RPG_STORAGE_KEY as STORAGE_KEY, RPG_CLOUD_KEY as CLOUD_KEY,
   CATEGORY_ICON_KEYS as ICON_KEYS, CatIcon,
   CATEGORY_PALETTE as PALETTE, DEFAULT_CATEGORIES, habitCategoryIds,
+  TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, TASK_XP,
 } from "@/lib/lifeRpgCategories";
 
 const T = {
@@ -200,7 +201,7 @@ function computeXpSeries(habits, history, categories) {
 //  - les OBJECTIFS de la page « Objectifs » rattachés à une catégorie
 //    (`rpgCategory` + `rpgXp`) → XP AU PRORATA de leur avancement (50 % = 50 %).
 // Pure et déterministe.
-function computeProgress(habits, history, goals = [], trades = [], accounts = []) {
+function computeProgress(habits, history, goals = [], trades = [], accounts = [], taskRpg = {}) {
   const attributes = {};
   let totalXp = 0, coinsEarned = 0, totalCompletions = 0, bestStreak = 0;
   const perHabit = {};
@@ -254,6 +255,18 @@ function computeProgress(habits, history, goals = [], trades = [], accounts = []
     if (gained <= 0) continue;
     totalXp += gained;
     attributes[g.rpgCategory] = (attributes[g.rpgCategory] || 0) + gained;
+  }
+  // XP des tâches d'agenda terminées et liées à des cartes : `TASK_XP` fixe par
+  // tâche, crédité à chaque carte liée (comme une complétion d'habitude). Source
+  // indépendante des habitudes et objectifs → pas de double comptage.
+  for (const taskId in (taskRpg || {})) {
+    const entry = taskRpg[taskId];
+    if (!entry || !entry.completedAt) continue;
+    const cats = Array.isArray(entry.categories) ? entry.categories.filter(Boolean) : [];
+    if (!cats.length) continue;
+    totalXp += TASK_XP;
+    for (const cid of cats) attributes[cid] = (attributes[cid] || 0) + TASK_XP;
+    activityLog.push({ ts: entry.completedAt, label: entry.title || "Tâche", xp: TASK_XP, attribute: cats[0] || null });
   }
   // Les pénalités peuvent rendre une valeur négative : on borne à 0.
   for (const k in attributes) attributes[k] = Math.max(0, attributes[k]);
@@ -314,6 +327,9 @@ export default function LifeRpgPage() {
   // Objectifs partagés avec la page « Objectifs » : ceux rattachés à une
   // catégorie (rpgCategory) alimentent son XP au prorata de leur avancement.
   const [goals, setGoals] = useCloudState(GOALS_STORAGE_KEY, GOALS_CLOUD_KEY, []);
+  // Liaison « tâche d'agenda → cartes » écrite par la page Agenda : les tâches
+  // terminées et liées créditent de l'XP (lecture seule ici).
+  const [taskRpg] = useCloudState(TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, {});
   const tradesHook = useTrades();
   const trades = useMemo(() => tradesHook?.trades || [], [tradesHook?.trades]);
   const accountsHook = useTradingAccounts();
@@ -404,7 +420,7 @@ export default function LifeRpgPage() {
     apply();
     pushUndo({ label: "Habitude", undo: async () => apply(), redo: async () => apply() });
   };
-  const progress = useMemo(() => computeProgress(habitsList, habitHistory, goalsList, trades, accounts), [habitsList, habitHistory, goalsList, trades, accounts]);
+  const progress = useMemo(() => computeProgress(habitsList, habitHistory, goalsList, trades, accounts, taskRpg), [habitsList, habitHistory, goalsList, trades, accounts, taskRpg]);
   // Objectifs liés, regroupés par catégorie, avec leur avancement (pour les cartes).
   const goalsByCat = useMemo(() => {
     const map = {};
