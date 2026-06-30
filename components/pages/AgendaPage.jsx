@@ -221,25 +221,16 @@ function payloadFromForm(form) {
   return { summary: form.summary, location: form.location, description: form.description, allDay: false, start, end, timeZone: tz, ...extra };
 }
 
-/* ─────────────── Tâches Google : heure conservée côté tr4de ─────────────── */
+/* ─────────────── Tâches Google : heure conservée côté tr4de ───────────────
+   Persistées via useCloudState (table user_productivity, clé "task_times")
+   pour une synchro en ligne ; le storageKey localStorage sert de cache. */
 const TASK_TIMES_KEY = "tr4de_task_times";
-function readTaskTimes() {
-  try { return JSON.parse(localStorage.getItem(TASK_TIMES_KEY) || "{}"); } catch { return {}; }
-}
-function writeTaskTimes(map) {
-  try { localStorage.setItem(TASK_TIMES_KEY, JSON.stringify(map)); } catch {}
-}
 
 /* ─────────────── Tâches Google liées à un évènement ───────────────
    Les tâches sont de VRAIES Google Tasks. On mémorise seulement l'association
-   évènement → ids de tâches (localStorage), indexée par id d'évènement. */
+   évènement → ids de tâches, indexée par id d'évènement. Persistée en ligne
+   via useCloudState (clé "event_task_links"). */
 const EVENT_TASK_LINKS_KEY = "tr4de_event_task_links";
-function readEventTaskLinks() {
-  try { return JSON.parse(localStorage.getItem(EVENT_TASK_LINKS_KEY) || "{}"); } catch { return {}; }
-}
-function writeEventTaskLinks(map) {
-  try { localStorage.setItem(EVENT_TASK_LINKS_KEY, JSON.stringify(map)); } catch {}
-}
 
 /** Convertit une Google Task (+ heure locale) en item affiché comme un évènement. */
 function taskToItem(tk, times) {
@@ -541,14 +532,14 @@ export default function AgendaPage() {
   }, []);
   const [events, setEvents] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
-  const [taskTimes, setTaskTimes] = React.useState({});
+  const [taskTimes, setTaskTimes] = useCloudState(TASK_TIMES_KEY, "task_times", {});
   // Cartes Vie RPG (lecture seule ici — éditées sur la page « Vie RPG ») et
   // liaison « tâche → cartes » (+ complétion) que cette page écrit et que la
   // page Vie RPG lit pour créditer l'XP.
   const [rpgState] = useCloudState(RPG_STORAGE_KEY, RPG_CLOUD_KEY, { categories: DEFAULT_CATEGORIES });
   const rpgCategories = Array.isArray(rpgState.categories) ? rpgState.categories : DEFAULT_CATEGORIES;
   const [taskRpg, setTaskRpg] = useCloudState(TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, {});
-  const [eventTaskLinks, setEventTaskLinks] = React.useState({}); // évènement → ids de tâches Google
+  const [eventTaskLinks, setEventTaskLinks] = useCloudState(EVENT_TASK_LINKS_KEY, "event_task_links", {}); // évènement → ids de tâches Google
   const [modalTab, setModalTab] = React.useState("event"); // vue interne du modal évènement : "event" | "tasks"
   const [taskDraft, setTaskDraft] = React.useState(""); // saisie d'ajout de tâche
   const [loading, setLoading] = React.useState(false);
@@ -641,11 +632,8 @@ export default function AgendaPage() {
 
   React.useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  // Heures locales des tâches (localStorage).
-  React.useEffect(() => { setTaskTimes(readTaskTimes()); }, []);
-
-  // Liens évènement → tâches Google (localStorage).
-  React.useEffect(() => { setEventTaskLinks(readEventTaskLinks()); }, []);
+  // taskTimes et eventTaskLinks sont gérés par useCloudState (synchro en ligne) :
+  // pas de chargement manuel nécessaire ici.
 
   // Vraies tâches Google (échec silencieux si scope/API pas encore prêts).
   const loadTasks = React.useCallback(async () => {
@@ -779,19 +767,21 @@ export default function AgendaPage() {
   );
 
   const linkTaskToEvent = (eventId, taskId) => {
-    const map = readEventTaskLinks();
-    const ids = new Set(map[eventId] || []);
-    ids.add(taskId);
-    map[eventId] = [...ids];
-    writeEventTaskLinks(map);
-    setEventTaskLinks(map);
+    setEventTaskLinks((prev) => {
+      const map = { ...prev };
+      const ids = new Set(map[eventId] || []);
+      ids.add(taskId);
+      map[eventId] = [...ids];
+      return map;
+    });
   };
   const unlinkTaskFromEvent = (eventId, taskId) => {
-    const map = readEventTaskLinks();
-    map[eventId] = (map[eventId] || []).filter((id) => id !== taskId);
-    if (map[eventId].length === 0) delete map[eventId];
-    writeEventTaskLinks(map);
-    setEventTaskLinks(map);
+    setEventTaskLinks((prev) => {
+      const map = { ...prev };
+      map[eventId] = (map[eventId] || []).filter((id) => id !== taskId);
+      if (map[eventId].length === 0) delete map[eventId];
+      return map;
+    });
   };
 
   // Ajoute une tâche depuis le panneau « Tâche » d'un évènement.
@@ -1015,11 +1005,12 @@ export default function AgendaPage() {
     if (ev.isTask) {
       // Tâche : le jour de planification et l'heure sont conservés côté tr4de
       // (la date limite Google `due` n'est pas affectée par un déplacement).
-      const times = readTaskTimes();
-      const prev = times[ev.id] || {};
-      times[ev.id] = { ...prev, day: targetDayKey, startTime: toTime(startMin), endTime: toTime(endM) };
-      writeTaskTimes(times);
-      setTaskTimes(times);
+      setTaskTimes((prevTimes) => {
+        const times = { ...prevTimes };
+        const prev = times[ev.id] || {};
+        times[ev.id] = { ...prev, day: targetDayKey, startTime: toTime(startMin), endTime: toTime(endM) };
+        return times;
+      });
       return;
     }
     const form = {
@@ -1053,13 +1044,14 @@ export default function AgendaPage() {
         else { const r = await createTask(payload); taskId = r?.task?.id; }
         // Jour de planification + heure conservés côté tr4de : Google Tasks ne
         // stocke que la date limite (`due`), pas le jour où l'on pose la tâche.
-        const times = readTaskTimes();
         if (taskId) {
-          times[taskId] = modal.allDay
-            ? { day: modal.date, colorId: modal.colorId || null }
-            : { day: modal.date, startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null };
-          writeTaskTimes(times);
-          setTaskTimes(times);
+          const finalTimeId = taskId;
+          setTaskTimes((prevTimes) => ({
+            ...prevTimes,
+            [finalTimeId]: modal.allDay
+              ? { day: modal.date, colorId: modal.colorId || null }
+              : { day: modal.date, startTime: modal.startTime, endTime: modal.endTime, colorId: modal.colorId || null },
+          }));
           // Liaison aux cartes Vie RPG : on (dé)pose le lien et on préserve un
           // éventuel horodatage de complétion déjà connu (sinon on l'amorce
           // selon l'état « terminé » courant de la tâche).
@@ -1102,17 +1094,22 @@ export default function AgendaPage() {
         const savedId = modal.id || res?.event?.id;
         const pending = (modal.pendingTasks || []).map((s) => String(s).trim()).filter(Boolean);
         if (savedId && pending.length) {
-          const map = readEventTaskLinks();
-          const ids = new Set(map[savedId] || []);
+          const newIds = [];
           for (const title of pending) {
             try {
               const r = await createTask({ title, due: eventDueISO(modal) });
-              if (r?.task?.id) ids.add(r.task.id);
+              if (r?.task?.id) newIds.push(r.task.id);
             } catch (e) { /* tâche échouée : on continue les autres */ }
           }
-          map[savedId] = [...ids];
-          writeEventTaskLinks(map);
-          setEventTaskLinks(map);
+          if (newIds.length) {
+            setEventTaskLinks((prev) => {
+              const map = { ...prev };
+              const ids = new Set(map[savedId] || []);
+              newIds.forEach((id) => ids.add(id));
+              map[savedId] = [...ids];
+              return map;
+            });
+          }
           await loadTasks();
         }
         setModal(null);
@@ -1133,18 +1130,14 @@ export default function AgendaPage() {
     try {
       if (modal.kind === "task") {
         await deleteTask(modal.id);
-        const times = readTaskTimes();
-        delete times[modal.id];
-        writeTaskTimes(times);
-        setTaskTimes(times);
+        setTaskTimes((prev) => { if (!prev[modal.id]) return prev; const n = { ...prev }; delete n[modal.id]; return n; });
         setTaskRpg((prev) => { if (!prev[modal.id]) return prev; const n = { ...prev }; delete n[modal.id]; return n; });
         setModal(null);
         await loadTasks();
       } else {
         await deleteEvent(modal.id);
         // Retire l'association évènement → tâches (les tâches Google restent).
-        const map = readEventTaskLinks();
-        if (map[modal.id]) { delete map[modal.id]; writeEventTaskLinks(map); setEventTaskLinks(map); }
+        setEventTaskLinks((prev) => { if (!prev[modal.id]) return prev; const map = { ...prev }; delete map[modal.id]; return map; });
         setModal(null);
         await loadEvents();
       }

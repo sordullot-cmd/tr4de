@@ -698,6 +698,7 @@ export default function App() {
         { id: "add-trade",  icon: LucideUpload,       label: t("nav.addTrade") },
         { id: "dashboard",  icon: LayoutDashboard,    label: t("nav.dashboard") },
         { id: "calendar",   icon: LucideCalendar,     label: t("nav.calendar") },
+        { id: "life-rpg",   icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "trades",     icon: ListChecks,         label: t("nav.trades"), badge: filteredTrades.length > 0 ? filteredTrades.length : 0 },
         { id: "accounts",   icon: LucideWallet,       label: t("nav.accounts") },
         { id: "strategies", icon: LucideTarget,       label: t("nav.strategies") },
@@ -715,7 +716,6 @@ export default function App() {
       label: t("nav.productivity"),
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
-        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "eloquence",     icon: LucideMic,          label: t("nav.eloquence") },

@@ -13,6 +13,7 @@ const Schema = z.object({
     clarity: z.number().min(0).max(100),
     confidence: z.number().min(0).max(100),
     diction: z.number().min(0).max(100),
+    rhythm: z.number().min(0).max(100),
     fidelity: z.number().min(0).max(100).nullable(), // null si non applicable
   }),
   // Retour critique et technique, justifiant la note de CHAQUE axe :
@@ -23,6 +24,7 @@ const Schema = z.object({
     clarity: z.string(),
     confidence: z.string(),
     diction: z.string(),
+    rhythm: z.string(),
     fidelity: z.string().nullable(), // null si non applicable
   }),
   strengths: z.array(z.string()).max(4),
@@ -94,14 +96,14 @@ export async function POST(request: NextRequest) {
       case "diction":
         modeInstructions =
           "MODE DICTION : il s'agit d'un virelangue / exercice d'articulation. " +
-          "`fidelity` (0-100) = exactitude par rapport au texte de référence, `diction` = qualité de l'articulation. " +
-          "Les autres axes (structure, vocabulary, clarity, confidence) sont secondaires : donne-leur des valeurs cohérentes alignées sur le niveau de diction (le schéma exige des nombres pour ces 5 axes). " +
+          "`fidelity` (0-100) = exactitude par rapport au texte de référence, `diction` = qualité de l'articulation, `rhythm` = maîtrise de la cadence et des pauses. " +
+          "Les autres axes (structure, vocabulary, clarity, confidence) sont secondaires : donne-leur des valeurs cohérentes alignées sur le niveau de diction (le schéma exige des nombres pour tous les axes). " +
           "Concentre tout le feedback sur l'articulation, la netteté des consonnes et la maîtrise du rythme.";
         break;
       case "freeSpeech":
         modeInstructions =
           "MODE PRISE DE PAROLE LIBRE : pas de fidélité applicable, mets `fidelity` à null. " +
-          "Évalue les 5 axes (structure, vocabulary, clarity, confidence, diction) sur le fond ET la forme, en lien avec le sujet imposé.";
+          "Évalue les 6 axes (structure, vocabulary, clarity, confidence, diction, rhythm) sur le fond ET la forme, en lien avec le sujet imposé.";
         break;
       case "structure":
         modeInstructions =
@@ -156,11 +158,11 @@ export async function POST(request: NextRequest) {
       promptParts.push(
         "Métriques mesurées (à prendre en compte) :\n" +
           metricsLines.join("\n") +
-          "\nUn débit hors de la fourchette 110-160 mots/minute, ou de nombreux tics de langage, doivent faire baisser les scores de confiance (confidence) et de diction."
+          "\nUn débit hors de la fourchette 110-160 mots/minute doit faire baisser le score de rythme (rhythm) ; de nombreux tics de langage doivent faire baisser la confiance (confidence) et le rythme. Le score `rhythm` reflète la cadence, la régularité du débit et la gestion des pauses."
       );
     }
     promptParts.push(
-      "Pour CHAQUE axe noté (structure, vocabulary, clarity, confidence, diction" +
+      "Pour CHAQUE axe noté (structure, vocabulary, clarity, confidence, diction, rhythm" +
         (mode === "reading" || mode === "diction" ? ", fidelity" : "") +
         "), rédige dans `axisFeedback` une analyse critique et technique de 1 à 3 phrases qui JUSTIFIE la note : " +
         "explique précisément ce qui fonctionne et surtout ce qui ne va pas, en citant des éléments concrets de la transcription, et indique le point exact à corriger. " +
