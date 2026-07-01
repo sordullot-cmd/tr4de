@@ -31,8 +31,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import {
   Plus, X, Trash2, Pencil, Sparkles, Target, UserRound, ListChecks, TrendingUp, Check, Flame,
+  CalendarPlus, CalendarClock,
 } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
 import { useApp } from "@/lib/contexts/AppContext";
 import { useUndo } from "@/lib/contexts/UndoContext";
@@ -51,6 +53,7 @@ import {
   CATEGORY_ICON_KEYS as ICON_KEYS, CatIcon,
   CATEGORY_PALETTE as PALETTE, DEFAULT_CATEGORIES, habitCategoryIds,
   TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, TASK_XP,
+  TASK_TIMES_STORAGE_KEY, TASK_TIMES_CLOUD_KEY,
 } from "@/lib/lifeRpgCategories";
 
 const T = {
@@ -327,9 +330,17 @@ export default function LifeRpgPage() {
   // Objectifs partagés avec la page « Objectifs » : ceux rattachés à une
   // catégorie (rpgCategory) alimentent son XP au prorata de leur avancement.
   const [goals, setGoals] = useCloudState(GOALS_STORAGE_KEY, GOALS_CLOUD_KEY, []);
-  // Liaison « tâche d'agenda → cartes » écrite par la page Agenda : les tâches
-  // terminées et liées créditent de l'XP (lecture seule ici).
-  const [taskRpg] = useCloudState(TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, {});
+  // Liaison « tâche d'agenda → cartes » partagée avec la page Agenda : les tâches
+  // terminées et liées créditent de l'XP. On peut désormais en créer ici (une
+  // tâche rattachée à une carte), d'où l'accès en écriture.
+  const [taskRpg, setTaskRpg] = useCloudState(TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, {});
+  // Jour de planification des tâches (écrit aussi par l'Agenda) : une tâche créée
+  // ici avec une date y est posée pour apparaître dans le calendrier ; on le lit
+  // aussi pour afficher la date des tâches sur les cartes.
+  const [taskTimes, setTaskTimes] = useCloudState(TASK_TIMES_STORAGE_KEY, TASK_TIMES_CLOUD_KEY, {});
+  // Accès à Google Tasks : une tâche de carte est une VRAIE Google Task, visible
+  // et cochable depuis l'Agenda (où sa complétion créditera l'XP de la carte).
+  const gcal = useGoogleCalendar();
   const tradesHook = useTrades();
   const trades = useMemo(() => tradesHook?.trades || [], [tradesHook?.trades]);
   const accountsHook = useTradingAccounts();
@@ -435,7 +446,58 @@ export default function LifeRpgPage() {
     }
     return map;
   }, [goalsList, trades, accounts]);
+  // Tâches liées, regroupées par catégorie (pour les afficher sur les cartes).
+  // Dérivées de `taskRpg` (titre + état terminé) + `taskTimes` (jour planifié).
+  const tasksByCat = useMemo(() => {
+    const map = {};
+    for (const taskId in (taskRpg || {})) {
+      const e = taskRpg[taskId];
+      const cats = Array.isArray(e?.categories) ? e.categories.filter(Boolean) : [];
+      if (!cats.length) continue;
+      const item = { id: taskId, title: e.title || "Tâche", done: !!e.completedAt, day: taskTimes?.[taskId]?.day || null };
+      for (const cid of cats) (map[cid] = map[cid] || []).push(item);
+    }
+    // Non terminées d'abord, puis par date croissante.
+    for (const cid in map) map[cid].sort((a, b) => (Number(a.done) - Number(b.done)) || String(a.day || "").localeCompare(String(b.day || "")));
+    return map;
+  }, [taskRpg, taskTimes]);
   const lvl = useMemo(() => levelInfo(progress.totalXp), [progress.totalXp]);
+
+  // Coche / décoche une tâche de carte : bascule la vraie Google Task et met à
+  // jour l'horodatage de complétion (qui pilote l'XP). MAJ optimiste, annulée en
+  // cas d'échec réseau. Même contrat que la bascule côté Agenda.
+  const toggleTaskDone = async (taskId) => {
+    const entry = taskRpg[taskId];
+    if (!entry) return;
+    const prevCompletedAt = entry.completedAt || null;
+    const nowDone = !prevCompletedAt;
+    const setCompleted = (val) => setTaskRpg(prev => {
+      const e = prev[taskId];
+      if (!e) return prev;
+      return { ...prev, [taskId]: { ...e, completedAt: val } };
+    });
+    setCompleted(nowDone ? new Date().toISOString() : null);
+    try {
+      await gcal.toggleTask(taskId, nowDone);
+    } catch {
+      setCompleted(prevCompletedAt); // rollback
+    }
+  };
+
+  // Supprime une tâche de carte : efface la vraie Google Task et ses liens
+  // locaux (MAJ optimiste, restaurés en cas d'échec réseau).
+  const deleteTaskFromCard = async (taskId) => {
+    const prevRpg = taskRpg[taskId];
+    const prevTime = taskTimes[taskId];
+    setTaskRpg(prev => { if (!prev[taskId]) return prev; const n = { ...prev }; delete n[taskId]; return n; });
+    setTaskTimes(prev => { if (!prev[taskId]) return prev; const n = { ...prev }; delete n[taskId]; return n; });
+    try {
+      await gcal.deleteTask(taskId);
+    } catch {
+      if (prevRpg) setTaskRpg(prev => ({ ...prev, [taskId]: prevRpg }));
+      if (prevTime) setTaskTimes(prev => ({ ...prev, [taskId]: prevTime }));
+    }
+  };
 
   // Journal d'activité = complétions dérivées + échanges de récompenses.
   const log = useMemo(() => {
@@ -489,6 +551,9 @@ export default function LifeRpgPage() {
 
   /* --- Modales & vue --- */
   const [categoryModal, setCategoryModal] = useState(null);
+  // Modale « + Tâche » d'une carte : porte la catégorie ciblée (la tâche créée
+  // lui sera rattachée). null = fermée.
+  const [taskModal, setTaskModal] = useState(null);
 
   const openNewCategory = () => setCategoryModal({ id: `cat_${Date.now()}`, isNew: true, label: "", color: PALETTE[0], icon: "star", identity: "", roleModel: "", roleModelWhy: "" });
   const editCategory = (c) => setCategoryModal({ id: c.id, isNew: false, label: c.label, color: c.color, icon: c.icon, identity: c.identity || "", roleModel: c.roleModel || "", roleModelWhy: c.roleModelWhy || "" });
@@ -556,6 +621,11 @@ export default function LifeRpgPage() {
                 onToggleObjective={(goalId) => toggleObjectiveLink(cat.id, goalId)}
                 onCreateObjective={() => setPage("goals")}
                 onDetachObjective={detachObjective}
+                tasks={tasksByCat[cat.id] || []}
+                onCreateTask={() => setTaskModal({ cat })}
+                onToggleTask={toggleTaskDone}
+                onEditTask={(tk) => setTaskModal({ cat, task: tk })}
+                onDeleteTask={deleteTaskFromCard}
                 onEdit={() => editCategory(cat)}
                 onDelete={categories.length > 1 ? () => removeCategory(cat.id) : null} />
             ))}
@@ -608,14 +678,22 @@ export default function LifeRpgPage() {
 
       {categoryModal && <CategoryModal initial={categoryModal} onSave={upsertCategory} onClose={closeCategory} onGoToObjectives={() => { closeCategory(); setPage("goals"); }} />}
 
+      {taskModal && (
+        <CreateTaskModal cat={taskModal.cat} task={taskModal.task} gcal={gcal}
+          setTaskRpg={setTaskRpg} setTaskTimes={setTaskTimes}
+          onClose={() => setTaskModal(null)}
+          onGoToAgenda={() => { setTaskModal(null); setPage("agenda"); }} />
+      )}
+
       <style>{`@media (max-width: 760px) { .tr4de-rpg-grid { grid-template-columns: 1fr !important; } } .tr4de-portrait > * + * { margin-top: 18px; padding-top: 18px; border-top: 1px solid #F0F0F0; } .tr4de-portrait > *:nth-child(3) { margin-top: 20px; padding-top: 0; border-top: none; }`}</style>
     </div>
   );
 }
 
-function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], onToggleObjective, onCreateObjective, onDetachObjective, onEdit, onDelete }) {
+function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], tasks = [], onToggleObjective, onCreateObjective, onDetachObjective, onCreateTask, onToggleTask, onEditTask, onDeleteTask, onEdit, onDelete }) {
   const cl = categoryLevel(xp);
   const [hover, setHover] = useState(false);
+  const [taskAddHov, setTaskAddHov] = useState(false);
   return (
     <div className="tr4de-portrait" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, background: T.white, display: "flex", flexDirection: "column", gap: 0 }}>
@@ -659,7 +737,7 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], o
             <UserRound size={15} strokeWidth={1.75} color={cat.color} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: cat.color, marginBottom: 3, opacity: 0.85 }}>Mon modèle</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: cat.color, marginBottom: 3, opacity: 0.85 }}>Mon modèle</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{cat.roleModel}</div>
             {cat.roleModelWhy && <div style={{ fontSize: 11.5, color: T.textSub, marginTop: 3, lineHeight: 1.45 }}>{cat.roleModelWhy}</div>}
           </div>
@@ -670,7 +748,7 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], o
           se gère sur la page Objectifs ; ici elle donne l'XP au prorata. On peut
           créer un objectif directement (il devient un vrai objectif rattaché). */}
       <div>
-        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: T.textMut, marginBottom: 8 }}>Objectifs</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.textMut, marginBottom: 8 }}>Objectifs</div>
         {linkedGoals.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {linkedGoals.map(g => {
@@ -707,6 +785,45 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], o
       </div>
 
 
+      {/* Tâches liées au calendrier : créées ici, ce sont de vraies tâches de
+          l'Agenda dont la complétion crédite l'XP de la carte. Cochables ici.
+          La liste s'affiche dès qu'il y a des tâches ; le bouton d'ajout pleine
+          largeur reste toujours présent en dessous. */}
+      {onCreateTask && (
+        <div>
+          {tasks.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textMut, marginBottom: 8 }}>Tâches</div>
+              <div style={{ display: "flex", flexDirection: "column", marginBottom: 10 }}>
+                {tasks.map((tk, i) => (
+                  <TaskRow key={tk.id} tk={tk} cat={cat} isLast={i === tasks.length - 1}
+                    onToggle={() => onToggleTask && onToggleTask(tk.id)}
+                    onEdit={onEditTask ? () => onEditTask(tk) : null}
+                    onDelete={onDeleteTask ? () => onDeleteTask(tk.id) : null} />
+                ))}
+              </div>
+            </>
+          )}
+          {/* Dès qu'une tâche existe, l'ajout devient un lien discret « + Ajouter »
+              (même style que celui des objectifs) ; sinon un bouton pleine largeur. */}
+          {tasks.length > 0 ? (
+            <button type="button" onClick={onCreateTask}
+              onMouseEnter={() => setTaskAddHov(true)} onMouseLeave={() => setTaskAddHov(false)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 4px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: taskAddHov ? T.textSub : T.textMut, opacity: taskAddHov ? 1 : 0.65, transition: "color .15s ease, opacity .15s ease" }}>
+              <Plus size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+              Ajouter
+            </button>
+          ) : (
+            <button onClick={onCreateTask}
+              style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "9px 14px", borderRadius: 999, border: `1px dashed ${cat.color}66`, background: `${cat.color}0D`, color: cat.color, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${cat.color}1A`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = `${cat.color}0D`; }}>
+              <CalendarPlus size={14} strokeWidth={2} /> Ajouter une tâche
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Habitudes rattachées */}
       <div>
         <div style={{ fontSize: 11, color: T.textMut, marginBottom: 6 }}>{habits.length} habitude{habits.length > 1 ? "s" : ""} rattachée{habits.length > 1 ? "s" : ""}</div>
@@ -719,6 +836,36 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], o
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Formate un jour "YYYY-MM-DD" en libellé court « 5 juil. » (fuseau local).
+function fmtDayShort(day) {
+  const [y, m, d] = String(day).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+// Ligne d'une tâche de carte : case à cocher (complétion → XP), titre, date, et
+// actions modifier / supprimer révélées au survol de la ligne.
+function TaskRow({ tk, cat, isLast, onToggle, onEdit, onDelete }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: isLast ? "none" : `1px solid ${T.border}` }}>
+      <button onClick={onToggle} title={tk.done ? "Marquer à faire" : "Marquer terminée"}
+        style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${tk.done ? cat.color : T.border}`, background: tk.done ? cat.color : T.white, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+        {tk.done && <Check size={10} strokeWidth={3} />}
+      </button>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: tk.done ? T.textMut : T.text, textDecoration: tk.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.title}</span>
+      {tk.day && <span style={{ fontSize: 10.5, color: T.textMut, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{fmtDayShort(tk.day)}</span>}
+      {(onEdit || onDelete) && (
+        <div style={{ display: "flex", gap: 2, flexShrink: 0, opacity: hov ? 1 : 0, pointerEvents: hov ? "auto" : "none", transition: "opacity .15s ease" }}>
+          {onEdit && <button onClick={onEdit} title="Modifier" style={iconBtnSm()}><Pencil size={12} strokeWidth={1.75} /></button>}
+          {onDelete && <button onClick={onDelete} title="Supprimer" style={iconBtnSm()}><Trash2 size={12} strokeWidth={1.75} /></button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -995,6 +1142,109 @@ function CategoryModal({ initial, onSave, onClose, onGoToObjectives }) {
   );
 }
 
+// Modale de tâche d'une carte. En création : crée une VRAIE Google Task (visible
+// et cochable depuis l'Agenda), la rattache à la carte via `taskRpg` (XP à la
+// complétion) et, si une date est fournie, la pose ce jour-là via `taskTimes`.
+// En édition (prop `task`) : met à jour le titre et la date de la tâche existante.
+function CreateTaskModal({ cat, task, gcal, setTaskRpg, setTaskTimes, onClose, onGoToAgenda }) {
+  const isEdit = !!task;
+  const [title, setTitle] = useState(task?.title || "");
+  const [date, setDate] = useState(isEdit ? (task.day || "") : getLocalDateString());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  // On n'affiche le pont « connexion » qu'une fois l'état des tokens chargé.
+  const needsConnect = gcal.ready && !gcal.connected;
+
+  const save = async () => {
+    const name = title.trim();
+    if (!name) { setError("Donne un titre à la tâche."); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const due = date ? `${date}T00:00:00.000Z` : null;
+      if (isEdit) {
+        await gcal.updateTask(task.id, { title: name, notes: "", due });
+        // Met à jour le titre du lien (catégories et complétion inchangés).
+        setTaskRpg(prev => { const e = prev[task.id]; if (!e) return prev; return { ...prev, [task.id]: { ...e, title: name } }; });
+        // Recale le jour planifié en préservant une éventuelle heure/couleur
+        // posée depuis l'Agenda ; sans date, la tâche redevient à planifier.
+        setTaskTimes(prev => ({ ...prev, [task.id]: { ...(prev[task.id] || {}), day: date || null } }));
+      } else {
+        const r = await gcal.createTask({ title: name, notes: "", due });
+        const taskId = r?.task?.id;
+        if (!taskId) throw new Error("La tâche n'a pas pu être créée.");
+        // Lien carte → XP (même format que celui écrit par la page Agenda).
+        setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null } }));
+        // Jour de planification (tâche « toute la journée ») pour l'afficher dans
+        // l'Agenda ; sans date, la tâche reste non posée jusqu'à sa planification.
+        if (date) setTaskTimes(prev => ({ ...prev, [taskId]: { day: date, colorId: null } }));
+      }
+      onClose();
+    } catch (e) {
+      const msg = e?.message;
+      if (msg === "insufficient_scope") setError("Autorisation Google Tasks manquante. Reconnecte Google depuis l'Agenda.");
+      else if (msg === "not_connected") setError("Connecte d'abord Google Agenda depuis la page Agenda.");
+      else if (msg === "refresh_unavailable") setError("Connexion à Google indisponible, réessaie dans un instant.");
+      else setError(msg || "Erreur d'enregistrement.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Overlay onClose={onClose} title={isEdit ? "Modifier la tâche" : "Nouvelle tâche"}>
+      {/* Rappel de la carte à laquelle la tâche est rattachée */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontSize: 12.5, color: T.textSub }}>
+        <span style={{ width: 24, height: 24, borderRadius: 7, background: `${cat.color}1A`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <CatIcon name={cat.icon} size={14} strokeWidth={1.9} color={cat.color} />
+        </span>
+        <span>Rattachée à <strong style={{ color: cat.color }}>{cat.label}</strong></span>
+      </div>
+
+      {needsConnect ? (
+        <div>
+          <div style={{ fontSize: 13, color: T.textSub, lineHeight: 1.55, marginBottom: 14 }}>
+            Les tâches sont synchronisées avec Google Agenda. Connecte ton compte Google (depuis la page Agenda) pour créer une tâche liée au calendrier.
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={onClose} style={btnGhost()}>Annuler</button>
+            <button onClick={onGoToAgenda} style={btnDark()}>
+              <CalendarClock size={14} strokeWidth={2} /> {"Aller à l'Agenda"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <Field label="Titre de la tâche">
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !saving && title.trim()) save(); }}
+              placeholder="ex : Séance de sport 1h" style={input()} />
+          </Field>
+
+          <Field label="Date (optionnelle)">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={input()} />
+          </Field>
+
+          <div style={{ fontSize: 11, color: T.textMut, marginTop: -6, marginBottom: 14, lineHeight: 1.5 }}>
+            {date
+              ? `Elle apparaîtra dans l'Agenda. En la cochant terminée, tu gagneras ${TASK_XP} XP en ${cat.label}.`
+              : `Sans date, elle restera à planifier. Une fois cochée terminée, tu gagneras ${TASK_XP} XP en ${cat.label}.`}
+          </div>
+
+          {error && <div style={{ fontSize: 12, color: T.red, marginBottom: 12 }}>{error}</div>}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={onClose} disabled={saving} style={btnGhost()}>Annuler</button>
+            <button onClick={save} disabled={saving || !title.trim()}
+              style={{ ...btnDark(), opacity: (saving || !title.trim()) ? 0.55 : 1, cursor: (saving || !title.trim()) ? "default" : "pointer" }}>
+              {saving ? "Enregistrement…" : (isEdit ? "Enregistrer" : "Créer la tâche")}
+            </button>
+          </div>
+        </>
+      )}
+    </Overlay>
+  );
+}
+
 /* ---------- Primitifs UI ---------- */
 function Section({ title, icon: Icon, action, children, bare, fill }) {
   const wrap = bare
@@ -1109,6 +1359,14 @@ function AutoTextarea({ value, onChange, placeholder, minRows = 3, style }) {
 /* ---------- Styles partagés ---------- */
 function btnPrimary() {
   return { marginLeft: "auto", padding: "7px 16px", height: 34, borderRadius: 999, background: T.text, border: `1px solid ${T.text}`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 };
+}
+// Bouton d'action principal d'une modale (fond sombre).
+function btnDark() {
+  return { padding: "9px 18px", borderRadius: 999, border: `1px solid ${T.text}`, background: T.text, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 };
+}
+// Bouton secondaire d'une modale (contour discret).
+function btnGhost() {
+  return { padding: "9px 18px", borderRadius: 999, border: `1px solid ${T.border}`, background: T.white, color: T.textSub, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
 }
 function iconBtn() {
   return { width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent", color: T.textMut, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };

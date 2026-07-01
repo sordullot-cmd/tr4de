@@ -30,6 +30,14 @@ export const TASK_RPG_CLOUD_KEY = "agenda_task_rpg";
 // XP gagnée pour une tâche terminée, par catégorie liée (≈ une habitude « normale »).
 export const TASK_XP = 25;
 
+// Horaires locaux d'une tâche d'agenda (jour planifié + heure éventuelle),
+// indexés par id de Google Task : { [taskId]: { day, startTime?, endTime?, colorId } }.
+// Partagé entre la page Agenda et la page Vie RPG (qui peut créer une tâche datée
+// rattachée à une carte). Google Tasks ne stocke que la date limite (`due`), pas
+// le jour où l'on pose la tâche → on le conserve côté tr4de.
+export const TASK_TIMES_STORAGE_KEY = "tr4de_task_times";
+export const TASK_TIMES_CLOUD_KEY = "task_times";
+
 // Catégories (« cartes ») rattachées à une habitude. Une habitude peut être
 // liée à PLUSIEURS cartes. Rétrocompatible avec l'ancien champ `attribute`
 // (id unique) : on le convertit en tableau à un élément.

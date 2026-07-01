@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Check as LucideCheck,
   Upload as LucideUpload,
+  X as LucideX,
   Star,
 } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
@@ -69,8 +70,8 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       return next;
     });
   };
-  const [fileName, setFileName] = useState("");
-  const [fileContent, setFileContent] = useState("");
+  // Fichiers de trades sélectionnés : [{ name, content }] — supporte l'import multi-fichiers
+  const [files, setFiles] = useState([]);
   const [preview, setPreview] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -611,22 +612,28 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
   };
 
   const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
+    const selected = Array.from(e.target.files || []);
+    if (selected.length === 0) return;
     setError("");
     setLoading(true);
     try {
-      const content = await file.text();
-      setFileContent(content);
-      const trades = parseCSV(content, selectedBroker);
-      if (trades.length === 0) {
+      const read = await Promise.all(
+        selected.map(async (file) => ({ name: file.name, content: await file.text() }))
+      );
+      // Accumule avec les fichiers déjà choisis, en évitant les doublons par nom
+      const existingNames = new Set(files.map((f) => f.name));
+      const merged = [...files, ...read.filter((f) => !existingNames.has(f.name))];
+      setFiles(merged);
+
+      // Aperçu : trades concaténés de tous les fichiers
+      const allTrades = merged.flatMap((f) => parseCSV(f.content, selectedBroker));
+      if (allTrades.length === 0) {
         setError(t("addTrade.err.noTradesFound"));
         setPreview([]);
         setLoading(false);
         return;
       }
-      setPreview(trades.slice(0, 3));
+      setPreview(allTrades.slice(0, 3));
       setError("");
     } catch (err) {
       setError(t("addTrade.err.generic").replace("{msg}", err.message));
@@ -635,12 +642,23 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     setLoading(false);
   };
 
+  const removeFile = (name) => {
+    const merged = files.filter((f) => f.name !== name);
+    setFiles(merged);
+    if (merged.length === 0) {
+      setPreview([]);
+      return;
+    }
+    const allTrades = merged.flatMap((f) => parseCSV(f.content, selectedBroker));
+    setPreview(allTrades.slice(0, 3));
+  };
+
   const handleImport = async () => {
     if (accountNames.length === 0) {
       setError(t("addTrade.err.noAccountName"));
       return;
     }
-    if (!fileContent) {
+    if (files.length === 0) {
       setError(t("addTrade.err.noFile"));
       return;
     }
@@ -650,7 +668,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     try {
       const supabase = createClient();
       const userId = user?.id;
-      const importedTrades = parseCSV(fileContent, selectedBroker);
+      const importedTrades = files.flatMap((f) => parseCSV(f.content, selectedBroker));
       if (importedTrades.length === 0) {
         setError(t("addTrade.err.noTrades"));
         setLoading(false);
@@ -888,8 +906,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
       }
 
       setAccountNames([]);
-      setFileName("");
-      setFileContent("");
+      setFiles([]);
       setPreview([]);
       setSelectedBroker("tradovate");
       setSelectedImportStrategy("");
@@ -1113,29 +1130,26 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
             <div
               style={{
                 padding: "36px 20px",
-                border: `1px dashed ${fileName ? "#16A34A" : T.border}`,
+                border: `1px dashed ${files.length > 0 ? "#16A34A" : T.border}`,
                 borderRadius: 12,
                 textAlign: "center",
                 cursor: "pointer",
-                background: fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA",
+                background: files.length > 0 ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA",
                 transition: "border-color 160ms ease, background 160ms ease",
               }}
               onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#0D0D0D"; e.currentTarget.style.background = "#F5F5F5"; }}
-              onDragLeave={(e) => { e.currentTarget.style.borderColor = fileName ? "#16A34A" : T.border; e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA"; }}
+              onDragLeave={(e) => { e.currentTarget.style.borderColor = files.length > 0 ? "#16A34A" : T.border; e.currentTarget.style.background = files.length > 0 ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA"; }}
               onDrop={(e) => {
                 e.preventDefault();
-                e.currentTarget.style.borderColor = fileName ? "#16A34A" : T.border;
-                e.currentTarget.style.background = fileName ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA";
-                const file = e.dataTransfer.files?.[0];
-                if (file && fileInputRef.current) {
-                  const dt = new DataTransfer();
-                  dt.items.add(file);
-                  fileInputRef.current.files = dt.files;
-                  handleFileSelect({ target: { files: [file] } });
+                e.currentTarget.style.borderColor = files.length > 0 ? "#16A34A" : T.border;
+                e.currentTarget.style.background = files.length > 0 ? "rgba(16, 163, 127, 0.04)" : "#FAFAFA";
+                const dropped = Array.from(e.dataTransfer.files || []);
+                if (dropped.length > 0) {
+                  handleFileSelect({ target: { files: dropped } });
                 }
               }}
             >
-              <input ref={fileInputRef} type="file" onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} accept=".csv,.html,.txt" />
               <button
                 aria-label={t("addTrade.importFileAria")}
                 onClick={() => fileInputRef.current?.click()}
@@ -1144,24 +1158,55 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                 <span style={{
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   width: 44, height: 44, borderRadius: "50%",
-                  background: fileName ? "rgba(16, 163, 127, 0.12)" : "#F0F0F0",
-                  color: fileName ? "#16A34A" : "#5C5C5C",
+                  background: files.length > 0 ? "rgba(16, 163, 127, 0.12)" : "#F0F0F0",
+                  color: files.length > 0 ? "#16A34A" : "#5C5C5C",
                   transition: "background 160ms ease, color 160ms ease",
                 }}>
-                  {fileName
+                  {files.length > 0
                     ? <LucideCheck size={20} strokeWidth={2} />
                     : <LucideUpload size={20} strokeWidth={1.75} />}
                 </span>
                 <div>
                   <div style={{ fontSize: 13, color: "#0D0D0D", fontWeight: 600, marginBottom: 4 }}>
-                    {fileName || t("addTrade.dropFile")}
+                    {files.length === 1
+                      ? files[0].name
+                      : files.length > 1
+                        ? t("addTrade.filesReady").replace("{n}", String(files.length))
+                        : t("addTrade.dropFiles")}
                   </div>
                   <div style={{ fontSize: 11, color: "#8E8E8E", fontWeight: 400 }}>
-                    {fileName ? t("addTrade.fileReady") : <>{t("addTrade.orBrowse2")} <span style={{ color: "#0D0D0D", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 2 }}>{t("addTrade.browse")}</span> · {t("addTrade.fileTypes")}</>}
+                    {files.length > 0 ? t("addTrade.fileReady") : <>{t("addTrade.orBrowse2")} <span style={{ color: "#0D0D0D", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 2 }}>{t("addTrade.browse")}</span> · {t("addTrade.fileTypes")}</>}
                   </div>
                 </div>
               </button>
             </div>
+            {/* Liste des fichiers sélectionnés (retrait individuel) */}
+            {files.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+                {files.map((f) => (
+                  <div
+                    key={f.name}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      padding: "8px 12px", background: "#FAFAFA", border: `1px solid ${T.border}`, borderRadius: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: "#0D0D0D", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {f.name}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t("addTrade.removeFile")}
+                      title={t("addTrade.removeFile")}
+                      onClick={() => removeFile(f.name)}
+                      style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#8E8E8E", display: "inline-flex", alignItems: "center", fontFamily: "var(--font-sans)" }}
+                    >
+                      <LucideX size={16} strokeWidth={2} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {/* PREVIEW */}
           {preview.length > 0 && (
@@ -1201,7 +1246,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
 
           <button
             onClick={handleImport}
-            disabled={!fileContent || accountNames.length === 0 || loading}
+            disabled={files.length === 0 || accountNames.length === 0 || loading}
             style={{
               width: "100%",
               display: "inline-flex",
@@ -1210,13 +1255,13 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
               gap: 6,
               padding: "10px 18px",
               borderRadius: 999,
-              background: fileContent && accountNames.length > 0 && !loading ? T.text : "#FFFFFF",
-              color: fileContent && accountNames.length > 0 && !loading ? "#FFFFFF" : T.textMut,
-              border: `1px solid ${fileContent && accountNames.length > 0 && !loading ? T.text : T.border}`,
-              cursor: fileContent && accountNames.length > 0 && !loading ? "pointer" : "not-allowed",
+              background: files.length > 0 && accountNames.length > 0 && !loading ? T.text : "#FFFFFF",
+              color: files.length > 0 && accountNames.length > 0 && !loading ? "#FFFFFF" : T.textMut,
+              border: `1px solid ${files.length > 0 && accountNames.length > 0 && !loading ? T.text : T.border}`,
+              cursor: files.length > 0 && accountNames.length > 0 && !loading ? "pointer" : "not-allowed",
               fontSize: 13,
               fontWeight: 500,
-              opacity: fileContent && accountNames.length > 0 && !loading ? 1 : 0.6,
+              opacity: files.length > 0 && accountNames.length > 0 && !loading ? 1 : 0.6,
               transition: "background 140ms ease, border-color 140ms ease, color 140ms ease",
               fontFamily: "var(--font-sans)",
             }}

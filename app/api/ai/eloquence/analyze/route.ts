@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       wpm,
       fillerCount,
       fillers,
+      audioMetrics,
     }: {
       mode: "reading" | "freeSpeech" | "diction" | "structure";
       transcript: string;
@@ -68,6 +69,16 @@ export async function POST(request: NextRequest) {
       wpm?: number;
       fillerCount?: number;
       fillers?: Record<string, number>;
+      audioMetrics?: {
+        pitchMean?: number | null;
+        pitchVarSemitones?: number | null;
+        pitchRangeSemitones?: number | null;
+        loudnessVar?: number | null;
+        voicedRatio?: number | null;
+        pauseCount?: number | null;
+        pauseRatio?: number | null;
+        longestPauseSec?: number | null;
+      } | null;
     } = body;
 
     if (!transcript || !transcript.trim()) {
@@ -153,6 +164,47 @@ export async function POST(request: NextRequest) {
         promptParts.push("Cadre à respecter : (non fourni)");
       }
     }
+    // Mesures acoustiques réelles (analyse du signal côté navigateur) : elles
+    // décrivent le SON, pas le texte. On les fournit pour fiabiliser rhythm,
+    // diction et confidence au lieu de tout déduire du seul WPM.
+    const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : null);
+    if (audioMetrics) {
+      const a = audioMetrics;
+      const acousticLines: string[] = [];
+      if (num(a.pitchVarSemitones) != null)
+        acousticLines.push(
+          `- Variation de hauteur (mélodie) : ${num(a.pitchVarSemitones)!.toFixed(1)} demi-tons ` +
+            "(< 1 = très monotone, ~2-5 = expressif, > 8 = instable)"
+        );
+      if (num(a.pitchRangeSemitones) != null)
+        acousticLines.push(`- Étendue mélodique : ${num(a.pitchRangeSemitones)!.toFixed(1)} demi-tons`);
+      if (num(a.loudnessVar) != null)
+        acousticLines.push(
+          `- Stabilité du volume (coef. de variation) : ${num(a.loudnessVar)!.toFixed(2)} ` +
+            "(élevé = voix instable/irrégulière)"
+        );
+      if (num(a.voicedRatio) != null)
+        acousticLines.push(`- Proportion de parole (vs silences) : ${Math.round(num(a.voicedRatio)! * 100)} %`);
+      if (num(a.pauseCount) != null)
+        acousticLines.push(`- Nombre de pauses marquées : ${num(a.pauseCount)}`);
+      if (num(a.pauseRatio) != null)
+        acousticLines.push(
+          `- Temps en pause : ${Math.round(num(a.pauseRatio)! * 100)} % ` +
+            "(idéal ~12-30 % ; trop bas = pas de respiration, trop haut = discours haché)"
+        );
+      if (num(a.longestPauseSec) != null)
+        acousticLines.push(`- Pause la plus longue : ${num(a.longestPauseSec)!.toFixed(1)} s`);
+      if (acousticLines.length > 0) {
+        promptParts.push(
+          "Mesures acoustiques réelles (issues du signal audio, à intégrer au jugement) :\n" +
+            acousticLines.join("\n") +
+            "\nAppuie les notes de `rhythm` (cadence, pauses, débit), `diction` et `confidence` sur ces mesures : " +
+            "une intonation monotone (faible variation de hauteur) doit être signalée dans le feedback ; " +
+            "un temps de pause hors de la fourchette 12-30 % ou une pause très longue doit faire baisser `rhythm`."
+        );
+      }
+    }
+
     promptParts.push(`Transcription à analyser :\n"""${transcript}"""`);
     if (metricsLines.length > 0) {
       promptParts.push(

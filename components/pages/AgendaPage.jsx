@@ -17,6 +17,7 @@ import MiniCalendar from "@/components/ui/MiniCalendar";
 import {
   RPG_STORAGE_KEY, RPG_CLOUD_KEY, DEFAULT_CATEGORIES, CatIcon,
   TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY,
+  TASK_TIMES_STORAGE_KEY, TASK_TIMES_CLOUD_KEY,
 } from "@/lib/lifeRpgCategories";
 
 /* ─────────────── Helpers date ─────────────── */
@@ -223,8 +224,9 @@ function payloadFromForm(form) {
 
 /* ─────────────── Tâches Google : heure conservée côté tr4de ───────────────
    Persistées via useCloudState (table user_productivity, clé "task_times")
-   pour une synchro en ligne ; le storageKey localStorage sert de cache. */
-const TASK_TIMES_KEY = "tr4de_task_times";
+   pour une synchro en ligne ; le storageKey localStorage sert de cache.
+   Clés partagées avec la page Vie RPG (cf. lib/lifeRpgCategories). */
+const TASK_TIMES_KEY = TASK_TIMES_STORAGE_KEY;
 
 /* ─────────────── Tâches Google liées à un évènement ───────────────
    Les tâches sont de VRAIES Google Tasks. On mémorise seulement l'association
@@ -532,7 +534,7 @@ export default function AgendaPage() {
   }, []);
   const [events, setEvents] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
-  const [taskTimes, setTaskTimes] = useCloudState(TASK_TIMES_KEY, "task_times", {});
+  const [taskTimes, setTaskTimes] = useCloudState(TASK_TIMES_KEY, TASK_TIMES_CLOUD_KEY, {});
   // Cartes Vie RPG (lecture seule ici — éditées sur la page « Vie RPG ») et
   // liaison « tâche → cartes » (+ complétion) que cette page écrit et que la
   // page Vie RPG lit pour créditer l'XP.
