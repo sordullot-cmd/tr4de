@@ -25,6 +25,17 @@ export async function POST(req) {
       expiry_date: credentials.expiry_date || null,
     });
   } catch (e) {
-    return json({ error: e?.message || "refresh_failed" }, 401);
+    // On ne renvoie 401 (= « révoqué », qui déconnecte l'utilisateur côté client)
+    // QUE lorsque Google confirme que le refresh_token est réellement invalide
+    // (`invalid_grant` : révoqué, expiré, ou consentement retiré).
+    // Toute autre erreur — panne réseau, timeout, cold-start, 5xx de Google —
+    // est transitoire : on renvoie 503 pour que le client garde ses tokens et
+    // réessaie plus tard, au lieu de déconnecter à tort.
+    const googleError = e?.response?.data?.error;
+    const isRevoked = googleError === "invalid_grant";
+    return json(
+      { error: googleError || e?.message || "refresh_failed" },
+      isRevoked ? 401 : 503,
+    );
   }
 }

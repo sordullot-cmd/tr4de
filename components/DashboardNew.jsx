@@ -715,8 +715,8 @@ export default function App() {
       label: t("nav.productivity"),
       items: [
         { id: "daily-planner", icon: LucideCalendarDays, label: t("nav.dailyPlanner") },
-        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "agenda",        icon: LucideCalendarClock, label: t("nav.agenda") },
+        { id: "life-rpg",      icon: Mountain,           label: t("nav.lifeRpg") },
         { id: "notes",         icon: LucideFileText,     label: t("nav.notes") },
         { id: "eloquence",     icon: LucideMic,          label: t("nav.eloquence") },
         { id: "goals",         icon: LucideZap,          label: t("nav.goals") },
