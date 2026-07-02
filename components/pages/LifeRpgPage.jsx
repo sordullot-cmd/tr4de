@@ -288,6 +288,23 @@ function flattenGoals(goals) {
   walk(goals);
   return out;
 }
+// Sous-objectifs « ++ » d'un objectif : ses descendants qui sont eux-mêmes de
+// vrais objectifs (`autoType`), aplatis. On IGNORE les sous-tâches simples
+// (checklist, sans autoType) et on s'arrête à tout descendant qui possède son
+// propre `rpgCategory` — celui-ci a déjà sa propre entrée dans une carte.
+function collectSubGoals(goal) {
+  const out = [];
+  const walk = (arr) => {
+    for (const s of arr || []) {
+      if (!s.autoType) continue;   // sous-tâche simple → pas un sous-objectif
+      if (s.rpgCategory) continue; // rattaché ailleurs → entrée à part entière
+      out.push(s);
+      if (Array.isArray(s.subtasks) && s.subtasks.length) walk(s.subtasks);
+    }
+  };
+  walk(goal.subtasks);
+  return out;
+}
 // Applique `patch` à l'objectif d'id `id` (récursif sur les sous-objectifs).
 function patchGoal(goals, id, patch) {
   return (Array.isArray(goals) ? goals : []).map(g => {
@@ -435,14 +452,20 @@ export default function LifeRpgPage() {
   // Objectifs liés, regroupés par catégorie, avec leur avancement (pour les cartes).
   const goalsByCat = useMemo(() => {
     const map = {};
-    for (const g of flattenGoals(goalsList)) {
-      if (!g.rpgCategory) continue;
+    const toEntry = (g) => {
       const { current, target, pct } = computeGoalProgress(g, trades, accounts);
       const xpFull = Math.max(0, parseInt(g.rpgXp, 10) || 0);
-      (map[g.rpgCategory] = map[g.rpgCategory] || []).push({
+      return {
         id: g.id, label: g.label, pct, current, target, unit: goalUnitOf(g),
         xpGained: Math.round((pct / 100) * xpFull), xpFull,
-      });
+      };
+    };
+    for (const g of flattenGoals(goalsList)) {
+      if (!g.rpgCategory) continue;
+      const entry = toEntry(g);
+      // Sous-objectifs ++ (déposés dans cet objectif) affichés sous lui.
+      entry.subGoals = collectSubGoals(g).map(toEntry);
+      (map[g.rpgCategory] = map[g.rpgCategory] || []).push(entry);
     }
     return map;
   }, [goalsList, trades, accounts]);
@@ -496,6 +519,27 @@ export default function LifeRpgPage() {
     } catch {
       if (prevRpg) setTaskRpg(prev => ({ ...prev, [taskId]: prevRpg }));
       if (prevTime) setTaskTimes(prev => ({ ...prev, [taskId]: prevTime }));
+    }
+  };
+
+  // Création RAPIDE d'une tâche depuis une carte : à partir d'un simple titre
+  // (saisie inline dans la carte, sans modale ni date). Crée la vraie Google
+  // Task et la rattache à la catégorie. Renvoie/propage une erreur lisible pour
+  // que la ligne d'édition inline puisse l'afficher et rester ouverte.
+  const createTaskInline = async (cat, rawTitle) => {
+    const name = (rawTitle || "").trim();
+    if (!name) return;
+    try {
+      const r = await gcal.createTask({ title: name, notes: "", due: null });
+      const taskId = r?.task?.id;
+      if (!taskId) throw new Error("La tâche n'a pas pu être créée.");
+      setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null } }));
+    } catch (e) {
+      const msg = e?.message;
+      if (msg === "insufficient_scope") throw new Error("Autorisation Google Tasks manquante (reconnecte Google depuis l'Agenda).");
+      if (msg === "not_connected") throw new Error("Connecte Google Agenda depuis la page Agenda.");
+      if (msg === "refresh_unavailable") throw new Error("Connexion à Google indisponible, réessaie.");
+      throw new Error(msg || "Erreur d'enregistrement.");
     }
   };
 
@@ -622,7 +666,7 @@ export default function LifeRpgPage() {
                 onCreateObjective={() => setPage("goals")}
                 onDetachObjective={detachObjective}
                 tasks={tasksByCat[cat.id] || []}
-                onCreateTask={() => setTaskModal({ cat })}
+                onCreateTask={(title) => createTaskInline(cat, title)}
                 onToggleTask={toggleTaskDone}
                 onEditTask={(tk) => setTaskModal({ cat, task: tk })}
                 onDeleteTask={deleteTaskFromCard}
@@ -694,6 +738,30 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
   const cl = categoryLevel(xp);
   const [hover, setHover] = useState(false);
   const [taskAddHov, setTaskAddHov] = useState(false);
+  // Ajout de tâche INLINE : le bouton fait apparaître une ligne éditable vide
+  // dans la carte (pas de modale). Enter/clic ailleurs → crée ; vide → annule.
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [savingTask, setSavingTask] = useState(false);
+  const [taskErr, setTaskErr] = useState(null);
+  const submittedRef = useRef(false);
+  const openAdd = () => { submittedRef.current = false; setTaskErr(null); setNewTitle(""); setAdding(true); };
+  const closeAdd = () => { setAdding(false); setNewTitle(""); setSavingTask(false); };
+  const submitNewTask = async () => {
+    if (submittedRef.current) return;          // évite le double-appel Enter + blur
+    const name = newTitle.trim();
+    if (!name) { closeAdd(); return; }
+    submittedRef.current = true;
+    setSavingTask(true); setTaskErr(null);
+    try {
+      await onCreateTask(name);
+      closeAdd();
+    } catch (e) {
+      submittedRef.current = false;            // laisse réessayer
+      setTaskErr(e?.message || "La tâche n'a pas pu être créée.");
+      setSavingTask(false);
+    }
+  };
   return (
     <div className="tr4de-portrait" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, background: T.white, display: "flex", flexDirection: "column", gap: 0 }}>
@@ -771,6 +839,24 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 600, color: reached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>{reached ? "100%" : `${Math.round(g.pct)}%`}</span>
                   </div>
+                  {/* Sous-objectifs ++ (déposés dans cet objectif) : en dessous,
+                      plus petits. Label et valeurs à CÔTÉ de la barre (une ligne). */}
+                  {Array.isArray(g.subGoals) && g.subGoals.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8, paddingLeft: 12 }}>
+                      {g.subGoals.map(sg => {
+                        const sgReached = sg.pct >= 100;
+                        return (
+                          <div key={sg.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ flexShrink: 0, maxWidth: "42%", fontSize: 11.5, fontWeight: 600, color: T.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sg.label}</span>
+                            <div style={{ flex: 1, minWidth: 0, height: 4, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
+                              <div style={{ width: `${sg.pct}%`, height: "100%", background: sgReached ? T.green : cat.color, borderRadius: 999, opacity: 0.75, transition: "width .5s ease" }} />
+                            </div>
+                            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: sgReached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums" }}>{fmtGoalVal(sg.current, sg.unit)} / {fmtGoalVal(sg.target, sg.unit)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -791,36 +877,54 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
           largeur reste toujours présent en dessous. */}
       {onCreateTask && (
         <div>
-          {tasks.length > 0 && (
+          {(tasks.length > 0 || adding) && (
             <>
               <div style={{ fontSize: 11, fontWeight: 700, color: T.textMut, marginBottom: 8 }}>Tâches</div>
               <div style={{ display: "flex", flexDirection: "column", marginBottom: 10 }}>
                 {tasks.map((tk, i) => (
-                  <TaskRow key={tk.id} tk={tk} cat={cat} isLast={i === tasks.length - 1}
+                  <TaskRow key={tk.id} tk={tk} cat={cat} isLast={i === tasks.length - 1 && !adding}
                     onToggle={() => onToggleTask && onToggleTask(tk.id)}
                     onEdit={onEditTask ? () => onEditTask(tk) : null}
                     onDelete={onDeleteTask ? () => onDeleteTask(tk.id) : null} />
                 ))}
+                {/* Ligne d'ajout inline : petite tâche vide, cochage désactivé
+                    tant qu'elle n'existe pas ; champ de titre auto-focus. */}
+                {adding && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+                    <span style={{ width: 15, height: 15, borderRadius: 4, flexShrink: 0, border: `1.5px solid ${T.border}`, background: T.white }} />
+                    <input autoFocus value={newTitle} disabled={savingTask}
+                      onChange={e => setNewTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") submitNewTask();
+                        else if (e.key === "Escape") { submittedRef.current = true; closeAdd(); setTaskErr(null); }
+                      }}
+                      onBlur={submitNewTask}
+                      placeholder="Nouvelle tâche…"
+                      style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 12.5, color: T.text, fontFamily: "inherit", padding: 0 }} />
+                  </div>
+                )}
               </div>
             </>
           )}
+          {taskErr && <div style={{ fontSize: 11, color: T.red, marginBottom: 8, lineHeight: 1.4 }}>{taskErr}</div>}
           {/* Dès qu'une tâche existe, l'ajout devient un lien discret « + Ajouter »
-              (même style que celui des objectifs) ; sinon un bouton pleine largeur. */}
-          {tasks.length > 0 ? (
-            <button type="button" onClick={onCreateTask}
+              (même style que celui des objectifs) ; sinon un bouton pleine largeur.
+              Masqué pendant la saisie inline. */}
+          {!adding && (tasks.length > 0 ? (
+            <button type="button" onClick={openAdd}
               onMouseEnter={() => setTaskAddHov(true)} onMouseLeave={() => setTaskAddHov(false)}
               style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 4px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: taskAddHov ? T.textSub : T.textMut, opacity: taskAddHov ? 1 : 0.65, transition: "color .15s ease, opacity .15s ease" }}>
               <Plus size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
               Ajouter
             </button>
           ) : (
-            <button onClick={onCreateTask}
+            <button onClick={openAdd}
               style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "9px 14px", borderRadius: 999, border: `1px dashed ${cat.color}66`, background: `${cat.color}0D`, color: cat.color, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
               onMouseEnter={e => { e.currentTarget.style.background = `${cat.color}1A`; }}
               onMouseLeave={e => { e.currentTarget.style.background = `${cat.color}0D`; }}>
               <CalendarPlus size={14} strokeWidth={2} /> Ajouter une tâche
             </button>
-          )}
+          ))}
         </div>
       )}
 
