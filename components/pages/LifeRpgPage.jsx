@@ -36,10 +36,13 @@ import {
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useGoogleCalendar } from "@/lib/hooks/useGoogleCalendar";
 import { backdropDismiss } from "@/lib/hooks/useBackdropDismiss";
+import MiniCalendar from "@/components/ui/MiniCalendar";
+import { TimeField } from "@/components/pages/AgendaDateFields";
 import { useApp } from "@/lib/contexts/AppContext";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { useTrades, useTradingAccounts } from "@/lib/hooks/useTradeData";
 import { getLocalDateString } from "@/lib/dateUtils";
+import { nearestGcalColorId } from "@/lib/gcalColors";
 import { t, useLang } from "@/lib/i18n";
 import {
   STORAGE_HABITS, STORAGE_HABITS_HISTORY, CLOUD_HABITS, CLOUD_HABITS_HISTORY,
@@ -453,10 +456,10 @@ export default function LifeRpgPage() {
   const goalsByCat = useMemo(() => {
     const map = {};
     const toEntry = (g) => {
-      const { current, target, pct } = computeGoalProgress(g, trades, accounts);
+      const { current, target, pct, rawPct } = computeGoalProgress(g, trades, accounts);
       const xpFull = Math.max(0, parseInt(g.rpgXp, 10) || 0);
       return {
-        id: g.id, label: g.label, pct, current, target, unit: goalUnitOf(g),
+        id: g.id, label: g.label, pct, rawPct: rawPct != null ? rawPct : pct, current, target, unit: goalUnitOf(g),
         xpGained: Math.round((pct / 100) * xpFull), xpFull,
       };
     };
@@ -473,11 +476,21 @@ export default function LifeRpgPage() {
   // Dérivées de `taskRpg` (titre + état terminé) + `taskTimes` (jour planifié).
   const tasksByCat = useMemo(() => {
     const map = {};
+    const today = getLocalDateString();
     for (const taskId in (taskRpg || {})) {
       const e = taskRpg[taskId];
       const cats = Array.isArray(e?.categories) ? e.categories.filter(Boolean) : [];
       if (!cats.length) continue;
-      const item = { id: taskId, title: e.title || "Tâche", done: !!e.completedAt, day: taskTimes?.[taskId]?.day || null };
+      const tt = taskTimes?.[taskId] || {};
+      const day = tt.day || null;
+      // Masquage VISUEL propre à cette page (les vraies tâches ne sont pas
+      // touchées) : une tâche disparaît des cartes une fois sa date passée.
+      //  - date planifiée (deadline) → masquée dès le lendemain de ce jour ;
+      //  - sans date → masquée 1 jour après sa création ;
+      //  - aucun repère de date connu (ancienne tâche) → conservée.
+      const refDay = day || (e.createdAt ? getLocalDateString(new Date(e.createdAt)) : null);
+      if (refDay && refDay < today) continue;
+      const item = { id: taskId, title: e.title || "Tâche", done: !!e.completedAt, day, startTime: tt.startTime || null, endTime: tt.endTime || null };
       for (const cid of cats) (map[cid] = map[cid] || []).push(item);
     }
     // Non terminées d'abord, puis par date croissante.
@@ -529,11 +542,15 @@ export default function LifeRpgPage() {
   const createTaskInline = async (cat, rawTitle) => {
     const name = (rawTitle || "").trim();
     if (!name) return;
+    const today = getLocalDateString();
     try {
-      const r = await gcal.createTask({ title: name, notes: "", due: null });
+      // Date limite par défaut = aujourd'hui (planifiée comme dans la modale).
+      const r = await gcal.createTask({ title: name, notes: "", due: `${today}T00:00:00.000Z` });
       const taskId = r?.task?.id;
       if (!taskId) throw new Error("La tâche n'a pas pu être créée.");
-      setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null } }));
+      setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null, createdAt: new Date().toISOString() } }));
+      // Couleur de la tâche = couleur de la catégorie (colorId Google le plus proche).
+      setTaskTimes(prev => ({ ...prev, [taskId]: { day: today, colorId: nearestGcalColorId(cat.color) } }));
     } catch (e) {
       const msg = e?.message;
       if (msg === "insufficient_scope") throw new Error("Autorisation Google Tasks manquante (reconnecte Google depuis l'Agenda).");
@@ -821,6 +838,7 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {linkedGoals.map(g => {
               const reached = g.pct >= 100;
+              const negative = g.rawPct < 0;
               return (
                 <div key={g.id}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -835,9 +853,9 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }} title={`+${g.xpGained} / ${g.xpFull} XP`}>
                     <div style={{ flex: 1, height: 6, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
-                      <div style={{ width: `${g.pct}%`, height: "100%", background: reached ? T.green : cat.color, borderRadius: 999, transition: "width .5s ease" }} />
+                      <div style={{ width: `${g.pct}%`, height: "100%", background: negative ? T.red : reached ? T.green : cat.color, borderRadius: 999, transition: "width .5s ease" }} />
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: reached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>{reached ? "100%" : `${Math.round(g.pct)}%`}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: negative ? T.red : reached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums", flexShrink: 0, minWidth: 32, textAlign: "right" }}>{reached ? "100%" : `${Math.round(g.rawPct)}%`}</span>
                   </div>
                   {/* Sous-objectifs ++ (déposés dans cet objectif) : en dessous,
                       plus petits. Label et valeurs à CÔTÉ de la barre (une ligne). */}
@@ -845,13 +863,14 @@ function PortraitCard({ cat, xp, habits, linkedGoals = [], allObjectives = [], t
                     <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8, paddingLeft: 12 }}>
                       {g.subGoals.map(sg => {
                         const sgReached = sg.pct >= 100;
+                        const sgNegative = sg.rawPct < 0;
                         return (
                           <div key={sg.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ flexShrink: 0, maxWidth: "42%", fontSize: 11.5, fontWeight: 600, color: T.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sg.label}</span>
                             <div style={{ flex: 1, minWidth: 0, height: 4, borderRadius: 999, background: T.accentBg, overflow: "hidden" }}>
-                              <div style={{ width: `${sg.pct}%`, height: "100%", background: sgReached ? T.green : cat.color, borderRadius: 999, opacity: 0.75, transition: "width .5s ease" }} />
+                              <div style={{ width: `${sg.pct}%`, height: "100%", background: sgNegative ? T.red : sgReached ? T.green : cat.color, borderRadius: 999, opacity: 0.75, transition: "width .5s ease" }} />
                             </div>
-                            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: sgReached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums" }}>{fmtGoalVal(sg.current, sg.unit)} / {fmtGoalVal(sg.target, sg.unit)}</span>
+                            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: sgNegative ? T.red : sgReached ? T.green : T.textMut, fontVariantNumeric: "tabular-nums" }}>{fmtGoalVal(sg.current, sg.unit)} / {fmtGoalVal(sg.target, sg.unit)}</span>
                           </div>
                         );
                       })}
@@ -951,6 +970,13 @@ function fmtDayShort(day) {
   return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
+// Idem en libellé long « sam. 5 juillet » (déclencheur du sélecteur de date).
+function fmtDayLong(day) {
+  const [y, m, d] = String(day).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" });
+}
+
 // Ligne d'une tâche de carte : case à cocher (complétion → XP), titre, date, et
 // actions modifier / supprimer révélées au survol de la ligne.
 function TaskRow({ tk, cat, isLast, onToggle, onEdit, onDelete }) {
@@ -963,11 +989,22 @@ function TaskRow({ tk, cat, isLast, onToggle, onEdit, onDelete }) {
         {tk.done && <Check size={10} strokeWidth={3} />}
       </button>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: tk.done ? T.textMut : T.text, textDecoration: tk.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.title}</span>
-      {tk.day && <span style={{ fontSize: 10.5, color: T.textMut, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{fmtDayShort(tk.day)}</span>}
-      {(onEdit || onDelete) && (
+      {/* Date cliquable : ouvre la modale d'édition (choix/modification de la date
+          via le mini-calendrier). Sans date, un « Dater » discret apparaît au survol. */}
+      {onEdit ? (
+        <button type="button" onClick={onEdit} title={tk.day ? "Modifier la date" : "Ajouter une date"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: "2px 5px", borderRadius: 6, fontSize: 10.5, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: tk.day ? T.textMut : T.blue, opacity: tk.day ? 1 : (hov ? 1 : 0), transition: "opacity .15s ease, background .12s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.background = T.accentBg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+          <CalendarClock size={11} strokeWidth={2} />
+          {tk.day ? (tk.startTime ? `${fmtDayShort(tk.day)} · ${tk.startTime}` : fmtDayShort(tk.day)) : "Dater"}
+        </button>
+      ) : (
+        tk.day && <span style={{ fontSize: 10.5, color: T.textMut, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{tk.startTime ? `${fmtDayShort(tk.day)} · ${tk.startTime}` : fmtDayShort(tk.day)}</span>
+      )}
+      {onDelete && (
         <div style={{ display: "flex", gap: 2, flexShrink: 0, opacity: hov ? 1 : 0, pointerEvents: hov ? "auto" : "none", transition: "opacity .15s ease" }}>
-          {onEdit && <button onClick={onEdit} title="Modifier" style={iconBtnSm()}><Pencil size={12} strokeWidth={1.75} /></button>}
-          {onDelete && <button onClick={onDelete} title="Supprimer" style={iconBtnSm()}><Trash2 size={12} strokeWidth={1.75} /></button>}
+          <button onClick={onDelete} title="Supprimer" style={iconBtnSm()}><Trash2 size={12} strokeWidth={1.75} /></button>
         </div>
       )}
     </div>
@@ -1254,6 +1291,21 @@ function CreateTaskModal({ cat, task, gcal, setTaskRpg, setTaskTimes, onClose, o
   const isEdit = !!task;
   const [title, setTitle] = useState(task?.title || "");
   const [date, setDate] = useState(isEdit ? (task.day || "") : getLocalDateString());
+  // Heure de planification (facultative) : sans heure, la tâche est « toute la
+  // journée » ; avec heure, elle est posée sur ce créneau dans l'Agenda.
+  const [hasTime, setHasTime] = useState(!!task?.startTime);
+  const [startTime, setStartTime] = useState(task?.startTime || "09:00");
+  const [endTime, setEndTime] = useState(task?.endTime || "10:00");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Ancre du popover : le calendrier est rendu via un portail (position fixe) pour
+  // ne pas être rogné par l'`overflow` de la modale ; on mémorise la position du
+  // déclencheur au moment de l'ouverture.
+  const dateBtnRef = useRef(null);
+  const [anchorRect, setAnchorRect] = useState(null);
+  const openPicker = () => {
+    if (dateBtnRef.current) setAnchorRect(dateBtnRef.current.getBoundingClientRect());
+    setPickerOpen(o => !o);
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   // On n'affiche le pont « connexion » qu'une fois l'état des tokens chargé.
@@ -1266,22 +1318,30 @@ function CreateTaskModal({ cat, task, gcal, setTaskRpg, setTaskTimes, onClose, o
     setError(null);
     try {
       const due = date ? `${date}T00:00:00.000Z` : null;
+      // Recalcule l'entrée `taskTimes` (jour + heure) au même format que l'Agenda :
+      // avec heure → { day, startTime, endTime } ; sinon tâche « toute la journée ».
+      // On préserve les autres champs (couleur) déjà posés.
+      const applyTimes = (prevEntry) => {
+        const base = { ...(prevEntry || {}), day: date || null };
+        if (date && hasTime) { base.startTime = startTime; base.endTime = endTime; }
+        else { delete base.startTime; delete base.endTime; }
+        return base;
+      };
       if (isEdit) {
         await gcal.updateTask(task.id, { title: name, notes: "", due });
         // Met à jour le titre du lien (catégories et complétion inchangés).
         setTaskRpg(prev => { const e = prev[task.id]; if (!e) return prev; return { ...prev, [task.id]: { ...e, title: name } }; });
-        // Recale le jour planifié en préservant une éventuelle heure/couleur
-        // posée depuis l'Agenda ; sans date, la tâche redevient à planifier.
-        setTaskTimes(prev => ({ ...prev, [task.id]: { ...(prev[task.id] || {}), day: date || null } }));
+        // Recale le jour/l'heure planifiés ; sans date, la tâche redevient à planifier.
+        setTaskTimes(prev => ({ ...prev, [task.id]: applyTimes(prev[task.id]) }));
       } else {
         const r = await gcal.createTask({ title: name, notes: "", due });
         const taskId = r?.task?.id;
         if (!taskId) throw new Error("La tâche n'a pas pu être créée.");
         // Lien carte → XP (même format que celui écrit par la page Agenda).
-        setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null } }));
-        // Jour de planification (tâche « toute la journée ») pour l'afficher dans
-        // l'Agenda ; sans date, la tâche reste non posée jusqu'à sa planification.
-        if (date) setTaskTimes(prev => ({ ...prev, [taskId]: { day: date, colorId: null } }));
+        setTaskRpg(prev => ({ ...prev, [taskId]: { categories: [cat.id], title: name, completedAt: null, createdAt: new Date().toISOString() } }));
+        // Jour (et heure éventuelle) de planification pour l'afficher dans l'Agenda ;
+        // sans date, la tâche reste non posée jusqu'à sa planification.
+        if (date) setTaskTimes(prev => ({ ...prev, [taskId]: applyTimes({ colorId: nearestGcalColorId(cat.color) }) }));
       }
       onClose();
     } catch (e) {
@@ -1325,7 +1385,58 @@ function CreateTaskModal({ cat, task, gcal, setTaskRpg, setTaskTimes, onClose, o
           </Field>
 
           <Field label="Date (optionnelle)">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={input()} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {/* Déclencheur : ouvre le mini-calendrier (même composant que l'Agenda). */}
+              <button type="button" ref={dateBtnRef} onClick={openPicker}
+                style={{ ...input(), flex: 1, cursor: "pointer", textAlign: "left", color: date ? T.text : T.textMut, textTransform: date ? "capitalize" : "none" }}>
+                {date ? fmtDayLong(date) : "Choisir une date"}
+              </button>
+              {/* Retirer la date (redevient « à planifier »). */}
+              {date && (
+                <button type="button" onClick={() => setDate("")} title="Retirer la date" style={iconBtn()}>
+                  <X size={15} strokeWidth={2} />
+                </button>
+              )}
+            </div>
+            {/* Heure (facultative) : uniquement si une date est posée. */}
+            {date && (
+              <div style={{ marginTop: 10 }}>
+                {hasTime ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <TimeField value={startTime} onChange={setStartTime} portal
+                        triggerStyle={{ ...input(), display: "inline-flex", alignItems: "center", justifyContent: "space-between", width: "100%", cursor: "pointer" }} />
+                    </div>
+                    <span style={{ color: T.textMut, fontSize: 13, flexShrink: 0 }}>→</span>
+                    <div style={{ flex: 1 }}>
+                      <TimeField value={endTime} onChange={setEndTime} portal
+                        triggerStyle={{ ...input(), display: "inline-flex", alignItems: "center", justifyContent: "space-between", width: "100%", cursor: "pointer" }} />
+                    </div>
+                    <button type="button" onClick={() => setHasTime(false)} title="Toute la journée" style={iconBtn()}>
+                      <X size={15} strokeWidth={2} />
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setHasTime(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 4px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, color: T.blue }}>
+                    <CalendarClock size={13} strokeWidth={2} /> Ajouter une heure
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Popover via portail (position fixe) : déborde librement au lieu d'être
+                coupé par le défilement/`overflow` de la modale. */}
+            {pickerOpen && anchorRect && ReactDOM.createPortal(
+              <div style={{ position: "fixed", top: anchorRect.bottom, left: anchorRect.left, width: anchorRect.width, zIndex: 11000 }}>
+                <MiniCalendar
+                  value={date ? new Date(`${date}T00:00:00`) : new Date()}
+                  onSelect={(d) => setDate(getLocalDateString(d))}
+                  onClose={() => setPickerOpen(false)}
+                  align="left"
+                />
+              </div>,
+              document.body
+            )}
           </Field>
 
           <div style={{ fontSize: 11, color: T.textMut, marginTop: -6, marginBottom: 14, lineHeight: 1.5 }}>

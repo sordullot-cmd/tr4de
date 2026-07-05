@@ -47,14 +47,20 @@ interface PresetDef {
   compute: () => DateRange;
 }
 
+// Lundi de la semaine contenant `d` (semaine calendaire, lundi → dimanche).
+const mondayOf = (d: Date) => {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = x.getDay(); // 0 = dimanche
+  x.setDate(x.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return x;
+};
+
 const PRESETS: PresetDef[] = [
   { key: "today", label: "Today", compute: () => { const t = new Date(); return { start: toISO(t), end: toISO(t) }; } },
-  { key: "7d", label: "Last 7 days", compute: () => { const e = new Date(); const s = new Date(); s.setDate(e.getDate() - 6); return { start: toISO(s), end: toISO(e) }; } },
+  { key: "week", label: "This week", compute: () => { const e = new Date(); const s = mondayOf(e); return { start: toISO(s), end: toISO(e) }; } },
+  { key: "lastweek", label: "Last week", compute: () => { const thisMon = mondayOf(new Date()); const s = new Date(thisMon); s.setDate(thisMon.getDate() - 7); const e = new Date(thisMon); e.setDate(thisMon.getDate() - 1); return { start: toISO(s), end: toISO(e) }; } },
   { key: "4w", label: "Last 4 weeks", compute: () => { const e = new Date(); const s = new Date(); s.setDate(e.getDate() - 27); return { start: toISO(s), end: toISO(e) }; } },
-  { key: "6m", label: "Last 6 months", compute: () => { const e = new Date(); const s = new Date(); s.setMonth(e.getMonth() - 6); return { start: toISO(s), end: toISO(e) }; } },
   { key: "12m", label: "Last 12 months", compute: () => { const e = new Date(); const s = new Date(); s.setMonth(e.getMonth() - 12); return { start: toISO(s), end: toISO(e) }; } },
-  { key: "mtd", label: "Month to date", compute: () => { const e = new Date(); const s = new Date(e.getFullYear(), e.getMonth(), 1); return { start: toISO(s), end: toISO(e) }; } },
-  { key: "ytd", label: "Year to date", compute: () => { const e = new Date(); const s = new Date(e.getFullYear(), 0, 1); return { start: toISO(s), end: toISO(e) }; } },
   { key: "all", label: "All time", compute: () => ({ start: "1970-01-01", end: toISO(new Date()) }) },
 ];
 

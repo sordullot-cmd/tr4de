@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import ReactDOM from "react-dom";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { T } from "@/lib/ui/tokens";
 
@@ -118,15 +119,23 @@ export function DateField({ value, min, onChange }) {
   );
 }
 
-/* ─────────────── Champ heure : déclencheur + liste maison ─────────────── */
-export function TimeField({ value, onChange, placeholder = "", triggerStyle }) {
+/* ─────────────── Champ heure : déclencheur + liste maison ───────────────
+ * `portal` : rend la liste via un portail en position fixe (ancrée sous le
+ * déclencheur) pour qu'elle ne soit pas rognée par un conteneur à `overflow`
+ * (ex. une modale scrollable). Comportement d'origine conservé sans la prop. */
+export function TimeField({ value, onChange, placeholder = "", triggerStyle, portal = false }) {
   const [open, setOpen] = React.useState(false);
+  const [rect, setRect] = React.useState(null);
   const ref = React.useRef(null);
   const listRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!open) return;
-    const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    // Ferme si le clic est hors du déclencheur ET hors de la liste (la liste peut
+    // être portaillée, donc hors de `ref`).
+    const onDown = (e) => {
+      if (!ref.current?.contains(e.target) && !listRef.current?.contains(e.target)) setOpen(false);
+    };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
@@ -141,31 +150,46 @@ export function TimeField({ value, onChange, placeholder = "", triggerStyle }) {
   // Créneaux par pas de 15 min sur 24 h.
   const slots = Array.from({ length: 96 }, (_, i) => `${pad(Math.floor(i / 4))}:${pad((i % 4) * 15)}`);
 
+  const toggle = () => {
+    if (!open && portal && ref.current) setRect(ref.current.getBoundingClientRect());
+    setOpen((o) => !o);
+  };
+
+  const list = (
+    <div ref={listRef}
+      style={{
+        position: portal ? "fixed" : "absolute",
+        top: portal ? (rect ? rect.bottom + 6 : 0) : "calc(100% + 6px)",
+        left: portal ? (rect ? rect.left : 0) : 0,
+        zIndex: portal ? 11000 : 20,
+        background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6,
+        boxShadow: "0 12px 32px rgba(0,0,0,0.16)", width: 110, maxHeight: 240, overflowY: "auto",
+      }}>
+      {slots.map((s) => {
+        const isSel = s === value;
+        return (
+          <button key={s} type="button" data-sel={isSel ? "1" : "0"}
+            onClick={() => { onChange(s); setOpen(false); }}
+            style={{
+              display: "block", width: "100%", textAlign: "left", border: "none", fontFamily: "inherit",
+              padding: "6px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13,
+              background: isSel ? `${T.blue}1A` : "transparent",
+              color: isSel ? T.blue : T.text, fontWeight: isSel ? 600 : 400,
+            }}>
+            {s}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div ref={ref} style={{ position: "relative", display: triggerStyle ? "block" : "inline-block" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={{ ...triggerBtn, ...triggerStyle }}>
+      <button type="button" onClick={toggle} style={{ ...triggerBtn, ...triggerStyle }}>
         <span style={{ color: value ? T.text : T.textMut }}>{value || placeholder}</span>
         <ChevronDown size={14} color={T.textMut} style={{ marginLeft: triggerStyle ? "auto" : 2 }} />
       </button>
-      {open && (
-        <div ref={listRef} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20, background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: 6, boxShadow: "0 12px 32px rgba(0,0,0,0.16)", width: 110, maxHeight: 240, overflowY: "auto" }}>
-          {slots.map((s) => {
-            const isSel = s === value;
-            return (
-              <button key={s} type="button" data-sel={isSel ? "1" : "0"}
-                onClick={() => { onChange(s); setOpen(false); }}
-                style={{
-                  display: "block", width: "100%", textAlign: "left", border: "none", fontFamily: "inherit",
-                  padding: "6px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13,
-                  background: isSel ? `${T.blue}1A` : "transparent",
-                  color: isSel ? T.blue : T.text, fontWeight: isSel ? 600 : 400,
-                }}>
-                {s}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open && (portal ? ReactDOM.createPortal(list, document.body) : list)}
     </div>
   );
 }

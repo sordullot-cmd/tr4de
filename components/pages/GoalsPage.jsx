@@ -177,8 +177,12 @@ export function computeGoalProgress(g, trades = [], accounts = []) {
     for (const tr of list) { cum += (tr.pnl || 0); if (cum > peak) peak = cum; if (peak - cum > mdd) mdd = peak - cum; }
     current = mdd;
   }
-  const pct = tgt === 0 ? 0 : Math.max(0, Math.min(100, (current / tgt) * 100));
-  return { current, target: tgt, pct };
+  // rawPct : pourcentage NON borné (peut être négatif) — sert à l'affichage du
+  // « % » et à signaler un objectif dans le rouge (ex. compte de trading en perte).
+  // pct : borné 0-100, utilisé pour la largeur de barre et la dérivation d'XP RPG.
+  const rawPct = tgt === 0 ? 0 : (current / tgt) * 100;
+  const pct = Math.max(0, Math.min(100, rawPct));
+  return { current, target: tgt, pct, rawPct };
 }
 
 // Statut de RYTHME (« pace ») d'un objectif : compare l'avancement réel à
@@ -276,13 +280,17 @@ function fmtGoalNum(x) {
 }
 
 export function fmtGoalVal(v, u) {
+  // Le signe est placé en tête (ex. « -€500 » plutôt que « €-500 ») pour rendre
+  // lisibles les valeurs négatives (compte en perte, drawdown, etc.).
+  const sign = v < 0 ? "-" : "";
+  const abs = Math.abs(v);
   if (typeof u === "string") {
     if (u === "%") return `${Math.round(v)}%`;
-    if (u === "") return fmtGoalNum(Math.round(v));
-    return `${u}${fmtGoalNum(v)}`;
+    if (u === "") return `${sign}${fmtGoalNum(Math.round(abs))}`;
+    return `${sign}${u}${fmtGoalNum(abs)}`;
   }
   const { prefix = "", suffix = "" } = u || {};
-  return `${prefix}${fmtGoalNum(v)}${suffix}`;
+  return `${sign}${prefix}${fmtGoalNum(abs)}${suffix}`;
 }
 
 // Walk the goals tree (top level + 1 level of nested goal-subtasks) and apply
@@ -1185,8 +1193,12 @@ function TimelineSection({ title, rows, compute, unitOf, fmtVal, onEdit, onDelet
 function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDuplicate, onTogglePin, onSetPinnedOpen, onAdjustManual, onSetManual, onSubtasksChange, doneSection, drag, setDrag, onDrop, nested, drawerOpen }) {
   const cat = CATEGORIES.find(c => c.id === g.category) || CATEGORIES[0];
   const Ic = cat.icon;
-  const { current, target, pct } = compute(g);
+  const { current, target, pct, rawPct } = compute(g);
   const unit = unitOf(g);
+  // Objectif « dans le rouge » : progression réelle négative (ex. compte de
+  // trading en perte). rawPct peut manquer sur d'anciens calculs → fallback pct.
+  const displayPct = rawPct != null ? rawPct : pct;
+  const isNegative = displayPct < 0;
   const dl = daysLeft(g.deadline);
   const isAchieved = doneSection || (g.autoType === "max_dd" ? current <= target : pct >= 100);
   const atRisk = !isAchieved && dl !== null && dl < 3 && pct < 80;
@@ -1468,21 +1480,29 @@ function TimelineRow({ goal: g, compute, unitOf, fmtVal, onEdit, onDelete, onDup
             <span style={{ color: T.textMut, margin: "0 3px" }}>/</span>
             <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtVal(target, unit)}</span>
           </span>
-          <div style={{ position: "relative", marginTop: 8 }}>
-            {/* Repère « où je devrais en être » : petit triangle POSÉ au-dessus de
-                la barre (ne la traverse pas), pointant vers le niveau attendu. */}
-            {!isAchieved && pace && pace.expectedPct > 0 && pace.expectedPct < 100 && (
-              <div title={`Tu devrais être à ${pace.expectedPct}% à ce stade`}
-                style={{
-                  position: "absolute", top: -5, left: `${pace.expectedPct}%`, transform: "translateX(-50%)",
-                  width: 0, height: 0,
-                  borderLeft: "3px solid transparent", borderRight: "3px solid transparent",
-                  borderTop: `4px solid ${T.textMut}`,
-                }} />
-            )}
-            <div style={{ height: 3, background: T.accentBg, borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+              {/* Repère « où je devrais en être » : petit triangle POSÉ au-dessus de
+                  la barre (ne la traverse pas), pointant vers le niveau attendu. */}
+              {!isAchieved && pace && pace.expectedPct > 0 && pace.expectedPct < 100 && (
+                <div title={`Tu devrais être à ${pace.expectedPct}% à ce stade`}
+                  style={{
+                    position: "absolute", top: -5, left: `${pace.expectedPct}%`, transform: "translateX(-50%)",
+                    width: 0, height: 0,
+                    borderLeft: "3px solid transparent", borderRight: "3px solid transparent",
+                    borderTop: `4px solid ${T.textMut}`,
+                  }} />
+              )}
+              <div style={{ height: 3, background: T.accentBg, borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: isNegative ? T.red : isAchieved ? T.green : pct >= 50 ? T.blue : T.amber, borderRadius: 2, transition: "width .4s ease" }} />
+              </div>
             </div>
+            {/* Pourcentage d'avancement à droite de la barre (négatif si dans le rouge). */}
+            <span style={{
+              fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+              color: isNegative ? T.red : isAchieved ? T.green : T.textSub,
+              flexShrink: 0, minWidth: 30, textAlign: "right",
+            }}>{Math.round(displayPct)}%</span>
           </div>
           {/* Rythme requis pour tenir l'échéance (métriques additives uniquement). */}
           {!isAchieved && pace?.requiredRate != null && (

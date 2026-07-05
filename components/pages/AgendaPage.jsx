@@ -19,6 +19,7 @@ import {
   TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY,
   TASK_TIMES_STORAGE_KEY, TASK_TIMES_CLOUD_KEY,
 } from "@/lib/lifeRpgCategories";
+import { GCAL_COLORS, DEFAULT_EVENT_COLOR, nearestGcalColorId } from "@/lib/gcalColors";
 
 /* ─────────────── Helpers date ─────────────── */
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -76,23 +77,8 @@ function eventTimeLabel(ev) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Palette officielle Google Agenda (colorId 1–11) — teintes saturées.
-// Le fond est tinté via la transparence ; la barre latérale reste pleine.
-const GCAL_COLORS = {
-  1: "#7B68EE",  // Lavande (violet plus franc, lisible)
-  2: "#33B679",  // Sauge
-  3: "#8E24AA",  // Raisin
-  4: "#E67C73",  // Flamant
-  5: "#F6BF26",  // Banane
-  6: "#F4511E",  // Tangerine
-  7: "#039BE5",  // Paon
-  8: "#CCCCCC",  // Graphite (gris clair)
-  9: "#3F51B5",  // Myrtille
-  10: "#0B8043", // Basilic
-  11: "#D50000", // Tomate
-};
-// Couleur par défaut (évènement sans colorId) : lavande, accordée à la palette.
-const DEFAULT_EVENT_COLOR = "#7B68EE";
+// Palette officielle Google Agenda (colorId 1–11) : voir l'import GCAL_COLORS /
+// DEFAULT_EVENT_COLOR en tête de fichier (source partagée avec la page Vie RPG).
 
 /** Éclaircit une couleur hex (mélange vers le blanc). */
 function lighten(hex, f = 0.2) {
@@ -1988,13 +1974,13 @@ export default function AgendaPage() {
                 </div>
               </FormRow>
 
-              {/* Quêtes de soi (cartes Vie RPG) — tâches uniquement : terminer la
-                  tâche crédite de l'XP à chaque carte liée. */}
-              {(modal.kind === "task" || modalTab === "tasks") && (
-                <FormRow icon={Sparkles} top>
+              {/* Quêtes de soi (cartes Vie RPG). Pour une tâche : terminer la tâche
+                  crédite de l'XP à chaque carte liée. Pour un évènement : aucun XP,
+                  la sélection sert uniquement à reprendre la couleur de la catégorie. */}
+              <FormRow icon={Sparkles} top>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 500, color: T.textSub, marginBottom: 8 }}>
-                      Quêtes de soi <span style={{ color: T.textMut, fontWeight: 400 }}>{"· optionnel · gagne de l'XP"}</span>
+                      Quêtes de soi
                     </div>
                     {rpgCategories.length === 0 ? (
                       <div style={{ fontSize: 12, color: T.textMut }}>Crée des cartes sur la page « Vie RPG » pour les lier ici.</div>
@@ -2003,7 +1989,15 @@ export default function AgendaPage() {
                         {rpgCategories.map((c) => {
                           const sel = Array.isArray(modal.rpgCategories) ? modal.rpgCategories : [];
                           const active = sel.includes(c.id);
-                          const toggle = () => setModal({ ...modal, rpgCategories: active ? sel.filter((x) => x !== c.id) : [...sel, c.id] });
+                          const toggle = () => setModal((m) => {
+                            const cur = Array.isArray(m.rpgCategories) ? m.rpgCategories : [];
+                            const willActive = !cur.includes(c.id);
+                            const next = { ...m, rpgCategories: willActive ? [...cur, c.id] : cur.filter((x) => x !== c.id) };
+                            // Sélectionner une catégorie adopte sa couleur par défaut
+                            // (modifiable ensuite manuellement via le sélecteur de couleur).
+                            if (willActive) next.colorId = nearestGcalColorId(c.color);
+                            return next;
+                          });
                           return (
                             <button key={c.id} type="button" onClick={toggle}
                               style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 999, border: `1px solid ${active ? c.color : T.border}`, background: active ? `${c.color}14` : T.white, color: active ? c.color : T.text, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
@@ -2018,7 +2012,6 @@ export default function AgendaPage() {
                     )}
                   </div>
                 </FormRow>
-              )}
               </>
 
               {modalError && (
