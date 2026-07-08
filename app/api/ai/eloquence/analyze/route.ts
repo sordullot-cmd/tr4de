@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       referenceText,
       topic,
       framework,
+      drillGoal,
       durationSec,
       wpm,
       fillerCount,
@@ -65,6 +66,9 @@ export async function POST(request: NextRequest) {
       referenceText?: string;
       topic?: string;
       framework?: Framework;
+      // Consigne d'un défi (onglet « Défis ») : oriente le jugement de l'IA sans
+      // changer le mode d'analyse de base.
+      drillGoal?: string;
       durationSec?: number;
       wpm?: number;
       fillerCount?: number;
@@ -144,6 +148,14 @@ export async function POST(request: NextRequest) {
     const promptParts: string[] = [];
     promptParts.push(`Mode d'analyse : ${mode}`);
     promptParts.push(modeInstructions);
+    // Consigne spécifique du défi : elle PRIME sur le cadrage générique du mode
+    // et doit être au cœur du jugement et du feedback.
+    if (typeof drillGoal === "string" && drillGoal.trim()) {
+      promptParts.push(
+        "CONSIGNE PRIORITAIRE DE L'EXERCICE (à placer au centre du jugement et du feedback) :\n" +
+          drillGoal.trim()
+      );
+    }
     if (mode === "reading" || mode === "diction") {
       promptParts.push(
         `Texte de référence (ce qui aurait dû être dit) :\n"""${referenceText || "(non fourni)"}"""`

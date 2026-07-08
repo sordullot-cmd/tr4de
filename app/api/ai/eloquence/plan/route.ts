@@ -26,7 +26,7 @@ const Schema = z.object({
       z.object({
         title: z.string(), // tâche concrète pour la prochaine séance
         why: z.string(), // pourquoi (lié à une faiblesse mesurée)
-        mode: z.enum(["reading", "freeSpeech", "diction", "structure"]), // onglet d'exercice à ouvrir
+        mode: z.enum(["reading", "freeSpeech", "diction", "structure", "drills"]), // onglet d'exercice à ouvrir
       })
     )
     .min(2)
@@ -65,6 +65,7 @@ type PlanBody = {
     freeSpeech: number;
     diction: number;
     structure: number;
+    drills?: number;
   };
   axisAverages: AxisAverages;
   audioAverages: {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
       "la VOIX reflète la stabilité et le volume (variation de force) — une voix instable ou trop plate manque de présence ; " +
       "le RYTHME reflète les pauses et le débit — un pauseRatio trop bas = l'orateur ne respire pas / n'aère pas son propos, un débit (wpm) hors de la fourchette 110-160 mots/minute est à corriger (trop lent en dessous, précipité au-dessus), une pause la plus longue excessive trahit une hésitation. " +
       "Les tâches du plan du jour (dayPlan) doivent viser les axes les plus faibles et pointer le BON mode d'exercice : " +
-      "reading = lecture à voix haute (travail de la diction et de la fluidité), diction = articulation (virelangues), freeSpeech = prise de parole libre (structure, aisance, confiance), structure = plan/architecture du discours. " +
+      "reading = lecture à voix haute (travail de la diction et de la fluidité), diction = articulation (virelangues), freeSpeech = prise de parole libre (structure, aisance, confiance), structure = plan/architecture du discours, drills = défis ciblés (storytelling, débit lent, fluidité sans hésitation, synthèse, mot interdit, imitation, lecture théâtrale, miroir). " +
       "Sois concret et actionnable : des tâches faisables dès la prochaine séance, et des objectifs de fond pour la semaine.";
 
     // Sérialisation lisible de l'agrégat reçu pour le prompt utilisateur.
@@ -156,7 +157,8 @@ export async function POST(request: NextRequest) {
         `- Lecture (reading) : ${byMode.reading}\n` +
         `- Prise de parole libre (freeSpeech) : ${byMode.freeSpeech}\n` +
         `- Diction / articulation (diction) : ${byMode.diction}\n` +
-        `- Structure du discours (structure) : ${byMode.structure}`
+        `- Structure du discours (structure) : ${byMode.structure}\n` +
+        `- Défis / ateliers ciblés (drills) : ${byMode.drills ?? 0}`
     );
 
     parts.push(
