@@ -499,24 +499,27 @@ export default function LifeRpgPage() {
   }, [taskRpg, taskTimes]);
   const lvl = useMemo(() => levelInfo(progress.totalXp), [progress.totalXp]);
 
-  // Coche / décoche une tâche de carte : bascule la vraie Google Task et met à
-  // jour l'horodatage de complétion (qui pilote l'XP). MAJ optimiste, annulée en
-  // cas d'échec réseau. Même contrat que la bascule côté Agenda.
+  // Coche / décoche une tâche de carte : met à jour l'horodatage de complétion
+  // (source de vérité locale qui pilote l'affichage ET l'XP), puis synchronise la
+  // vraie Google Task en arrière-plan. On NE revient PAS en arrière si Google
+  // échoue : l'état local prime, sinon un hoquet réseau décocherait la tâche
+  // ~1 s après le clic. La tâche cochée reste « finie » puis quitte la carte le
+  // lendemain de sa date (masquage géré dans `tasksByCat`).
   const toggleTaskDone = async (taskId) => {
     const entry = taskRpg[taskId];
     if (!entry) return;
-    const prevCompletedAt = entry.completedAt || null;
-    const nowDone = !prevCompletedAt;
-    const setCompleted = (val) => setTaskRpg(prev => {
+    const nowDone = !(entry.completedAt || null);
+    setTaskRpg(prev => {
       const e = prev[taskId];
       if (!e) return prev;
-      return { ...prev, [taskId]: { ...e, completedAt: val } };
+      return { ...prev, [taskId]: { ...e, completedAt: nowDone ? new Date().toISOString() : null } };
     });
-    setCompleted(nowDone ? new Date().toISOString() : null);
+    // Synchro Google en best-effort : on laisse l'état local tel quel en cas
+    // d'échec (l'utilisateur reverra son action, l'XP est créditée).
     try {
       await gcal.toggleTask(taskId, nowDone);
-    } catch {
-      setCompleted(prevCompletedAt); // rollback
+    } catch (e) {
+      console.warn("[LifeRpg] synchro Google de la complétion échouée:", e?.message || e);
     }
   };
 

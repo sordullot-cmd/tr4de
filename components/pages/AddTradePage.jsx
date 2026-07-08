@@ -1083,6 +1083,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
                     { id: "50k", label: "$50,000" },
                     { id: "100k", label: "$100,000" },
                     { id: "150k", label: "$150,000" },
+                    { id: "250k", label: "$250,000" },
                   ]}
                   searchable={false}
                 />

@@ -23,6 +23,7 @@ export default function CalendarPage({ trades = [], accountType = "live", evalAc
     "50k": 3000,
     "100k": 6000,
     "150k": 9000,
+    "250k": 15000,
   };
 
   // Convertit n'importe quelle taille (ex. "50k", "10000") en montant USD,

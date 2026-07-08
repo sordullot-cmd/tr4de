@@ -5,4 +5,4 @@ ADD COLUMN eval_account_size TEXT;
 
 -- Add comment to explain the columns
 COMMENT ON COLUMN trading_accounts.account_type IS 'Type of account: live or eval';
-COMMENT ON COLUMN trading_accounts.eval_account_size IS 'Size of eval account: 25k, 50k, 100k, or 150k (only for eval accounts)';
+COMMENT ON COLUMN trading_accounts.eval_account_size IS 'Size of eval account: 25k, 50k, 100k, 150k, or 250k (only for eval accounts)';

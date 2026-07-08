@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Mic, Square, Volume2, Loader2, Check, ChevronRight,
-  Sparkles, RefreshCw, Lightbulb,
+  Sparkles, RefreshCw, Lightbulb, Video, VideoOff, Clock, Ban, Eye, X,
 } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useAudioRecorder } from "@/lib/hooks/useAudioRecorder";
@@ -12,7 +12,8 @@ import { decodeAudioBlob, analyzeAudioBuffer, deriveAudioScores, encodeWav } fro
 import {
   ELOQ_STORAGE_KEY, ELOQ_CLOUD_KEY, LEVELS, LEVEL_BY_ID, SCORE_AXES, FIDELITY_AXIS, AUDIO_AXES,
   READING_TEXTS, TONGUE_TWISTERS, WARMUPS, TOPIC_THEMES, STRUCTURE_FRAMEWORKS,
-  EXERCISE_MODES, countWords, countFillers, computeWpm, describeWpm, overallScore,
+  DRILLS, FRAMEWORK_BY_ID,
+  EXERCISE_MODES, countWords, countFillers, countWordOccurrences, computeWpm, describeWpm, overallScore,
   getTopicsFromBank, pickRandomTopic, todayKey, buildDailyAggregate,
 } from "@/lib/eloquenceData";
 
@@ -139,7 +140,7 @@ async function runVoiceAnalysis(audioBuffer, mode, topic) {
 }
 
 /* ─────────────── Panneau d'enregistrement + analyse IA ─────────────── */
-function RecorderPanel({ mode, referenceText, topic, framework, onResult }) {
+function RecorderPanel({ mode, referenceText, topic, framework, drillGoal, onResult }) {
   const { recording, durationSec, error, supported, start, stop, reset } = useAudioRecorder();
   const { uploadAudio } = useEloquenceAudio();
   const [phase, setPhase] = useState("idle"); // idle | analyzing | error
@@ -190,7 +191,7 @@ function RecorderPanel({ mode, referenceText, topic, framework, onResult }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode, transcript: text, referenceText, topic, framework,
+          mode, transcript: text, referenceText, topic, framework, drillGoal,
           durationSec: dur, wpm, fillerCount, fillers, audioMetrics,
         }),
       });
@@ -1033,6 +1034,360 @@ function StructureTab({ onSession }) {
 const lead = { fontSize: 14, color: T.textSub, lineHeight: 1.5, margin: 0 };
 const blockTitle = { fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 6 };
 
+/* ═══════════════════════════════════════════════════════════
+   ONGLET — Défis (ateliers guidés)
+   ═══════════════════════════════════════════════════════════ */
+const drillInput = {
+  width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`,
+  borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "inherit",
+  color: T.text, outline: "none",
+};
+const drillInfoLine = {
+  display: "flex", alignItems: "center", gap: 8, fontSize: 13,
+  color: T.textSub, fontWeight: 600,
+};
+// Format d'une durée en secondes → « 1 min » / « 30 s ».
+function fmtDuration(s) {
+  return s >= 60 ? `${s % 60 === 0 ? s / 60 : (s / 60).toFixed(1)} min` : `${s} s`;
+}
+
+// Consigne d'un défi : accroche, description détaillée, conseils, structure conseillée.
+function DrillBrief({ drill }) {
+  const fw = drill.frameworkId ? FRAMEWORK_BY_ID[drill.frameworkId] : null;
+  return (
+    <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 28, lineHeight: 1 }}>{drill.emoji}</span>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: T.text }}>{drill.title}</div>
+          <div style={{ fontSize: 12.5, color: T.textMut }}>{drill.tagline}</div>
+        </div>
+      </div>
+      <p style={{ fontSize: 14, color: T.textSub, lineHeight: 1.6, margin: 0 }}>{drill.description}</p>
+      {Array.isArray(drill.tips) && drill.tips.length > 0 && (
+        <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+          {drill.tips.map((t, i) => (
+            <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, color: T.textSub, lineHeight: 1.45 }}>
+              <Lightbulb size={14} color={T.amber} style={{ marginTop: 2, flexShrink: 0 }} />
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {fw && (
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 12px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 2 }}>Structure conseillée · {fw.name}</div>
+          <div style={{ fontSize: 12, color: T.textMut }}>{fw.short}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bilan immédiat du défi « mot interdit » (comptage local sur la transcription).
+function ForbiddenBadge({ word, count }) {
+  const ok = count === 0;
+  return (
+    <div style={{ ...card, display: "flex", alignItems: "center", gap: 12, borderColor: ok ? T.green : T.red, background: ok ? "#F0FDF4" : "#FEF2F2" }}>
+      {ok ? <Check size={20} color={T.green} /> : <Ban size={20} color={T.red} />}
+      <div style={{ fontSize: 13.5, color: T.text }}>
+        {ok ? (
+          <>Bravo : le mot « <strong>{word}</strong> » n’est jamais sorti. 🎉</>
+        ) : (
+          <>Le mot interdit « <strong>{word}</strong> » est apparu <strong>{count}</strong> fois. Retente en le traquant.</>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Défi de type « record » : enregistrement + analyse IA, avec paramètres selon le défi.
+function DrillRecord({ drill, onSession }) {
+  const [topic, setTopic] = useState("");
+  const [reference, setReference] = useState("");
+  const [durationIdx, setDurationIdx] = useState(0);
+  const [forbiddenWord, setForbiddenWord] = useState(drill.forbidden ? drill.forbiddenChoices[0] : "");
+  const [customForbidden, setCustomForbidden] = useState("");
+  const [result, setResult] = useState(null);
+
+  const activeForbidden = drill.forbidden ? (customForbidden.trim() || forbiddenWord) : "";
+  const targetSec = drill.durations ? drill.durations[durationIdx] : (drill.timerTargetSec || null);
+
+  // Consigne finale envoyée à l'IA : base du défi + contraintes dynamiques.
+  const goal = useMemo(() => {
+    let g = drill.drillGoal || "";
+    if (drill.durations && targetSec) g += ` Durée cible STRICTE : ${targetSec} secondes maximum.`;
+    if (activeForbidden) g += ` Le mot précisément interdit est : « ${activeForbidden} ».`;
+    return g;
+  }, [drill, targetSec, activeForbidden]);
+
+  const ready = drill.input === "topic" ? topic.trim().length > 0
+    : drill.input === "reference" ? reference.trim().length > 0
+    : true;
+
+  const drawTopic = () => {
+    const tp = pickRandomTopic("surprise");
+    if (tp) { setTopic(tp.title); setResult(null); }
+  };
+
+  const handleResult = (r) => {
+    const merged = activeForbidden
+      ? { ...r, forbiddenWord: activeForbidden, forbiddenCount: countWordOccurrences(r.transcript, activeForbidden) }
+      : r;
+    setResult(merged);
+    onSession({ mode: EXERCISE_MODES.drills, r: merged });
+  };
+
+  return (
+    <>
+      <DrillBrief drill={drill} />
+
+      {/* Paramètres du défi */}
+      <div style={{ ...card, display: "flex", flexDirection: "column", gap: 12 }}>
+        {drill.input === "topic" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input
+              value={topic}
+              onChange={(e) => { setTopic(e.target.value); setResult(null); }}
+              placeholder={drill.topicPlaceholder}
+              style={drillInput}
+            />
+            <button type="button" style={{ ...ghost(false), alignSelf: "flex-start" }} onClick={drawTopic}>
+              <Sparkles size={14} /> Tirer un sujet
+            </button>
+          </div>
+        )}
+
+        {drill.input === "reference" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <textarea
+              value={reference}
+              onChange={(e) => { setReference(e.target.value); setResult(null); }}
+              placeholder={drill.referencePlaceholder}
+              rows={5}
+              style={{ ...drillInput, resize: "vertical", lineHeight: 1.5 }}
+            />
+            {reference.trim() && <ListenButton text={reference.trim()} />}
+          </div>
+        )}
+
+        {drill.durations && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: T.textMut }}>Contrainte de temps :</span>
+            {drill.durations.map((s, i) => (
+              <button key={s} type="button" style={pill(durationIdx === i)} onClick={() => { setDurationIdx(i); setResult(null); }}>
+                {fmtDuration(s)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {drill.forbidden && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 12, color: T.textMut }}>Mot interdit :</span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {drill.forbiddenChoices.map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  style={pill(!customForbidden.trim() && forbiddenWord === w)}
+                  onClick={() => { setForbiddenWord(w); setCustomForbidden(""); setResult(null); }}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+            <input
+              value={customForbidden}
+              onChange={(e) => { setCustomForbidden(e.target.value); setResult(null); }}
+              placeholder="…ou saisis ton propre mot à bannir"
+              style={drillInput}
+            />
+          </div>
+        )}
+
+        {/* Repères d'objectif */}
+        {drill.targetWpmMax && (
+          <div style={drillInfoLine}><Clock size={14} /> Débit cible : moins de {drill.targetWpmMax} mots/minute.</div>
+        )}
+        {drill.timerTargetSec && (
+          <div style={drillInfoLine}><Clock size={14} /> Objectif : tiens {fmtTime(drill.timerTargetSec)} sans jamais t’arrêter.</div>
+        )}
+        {drill.durations && targetSec && (
+          <div style={drillInfoLine}><Clock size={14} /> Vise {fmtDuration(targetSec)} maximum pour ce passage.</div>
+        )}
+        {activeForbidden && (
+          <div style={drillInfoLine}><Ban size={14} color={T.red} /> Interdit d’urgence : « {activeForbidden} ».</div>
+        )}
+      </div>
+
+      {ready && (
+        <>
+          <RecorderPanel
+            mode={drill.analysisMode}
+            topic={drill.input === "topic" ? topic.trim() : undefined}
+            referenceText={drill.input === "reference" ? reference.trim() : undefined}
+            drillGoal={goal}
+            onResult={handleResult}
+          />
+          {result && drill.forbidden && result.forbiddenWord && (
+            <ForbiddenBadge word={result.forbiddenWord} count={result.forbiddenCount || 0} />
+          )}
+          {result && <ResultCard result={result} showFidelity={drill.analysisMode === "reading"} />}
+        </>
+      )}
+    </>
+  );
+}
+
+// Défi « miroir » : webcam en mode miroir + minuteur, sans enregistrement ni analyse.
+function MirrorDrill({ drill }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [active, setActive] = useState(false);
+  const [err, setErr] = useState(null);
+  const [remaining, setRemaining] = useState(drill.timerSec);
+
+  const stop = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setActive(false);
+  };
+
+  const start = async () => {
+    setErr(null);
+    try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices) throw new Error("no-media");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      setRemaining(drill.timerSec);
+      setActive(true);
+    } catch {
+      setErr("Impossible d'accéder à la caméra. Autorise l'accès, ou fais l'exercice devant un vrai miroir.");
+    }
+  };
+
+  // Branche le flux sur l'élément vidéo une fois celui-ci monté.
+  useEffect(() => {
+    if (active && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [active]);
+
+  // Minuteur décroissant (non bloquant : la vidéo continue après 0).
+  useEffect(() => {
+    if (!active || remaining <= 0) return;
+    const id = setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => clearTimeout(id);
+  }, [active, remaining]);
+
+  // Coupe la caméra au démontage.
+  useEffect(() => () => stop(), []);
+
+  const done = active && remaining <= 0;
+
+  return (
+    <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+      {active ? (
+        <>
+          <div style={{ position: "relative", width: "100%", maxWidth: 460, aspectRatio: "4 / 3", borderRadius: 14, overflow: "hidden", background: "#000" }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+            />
+            <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,.55)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+              {fmtTime(remaining)}
+            </div>
+            <div style={{ position: "absolute", bottom: 10, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 12.5, textShadow: "0 1px 3px rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <Eye size={14} /> Regarde tes yeux, uniquement.
+            </div>
+          </div>
+          {done && (
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: T.green }}>Temps écoulé — bravo, tu as tenu 2 minutes.</div>
+          )}
+          <button type="button" style={ghost(false)} onClick={stop}>
+            <VideoOff size={15} /> Arrêter la caméra
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={start}
+            style={{
+              width: 96, height: 96, borderRadius: "50%", cursor: "pointer",
+              border: "none", fontFamily: "inherit", background: T.text, color: "#fff",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+            }}
+          >
+            <Video size={28} />
+            <span style={{ fontSize: 11, fontWeight: 700 }}>Démarrer</span>
+          </button>
+          <div style={{ fontSize: 12.5, color: T.textMut, textAlign: "center" }}>
+            La caméra reste sur ton appareil : rien n’est enregistré ni envoyé.
+          </div>
+          {err && <div style={{ color: T.red, fontSize: 13, textAlign: "center" }}>{err}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function DrillsTab({ onSession }) {
+  const [selectedId, setSelectedId] = useState(null);
+  const selected = DRILLS.find((d) => d.id === selectedId) || null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={lead}>
+        Des ateliers ciblés pour progresser vite : storytelling, débit, fluidité, synthèse, imitation… Choisis un défi et lance-toi.
+      </p>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {DRILLS.map((d) => {
+          const active = d.id === selectedId;
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setSelectedId(active ? null : d.id)}
+              style={{
+                ...card, width: 240, textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                borderColor: active ? T.text : T.border, borderWidth: active ? 2 : 1,
+                background: active ? T.accentBg : T.white,
+                display: "flex", flexDirection: "column", gap: 6,
+              }}
+            >
+              <div style={{ fontSize: 24, lineHeight: 1 }}>{d.emoji}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{d.title}</div>
+              <div style={{ fontSize: 12.5, color: T.textMut, lineHeight: 1.4 }}>{d.tagline}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {selected.kind === "mirror" ? (
+            <>
+              <DrillBrief drill={selected} />
+              <MirrorDrill drill={selected} />
+            </>
+          ) : (
+            <DrillRecord key={selected.id} drill={selected} onSession={onSession} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────── Types d'exercice suivis ───────────────
  * Le score global est propre à chaque type (et au cumul global). Les sessions
  * sont déjà persistées avec leur `mode`, donc rien à stocker en plus — on
@@ -1042,6 +1397,7 @@ const SESSION_MODES = [
   { id: EXERCISE_MODES.freeSpeech, label: "Discours libre" },
   { id: EXERCISE_MODES.diction,    label: "Diction" },
   { id: EXERCISE_MODES.structure,  label: "Structure" },
+  { id: EXERCISE_MODES.drills,     label: "Défis" },
 ];
 
 // Tendance d'une série : moyenne de la 2nde moitié (récent) moins la 1re (ancien).
@@ -1252,6 +1608,7 @@ const TABS = [
   { id: EXERCISE_MODES.topics,     label: "Sujets" },
   { id: EXERCISE_MODES.diction,    label: "Diction" },
   { id: EXERCISE_MODES.structure,  label: "Structure" },
+  { id: EXERCISE_MODES.drills,     label: "Défis" },
 ];
 
 /* ─────────────── Réécoute des enregistrements passés ───────────────
@@ -1327,6 +1684,14 @@ function DailyReview({ sessions, store, setStore, onOpenTab }) {
   const review = reviews[dateKey] || null;
   const stale = !!review && review.sessionCount < aggregate.sessionCount;
 
+  // Fermeture du bilan, mémorisée par jour : une fois masqué il ne réapparaît
+  // pas au rechargement. Réversible via la barre compacte « Afficher le bilan ».
+  const dismissed = !!((store && store.dismissedReviews) || {})[dateKey];
+  const setDismissed = (val) => setStore((prev) => ({
+    ...(prev || {}),
+    dismissedReviews: { ...((prev && prev.dismissedReviews) || {}), [dateKey]: val },
+  }));
+
   const modeLabel = (m) => (SESSION_MODES.find((x) => x.id === m) || {}).label;
 
   const generate = async () => {
@@ -1369,6 +1734,16 @@ function DailyReview({ sessions, store, setStore, onOpenTab }) {
 
   if (aggregate.sessionCount < 1 && !review) return null;
 
+  // Bilan fermé : barre compacte discrète pour le rouvrir.
+  if (dismissed) {
+    return (
+      <button type="button" onClick={() => setDismissed(false)}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, alignSelf: "flex-start", padding: "8px 14px", border: `1px solid ${T.border}`, borderRadius: 999, background: T.white, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: T.textSub }}>
+        <Eye size={14} /> Afficher le bilan du jour
+      </button>
+    );
+  }
+
   const axisDefs = [...SCORE_AXES, ...AUDIO_AXES];
 
   return (
@@ -1381,6 +1756,10 @@ function DailyReview({ sessions, store, setStore, onOpenTab }) {
         <button type="button" style={{ ...ghost(false), marginLeft: "auto" }} onClick={generate} disabled={loading}>
           {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={14} />}
           {review ? "Régénérer" : "Générer"}
+        </button>
+        <button type="button" title="Fermer le bilan" aria-label="Fermer le bilan" onClick={() => setDismissed(true)}
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, border: `1px solid ${T.border}`, borderRadius: 8, background: T.white, cursor: "pointer", color: T.textMut, padding: 0 }}>
+          <X size={16} />
         </button>
       </div>
 
@@ -1558,6 +1937,7 @@ export default function EloquencePage() {
       {tab === EXERCISE_MODES.topics && <TopicsTab onPractice={practiceTopic} />}
       {tab === EXERCISE_MODES.diction && <DictionTab onSession={recordSession} />}
       {tab === EXERCISE_MODES.structure && <StructureTab onSession={recordSession} />}
+      {tab === EXERCISE_MODES.drills && <DrillsTab onSession={recordSession} />}
 
       {/* Suivi de progression du type d'exercice affiché (score global propre à l'onglet) */}
       <ProgressByAxis sessions={sessions} mode={tab} />
