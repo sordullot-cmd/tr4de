@@ -200,7 +200,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
   const [tradeNotes, setTradeNotes] = useState({});
   const [tradeStrategies, setTradeStrategies] = useState({});
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
-  const [checkedRules, setCheckedRules] = useState({});
+  // Cases cochées des règles de stratégie : persistées côté compte (Supabase via
+  // useCloudState) avec fallback localStorage. La clé localStorage reste
+  // "tr4de_checked_rules" pour que les autres pages (Dashboard, Stratégies) les lisent.
+  const [checkedRules, setCheckedRules] = useCloudState("tr4de_checked_rules", "trades_checked_rules", {});
   const [emotionTags, setEmotionTags] = useState({});
   const [errorTags, setErrorTags] = useState({});
   // Réponses à la checklist Oui/Non par trade : { [tradeId]: { [questionId]: "yes" | "no" } }
@@ -317,6 +320,27 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     }
     return "";
   };
+
+  // Nombre de trades distincts auxquels chaque stratégie est assignée.
+  // (indexKeysOf déduplique les clés multiples d'un même trade → pas de double compte.)
+  const strategyTradeCounts = React.useMemo(() => {
+    const counts = {};
+    (trades || []).forEach((tr) => {
+      const ids = Array.from(new Set(indexKeysOf(tr).flatMap((k) => tradeStrategies[k] || [])));
+      ids.forEach((id) => { counts[id] = (counts[id] || 0) + 1; });
+    });
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades, tradeStrategies]);
+
+  // Stratégies triées par nombre de trades (décroissant) pour la sélection.
+  // À égalité, on conserve l'ordre alphabétique pour un affichage stable.
+  const strategiesByUsage = React.useMemo(() => {
+    return [...loadedStrategies].sort((a, b) => {
+      const diff = (strategyTradeCounts[b.id] || 0) - (strategyTradeCounts[a.id] || 0);
+      return diff !== 0 ? diff : String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [loadedStrategies, strategyTradeCounts]);
 
   // Groupes "trades pris sur plusieurs comptes" (même symbole/sens/prix d'entrée à 1 min près)
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
@@ -623,25 +647,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
         }
       }
 
-      // Reload checked rules - ONLY use valid boolean values
-      const savedCheckedRules = localStorage.getItem("tr4de_checked_rules");
-      if (savedCheckedRules) {
-        try {
-          const parsed = JSON.parse(savedCheckedRules);
-          // ✅ Clean: filter out non-boolean values to prevent corruption
-          const cleaned = {};
-          Object.keys(parsed).forEach(key => {
-            if (typeof parsed[key] === 'boolean') {
-              cleaned[key] = parsed[key];
-            }
-          });
-          setCheckedRules(cleaned);
-        } catch (e) {
-          console.warn("⚠️ Corrupt checked rules data, resetting");
-          setCheckedRules({});
-          localStorage.removeItem("tr4de_checked_rules");
-        }
-      }
+      // checkedRules : hydratation gérée par useCloudState (localStorage + Supabase).
     } catch (err) {
       console.error("Error loading data from localStorage:", err);
     }
@@ -741,13 +747,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
     return () => clearTimeout(handle);
   }, [tradeStrategies, user?.id]);
 
-  // Auto-save checked rules to localStorage
+  // Notifie les autres composants du même onglet quand les cases changent
+  // (la persistance localStorage + Supabase est assurée par useCloudState ci-dessus ;
+  // le `storage` event natif ne se déclenche que pour les autres onglets).
   React.useEffect(() => {
-    if (Object.keys(checkedRules).length > 0) {
-      localStorage.setItem("tr4de_checked_rules", JSON.stringify(checkedRules));
-    }
-    // Notifier les autres composants du même onglet (le `storage` event
-    // natif ne se déclenche que pour les autres onglets).
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("tr4de:checked-rules-changed"));
     }
@@ -1896,8 +1899,9 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                               {loadedStrategies.length === 0 ? (
                                 <div style={{padding:12,textAlign:"center",fontSize:11,color:T.textSub}}>{t("trades.detail.noStrategy")}</div>
                               ) : (
-                                loadedStrategies.map(strat=>{
+                                strategiesByUsage.map(strat=>{
                                   const isSelected = selectedIds.includes(strat.id);
+                                  const tradeCount = strategyTradeCounts[strat.id] || 0;
                                   return (
                                     <button key={strat.id} onClick={()=>{
                                       // Mise à jour cohérente sur TOUTES les clés du trade
@@ -1913,7 +1917,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                                       setShowStrategyDropdown(false);
                                     }} style={{width:"100%",padding:"8px 12px",borderBottom:`1px solid ${T.border}`,background:isSelected?T.accentBg:T.white,border:"none",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:6,transition:"all .2s"}}>
                                     <div style={{width:10,height:10,borderRadius:3,background:strat.color}}/>
-                                    <div style={{flex:1}}><div style={{fontSize:11,fontWeight:600,color:T.text}}>{strat.name}</div><div style={{fontSize:9,color:T.textSub}}>{t("trades.detail.groupCount").replace("{n}", String(strat.groups?.length || 0))}</div></div>
+                                    <div style={{flex:1}}><div style={{fontSize:11,fontWeight:600,color:T.text}}>{strat.name}</div><div style={{fontSize:9,color:T.textSub}}>{t("trades.detail.groupCount").replace("{n}", String(strat.groups?.length || 0))}{tradeCount > 0 ? ` · ${tradeCount} trade${tradeCount > 1 ? "s" : ""}` : ""}</div></div>
                                     {isSelected && <span style={{fontSize:12}}>✓</span>}
                                     </button>
                                   );
@@ -2201,7 +2205,7 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                 overflowY:"auto",
                 padding:4,
               }}>
-                {(loadedStrategies && loadedStrategies.length > 0) ? loadedStrategies.map(s => (
+                {(strategiesByUsage && strategiesByUsage.length > 0) ? strategiesByUsage.map(s => (
                   <button
                     key={s.id}
                     onClick={() => {
@@ -2216,7 +2220,10 @@ export default function TradesPage({ trades = [], strategies = [], onImportClick
                     onMouseLeave={(e)=>{e.currentTarget.style.background="transparent"}}
                   >
                     <span style={{width:8,height:8,borderRadius:"50%",background:s.color||"#16A34A"}}/>
-                    {s.name}
+                    <span style={{flex:1}}>{s.name}</span>
+                    {(strategyTradeCounts[s.id] || 0) > 0 && (
+                      <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{strategyTradeCounts[s.id]}</span>
+                    )}
                   </button>
                 )) : (
                   <div style={{padding:"10px 10px",fontSize:12,color:"#8E8E8E"}}>Aucune stratégie disponible</div>

@@ -19,9 +19,18 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     if (typeof setPage === "function") setPage("trades");
   };
   // Vue du graphique : "cumulative" | "byAccount" | "byStrategy"
-  const [chartView, setChartView] = React.useState("cumulative");
-  const [hoveredDayIdx, setHoveredDayIdx] = React.useState(null);
+  // Persistée dans localStorage pour survivre au refresh de la page.
   const VIEWS = ["cumulative", "byAccount", "byStrategy"];
+  const [chartView, setChartView] = React.useState(() => {
+    if (typeof window === "undefined") return "cumulative";
+    const saved = localStorage.getItem("tr4de_dashboard_chart_view");
+    return VIEWS.includes(saved) ? saved : "cumulative";
+  });
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("tr4de_dashboard_chart_view", chartView);
+  }, [chartView]);
+  const [hoveredDayIdx, setHoveredDayIdx] = React.useState(null);
   const cycleView = (dir) => {
     const idx = VIEWS.indexOf(chartView);
     const next = (idx + dir + VIEWS.length) % VIEWS.length;
