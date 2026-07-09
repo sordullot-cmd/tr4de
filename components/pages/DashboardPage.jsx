@@ -833,8 +833,8 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               const zeroY = (yMin < 0 && yMax > 0) ? yFor(0) : null;
 
               return (
-                <div style={{position:"relative",width:"100%",height:280,overflow:"hidden"}}>
-                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
+                <div style={{position:"relative",width:"100%",height:280}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",overflow:"hidden",fontFamily:"inherit"}}>
                     {zeroY !== null && (
                       <line x1={padL} y1={zeroY} x2={W} y2={zeroY} stroke="#8E8E8E" strokeWidth="0.5" strokeDasharray="3 3" strokeOpacity="0.5" vectorEffect="non-scaling-stroke"/>
                     )}
@@ -1018,8 +1018,8 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
               const zeroY = (yMin < 0 && yMax > 0) ? yFor(0) : null;
 
               return (
-                <div style={{position:"relative",width:"100%",height:280,overflow:"hidden"}}>
-                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
+                <div style={{position:"relative",width:"100%",height:280}}>
+                  <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",overflow:"hidden",fontFamily:"inherit"}}>
                     {zeroY !== null && (
                       <line x1={padL} y1={zeroY} x2={W} y2={zeroY} stroke="#8E8E8E" strokeWidth="0.5" strokeDasharray="3 3" strokeOpacity="0.5" vectorEffect="non-scaling-stroke"/>
                     )}
