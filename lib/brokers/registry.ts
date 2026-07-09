@@ -114,7 +114,7 @@ export const BROKERS: Record<BrokerId, BrokerAdapter> = {
   topstep: propFirm("topstep", "Topstep", "Prop firm futures. Export CSV depuis TopstepX (Performance → Trades).", "#16A34A", "T", "/brokers/Topstep_Logo.jpg"),
   apex: propFirm("apex", "Apex Trader Funding", "Prop firm futures. Export CSV depuis la plateforme (Tradovate / Rithmic).", "#8B5CF6", "A", "/brokers/apex.avif"),
   alphafutures: propFirm("alphafutures", "Alpha Futures", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#0EA5E9", "A", "/brokers/alpha%20futur.svg"),
-  tradeify: propFirm("tradeify", "Tradeify", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#F43F5E", "T", "/brokers/Tradeify.svg"),
+  tradeify: propFirm("tradeify", "Tradeify", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#F43F5E", "T", "/brokers/Tradeify.png"),
   lucid: propFirm("lucid", "Lucid Trading", "Prop firm futures. Export CSV depuis le dashboard (plateforme ProjectX).", "#6366F1", "L", "/brokers/lucid.png"),
 
   // ── Prop firms forex / CFD ──

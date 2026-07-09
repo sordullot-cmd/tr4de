@@ -32,7 +32,7 @@ const BROKER_LOGOS = {
   "apex trader funding": "/brokers/apex.avif",
   "alphafutures":        "/brokers/alpha futur.svg",
   "alpha futures":       "/brokers/alpha futur.svg",
-  "tradeify":            "/brokers/Tradeify.svg",
+  "tradeify":            "/brokers/Tradeify.png",
   "lucid":               "/brokers/lucid.png",
   "lucid trading":       "/brokers/lucid.png",
   "ftmo":                "/brokers/ftmo.png",

@@ -174,7 +174,7 @@ export default function AddTradePage({ trades, setPage, setAccounts, setSelected
     { id: "topstep",       name: "Topstep",              format: "csv",  iconPath: "/brokers/Topstep_Logo.jpg" },
     { id: "apex",          name: "Apex Trader Funding",  format: "csv",  iconPath: "/brokers/apex.avif" },
     { id: "alphafutures",  name: "Alpha Futures",        format: "csv",  iconPath: "/brokers/alpha%20futur.svg" },
-    { id: "tradeify",      name: "Tradeify",             format: "csv",  iconPath: "/brokers/Tradeify.svg" },
+    { id: "tradeify",      name: "Tradeify",             format: "csv",  iconPath: "/brokers/Tradeify.png" },
     { id: "lucid",         name: "Lucid Trading",        format: "csv",  iconPath: "/brokers/lucid.png" },
     // Prop firms forex / CFD
     { id: "ftmo",          name: "FTMO",                 format: "csv",  iconPath: "/brokers/ftmo.png" },

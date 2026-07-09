@@ -798,8 +798,14 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 return { ...s, filled };
               });
 
-              let yMin = 0, yMax = 0;
+              // Échelle auto-ajustée à la plage réelle des données (sans forcer 0),
+              // pour que les stratégies en négatif ou à faible amplitude restent lisibles
+              // au lieu d'apparaître comme une ligne plate écrasée contre un bord.
+              let yMin = Infinity, yMax = -Infinity;
               seriesFilled.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+              if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 0; }
+              const yPad = (yMax - yMin) * 0.08 || 1;
+              yMin -= yPad; yMax += yPad;
               const yRange = (yMax - yMin) || 1;
 
               const W = 600, H = 240;
@@ -823,10 +829,15 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 const ratio = i / N;
                 yTicks.push({ y: padT + plotH * ratio, value: yMax - ratio * yRange });
               }
+              // Ligne de référence à 0 (seuil gain/perte) si elle est dans la plage visible
+              const zeroY = (yMin < 0 && yMax > 0) ? yFor(0) : null;
 
               return (
-                <div style={{position:"relative",width:"100%",height:280}}>
+                <div style={{position:"relative",width:"100%",height:280,overflow:"hidden"}}>
                   <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
+                    {zeroY !== null && (
+                      <line x1={padL} y1={zeroY} x2={W} y2={zeroY} stroke="#8E8E8E" strokeWidth="0.5" strokeDasharray="3 3" strokeOpacity="0.5" vectorEffect="non-scaling-stroke"/>
+                    )}
                     <defs>
                       {seriesFilled.map(s => (
                         <linearGradient key={`g-${s.id}`} id={`dash-strat-grad-${s.id}`} x1="0" y1="0" x2="0" y2="1">
@@ -970,8 +981,16 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 return { ...s, filled };
               });
 
-              let yMin = 0, yMax = 0;
-              seriesFilled.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+              // Échelle auto-ajustée à la plage réelle (sans forcer 0). On la calcule
+              // sur les comptes mis en avant (sélectionnés) pour qu'ils restent lisibles ;
+              // un compte en négatif ou à faible amplitude ne s'écrase plus en ligne plate.
+              const scaleSeries = seriesFilled.filter(s => selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id));
+              const scaleSource = scaleSeries.length > 0 ? scaleSeries : seriesFilled;
+              let yMin = Infinity, yMax = -Infinity;
+              scaleSource.forEach(s => s.filled.forEach(p => { if (p.value < yMin) yMin = p.value; if (p.value > yMax) yMax = p.value; }));
+              if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 0; }
+              const yPad = (yMax - yMin) * 0.08 || 1;
+              yMin -= yPad; yMax += yPad;
               const yRange = (yMax - yMin) || 1;
 
               const W = 600, H = 240;
@@ -995,10 +1014,15 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 const ratio = i / N;
                 yTicks.push({ y: padT + plotH * ratio, value: yMax - ratio * yRange });
               }
+              // Ligne de référence à 0 (seuil gain/perte) si elle est dans la plage visible
+              const zeroY = (yMin < 0 && yMax > 0) ? yFor(0) : null;
 
               return (
-                <div style={{position:"relative",width:"100%",height:280}}>
+                <div style={{position:"relative",width:"100%",height:280,overflow:"hidden"}}>
                   <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{display:"block",position:"absolute",top:0,left:0,right:64,bottom:0,width:"calc(100% - 64px)",fontFamily:"inherit"}}>
+                    {zeroY !== null && (
+                      <line x1={padL} y1={zeroY} x2={W} y2={zeroY} stroke="#8E8E8E" strokeWidth="0.5" strokeDasharray="3 3" strokeOpacity="0.5" vectorEffect="non-scaling-stroke"/>
+                    )}
                     {/* Lignes de grille */}
                     {/* Courbes — non-sélectionnés en arrière-plan, sélectionnés au-dessus */}
                     {seriesFilled.filter(s => !(selectedAccountIds.length === 0 || selectedAccountIds.includes(s.id))).map(s => {
