@@ -5,7 +5,6 @@ import { T } from "@/lib/ui/tokens";
 import { t, useLang } from "@/lib/i18n";
 import { fmt } from "@/lib/ui/format";
 import { getCurrencySymbol } from "@/lib/userPrefs";
-import AIReportSummaryCard from "@/components/AIReportSummaryCard";
 import { Skeleton, SkeletonRows } from "@/components/ui/Skeleton";
 import { useApp } from "@/lib/contexts/AppContext";
 import { LayoutDashboard, Plus } from "lucide-react";
@@ -65,6 +64,10 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   }, []);
   const [emotionTags, setEmotionTags] = React.useState({});
   const [errorTags, setErrorTags] = React.useState({});
+  // Tags par trade partagés avec TradesPage (miroir localStorage de useCloudState)
+  const [liquidityTags, setLiquidityTags] = React.useState({});
+  const [entryTags, setEntryTags] = React.useState({});
+  const [timeframeTags, setTimeframeTags] = React.useState({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
   const [selectedDay, setSelectedDay] = React.useState(null);
@@ -93,6 +96,28 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     { id: "wronganalysis", label: t("errtag.wronganalysis"), color: "#8B6BB6" }
   ];
 
+  // Catégories ICT/SMC + unité de temps — identiques à TradesPage (pour recouper les stats).
+  const allEntryTags = [
+    { id: "fvg", label: "FVG", color: "#5B7EC9" },
+    { id: "ifvg", label: "IFVG", color: "#4A9D6F" },
+    { id: "ob", label: "OB", color: "#8B6BB6" },
+    { id: "rejectionblock", label: "RB", color: "#D4A574" }
+  ];
+  const allLiquidityTags = [
+    { id: "pdhpdl", label: "PDH/PDL", color: "#5B7EC9" },
+    { id: "equalhl", label: "Equal Highs/Lows", color: "#4A9D6F" },
+    { id: "asianhl", label: "Asian H/L", color: "#D4A574" },
+    { id: "sessionhl", label: "Session H/L", color: "#8B6BB6" },
+    { id: "trendline", label: "Trendline", color: "#C94F4F" }
+  ];
+  const allTimeframeTags = [
+    { id: "M1", label: "M1", color: "#C94F4F" },
+    { id: "M5", label: "M5", color: "#D4A574" },
+    { id: "M15", label: "M15", color: "#4A9D6F" },
+    { id: "H1", label: "H1", color: "#5B7EC9" },
+    { id: "H4", label: "H4", color: "#8B6BB6" }
+  ];
+
   // Load emotion tags from localStorage
   React.useEffect(() => {
     try {
@@ -117,6 +142,21 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
     } catch (err) {
       console.error("Error loading error tags:", err);
     }
+  }, []);
+
+  // Load liquidity / entry / timeframe tags from localStorage (miroir useCloudState)
+  React.useEffect(() => {
+    const load = (key, setter) => {
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved) setter(JSON.parse(saved));
+      } catch (err) {
+        console.error(`Error loading ${key}:`, err);
+      }
+    };
+    load("tr4de_trade_liquidity_tags", setLiquidityTags);
+    load("tr4de_trade_entry_tags", setEntryTags);
+    load("tr4de_trade_timeframe", setTimeframeTags);
   }, []);
 
   // Pendant que les trades arrivent depuis Supabase, afficher un skeleton
@@ -475,6 +515,60 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
   // Prepare day labels
   const dayLabelsFull = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
   const dayLabelsFr = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+
+  // Winrate + P&L par valeur de catégorie. `getTags(trade)` renvoie la liste
+  // des ids de tags du trade (valeur unique → tableau à 1 élément).
+  const categoryStats = (items, getTags) =>
+    items
+      .map(item => {
+        const matched = filteredTrades.filter(tr => getTags(tr).includes(item.id));
+        const count = matched.length;
+        const wins = matched.filter(tr => tr.pnl > 0).length;
+        const pnl = matched.reduce((s, tr) => s + tr.pnl, 0);
+        return { ...item, count, wins, pnl, winrate: count ? (wins / count) * 100 : 0 };
+      })
+      .filter(r => r.count > 0)
+      .sort((a, b) => b.pnl - a.pnl);
+
+  const entryStats = categoryStats(allEntryTags, tr => entryTags[tr.id] || []);
+  const liquidityStats = categoryStats(allLiquidityTags, tr => liquidityTags[tr.id] || []);
+  const timeframeStats = categoryStats(allTimeframeTags, tr => {
+    const v = timeframeTags[tr.id];
+    return v ? [v] : [];
+  });
+
+  // Carte générique « Winrate + P&L par catégorie »
+  const renderCategoryCard = (title, subtitle, rows) => (
+    <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:700,color:T.text}}>{title}</div>
+        <div style={{fontSize:12,color:T.textSub}}>{subtitle}</div>
+      </div>
+      {rows.length === 0 ? (
+        <div style={{fontSize:12,color:T.textMut,padding:"12px 0"}}>Aucune donnée renseignée</div>
+      ) : (
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1.4fr 0.6fr 0.8fr 0.9fr",gap:8,fontSize:10,fontWeight:600,color:T.textMut,paddingBottom:8,borderBottom:`1px solid ${T.border}`}}>
+            <div>Catégorie</div>
+            <div style={{textAlign:"right"}}>Trades</div>
+            <div style={{textAlign:"right"}}>Winrate</div>
+            <div style={{textAlign:"right"}}>P&L</div>
+          </div>
+          {rows.map((r, i) => (
+            <div key={r.id} style={{display:"grid",gridTemplateColumns:"1.4fr 0.6fr 0.8fr 0.9fr",gap:8,alignItems:"center",padding:"10px 0",borderBottom:i<rows.length-1?`1px solid ${T.border}`:"none"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                <span style={{width:8,height:8,borderRadius:"50%",background:r.color,flexShrink:0}}/>
+                <span style={{fontSize:12,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.label}</span>
+              </div>
+              <div style={{textAlign:"right",fontSize:12,color:T.textSub}}>{r.count}</div>
+              <div style={{textAlign:"right",fontSize:12,fontWeight:600,color:r.winrate>=50?T.green:T.red}}>{r.winrate.toFixed(0)}%</div>
+              <div style={{textAlign:"right",fontSize:12,fontWeight:600,color:r.pnl>0?T.green:r.pnl<0?T.red:T.textMut}}>{r.pnl>=0?"+":""}{fmt(r.pnl,false)}</div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,fontFamily:"var(--font-sans)"}} className="anim-1">
@@ -1142,7 +1236,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
 
       </div>  {/* fin MERGED CARD (KPIs + P&L Cumulatif) */}
 
-      {/* GRID: Calendrier + Rapport IA */}
+      {/* GRID: Calendrier + tao score */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1.5fr",gap:20,alignItems:"start"}}>
 
       {/* CALENDRIER P&L */}
@@ -1219,81 +1313,77 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
         </div>
       </div>
 
-      {/* AI REPORT SUMMARY (droite) */}
-      <div style={{marginTop:20,marginBottom:20}}>
-        <AIReportSummaryCard onOpenReports={setPage ? () => setPage("agent") : undefined} />
-      </div>
+      {/* TAO SCORE CARD (droite) */}
+      <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)",marginTop:8,marginBottom:8}}>
+        <div style={{marginBottom:16}}>
+          <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>{t("dash.tr4deScore")}</h3>
+          <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>{t("dash.tr4deScoreSub")}</p>
+        </div>
 
-      </div>  {/* Close Calendrier + Rapport IA grid */}
-
-      {/* TR4DE SCORE + RECENT TRADES + EMOTIONAL IMPACT */}
-      <div style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 1.1fr",gap:8}}>
-        {/* TR4DE SCORE CARD */}
-        <div style={{background:"#FFFFFF",border:`1px solid #E5E5E5`,borderRadius:12,padding:"20px 24px",fontFamily:"var(--font-sans)"}}>
-          <div style={{marginBottom:16}}>
-            <h3 style={{fontSize:15,fontWeight:600,color:"#0D0D0D",margin:0,letterSpacing:-0.1}}>{t("dash.tr4deScore")}</h3>
-            <p style={{fontSize:12,color:"#8E8E8E",margin:"2px 0 0"}}>{t("dash.tr4deScoreSub")}</p>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{display:"flex",justifyContent:"center",width:"100%",paddingTop:12,overflow:"visible"}}>
+            <PentagonRadar metrics={pentagonMetrics} size={280} />
           </div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            <div style={{display:"flex",justifyContent:"center",width:"100%",paddingTop:12,overflow:"visible"}}>
-              <PentagonRadar metrics={pentagonMetrics} size={280} />
+          <div>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+                <span style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2,lineHeight:1}}>
+                  {pentagonMetrics.overallScore}
+                </span>
+                <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
+              </div>
+              <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{t("dash.globalScore")}</span>
             </div>
 
-            <div>
-              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"baseline",gap:5}}>
-                  <span style={{fontSize:20,fontWeight:600,color:"#0D0D0D",letterSpacing:-0.2,lineHeight:1}}>
-                    {pentagonMetrics.overallScore}
-                  </span>
-                  <span style={{fontSize:12,color:"#8E8E8E",fontWeight:500}}>/ 100</span>
-                </div>
-                <span style={{fontSize:11,color:"#8E8E8E",fontWeight:500}}>{t("dash.globalScore")}</span>
-              </div>
-
-              <div style={{position:"relative",height:10,paddingTop:2}}>
-                <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
-                  <div
-                    style={{
-                      width:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                      height:"100%",
-                      background:"#5F7FB4",
-                      transition:"width 0.6s ease",
-                      borderRadius:3,
-                    }}
-                  />
-                  {[20,40,60,80].map(v => (
-                    <div key={v} style={{position:"absolute",left:`${v}%`,top:0,bottom:0,width:1,background:"rgba(255,255,255,0.65)",transform:"translateX(-0.5px)",pointerEvents:"none"}} />
-                  ))}
-                </div>
+            <div style={{position:"relative",height:10,paddingTop:2}}>
+              <div style={{position:"relative",height:6,background:"#F0F0F0",borderRadius:3,overflow:"hidden"}}>
                 <div
                   style={{
-                    position:"absolute",
-                    left:`${parseFloat(pentagonMetrics.overallScore)}%`,
-                    top:"50%",
-                    transform:"translate(-50%, -50%)",
-                    width:14,
-                    height:14,
-                    borderRadius:"50%",
+                    width:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                    height:"100%",
                     background:"#5F7FB4",
-                    border:"2px solid #FFFFFF",
-                    boxShadow:"0 1px 3px rgba(0,0,0,0.15)",
-                    transition:"left 0.6s ease",
-                    pointerEvents:"none",
+                    transition:"width 0.6s ease",
+                    borderRadius:3,
                   }}
                 />
+                {[20,40,60,80].map(v => (
+                  <div key={v} style={{position:"absolute",left:`${v}%`,top:0,bottom:0,width:1,background:"rgba(255,255,255,0.65)",transform:"translateX(-0.5px)",pointerEvents:"none"}} />
+                ))}
               </div>
-              <div style={{position:"relative",height:12,marginTop:4}}>
-                {[0,20,40,60,80,100].map(v => {
-                  const tx = v === 0 ? "translateX(0)" : v === 100 ? "translateX(-100%)" : "translateX(-50%)";
-                  return (
-                    <span key={v} style={{position:"absolute",left:`${v}%`,transform:tx,fontSize:9,color:"#8E8E8E",fontWeight:500,fontVariantNumeric:"tabular-nums"}}>{v}</span>
-                  );
-                })}
-              </div>
+              <div
+                style={{
+                  position:"absolute",
+                  left:`${parseFloat(pentagonMetrics.overallScore)}%`,
+                  top:"50%",
+                  transform:"translate(-50%, -50%)",
+                  width:14,
+                  height:14,
+                  borderRadius:"50%",
+                  background:"#5F7FB4",
+                  border:"2px solid #FFFFFF",
+                  boxShadow:"0 1px 3px rgba(0,0,0,0.15)",
+                  transition:"left 0.6s ease",
+                  pointerEvents:"none",
+                }}
+              />
+            </div>
+            <div style={{position:"relative",height:12,marginTop:4}}>
+              {[0,20,40,60,80,100].map(v => {
+                const tx = v === 0 ? "translateX(0)" : v === 100 ? "translateX(-100%)" : "translateX(-50%)";
+                return (
+                  <span key={v} style={{position:"absolute",left:`${v}%`,transform:tx,fontSize:9,color:"#8E8E8E",fontWeight:500,fontVariantNumeric:"tabular-nums"}}>{v}</span>
+                );
+              })}
             </div>
           </div>
         </div>
+      </div>
+
+      </div>  {/* Close Calendrier + tao score grid */}
+
+      {/* RECENT TRADES + EMOTIONAL IMPACT */}
+      <div style={{display:"grid",gridTemplateColumns:"1.2fr 1.1fr",gap:8}}>
 
         <div style={{background:T.white,border:`1px solid ${T.border}`,borderRadius:12,padding:16,overflow:"hidden"}}>
           <div style={{marginBottom:12}}>
@@ -1354,7 +1444,9 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
             
             const totalPnL = tradesWithTag.reduce((sum, t) => sum + t.pnl, 0);
             const pnlColor = totalPnL >= 0 ? T.green : T.red;
-            
+            const wins = tradesWithTag.filter(t => t.pnl > 0).length;
+            const winrate = tradesWithTag.length ? (wins / tradesWithTag.length) * 100 : 0;
+
             return (
               <div key={tag.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingBottom:8,borderBottom:`1px solid ${T.border}`}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -1363,6 +1455,7 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:16}}>
                   <div style={{fontSize:12,color:T.textSub,textAlign:"right",minWidth:30}}>{tradesWithTag.length}x</div>
+                  <div style={{fontSize:12,fontWeight:600,color:winrate>=50?T.green:T.red,textAlign:"right",minWidth:44}}>{winrate.toFixed(0)}%</div>
                   <div style={{fontSize:12,fontWeight:600,color:pnlColor,textAlign:"right",minWidth:80}}>{totalPnL>=0?"+":""}{fmt(totalPnL,false)}</div>
                 </div>
               </div>
@@ -1370,6 +1463,13 @@ export default function DashboardPage({ trades = [], allTrades = [], accounts = 
           })}
         </div>
         </div>
+      </div>
+
+      {/* PERFORMANCE PAR CATÉGORIE (entrée / liquidité / unité de temps) */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+        {renderCategoryCard("Type d'entrée", "Winrate & P&L par point d'entrée", entryStats)}
+        {renderCategoryCard("Liquidité ciblée", "Winrate & P&L par liquidité visée", liquidityStats)}
+        {renderCategoryCard("Unité de temps", "Winrate & P&L par timeframe d'analyse", timeframeStats)}
       </div>
 
       {/* DAY OF WEEK TABLE */}

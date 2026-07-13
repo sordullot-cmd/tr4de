@@ -16,6 +16,7 @@ const fmtNoCents = (n) => {
 };
 import { Plus, Trophy, Wallet, Users, Target as TargetIcon, Pencil, Trash2, Check, X, Calendar, ChevronDown } from "lucide-react";
 import { isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
+import { isArchivedAccount, ARCHIVED_VIEW_ID } from "@/lib/utils/archivedAccounts";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import ReactDOM from "react-dom";
 import { RoadmapSection } from "@/components/pages/ScalingPage";
@@ -90,56 +91,98 @@ const parseEvalSize = (size) => {
   return num;
 };
 
-export default function AccountsPage({ accounts = [], trades = [], setPage, selectedAccountIds = [], setSelectedAccountIds, setSelectedAccountDetailId, setAccounts }) {
+export default function AccountsPage({ accounts = [], trades = [], setPage, selectedAccountIds = [], setSelectedAccountIds, setSelectedAccountDetailId, setAccounts, archivedMeta = {}, setArchivedMeta }) {
   useLang();
-  const visibleAccounts = (accounts || []).filter((a) => !isPlaceholderAccount(a.id));
+  const notPlaceholder = (accounts || []).filter((a) => !isPlaceholderAccount(a.id));
+  // Comptes actifs (grille principale + KPI) vs comptes eval archivés (section
+  // dédiée en bas). Un compte archivé garde ses trades mais son P&L ne compte
+  // plus dans les totaux du site.
+  const visibleAccounts = notPlaceholder.filter((a) => !isArchivedAccount(a.id, archivedMeta));
+  // Comptes eval passés : le compte a été SUPPRIMÉ de la base, on le
+  // reconstruit à partir des métadonnées d'archivage (nom, taille, trade_ids).
+  const archivedAccounts = React.useMemo(
+    () => Object.entries(archivedMeta || {}).map(([id, m]) => ({
+      id,
+      name: m?.name || "Compte",
+      broker: m?.broker || null,
+      eval_account_size: m?.eval_account_size || null,
+      account_type: "eval",
+      trade_ids: Array.isArray(m?.trade_ids) ? m.trade_ids : [],
+      archived_at: m?.archived_at || null,
+    })),
+    [archivedMeta]
+  );
   const [fundedMeta, setFundedMeta] = React.useState(() => readFundedMeta());
 
-  // Met le compte en "funded" : passe account_type=funded en base, mémorise
-  // funded_at et les paramètres (target dépassée, DD max, payout min). Les
-  // trades antérieurs restent visibles mais le PnL "funded" repart de 0.
-  const markFunded = async (acc) => {
-    if (!acc) return;
-    const capital = parseEvalSize(acc.eval_account_size) || 0;
-    const inferred = inferEvalParams(capital);
-    const meta = {
-      funded_at: new Date().toISOString(),
-      eval_profit_target: inferred.profitTarget,
-      funded_max_dd: inferred.maxDD,
-      funded_payout_min: inferred.payoutMin,
-    };
-    const nextMeta = { ...fundedMeta, [acc.id]: meta };
-    writeFundedMeta(nextMeta);
-    setFundedMeta(nextMeta);
+  // Passage funded : on crée un tout nouveau compte funded vierge (P&L à 0, MÊME
+  // nom que l'eval, sans suffixe), puis on SUPPRIME le compte eval de la base
+  // (il disparaît donc de partout : sélecteurs, page Add Trade, réglages…).
+  // Les trades de l'eval sont conservés (FK ON DELETE SET NULL) et restitués
+  // dans la carte agrégée « Comptes eval passés » via leurs trade_ids ; ils
+  // restent aussi dans la page Stratégies (mapping par trade, pas par compte).
+  const [passing, setPassing] = React.useState(null); // id du compte en cours de passage
+  const passToFunded = async (acc) => {
+    if (!acc || passing) return;
+    setPassing(acc.id);
     try {
       const sb = createClient();
-      const { error } = await sb
-        .from("trading_accounts")
-        .update({ account_type: "funded" })
-        .eq("id", acc.id);
-      if (error) console.error("⚠️ Update funded failed:", error);
-    } catch (e) {
-      console.error("⚠️ Update funded exception:", e);
-    }
-    // MAJ locale immédiate
-    if (setAccounts) {
-      setAccounts(prev => (prev || []).map(a => a.id === acc.id ? { ...a, account_type: "funded" } : a));
-    }
-  };
+      const { data: { user } } = await sb.auth.getUser();
+      const userId = user?.id;
+      if (!userId) { console.error("⚠️ passToFunded: pas d'utilisateur connecté"); setPassing(null); return; }
 
-  // Repasser un funded en eval (au cas où l'utilisateur a cliqué par erreur).
-  const undoFunded = async (acc) => {
-    if (!acc) return;
-    const nextMeta = { ...fundedMeta };
-    delete nextMeta[acc.id];
-    writeFundedMeta(nextMeta);
-    setFundedMeta(nextMeta);
-    try {
-      const sb = createClient();
-      await sb.from("trading_accounts").update({ account_type: "eval" }).eq("id", acc.id);
-    } catch (e) { console.error(e); }
-    if (setAccounts) {
-      setAccounts(prev => (prev || []).map(a => a.id === acc.id ? { ...a, account_type: "eval" } : a));
+      // trade_ids de l'eval (pour garder l'attribution dans la carte agrégée)
+      const evalTradeIds = (trades || [])
+        .filter(t => t.account_id === acc.id)
+        .map(t => t.id)
+        .filter(Boolean);
+
+      // 1. Créer le nouveau compte funded vierge — MÊME nom (pas de suffixe)
+      const { data: created, error: insErr } = await sb
+        .from("trading_accounts")
+        .insert([{
+          user_id: userId,
+          name: acc.name || "Compte",
+          broker: acc.broker || null,
+          account_type: "funded",
+          eval_account_size: acc.eval_account_size || null,
+        }])
+        .select();
+      if (insErr) { console.error("⚠️ Création compte funded échouée:", insErr); setPassing(null); return; }
+      const newAcc = created?.[0];
+
+      // 2. Mémoriser l'eval passé (snapshot pour la carte agrégée)
+      setArchivedMeta?.(prev => ({
+        ...(prev || {}),
+        [acc.id]: {
+          archived_at: new Date().toISOString(),
+          name: acc.name || "Compte",
+          broker: acc.broker || null,
+          eval_account_size: acc.eval_account_size || null,
+          trade_ids: evalTradeIds,
+          funded_child_id: newAcc?.id || null,
+        },
+      }));
+
+      // 3. Supprimer le compte eval en base (trades conservés via SET NULL)
+      const { error: delErr } = await sb.from("trading_accounts").delete().eq("id", acc.id);
+      if (delErr) console.error("⚠️ Suppression compte eval échouée:", delErr);
+
+      // 4. MAJ locale : retirer l'eval, ajouter le funded, ajuster la sélection
+      if (setAccounts) {
+        setAccounts(prev => [newAcc, ...(prev || []).filter(a => a.id !== acc.id)]);
+      }
+      if (setSelectedAccountIds) {
+        setSelectedAccountIds(prev => {
+          const next = (prev || []).filter(id => id !== acc.id);
+          if (newAcc && !next.includes(newAcc.id)) next.push(newAcc.id);
+          try { localStorage.setItem("selectedAccountIds", JSON.stringify(next)); } catch {}
+          return next;
+        });
+      }
+    } catch (e) {
+      console.error("⚠️ passToFunded exception:", e);
+    } finally {
+      setPassing(null);
     }
   };
 
@@ -154,7 +197,9 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
     const map = new Map();
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    for (const acc of visibleAccounts) {
+    // Stats des comptes actifs (les comptes eval passés sont supprimés de la
+    // base et gérés séparément via `archivedStats`, à partir des trade_ids).
+    for (const acc of notPlaceholder) {
       map.set(acc.id, {
         trades: 0, wins: 0, losses: 0, pnl: 0, monthlyPnl: 0,
         peak: 0, maxDD: 0,
@@ -171,7 +216,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
     // Index des comptes funded pour savoir si on doit alimenter les stats funded.
     // Si funded_at n'existe pas (compte créé directement en funded), on
     // compte tous les trades — sinon uniquement ceux après funded_at.
-    const accById = new Map(visibleAccounts.map(a => [a.id, a]));
+    const accById = new Map(notPlaceholder.map(a => [a.id, a]));
     for (const tr of sortedTrades) {
       const s = map.get(tr.account_id);
       if (!s) continue;
@@ -202,16 +247,15 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
       }
     }
     return map;
-  }, [visibleAccounts, trades, fundedMeta]);
+  }, [notPlaceholder, trades, fundedMeta]);
 
   const totals = React.useMemo(() => {
+    // Totaux du site = comptes actifs uniquement (les eval archivés en sont
+    // exclus : leur P&L n'apparaît que sur leur propre carte / détail).
     let trades = 0, pnl = 0, wins = 0, capital = 0;
-    for (const s of stats.values()) {
-      trades += s.trades;
-      pnl += s.pnl;
-      wins += s.wins;
-    }
     for (const acc of visibleAccounts) {
+      const s = stats.get(acc.id);
+      if (s) { trades += s.trades; pnl += s.pnl; wins += s.wins; }
       capital += parseEvalSize(acc.eval_account_size) || 0;
     }
     return { trades, pnl, wins, capital, accounts: visibleAccounts.length };
@@ -226,6 +270,25 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
     setSelectedAccountDetailId?.(id);
     setPage?.("account-detail");
   };
+
+  // Stats des comptes eval passés : leurs trades ont perdu account_id (compte
+  // supprimé), on les retrouve par trade_ids stockés dans l'archivage.
+  const archivedStats = React.useMemo(() => {
+    const idToAcc = {};
+    archivedAccounts.forEach(a => (a.trade_ids || []).forEach(tid => { idToAcc[tid] = a.id; }));
+    const map = new Map();
+    archivedAccounts.forEach(a => map.set(a.id, { trades: 0, wins: 0, losses: 0, pnl: 0 }));
+    (trades || []).forEach(tr => {
+      const accId = idToAcc[tr.id];
+      if (!accId) return;
+      const s = map.get(accId);
+      if (!s) return;
+      const p = Number(tr.pnl) || 0;
+      s.trades += 1; s.pnl += p;
+      if (p > 0) s.wins += 1; else if (p < 0) s.losses += 1;
+    });
+    return map;
+  }, [archivedAccounts, trades]);
 
   const winRateGlobal = totals.trades > 0 ? (totals.wins / totals.trades) * 100 : 0;
   const pnlColorGlobal = totals.pnl > 0 ? T.green : totals.pnl < 0 ? T.red : T.text;
@@ -277,7 +340,7 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
       </div>
 
       {/* Liste des comptes */}
-      {visibleAccounts.length === 0 ? (
+      {visibleAccounts.length === 0 && archivedAccounts.length === 0 ? (
         <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 12, padding: "40px 40px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, background: T.accentBg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
             <Wallet size={22} strokeWidth={1.75} color={T.text} />
@@ -290,7 +353,8 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
         </div>
       ) : (
         <div className="anim-stagger tr4de-accounts-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-          {[...visibleAccounts].sort((a, b) => {
+          {(() => {
+            const cards = [...visibleAccounts].sort((a, b) => {
             const sa = stats.get(a.id) || { trades: 0, pnl: 0 };
             const sb = stats.get(b.id) || { trades: 0, pnl: 0 };
             if (sb.trades !== sa.trades) return sb.trades - sa.trades;
@@ -376,8 +440,11 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
               >
                 {/* Nom du compte */}
                 <div style={{ paddingRight: 200, marginBottom: 6 /* respiration avant la ligne type · broker */ }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.3, letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {acc.name || "Compte"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: dotColor, flexShrink: 0 }} title={typeLabel} />
+                    <span style={{ fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.3, letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {acc.name || "Compte"}
+                    </span>
                   </div>
                 </div>
 
@@ -491,30 +558,143 @@ export default function AccountsPage({ accounts = [], trades = [], setPage, sele
                         Objectif atteint ({fmtNoCents(evalParams.profitTarget)})
                       </div>
                       <div style={{ fontSize: 11, color: T.textSub }}>
-                        Passe le compte en funded — les trades sont gardés, le PnL repart de 0.
+                        Crée un nouveau compte funded vierge. L&apos;eval est archivé (ses trades restent dans Stratégies).
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); markFunded(acc); }}
+                      disabled={passing === acc.id}
+                      onClick={(e) => { e.stopPropagation(); passToFunded(acc); }}
                       style={{
                         padding: "6px 12px", borderRadius: 999,
                         border: `1px solid ${T.green}`, background: T.white, color: T.green,
-                        fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                        whiteSpace: "nowrap",
+                        fontSize: 11, fontWeight: 600, cursor: passing === acc.id ? "wait" : "pointer", fontFamily: "inherit",
+                        whiteSpace: "nowrap", opacity: passing === acc.id ? 0.6 : 1,
                       }}>
-                      Valider en Funded
+                      {passing === acc.id ? "Création…" : "Passer en Funded"}
                     </button>
                   </div>
                 )}
               </div>
             );
-          })}
+          });
+            // Carte agrégée « Comptes eval passés » insérée en 2e position
+            // (haut-droite en layout 2 colonnes) pour qu'elle soit bien visible.
+            if (archivedAccounts.length > 0) {
+              cards.splice(1, 0, (
+                <ArchivedAccountsCard
+                  key="__archived_card__"
+                  accounts={archivedAccounts}
+                  stats={archivedStats}
+                  onOpen={() => onOpenDetail(ARCHIVED_VIEW_ID)}
+                />
+              ));
+            }
+            return cards;
+          })()}
         </div>
       )}
 
       {/* Simulateur de scaling — bloc déplacé depuis la page Scaling */}
       <ScalingSimulator accounts={visibleAccounts} />
+    </div>
+  );
+}
+
+/* ============== CARTE UNIQUE « COMPTES EVAL PASSÉS » (ARCHIVÉS) ==============
+   Une seule carte qui agrège toutes les données de tous les comptes eval passés.
+   Le clic ouvre la vue détail agrégée (AccountDetailPage en mode ARCHIVED_VIEW_ID),
+   où l'on peut filtrer/trier par compte individuel. */
+function ArchivedDonut({ winRate: wr, size = 48 }) {
+  const radius = size / 2 - 6;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (wr / 100) * circumference;
+  const color = wr >= 50 ? T.green : T.red;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.05))" }}>
+      <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={T.border} strokeWidth="5" />
+      <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth="5"
+        strokeDasharray={circumference} strokeDashoffset={offset}
+        strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`} />
+    </svg>
+  );
+}
+
+function ArchivedAccountsCard({ accounts = [], stats, onOpen }) {
+  // Agrégat de tous les comptes archivés
+  const agg = React.useMemo(() => {
+    let trades = 0, wins = 0, losses = 0, pnl = 0, capital = 0;
+    for (const acc of accounts) {
+      const s = stats.get(acc.id);
+      if (s) { trades += s.trades; wins += s.wins; losses += s.losses; pnl += s.pnl; }
+      capital += parseEvalSize(acc.eval_account_size) || 0;
+    }
+    const winRate = trades > 0 ? (wins / trades) * 100 : 0;
+    return { trades, wins, losses, pnl, capital, winRate };
+  }, [accounts, stats]);
+
+  const pnlColor = agg.pnl > 0 ? T.green : agg.pnl < 0 ? T.red : T.textSub;
+
+  return (
+    <div
+      data-card
+      onClick={onOpen}
+      style={{
+        position: "relative", display: "flex", flexDirection: "column", gap: 8,
+        padding: 20, background: T.surface, border: `1px solid ${T.border}`,
+        borderRadius: 12, cursor: "pointer",
+        transition: "border-color .15s, box-shadow .15s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.boxShadow = "none"; }}
+    >
+      {/* Titre + pill */}
+      <div style={{ paddingRight: 160, marginBottom: 6 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.3, letterSpacing: -0.1 }}>
+          Comptes eval passés
+        </div>
+        <div style={{ fontSize: 11, color: T.textMut, marginTop: 3 }}>
+          Données unifiées · exclues des totaux du site, conservées dans Stratégies
+        </div>
+      </div>
+      <div style={{ position: "absolute", top: 16, right: 16, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 5,
+          padding: "2px 8px", borderRadius: 999,
+          border: `1px solid ${T.border}`, background: T.white,
+          fontSize: 11, color: T.textSub, fontWeight: 500, whiteSpace: "nowrap",
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, flexShrink: 0 }} />
+          {accounts.length} compte{accounts.length > 1 ? "s" : ""} archivé{accounts.length > 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* Ligne P&L | Win rate | Trades */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <div style={{ fontSize: 20, fontWeight: 600, color: pnlColor, letterSpacing: -0.2, fontVariantNumeric: "tabular-nums" }}>
+            {agg.trades > 0 ? fmt(agg.pnl, true) : "—"}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: T.textSub }}>P&L cumulé</div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, justifySelf: "center" }}>
+          <ArchivedDonut winRate={agg.trades > 0 ? Math.round(agg.winRate) : 0} size={48} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Win rate</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: T.text, fontVariantNumeric: "tabular-nums" }}>
+              {agg.trades > 0 ? `${agg.winRate.toFixed(1)}%` : "—"}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, justifySelf: "end", textAlign: "right" }}>
+          <div style={{ fontSize: 12, color: T.textSub, fontWeight: 500 }}>Trades</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: T.text, letterSpacing: -0.1, fontVariantNumeric: "tabular-nums" }}>
+            {agg.trades}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

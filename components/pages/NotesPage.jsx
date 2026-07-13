@@ -484,6 +484,29 @@ export default function NotesPage() {
                       return;
                     }
                   }
+                  // Backspace : supprimer un bloc d'indentation (jusqu'à 8
+                  // espaces) d'un seul coup, comme s'il s'agissait d'une
+                  // tabulation, au lieu d'espace par espace.
+                  if (e.key === "Backspace") {
+                    const ta = e.currentTarget;
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    if (start === end && start > 0) {
+                      const lineStart = draft.lastIndexOf("\n", start - 1) + 1;
+                      const prefix = draft.slice(lineStart, start);
+                      // Uniquement dans la zone d'indentation en début de ligne
+                      if (prefix.length > 0 && /^ +$/.test(prefix)) {
+                        const n = prefix.length;
+                        const remove = n % 8 === 0 ? 8 : n % 8;
+                        e.preventDefault();
+                        const next = draft.slice(0, start - remove) + draft.slice(start);
+                        setDraft(next);
+                        const pos = start - remove;
+                        requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = pos; });
+                        return;
+                      }
+                    }
+                  }
                   if (e.key === "Tab") {
                     e.preventDefault();
                     const ta = e.currentTarget;

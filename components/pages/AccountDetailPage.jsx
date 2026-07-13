@@ -7,6 +7,7 @@ import { getCurrencySymbol } from "@/lib/userPrefs";
 import { ArrowLeft, ArrowRight, TrendingUp as LucideTrendingUp } from "lucide-react";
 import TradesPage from "@/components/pages/TradesPage";
 import { t, useLang } from "@/lib/i18n";
+import { ARCHIVED_VIEW_ID } from "@/lib/utils/archivedAccounts";
 
 const fmtNoCents = (n) => {
   const sym = getCurrencySymbol();
@@ -51,10 +52,56 @@ const BROKER_LOGOS = {
 };
 const getBrokerLogo = (b) => b ? (BROKER_LOGOS[String(b).trim().toLowerCase()] || null) : null;
 
-export default function AccountDetailPage({ accountId, accounts = [], trades = [], strategies = [], setPage, setSelectedAccountIds }) {
+export default function AccountDetailPage({ accountId, accounts = [], trades = [], strategies = [], setPage, setSelectedAccountIds, archivedMeta = {} }) {
   useLang();
-  const account = accounts.find(a => a.id === accountId);
-  const accountTrades = (trades || []).filter(t => t.account_id === accountId);
+  // Vue agrégée « Comptes eval passés » : accountId === ARCHIVED_VIEW_ID.
+  // On unit les données de tous les comptes archivés, avec un filtre pour trier
+  // par compte individuel.
+  const isArchivedView = accountId === ARCHIVED_VIEW_ID;
+  // Comptes eval passés : reconstruits depuis les métadonnées d'archivage (le
+  // compte a été supprimé de la base). Chacun porte ses trade_ids.
+  const archivedAccts = React.useMemo(
+    () => Object.entries(archivedMeta || {}).map(([id, m]) => ({
+      id,
+      name: m?.name || "Compte",
+      broker: m?.broker || null,
+      eval_account_size: m?.eval_account_size || null,
+      account_type: "eval",
+      trade_ids: Array.isArray(m?.trade_ids) ? m.trade_ids : [],
+    })),
+    [archivedMeta]
+  );
+
+  // Trades des comptes archivés re-taggués avec leur ancien account_id (leur
+  // account_id réel est devenu NULL à la suppression du compte). Toute la
+  // logique aval (filtre, courbe, comparaison) fonctionne alors par account_id.
+  const archivedTrades = React.useMemo(() => {
+    const idToAcc = {};
+    archivedAccts.forEach(a => (a.trade_ids || []).forEach(tid => { idToAcc[tid] = a.id; }));
+    return (trades || []).filter(t => idToAcc[t.id]).map(t => ({ ...t, account_id: idToAcc[t.id] }));
+  }, [archivedAccts, trades]);
+
+  const [filterId, setFilterId] = React.useState("all"); // "all" | id d'un compte passé
+  React.useEffect(() => {
+    if (isArchivedView && filterId !== "all" && !archivedAccts.some(a => a.id === filterId)) {
+      setFilterId("all");
+    }
+  }, [isArchivedView, filterId, archivedAccts]);
+
+  // Compte « courant » : vue normale = le compte ciblé ; vue archivée = le
+  // compte filtré (null quand « tous » → on affiche l'agrégat).
+  const account = isArchivedView
+    ? (filterId !== "all" ? archivedAccts.find(a => a.id === filterId) : null)
+    : (accounts || []).find(a => a.id === accountId);
+
+  // Trades agrégés selon le périmètre.
+  const accountTrades = React.useMemo(() => {
+    if (isArchivedView) {
+      const ids = filterId !== "all" ? [filterId] : archivedAccts.map(a => a.id);
+      return archivedTrades.filter(t => ids.includes(t.account_id));
+    }
+    return (trades || []).filter(t => t.account_id === accountId);
+  }, [isArchivedView, filterId, archivedAccts, archivedTrades, trades, accountId]);
 
   const stats = React.useMemo(() => {
     let pnl = 0, wins = 0, losses = 0, scratch = 0, grossWin = 0, grossLoss = 0;
@@ -206,7 +253,8 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
     };
   }, [accountTrades]);
 
-  if (!account) {
+  // Vue normale sans compte, ou vue archivée sans aucun compte archivé.
+  if ((!isArchivedView && !account) || (isArchivedView && archivedAccts.length === 0)) {
     return (
       <div style={{ padding: 32, color: T.textSub }}>
         <button
@@ -215,19 +263,30 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
         >
           <ArrowLeft size={13} /> Retour
         </button>
-        <p>Compte introuvable.</p>
+        <p>{isArchivedView ? "Aucun compte eval passé." : "Compte introuvable."}</p>
       </div>
     );
   }
 
-  const type = account.account_type || "live";
-  const typeLabel = type === "eval"
-    ? `Eval${account.eval_account_size ? ` ${account.eval_account_size}` : ""}`
-    : type === "funded"
-      ? `Funded${account.eval_account_size ? ` ${account.eval_account_size}` : ""}`
-      : "Live";
+  const aggregatedAll = isArchivedView && filterId === "all";
+  const displayName = aggregatedAll
+    ? "Comptes eval passés"
+    : (account?.name || "Compte");
 
-  const capital = parseEvalSize(account.eval_account_size);
+  const type = account?.account_type || "live";
+  const typeLabel = aggregatedAll
+    ? `${archivedAccts.length} compte${archivedAccts.length > 1 ? "s" : ""} archivé${archivedAccts.length > 1 ? "s" : ""}`
+    : isArchivedView
+      ? `Eval passé${account?.eval_account_size ? ` ${account.eval_account_size}` : ""}`
+      : type === "eval"
+        ? `Eval${account?.eval_account_size ? ` ${account.eval_account_size}` : ""}`
+        : type === "funded"
+          ? `Funded${account?.eval_account_size ? ` ${account.eval_account_size}` : ""}`
+          : "Live";
+
+  // Capital : agrégat (somme des tailles) en vue « tous », sinon celui du compte.
+  const capitalAgg = archivedAccts.reduce((s, a) => s + (parseEvalSize(a.eval_account_size) || 0), 0);
+  const capital = aggregatedAll ? (capitalAgg > 0 ? capitalAgg : null) : parseEvalSize(account?.eval_account_size);
   const balance = capital !== null ? capital + stats.pnl : null;
   const pnlPct = capital ? (stats.pnl / capital) * 100 : null;
 
@@ -247,9 +306,9 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
             <ArrowLeft size={14} strokeWidth={1.75} />
           </button>
           <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#0D0D0D", letterSpacing: -0.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-sans)" }}>
-            {account.name || "Compte"}
+            {displayName}
           </h1>
-          {getBrokerLogo(account.broker) && (
+          {account && getBrokerLogo(account.broker) && (
             <img src={getBrokerLogo(account.broker)} alt={account.broker || ""} style={{ height: 20, maxWidth: 64, objectFit: "contain" }} />
           )}
           <span style={{
@@ -259,6 +318,28 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
           }}>
             {typeLabel}
           </span>
+
+          {/* Vue archivée : filtre par compte + restauration */}
+          {isArchivedView && (
+            <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <select
+                value={filterId}
+                onChange={(e) => setFilterId(e.target.value)}
+                aria-label="Trier par compte"
+                style={{
+                  padding: "6px 10px", borderRadius: 999,
+                  border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)",
+                  color: T.text, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit", outline: "none",
+                }}
+              >
+                <option value="all">Tous les comptes passés</option>
+                {archivedAccts.map(a => (
+                  <option key={a.id} value={a.id}>{a.name || "Compte"}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -316,10 +397,10 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
 
       {/* Equity curve — collé à la carte KPIs */}
       <ChartCard
-        currentAccountId={accountId}
-        currentName={account.name || "Compte"}
-        trades={trades}
-        accounts={accounts}
+        currentAccountId={isArchivedView ? (filterId !== "all" ? filterId : "") : accountId}
+        currentName={displayName}
+        trades={isArchivedView ? archivedTrades : trades}
+        accounts={isArchivedView ? archivedAccts : accounts}
         currentCurve={stats.curve}
         currentTotal={stats.total}
       />
@@ -346,23 +427,27 @@ export default function AccountDetailPage({ accountId, accounts = [], trades = [
           borderBottom: "none",
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Trades récents</div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedAccountIds?.([account.id]);
-              try { localStorage.setItem("selectedAccountIds", JSON.stringify([account.id])); } catch {}
-              setPage?.("trades");
-            }}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 999,
-              border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)",
-              color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            Tout voir <ArrowRight size={11} />
-          </button>
+          {/* « Tout voir » masqué en vue archivée : ces comptes sont exclus de
+              la page Trades globale (leur P&L ne compte plus sur le site). */}
+          {!isArchivedView && account && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAccountIds?.([account.id]);
+                try { localStorage.setItem("selectedAccountIds", JSON.stringify([account.id])); } catch {}
+                setPage?.("trades");
+              }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: 999,
+                border: `1px solid ${T.border}`, background: "var(--color-card-bg, #FFFFFF)",
+                color: T.textSub, fontSize: 11, fontWeight: 500, cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Tout voir <ArrowRight size={11} />
+            </button>
+          )}
         </div>
 
         {/* Séparateur explicite entre le titre et le tableau */}

@@ -16,14 +16,14 @@ import {
   EXERCISE_MODES, countWords, countFillers, countWordOccurrences, computeWpm, describeWpm, overallScore,
   getTopicsFromBank, pickRandomTopic, todayKey, buildDailyAggregate,
 } from "@/lib/eloquenceData";
+import { T as Tokens } from "@/lib/ui/tokens";
 
-/* ─────────────── Palette (cohérente avec le reste du projet) ─────────────── */
-const T = {
-  white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
-  text: "#0D0D0D", textSub: "#5C5C5C", textMut: "#8E8E8E",
-  accent: "#0D0D0D", accentBg: "#F0F0F0",
-  green: "#16A34A", red: "#EF4444", blue: "#3B82F6", amber: "#F59E0B",
-};
+/* ─────────────── Palette ───────────────
+ * On réutilise les tokens partagés du projet (câblés sur les CSS vars) : la page
+ * suit ainsi exactement le thème clair/sombre et la même palette que les autres
+ * pages (orange #F97316, bleu/vert/rouge de statut, fonds pastel). Seul `bg` est
+ * redéfini en surface subtile interne pour les cartes secondaires. */
+const T = { ...Tokens, bg: "var(--color-bg-subtle, #F5F5F5)" };
 
 /* ─────────────── Helpers génériques ─────────────── */
 // Couleur d'un score 0–100.
@@ -50,8 +50,9 @@ function uid() {
 
 /* Styles partagés */
 const card = {
-  background: T.white, border: `1px solid ${T.border}`, borderRadius: 14,
-  padding: 18, boxSizing: "border-box",
+  background: T.white, border: `1px solid ${T.border}`, borderRadius: 12,
+  padding: 20, boxSizing: "border-box",
+  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
 };
 const pill = (active) => ({
   display: "inline-flex", alignItems: "center", gap: 6,
@@ -790,7 +791,7 @@ function TopicsTab({ onPractice }) {
                   title="Voir le déroulé de la structure"
                   style={{
                     alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4,
-                    fontSize: 11, fontWeight: 700, color: T.blue, background: "#EFF6FF",
+                    fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueBg,
                     padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: "inherit",
                   }}
                 >
@@ -798,7 +799,7 @@ function TopicsTab({ onPractice }) {
                   {tp.suggestedStructure}
                 </button>
               ) : (
-                <span style={{ alignSelf: "flex-start", fontSize: 11, fontWeight: 700, color: T.blue, background: "#EFF6FF", padding: "2px 8px", borderRadius: 999 }}>
+                <span style={{ alignSelf: "flex-start", fontSize: 11, fontWeight: 700, color: T.blue, background: T.blueBg, padding: "2px 8px", borderRadius: 999 }}>
                   {tp.suggestedStructure}
                 </span>
               ))}
@@ -1088,7 +1089,7 @@ function DrillBrief({ drill }) {
 function ForbiddenBadge({ word, count }) {
   const ok = count === 0;
   return (
-    <div style={{ ...card, display: "flex", alignItems: "center", gap: 12, borderColor: ok ? T.green : T.red, background: ok ? "#F0FDF4" : "#FEF2F2" }}>
+    <div style={{ ...card, display: "flex", alignItems: "center", gap: 12, borderColor: ok ? T.green : T.red, background: ok ? T.greenBg : T.redBg }}>
       {ok ? <Check size={20} color={T.green} /> : <Ban size={20} color={T.red} />}
       <div style={{ fontSize: 13.5, color: T.text }}>
         {ok ? (

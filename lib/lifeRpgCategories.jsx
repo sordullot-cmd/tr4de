@@ -30,6 +30,36 @@ export const TASK_RPG_CLOUD_KEY = "agenda_task_rpg";
 // XP gagnée pour une tâche terminée, par catégorie liée (≈ une habitude « normale »).
 export const TASK_XP = 25;
 
+// Lien « page Discipline → page Vie RPG » : chaque règle de discipline respectée
+// (cochée un jour donné) crédite de l'XP à la catégorie « Trading ». Source
+// indépendante des habitudes/objectifs/tâches → pas de double comptage.
+export const TRADING_CATEGORY_ID = "trading";
+export const DISCIPLINE_RULE_XP = 10;
+
+// Résout l'id de la catégorie « Trading » RÉELLEMENT présente chez l'utilisateur.
+// Historiquement, l'XP de discipline (et le seed automatique) ciblaient un id
+// figé "trading". Si l'utilisateur a renommé ou recréé sa carte Trading à la
+// main (id `cat_...`), cet XP tombait dans le vide et pouvait faire naître une
+// 2ᵉ carte "trading" en double au moment du seed. On cible donc en priorité la
+// carte par son LIBELLÉ « Trading », puis par l'id historique, sinon on retombe
+// sur la constante. Ainsi l'XP se consolide sur une seule carte.
+export function resolveTradingCatId(categories) {
+  const cats = Array.isArray(categories) ? categories : [];
+  const byLabel = cats.find(c => String(c?.label || "").trim().toLowerCase() === "trading");
+  if (byLabel) return byLabel.id;
+  const byId = cats.find(c => c?.id === TRADING_CATEGORY_ID);
+  if (byId) return byId.id;
+  return TRADING_CATEGORY_ID;
+}
+
+// Vrai si une catégorie « Trading » existe déjà (par id historique OU par
+// libellé), pour éviter de créer un doublon au seed.
+export function hasTradingCategory(categories) {
+  const cats = Array.isArray(categories) ? categories : [];
+  return cats.some(c => c?.id === TRADING_CATEGORY_ID
+    || String(c?.label || "").trim().toLowerCase() === "trading");
+}
+
 // Horaires locaux d'une tâche d'agenda (jour planifié + heure éventuelle),
 // indexés par id de Google Task : { [taskId]: { day, startTime?, endTime?, colorId } }.
 // Partagé entre la page Agenda et la page Vie RPG (qui peut créer une tâche datée
@@ -84,4 +114,5 @@ export const DEFAULT_CATEGORIES = [
   { id: "finance",    label: "Finances",   color: "#059669", icon: "wallet",     identity: "Je gère mon argent avec sagesse et sérénité.",               roleModel: "", roleModelWhy: "" },
   { id: "creativity", label: "Créativité", color: "#8B5CF6", icon: "sparkles",   identity: "Je crée et j'exprime mes idées librement.",                  roleModel: "", roleModelWhy: "" },
   { id: "mind",       label: "Sérénité",   color: "#14B8A6", icon: "heart",      identity: "Je cultive le calme, la gratitude et la présence.",          roleModel: "", roleModelWhy: "" },
+  { id: TRADING_CATEGORY_ID, label: "Trading", color: "#F59E0B", icon: "trending", identity: "Je respecte mon plan et ma discipline de trading chaque jour.", roleModel: "", roleModelWhy: "" },
 ];

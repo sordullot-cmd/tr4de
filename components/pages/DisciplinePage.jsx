@@ -572,6 +572,7 @@ export default function DisciplinePage({ trades = [] }) {
       } catch {}
       return next;
     });
+    setHeatmapVersion(v => v + 1);
   };
   const toggleRoutineCheck = (id) => {
     setRoutineChecks(prev => {
@@ -582,6 +583,8 @@ export default function DisciplinePage({ trades = [] }) {
       } catch {}
       return next;
     });
+    // La heatmap intègre la routine → forcer un recalcul.
+    setHeatmapVersion(v => v + 1);
   };
   const routineDoneCount = ROUTINE_ITEMS.reduce((n, it) => n + (routineChecks[it.id] ? 1 : 0), 0);
   // Ferme la popover au clic extérieur / Esc.
@@ -1216,22 +1219,72 @@ export default function DisciplinePage({ trades = [] }) {
                   return '#16A34A';                         // Vert vif uniquement si 100%
                 };
                 
-                // La heatmap est désormais branchée sur le moteur de compliance (règles automatiques).
-                // Pour chaque jour, on compte les trades sans aucune violation comme "compliants".
-                // % = trades compliants / trades du jour (100% = aucun trade en infraction).
+                // Historique des checklists de routine, indexé par date.
+                // Les checks du jour sont persistés localement sous
+                // `tr4de_routine_checklist_${date}`. On les relit tous ici pour
+                // pouvoir colorer chaque case du calendrier. Le total de règles
+                // est celui de la définition courante (ROUTINE_ITEMS) ; un jour
+                // sans aucune donnée de routine n'entre pas dans le calcul.
+                const routineByDay = (() => {
+                  const map = new Map();
+                  const totalRules = ROUTINE_ITEMS.length;
+                  if (!totalRules) return map;
+                  try {
+                    const prefix = "tr4de_routine_checklist_";
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const k = localStorage.key(i);
+                      if (!k || !k.startsWith(prefix)) continue;
+                      const date = k.slice(prefix.length);
+                      let obj;
+                      try { obj = JSON.parse(localStorage.getItem(k) || "{}"); } catch { obj = {}; }
+                      if (!obj || Object.keys(obj).length === 0) continue; // aucune donnée
+                      const done = ROUTINE_ITEMS.reduce((n, it) => n + (obj[it.id] ? 1 : 0), 0);
+                      map.set(date, { done, total: totalRules });
+                    }
+                  } catch {}
+                  return map;
+                })();
+
+                // La heatmap combine le moteur de compliance (règles automatiques
+                // sur les trades) ET les règles de routine cochées ce jour-là.
+                // % = (routine cochée + trades sans violation) / (total routine + total trades).
+                // La routine n'est prise en compte que si des données existent pour
+                // le jour ; sinon le jour reste piloté par la seule compliance des trades
+                // (et gris s'il n'y a ni trade ni routine).
                 const getDailyData = (dateStr) => {
                   const day = complianceStats.byDay.get(dateStr);
-                  if (!day || day.trades === 0) {
-                    return { percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0 };
+                  const hasTrades = !!(day && day.trades > 0);
+                  const routine = routineByDay.get(dateStr); // { done, total } | undefined
+
+                  let numerator = 0, denominator = 0;
+                  let tradesClean = 0, tradesTotal = 0;
+                  if (hasTrades) {
+                    const violatingSet = violatingTradesByDay.get(dateStr) || new Set();
+                    tradesClean = day.trades - violatingSet.size;
+                    tradesTotal = day.trades;
+                    numerator += tradesClean;
+                    denominator += tradesTotal;
                   }
-                  const violatingSet = violatingTradesByDay.get(dateStr) || new Set();
-                  const cleanTrades = day.trades - violatingSet.size;
-                  const percentage = Math.round((cleanTrades / day.trades) * 100);
+                  if (routine) {
+                    numerator += routine.done;
+                    denominator += routine.total;
+                  }
+                  if (denominator === 0) {
+                    return {
+                      percentage: 0, hadTrading: false, rulesRespected: 0, totalRules: 0,
+                      routineDone: 0, routineTotal: 0, tradesClean: 0, tradesTotal: 0,
+                    };
+                  }
+                  const percentage = Math.round((numerator / denominator) * 100);
                   return {
                     percentage,
-                    hadTrading: true,
-                    rulesRespected: cleanTrades,
-                    totalRules: day.trades,
+                    hadTrading: hasTrades,
+                    rulesRespected: numerator,
+                    totalRules: denominator,
+                    routineDone: routine ? routine.done : 0,
+                    routineTotal: routine ? routine.total : 0,
+                    tradesClean,
+                    tradesTotal,
                   };
                 };
                 
@@ -1390,7 +1443,11 @@ export default function DisciplinePage({ trades = [] }) {
                                     border: 'none',
                                     opacity: 1
                                   }}
-                                  title={`${day.dateStr} : ${day.percentage}% compliance (${day.rulesRespected}/${day.totalRules} trades clean)`}
+                                  title={
+                                    `${day.dateStr} : ${day.percentage}% discipline` +
+                                    (day.routineTotal ? ` · routine ${day.routineDone}/${day.routineTotal}` : "") +
+                                    (day.tradesTotal ? ` · trades clean ${day.tradesClean}/${day.tradesTotal}` : "")
+                                  }
                                 />
                               );
                             })}

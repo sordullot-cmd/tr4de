@@ -13,6 +13,7 @@ const saveTimer = (s) => {
 };
 import { Play, Pause, RotateCcw, SkipForward, Square, Coffee, Focus, Flame, CheckCircle2, Pencil, Check, X } from "lucide-react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
+import { notify, ensureNotifyPermission } from "@/lib/notify";
 import { Stat } from "@/components/ui/Stat";
 
 const T = {
@@ -147,11 +148,9 @@ export default function FocusTimerPage() {
 
   const onSessionComplete = () => {
     if (mode === "work") logSession(durations.work, taskLabel.trim() || "Session de focus");
-    try {
-      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        new Notification("tao trade — Timer", { body: mode === "work" ? "Session terminée, fais une pause !" : "Pause terminée, retour au focus.", icon: "/web-app-manifest-192x192.png" });
-      }
-    } catch {}
+    void notify("tao trade — Timer", {
+      body: mode === "work" ? "Session terminée, fais une pause !" : "Pause terminée, retour au focus.",
+    });
     setEndAt(null);
     setPausedRemaining(durations[mode] || 0);
   };
@@ -165,9 +164,8 @@ export default function FocusTimerPage() {
   };
 
   const toggleRun = () => {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      try { Notification.requestPermission(); } catch {}
-    }
+    // Au premier démarrage, on s'assure d'avoir l'autorisation de notifier.
+    void ensureNotifyPermission();
     if (isStopwatch) {
       if (running) {
         setSwPausedElapsed(elapsed);
@@ -201,11 +199,7 @@ export default function FocusTimerPage() {
       setSwStartAt(null);
       setSwPausedElapsed(0);
       logSession(total, taskLabel.trim() || "Chrono");
-      try {
-        if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-          new Notification("tao trade — Chrono", { body: `Session enregistrée (${fmtMMSS(total)})`, icon: "/web-app-manifest-192x192.png" });
-        }
-      } catch {}
+      void notify("tao trade — Chrono", { body: `Session enregistrée (${fmtMMSS(total)})` });
       return;
     }
     setEndAt(null);

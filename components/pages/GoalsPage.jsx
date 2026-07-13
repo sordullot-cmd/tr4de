@@ -153,10 +153,23 @@ export function computeGoalProgress(g, trades = [], accounts = []) {
   const at = AUTO_TYPES.find(a => a.id === g.autoType);
   const horizonForCompute = at?.horizon || g.horizon || "month";
   const { start, end } = rangeOf(horizonForCompute);
+  // Filtre de compte : "all" (aucun filtre), "type:<live|eval|funded>" (tous les
+  // comptes d'un type donné, ex. « Tous les comptes funded ») ou un id précis.
   const accountFilter = g.accountIdFilter && g.accountIdFilter !== "all" ? g.accountIdFilter : null;
-  const scopedTrades = accountFilter
-    ? (trades || []).filter(t => String(t.account_id) === String(accountFilter))
-    : (trades || []);
+  let scopedTrades = trades || [];
+  if (accountFilter) {
+    if (String(accountFilter).startsWith("type:")) {
+      const wantedType = String(accountFilter).slice(5);
+      const idsOfType = new Set(
+        (accounts || [])
+          .filter(a => (a.account_type || "live") === wantedType)
+          .map(a => String(a.id))
+      );
+      scopedTrades = (trades || []).filter(t => idsOfType.has(String(t.account_id)));
+    } else {
+      scopedTrades = (trades || []).filter(t => String(t.account_id) === String(accountFilter));
+    }
+  }
   let current = 0;
   if (g.autoType === "manual") current = parseFloat(g.manual) || 0;
   else if (g.autoType === "pnl" || (g.autoType || "").startsWith("pnl_")) current = tradesInRange(scopedTrades, start, end).reduce((s, t) => s + (t.pnl || 0), 0);
@@ -972,13 +985,25 @@ export default function GoalsPage() {
                 <StackField label="Compte ciblé" last={form.autoType !== "manual"}>
                   <FancyDropdown
                     value={form.accountIdFilter || "all"}
-                    options={[
-                      { id: "all", label: "Tous mes comptes" },
-                      ...((accounts || []).map(a => ({
-                        id: String(a.id),
-                        label: `${a.name || "Compte"}${a.account_type ? ` · ${a.account_type}` : ""}`,
-                      }))),
-                    ]}
+                    options={(() => {
+                      // Groupes par type : n'affiche « Tous les comptes <type> » que
+                      // pour les types réellement présents parmi les comptes.
+                      const TYPE_LABELS = { live: "Live", funded: "Funded" };
+                      const presentTypes = ["live", "funded"].filter(ty =>
+                        (accounts || []).some(a => (a.account_type || "live") === ty)
+                      );
+                      return [
+                        { id: "all", label: "Tous mes comptes" },
+                        ...presentTypes.map(ty => ({
+                          id: `type:${ty}`,
+                          label: `Tous les comptes ${TYPE_LABELS[ty]}`,
+                        })),
+                        ...((accounts || []).map(a => ({
+                          id: String(a.id),
+                          label: `${a.name || "Compte"}${a.account_type ? ` · ${a.account_type}` : ""}`,
+                        }))),
+                      ];
+                    })()}
                     onChange={(v) => setForm({ ...form, accountIdFilter: v })}
                     renderValue={(o) => (
                       <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{o.label}</span>

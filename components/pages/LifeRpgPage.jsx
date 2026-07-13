@@ -57,7 +57,10 @@ import {
   CATEGORY_PALETTE as PALETTE, DEFAULT_CATEGORIES, habitCategoryIds,
   TASK_RPG_STORAGE_KEY, TASK_RPG_CLOUD_KEY, TASK_XP,
   TASK_TIMES_STORAGE_KEY, TASK_TIMES_CLOUD_KEY,
+  TRADING_CATEGORY_ID, DISCIPLINE_RULE_XP,
+  resolveTradingCatId, hasTradingCategory,
 } from "@/lib/lifeRpgCategories";
+import { useDisciplineTracking } from "@/lib/hooks/useDisciplineTracking";
 
 const T = {
   white: "#FFFFFF", border: "#E5E5E5", bg: "#F5F5F5",
@@ -206,9 +209,14 @@ function computeXpSeries(habits, history, categories) {
 //  - les complétions d'habitudes (dérivées de `history`) → XP/pièces du quotidien ;
 //  - les OBJECTIFS de la page « Objectifs » rattachés à une catégorie
 //    (`rpgCategory` + `rpgXp`) → XP AU PRORATA de leur avancement (50 % = 50 %).
+//  - les RÈGLES DE DISCIPLINE respectées (page Discipline) → XP fixe par règle
+//    cochée (par jour), créditée à la catégorie « Trading ».
 // Pure et déterministe.
-function computeProgress(habits, history, goals = [], trades = [], accounts = [], taskRpg = {}) {
+function computeProgress(habits, history, goals = [], trades = [], accounts = [], taskRpg = {}, disciplineData = {}, categories = []) {
   const attributes = {};
+  // Catégorie « Trading » réelle (par libellé/id) — l'XP de discipline y est
+  // créditée plutôt qu'à un id figé, pour ne pas la disperser sur un doublon.
+  const tradingCatId = resolveTradingCatId(categories);
   let totalXp = 0, coinsEarned = 0, totalCompletions = 0, bestStreak = 0;
   const perHabit = {};
   const activityLog = [];
@@ -273,6 +281,18 @@ function computeProgress(habits, history, goals = [], trades = [], accounts = []
     totalXp += TASK_XP;
     for (const cid of cats) attributes[cid] = (attributes[cid] || 0) + TASK_XP;
     activityLog.push({ ts: entry.completedAt, label: entry.title || "Tâche", xp: TASK_XP, attribute: cats[0] || null });
+  }
+  // XP de la DISCIPLINE : chaque règle respectée (cochée) un jour donné crédite
+  // `DISCIPLINE_RULE_XP` à la catégorie « Trading ». On agrège par jour pour le
+  // journal d'activité (une ligne par jour = nombre de règles × XP).
+  for (const date in (disciplineData || {})) {
+    const rules = disciplineData[date] || {};
+    const n = Object.values(rules).filter(Boolean).length;
+    if (n <= 0) continue;
+    const gain = n * DISCIPLINE_RULE_XP;
+    totalXp += gain;
+    attributes[tradingCatId] = (attributes[tradingCatId] || 0) + gain;
+    activityLog.push({ ts: `${date}T09:00:00`, label: `Discipline (${n} règle${n > 1 ? "s" : ""})`, xp: gain, attribute: tradingCatId });
   }
   // Les pénalités peuvent rendre une valeur négative : on borne à 0.
   for (const k in attributes) attributes[k] = Math.max(0, attributes[k]);
@@ -365,6 +385,9 @@ export default function LifeRpgPage() {
   const trades = useMemo(() => tradesHook?.trades || [], [tradesHook?.trades]);
   const accountsHook = useTradingAccounts();
   const accounts = useMemo(() => accountsHook?.accounts || [], [accountsHook?.accounts]);
+  // Discipline quotidienne (page Discipline) : chaque règle respectée crédite
+  // la catégorie « Trading » en XP. Source Supabase (90 derniers jours).
+  const { disciplineData } = useDisciplineTracking();
   const { pushUndo } = useUndo();
 
   // Migration : les anciennes sauvegardes n'avaient pas de `categories`.
@@ -372,6 +395,25 @@ export default function LifeRpgPage() {
     if (!Array.isArray(state.categories)) {
       setState(prev => ({ ...prev, categories: DEFAULT_CATEGORIES }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Seed UNIQUE de la catégorie « Trading » (alimentée par la page Discipline).
+  // Ajoutée une seule fois si absente ; on respecte ensuite une suppression
+  // manuelle par l'utilisateur grâce au drapeau `tradingCatSeeded`.
+  useEffect(() => {
+    setState(prev => {
+      if (prev.tradingCatSeeded) return prev;
+      const cats = Array.isArray(prev.categories) ? prev.categories : DEFAULT_CATEGORIES;
+      // Dédoublonnage par LIBELLÉ + id : si une carte « Trading » existe déjà
+      // (même avec un id personnalisé `cat_...`), on ne recrée pas la carte
+      // par défaut (id "trading") qui ferait apparaître un doublon.
+      if (hasTradingCategory(cats)) {
+        return { ...prev, tradingCatSeeded: true };
+      }
+      const def = DEFAULT_CATEGORIES.find(c => c.id === TRADING_CATEGORY_ID);
+      return { ...prev, categories: [...cats, def], tradingCatSeeded: true };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -451,7 +493,7 @@ export default function LifeRpgPage() {
     apply();
     pushUndo({ label: "Habitude", undo: async () => apply(), redo: async () => apply() });
   };
-  const progress = useMemo(() => computeProgress(habitsList, habitHistory, goalsList, trades, accounts, taskRpg), [habitsList, habitHistory, goalsList, trades, accounts, taskRpg]);
+  const progress = useMemo(() => computeProgress(habitsList, habitHistory, goalsList, trades, accounts, taskRpg, disciplineData, categories), [habitsList, habitHistory, goalsList, trades, accounts, taskRpg, disciplineData, categories]);
   // Objectifs liés, regroupés par catégorie, avec leur avancement (pour les cartes).
   const goalsByCat = useMemo(() => {
     const map = {};

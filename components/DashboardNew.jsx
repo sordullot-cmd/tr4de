@@ -16,9 +16,11 @@ import { useCustomDisciplineRules } from "@/lib/hooks/useCustomDisciplineRules";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { useTradeAlerts } from "@/lib/hooks/useTradeAlerts";
+import { useAgendaReminders } from "@/lib/hooks/useAgendaReminders";
 import { useApp } from "@/lib/contexts/AppContext";
 import { useUndo } from "@/lib/contexts/UndoContext";
 import { getPlaceholderAccountId, isPlaceholderAccount } from "@/lib/utils/placeholderAccount";
+import { readArchivedMeta, writeArchivedMeta, isArchivedAccount } from "@/lib/utils/archivedAccounts";
 import StrategyPage from "@/components/StrategyPage";
 import StrategyDetailPage from "@/components/StrategyDetailPage";
 import GoalsPage from "@/components/pages/GoalsPage";
@@ -231,6 +233,8 @@ export default function App() {
   const { pushUndo } = useUndo();
   // Surveillance des seuils P&L (alertes navigateur + événement interne)
   useTradeAlerts(trades || []);
+  // Rappels d'agenda → vraies notifications système, quelle que soit la page.
+  useAgendaReminders();
   const { strategies, addStrategy, updateStrategy, deleteStrategy } = useStrategies();
   const { notes: agentTradeNotes } = useTradeNotes();
   const { notes: agentDailyNotes } = useDailySessionNotes();
@@ -252,6 +256,17 @@ export default function App() {
   });
   const [previousSelectedAccountIds, setPreviousSelectedAccountIds] = useState([]);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  // Comptes eval « passés funded » et archivés (voir lib/utils/archivedAccounts).
+  // Persisté en localStorage, hissé ici pour que la sélection et le sélecteur
+  // de comptes les excluent de façon réactive.
+  const [archivedMeta, setArchivedMetaState] = useState(() => readArchivedMeta());
+  const setArchivedMeta = React.useCallback((updater) => {
+    setArchivedMetaState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      writeArchivedMeta(next);
+      return next;
+    });
+  }, []);
 
   // Construire l'objet affichage utilisateur à partir de l'utilisateur authentifié
   const displayUser = {
@@ -368,7 +383,11 @@ export default function App() {
           let current = [];
           try { current = saved ? JSON.parse(saved) : []; } catch {}
           if ((!Array.isArray(current) || current.length === 0) && loadedAccounts.length > 0) {
-            const allIds = loadedAccounts.map(a => a.id);
+            // Ne pas cocher par défaut les comptes eval archivés.
+            const archived = readArchivedMeta();
+            const allIds = loadedAccounts
+              .filter(a => !isArchivedAccount(a.id, archived))
+              .map(a => a.id);
             setSelectedAccountIds(allIds);
             localStorage.setItem("selectedAccountIds", JSON.stringify(allIds));
           }
@@ -420,8 +439,11 @@ export default function App() {
     }
   }, [authLoading, user]);
 
-  // ✅ Filtrer les comptes visibles (exclure le placeholder)
-  const visibleAccounts = accounts.filter(acc => !isPlaceholderAccount(acc.id));
+  // ✅ Filtrer les comptes visibles (exclure le placeholder ET les comptes
+  // eval archivés — ces derniers ne doivent plus apparaître dans le sélecteur
+  // ni compter dans le P&L du site ; seule la page Comptes les affiche encore
+  // dans une section « Comptes eval passés »).
+  const visibleAccounts = accounts.filter(acc => !isPlaceholderAccount(acc.id) && !isArchivedAccount(acc.id, archivedMeta));
 
   // Plage de dates par page (chaque page garde sa propre sélection).
   const iso = (d) => d.toISOString().split("T")[0];
@@ -451,7 +473,7 @@ export default function App() {
   const setGlobalDateRange = (r) => setDateRangesByPage(prev => ({ ...prev, [page]: r }));
 
   const filteredTrades = (() => {
-    const realSelected = selectedAccountIds.filter(id => !isPlaceholderAccount(id));
+    const realSelected = selectedAccountIds.filter(id => !isPlaceholderAccount(id) && !isArchivedAccount(id, archivedMeta));
     if (realSelected.length === 0) return [];
     const byAccount = trades.filter(t => realSelected.includes(t.account_id));
     const { start, end } = globalDateRange || {};
@@ -462,6 +484,30 @@ export default function App() {
         return d >= start && d <= end;
       } catch { return true; }
     });
+  })();
+
+  // Ids des trades des comptes eval passés (comptes supprimés → account_id NULL,
+  // on les retrouve via les trade_ids mémorisés dans archivedMeta).
+  const archivedTradeIds = React.useMemo(() => {
+    const s = new Set();
+    Object.values(archivedMeta || {}).forEach(m => (m?.trade_ids || []).forEach(id => s.add(id)));
+    return s;
+  }, [archivedMeta]);
+
+  // Trades passés à la page Discipline : les trades filtrés (comptes actifs
+  // sélectionnés) PLUS les trades des comptes eval passés, pour que l'historique
+  // de discipline de ces anciens trades reste conservé. Filtrés sur la même
+  // plage de dates, dédoublonnés par id.
+  const disciplineTrades = (() => {
+    if (archivedTradeIds.size === 0) return filteredTrades;
+    const seen = new Set(filteredTrades.map(t => t.id));
+    const { start, end } = globalDateRange || {};
+    const extra = trades.filter(t => {
+      if (!archivedTradeIds.has(t.id) || seen.has(t.id)) return false;
+      if (!start || !end) return true;
+      try { const d = (t.date || "").split("T")[0]; return d >= start && d <= end; } catch { return true; }
+    });
+    return extra.length ? [...filteredTrades, ...extra] : filteredTrades;
   })();
 
   // ✅ DEBUG: Log when account selection changes
@@ -764,13 +810,13 @@ export default function App() {
     "trade-chart": <TradeChartPage trades={filteredTrades} />,
     calendar:   <CalendarPage trades={filteredTrades} accountType={accountType} evalAccountSize={selectedEvalAccount} accounts={accounts} selectedAccountIds={selectedAccountIds} setPage={setPage} setDateRangesByPage={setDateRangesByPage} />,
     journal: <JournalPage trades={filteredTrades} strategies={strategies} onImportClick={() => setPage("add-trade")} onDeleteTrade={handleDeleteTrade} onClearTrades={handleClearTrades} />,
-    discipline: <DisciplinePage trades={filteredTrades} />,
+    discipline: <DisciplinePage trades={disciplineTrades} />,
     strategies: <StrategyPage setPage={setPage} setSelectedStrategyId={setSelectedStrategyId} />,
     "strategy-detail": <StrategyDetailPage setPage={setPage} />,
     backtest: <BacktestPage />,
     brokers: <BrokersPage />,
-    accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} setAccounts={setAccounts} />,
-    "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} strategies={strategies} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} />,
+    accounts: <AccountsPage accounts={accounts} trades={trades} setPage={setPage} selectedAccountIds={selectedAccountIds} setSelectedAccountIds={setSelectedAccountIds} setSelectedAccountDetailId={setSelectedAccountDetailId} setAccounts={setAccounts} archivedMeta={archivedMeta} setArchivedMeta={setArchivedMeta} />,
+    "account-detail": <AccountDetailPage accountId={selectedAccountDetailId} accounts={accounts} trades={trades} strategies={strategies} setPage={setPage} setSelectedAccountIds={setSelectedAccountIds} archivedMeta={archivedMeta} setArchivedMeta={setArchivedMeta} />,
     goals: <GoalsPage />,
     "daily-planner": <DailyPlannerPage />,
     agenda: <AgendaPage />,

@@ -5,6 +5,12 @@
   "windows": [
     "main"
   ],
+  "remote": {
+    "urls": [
+      "https://tao-trade.vercel.app",
+      "https://tao-trade.vercel.app/*"
+    ]
+  },
   "permissions": [
     "core:default",
     "notification:default",

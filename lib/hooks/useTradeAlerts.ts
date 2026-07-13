@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { getLocalDateString } from "@/lib/dateUtils";
+import { notify, ensureNotifyPermission } from "@/lib/notify";
 
 export interface AlertSettings {
   /** Active la surveillance globalement. */
@@ -28,15 +29,8 @@ interface MinimalTrade {
 }
 
 function fireNotification(title: string, body: string): void {
-  if (typeof window === "undefined" || !("Notification" in window)) return;
-  if (Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
-    return;
-  }
-  if (Notification.permission !== "granted") return;
-  try {
-    new Notification(title, { body, icon: "/web-app-manifest-192x192.png" });
-  } catch {}
+  // notify() gère lui-même la permission et le choix natif (Tauri) / Web.
+  void notify(title, { body });
 }
 
 function fireToast(title: string, body: string, severity: "info" | "warn" | "danger" = "info"): void {
@@ -77,6 +71,11 @@ export function useTradeAlerts(trades: MinimalTrade[]): void {
   );
   const firedTodayRef = useRef<Set<string>>(new Set());
   const firedDateRef = useRef<string>("");
+
+  // Demande l'autorisation de notifier dès que la surveillance est active.
+  useEffect(() => {
+    if (settings.enabled) void ensureNotifyPermission();
+  }, [settings.enabled]);
 
   useEffect(() => {
     if (!settings.enabled || !Array.isArray(trades) || trades.length === 0) return;

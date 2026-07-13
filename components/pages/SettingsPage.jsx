@@ -27,6 +27,7 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import { getLang, setLang as setLangPref, t, useLang } from "@/lib/i18n";
 import { useCloudState } from "@/lib/hooks/useCloudState";
 import { DEFAULT_ALERT_SETTINGS } from "@/lib/hooks/useTradeAlerts";
+import { notify, ensureNotifyPermission, isNotifyGranted, isTauri } from "@/lib/notify";
 
 const T = {
   white: "#FFFFFF",
@@ -1135,17 +1136,20 @@ function AlertsSection() {
     "alert_settings",
     DEFAULT_ALERT_SETTINGS
   );
+  // "granted" | "denied" | "default". Sur desktop (Tauri) l'API Web Notification
+  // n'est pas fiable : on interroge le plugin natif via isNotifyGranted().
   const [permission, setPermission] = useState(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
   const [testing, setTesting] = useState(false);
 
+  useEffect(() => {
+    isNotifyGranted().then((ok) => { if (ok) setPermission("granted"); });
+  }, []);
+
   const requestPermission = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    try {
-      const p = await Notification.requestPermission();
-      setPermission(p);
-    } catch {}
+    const ok = await ensureNotifyPermission();
+    setPermission(ok ? "granted" : isTauri() ? "denied" : (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "denied"));
   };
 
   const fireTest = () => {
@@ -1153,9 +1157,7 @@ function AlertsSection() {
     window.dispatchEvent(new CustomEvent("tr4de:alert", {
       detail: { title: t("settings.alerts.testTitle"), body: t("settings.alerts.testBody"), severity: "info" },
     }));
-    if (permission === "granted") {
-      try { new Notification("tao trade — Test", { body: t("settings.alerts.testNotifBody") }); } catch {}
-    }
+    void notify("tao trade — Test", { body: t("settings.alerts.testNotifBody") });
     setTimeout(() => setTesting(false), 1200);
   };
 
